@@ -268,7 +268,7 @@ queryAddressTransactions addrs =
         , "inputs"
         , "outputs"
         , "certificates"
-        -- , "withdrawals"
+        , "withdrawals"
         -- , "assets_minted"
         -- , "native_scripts"
         -- , "plutus_contracts" 

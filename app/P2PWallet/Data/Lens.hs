@@ -32,12 +32,14 @@ makeFieldsNoPrefix ''UserChangeOutput
 makeFieldsNoPrefix ''UserFilters
 makeFieldsNoPrefix ''UserInput
 makeFieldsNoPrefix ''UserOutput
+makeFieldsNoPrefix ''UserWithdrawal
 makeFieldsNoPrefix ''UTxOFilters
 makeFieldsNoPrefix ''VerifiedCertificate
 makeFieldsNoPrefix ''VerifiedChangeOutput
 makeFieldsNoPrefix ''VerifiedFilters
 makeFieldsNoPrefix ''VerifiedInput
 makeFieldsNoPrefix ''VerifiedOutput
+makeFieldsNoPrefix ''VerifiedWithdrawal
 
 -------------------------------------------------
 -- Data.Core

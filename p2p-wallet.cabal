@@ -120,6 +120,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.TxBuilder.AddChangeOutput
       P2PWallet.GUI.Widgets.TxBuilder.AddInput
       P2PWallet.GUI.Widgets.TxBuilder.AddOutput
+      P2PWallet.GUI.Widgets.TxBuilder.AddWithdrawal
       P2PWallet.GUI.Widgets.TxBuilder.ExportTxBody
       P2PWallet.GUI.Widgets.TxBuilder.Summary
       P2PWallet.Prelude

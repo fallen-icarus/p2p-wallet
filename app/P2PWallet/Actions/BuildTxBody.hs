@@ -43,7 +43,7 @@ buildTxBody network tx@TxBuilderModel{_inputs,_changeOutput,_certificates} = do
     writeFileBS (toString paramsFile) params
 
     -- Build the certificate files so they are available in the tmp directory. Registrations must
-    -- appear first in the transaction.
+    -- appear first in the transaction. The certificate file order sets the order in the tx.body.
     certFiles <- mapM (buildCertificate tmpDir) $ 
       sortOn (view certificateAction . snd) _certificates
 
@@ -128,6 +128,7 @@ buildRawCmd paramsFile outFile certFiles tx = toString $ unwords
     [ "cardano-cli transaction build-raw"
     , unwords $ map inputField $ tx ^. inputs
     , unwords $ map outputField $ tx ^. outputs
+    , unwords $ map withdrawalField $ tx ^. withdrawals
     , changeField $ tx ^. changeOutput
     , unwords $ flip map certFiles $ \certFile -> "--certificate-file " <> toText certFile
     , "--protocol-params-file " <> toText paramsFile
@@ -151,6 +152,12 @@ buildRawCmd paramsFile outFile certFiles tx = toString $ unwords
                   "+ " <> show (asset ^. quantity) <> " " <> (fullAssetName asset)
               ] 
           ]
+      ]
+
+    withdrawalField :: (Int,VerifiedWithdrawal) -> Text
+    withdrawalField (_,wtdr) = unwords
+      [ "--withdrawal"
+      , (toText $ wtdr ^. stakeAddress) <> "+" <> show (unLovelace $ wtdr ^. lovelaces)
       ]
 
     -- The fee has already been subtracted from the change output.

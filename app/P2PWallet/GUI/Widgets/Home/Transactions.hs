@@ -70,7 +70,7 @@ txWidget wenv model =
                   , hstack 
                       [ filler
                       , label_ 
-                          (toText @String $ printf "%D ADA" $ 
+                          (fromString $ printf "%D ADA" $ 
                             t ^. to (txValueFromWallet walletAddr))
                           [resizeFactor 1]
                       ]

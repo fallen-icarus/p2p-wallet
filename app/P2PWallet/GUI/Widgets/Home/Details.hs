@@ -88,7 +88,7 @@ detailsOverlay model =
             , spacer
             , detailTextField "Output Reference:" $ showTxOutRef $ utxo ^. utxoRef
             , detailTextField "Time Stamp:" $ showLocalTime "%D %T %Z" $ utxo ^. blockTime
-            , detailTextField "Value:" $ toText @String $ printf "%D ADA" $ 
+            , detailTextField "Value:" $ fromString $ printf "%D ADA" $ 
                 toADA $ utxo ^. lovelaces
             , detailTextField "Reference Script Hash:" $ fromMaybe "none" $ 
                 utxo ^. referenceScriptHash
@@ -133,13 +133,13 @@ detailsOverlay model =
             , spacer
             , detailTextField "Tx Hash:" $ tx ^. txHash
             , detailTextField "Time Stamp:" $ showLocalTime "%D %T %Z" $ tx ^. blockTime
-            , detailTextField "Fee:" $ toText @String $ printf "%D ADA" $ toADA $ tx ^. fee
-            , detailTextField "Tx Size:" $ toText @String $ printf "%d bytes" $ tx ^. size
-            , detailTextField "Deposit:" $ toText @String $ printf "%D ADA" $ toADA $ tx ^. deposit
+            , detailTextField "Fee:" $ fromString $ printf "%D ADA" $ toADA $ tx ^. fee
+            , detailTextField "Tx Size:" $ fromString $ printf "%d bytes" $ tx ^. size
+            , detailTextField "Deposit:" $ fromString $ printf "%D ADA" $ toADA $ tx ^. deposit
             , detailTextField "Invalid Before:" $ 
-                maybe "none" (toText @String . printf "slot %s") $ tx ^. invalidBefore
+                maybe "none" (fromString . printf "slot %s") $ tx ^. invalidBefore
             , detailTextField "Invalid After:" $ 
-                maybe "none" (toText @String . printf "slot %s") $ tx ^. invalidAfter
+                maybe "none" (fromString . printf "slot %s") $ tx ^. invalidAfter
             , if null $ tx ^. referenceInputs then 
                 detailTextField "Reference Inputs:" "none"
               else 
@@ -159,6 +159,11 @@ detailsOverlay model =
               else 
                 detailTextArea model "Certificates:" certificates $ 
                   show $ vsep $ intersperse mempty $ map pretty $ tx ^. certificates
+            , if null $ tx ^. withdrawals then 
+                detailTextField "Withdrawals:" "none"
+              else 
+                detailTextArea model "Withdrawals:" withdrawals $ 
+                  show $ vsep $ intersperse mempty $ map pretty $ tx ^. withdrawals
             , detailTextArea model "Inputs:" inputs $ show $ 
                 vsep $ intersperse mempty $ map pretty $ tx ^. inputs
             , detailTextArea model "Outputs:" outputs $ show $ 

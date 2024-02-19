@@ -101,7 +101,7 @@ homeWidget wenv model = do
         [ spacer
         , hstack_ [childSpacing] 
             [ filler
-            , label $ toText @String $ printf "UTxO Balance: %D ADA" $ toADA $
+            , label $ fromString $ printf "UTxO Balance: %D ADA" $ toADA $
                 model ^. homeModel . selectedWallet . lovelaces
             , separatorLine
             , textDropdown_ 

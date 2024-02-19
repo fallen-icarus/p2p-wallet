@@ -33,7 +33,7 @@ addCertificateWidget wenv model =
       editFields = vstack_ [childSpacing]
         [ -- Only allow toggling to `internalWallet` if there are tracked stake wallets.
           widgetIf (isJust firstStakeWallet) $ hstack_ [childSpacing]
-            [ label "Output To:"
+            [ label "Certificate For:"
             , hgrid_ [childSpacing] 
                 [ labeledRadio "Self" True boolLens'
                 , labeledRadio "Other" False boolLens'

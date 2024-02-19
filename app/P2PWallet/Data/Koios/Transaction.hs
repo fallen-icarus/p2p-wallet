@@ -155,6 +155,24 @@ instance Pretty TransactionCertificate where
          , pretty _info
          ]
 
+-- | The type representing withdrawal information in a transaction.
+data TransactionWithdrawal = TransactionWithdrawal
+  { _lovelaces :: Lovelace
+  , _stakeAddress :: StakeAddress
+  } deriving (Show,Eq)
+
+instance FromJSON TransactionWithdrawal where
+  parseJSON = withObject "TransactionWithdrawal" $ \o ->
+    TransactionWithdrawal
+      <$> o .: "amount"
+      <*> o .: "stake_addr"
+
+instance Pretty TransactionWithdrawal where
+  pretty TransactionWithdrawal{..} =
+    vsep [ "Stake Address:" <+> pretty _stakeAddress
+         , "Value:" <+> fromString (printf "%D ADA" $ toADA _lovelaces)
+         ]
+
 -- | The type respesenting the overall information returned with the tx_info query.
 data Transaction = Transaction
   { _txHash :: Text
@@ -171,7 +189,7 @@ data Transaction = Transaction
   , _inputs :: [TransactionUTxO]
   , _outputs :: [TransactionUTxO]
   , _certificates :: [TransactionCertificate]
-  -- , _withdrawals :: Value
+  , _withdrawals :: [TransactionWithdrawal]
   -- , _nativeAssetsMinted :: Value
   -- , _nativeScripts :: Value
   -- , _plutusContracts :: Value
@@ -195,7 +213,7 @@ instance FromJSON Transaction where
         <*> o .: "inputs"
         <*> o .: "outputs"
         <*> o .: "certificates"
-        -- <*> o .: "withdrawals"
+        <*> o .: "withdrawals"
         -- <*> o .: "assets_minted"
         -- <*> o .: "native_scripts"
         -- <*> o .: "plutus_contracts"

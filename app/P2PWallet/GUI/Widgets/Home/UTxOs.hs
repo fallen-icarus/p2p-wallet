@@ -63,7 +63,7 @@ utxoWidget wenv model =
               [ label_ (showTxOutRef $ u ^. utxoRef) [resizeFactor 1]
                   `styleBasic` [textFont "Medium", textSize 16]
               , filler
-              , label_ (toText @String $ printf "%D ADA" $ toADA $ u ^. lovelaces) 
+              , label_ (fromString $ printf "%D ADA" $ toADA $ u ^. lovelaces) 
                   [resizeFactor 1]
               ] `styleBasic` [height 80, padding 20, radius 5]
                 `styleHover` [bgColor rowBgColor, cursorIcon CursorHand]

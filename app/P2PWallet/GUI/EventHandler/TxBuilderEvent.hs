@@ -175,6 +175,44 @@ handleTxBuilderEvent model@AppModel{_config=Config{_network}, _txBuilderModel} e
     in [ Model $ flip (set txBuilderModel) model $
           newBalancedTx & isBuilt .~ False
        ]
+  InsertNewWithdrawal ->
+    -- Check if the new withdrawal is valid.
+    case processNewWithdrawal _network _txBuilderModel of
+      Left err -> 
+        -- If there was an error processing the new withdrawal, display the error to the user. 
+        -- Don't change the scene to make it easy for the user to quickly retry.
+        [ Model $ model & alertMessage .~ Just err ]
+      Right newBalancedTx ->
+        -- If processing was successfull, close the `addWithdrawal` widget and return the user
+        -- to the transaction summary page. Also reset the `nwWithdrawal` field so that it is
+        -- cleared for next time. Finally, disable the `isBuilt` flag since the new changes
+        -- invalidate the old build.
+        [ Model $ flip (set txBuilderModel) model $
+            newBalancedTx & isBuilt .~ False
+                          & scene .~ BuilderSummary
+                          & newWithdrawal .~ def
+        ]
+  EditWithdrawal index ->
+    -- Edit the withdrawal with the specified index. Editing is done by setting `newWithdrawal` to
+    -- the specified index and opening the `addWithdrawal` widget. Once editing is done,
+    -- `InsertNewWithdrawal` will be called.
+    let target = fromJust $ find ((==index) . fst) $ _txBuilderModel ^. withdrawals
+    in [ Model $ model & txBuilderModel . newWithdrawal .~ fmap fromVerifiedWithdrawal target
+                       & txBuilderModel . scene .~ BuilderAddNewWithdrawal 
+       ]
+  DeleteWithdrawal index ->
+    -- Delete the withdrawal with the specified index. Re-index the remaining withdrawals 
+    -- (preserving ordering). The new `txBuilderModel` will need to be rebalanced with the fee 
+    -- reset to 0. The `isBuilt` flag must be reset to false since the change invalidates the 
+    -- previous build. 
+    let newWtdrs = reIndex $ filter ((/= index) . fst) $ _txBuilderModel ^. withdrawals
+        newBalancedTx = 
+          balanceTx $ 
+            _txBuilderModel & withdrawals .~ newWtdrs
+                            & txFee .~ 0
+    in [ Model $ flip (set txBuilderModel) model $
+          newBalancedTx & isBuilt .~ False
+       ]
   BuildTx ->
     -- Build the transaction using the current `txBuilderModel`. It will calculate the fee
     -- and will return an updated `txBuilderModel`. The resulting tx.body file will be
@@ -196,7 +234,7 @@ handleTxBuilderEvent model@AppModel{_config=Config{_network}, _txBuilderModel} e
               & building .~ False
               & txBuilderModel . isBuilt .~ True
               & alertMessage .~ Just 
-                  (toText @String $ printf "Estimated Fee: %D ADA" (toADA $ newTx ^. txFee))
+                  (fromString $ printf "Estimated Fee: %D ADA" (toADA $ newTx ^. txFee))
     ]
 
   -----------------------------------------------

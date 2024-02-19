@@ -44,6 +44,8 @@ summaryWidget _ model =
       , separatorLine
       , certificateSummary $ model ^. txBuilderModel . certificates
       , separatorLine
+      , withdrawalSummary $ model ^. txBuilderModel . withdrawals
+      , separatorLine
       , changeOutputSummary $ model ^. txBuilderModel . changeOutput
       , separatorLine
       , feeSummary $ toADA $ model ^. txBuilderModel . txFee
@@ -152,12 +154,50 @@ certificateSummary xs = do
              in m & txBuilderModel . certificates .~ newOuts
            )
 
+withdrawalSummary :: [(Int,VerifiedWithdrawal)] -> WidgetNode AppModel AppEvent
+withdrawalSummary xs = do
+    vstack_ [childSpacing] $
+      [ hstack
+          [ spacer
+          , spacer
+          , label "Withdrawals:"
+          , spacer
+          , tooltip_ "Add" [tooltipDelay 1000] $
+              button remixAddLine (TxBuilderEvent $ ChangeBuilderScene BuilderAddNewWithdrawal)
+                `styleBasic`
+                  [ textFont "Remix"
+                  , padding 0
+                  , textMiddle
+                  , border 0 transparent
+                  ]
+          ]
+      ] <> flip concatMap xs (\(yi,y) ->
+             summaryRow 
+               "Withdrawal" 
+               y 
+               (yi-1) 
+               targetExpanded 
+               (DeleteWithdrawal yi) 
+               (EditWithdrawal yi))
+  where
+    targetExpanded :: Int -> ALens' AppModel Bool
+    targetExpanded n = 
+      lens (\m -> m ^. txBuilderModel . withdrawals . to (!!n) . _2 . expanded) 
+           (\m b -> 
+             let outs = m ^. txBuilderModel . withdrawals
+                 oldTarget = outs !! n 
+                 filteredOuts = filter (/= oldTarget) outs
+                 newTarget = oldTarget & _2 . expanded .~ b
+                 newOuts = sortOn fst $ newTarget : filteredOuts
+             in m & txBuilderModel . withdrawals .~ newOuts
+           )
+
 feeSummary :: ADA -> WidgetNode AppModel AppEvent
 feeSummary n =
   hstack
     [ spacer
     , spacer
-    , label $ toText @String $ printf "Fee: %D ADA" n
+    , label $ fromString $ printf "Fee: %D ADA" n
     ]
 
 changeOutputSummary :: VerifiedChangeOutput -> WidgetNode AppModel AppEvent

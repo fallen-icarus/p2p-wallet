@@ -47,13 +47,13 @@ registeredPoolsWidget wenv model =
              [ hstack
                  [ label nameAndTicker `styleBasic` [textFont "Medium", textSize 16]
                  , filler
-                 , label $ toText @String $ 
+                 , label $ fromString $ 
                      maybe "saturation: none" (printf "saturation: %D%%") $
                        p ^. liveSaturation
                  ]
              , hstack 
                 [ filler
-                , label $ toText @String $
+                , label $ fromString $
                      maybe "margin: none" (printf "margin: %D%%") $ p ^. margin
                 ]
              ] `styleBasic` [height 80, padding 20, radius 5]

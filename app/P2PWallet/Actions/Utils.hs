@@ -66,11 +66,13 @@ reIndex xs = go xs 1
 -- | Balance the inputs with the outputs by updating the changeOutput and subtracting off the
 -- fee.
 balanceTx :: TxBuilderModel -> TxBuilderModel
-balanceTx tx@TxBuilderModel{_inputs,_outputs,_txFee,_certificates} =
-    -- let (loves,assets) = change
-    tx & changeOutput . lovelaces .~ loves - _txFee - requiredDeposits
+balanceTx tx@TxBuilderModel{_inputs,_outputs,_txFee,_certificates,_withdrawals} =
+    tx & changeOutput . lovelaces .~ loves - _txFee - requiredDeposits + totalWithdrawn
        & changeOutput . nativeAssets .~ assets
   where
+    totalWithdrawn :: Lovelace
+    totalWithdrawn = sum $ map (view lovelaces . snd) _withdrawals
+    
     -- The total deposit required from certificates.
     requiredDeposits :: Lovelace
     requiredDeposits = (flip . flip foldl') 0 _certificates $ \acc (_,cert) ->
@@ -101,9 +103,12 @@ balanceTx tx@TxBuilderModel{_inputs,_outputs,_txFee,_certificates} =
 -- if known. Read the documentation for `RegistrationWitness` to see why they are treated
 -- separately.
 requiredWitnesses :: TxBuilderModel -> Either Text ([NormalWitness],[RegistrationWitness])
-requiredWitnesses TxBuilderModel{_inputs,_certificates} = do
+requiredWitnesses TxBuilderModel{_inputs,_certificates,_withdrawals} = do
     -- | Get the required pubkeys among the inputs. Returns the first error, if any.
     inputWitnesses <- catMaybes <$> sequence (map checkInput _inputs)
+
+    -- | Get the required pubkeys among the withdrawals. Returns the first error, if any.
+    wtdrWitnesses <- catMaybes <$> sequence (map checkWithdrawal _withdrawals)
 
     -- | Get the required witnesses among the certificates, keeping the required registration 
     -- witnesses separate.
@@ -114,11 +119,23 @@ requiredWitnesses TxBuilderModel{_inputs,_certificates} = do
     -- `DerivationPath`s so it is enough to just check the key hashes. Filter out registration
     -- certificate keys if they are also normal witnesses.
     return $ 
-      ( ordNubOn (fst . view witness) $ inputWitnesses <> normalCertWitness
+      ( ordNubOn (fst . view witness) $ inputWitnesses <> wtdrWitnesses <> normalCertWitness
       , ordNubOn (fst . view witness) $
           filterOutDoubleCertKeys normalCertWitness registrationCertWits
       )
   where
+    -- Get the pubkeyhash from the plutus address. Returns nothing if the withdrawal is a script 
+    -- withdrawal.
+    checkWithdrawal :: (Int,VerifiedWithdrawal) -> Either Text (Maybe NormalWitness)
+    checkWithdrawal (index,w) = do
+      cred <- 
+        first (const $ "Withdrawal " <> show index <> " has an invalid bech32 stake address.") $
+          stakeAddressToPlutusCredential $ w ^. stakeAddress
+      return $ 
+        case cred of
+          PubKeyCredential pkh -> Just $ NormalWitness (pkh, w ^. stakeKeyPath)
+          _ -> Nothing
+
     -- Get the pubkeyhash from the plutus address. Returns nothing if the input is a script input.
     checkInput :: (Int,VerifiedInput) -> Either Text (Maybe NormalWitness)
     checkInput (index,i) = do
@@ -261,9 +278,30 @@ processNewCertificate network tx@TxBuilderModel{_certificates,_newCertificate = 
         | index == 0 = (length _certificates + 1, _certificates)
         | otherwise = (index, filter ((/=index) . fst) _certificates)
 
-  -- Replace the old `changeOutput` with the `newChangeOutput`. Set the txFee to 0 
+  -- Replace the old certificates with the certificates. Set the txFee to 0 
   -- (it must be recalculated), rebalance the transaction, and then return it.
   return $ 
     balanceTx $ 
       tx & certificates .~ sortOn fst ( (newIndex,verified) : otherCerts )
+         & txFee .~ 0
+
+-- | Check a user specified withdrawal and return the first error that occurs. Otherwise,
+-- properly format the new withdrawal and add it to the model. Rebalance the transaction after 
+-- updating the model.
+processNewWithdrawal :: Network -> TxBuilderModel -> Either Text TxBuilderModel
+processNewWithdrawal network tx@TxBuilderModel{_withdrawals,_newWithdrawal = (index,wtdr)} = do
+  verified <- toVerifiedWithdrawal network wtdr
+
+  let -- If the index is currently zero, the new index needs to be calculated. If the index is
+      -- currently not zero, then this withdrawal is an edit and the old version must be removed 
+      -- from the withdrawals list.
+      (newIndex,otherWtdrs)
+        | index == 0 = (length _withdrawals + 1, _withdrawals)
+        | otherwise = (index, filter ((/=index) . fst) _withdrawals)
+
+  -- Replace the old withdrawals with the withdrawals. Set the txFee to 0 
+  -- (it must be recalculated), rebalance the transaction, and then return it.
+  return $ 
+    balanceTx $ 
+      tx & withdrawals .~ sortOn fst ( (newIndex,verified) : otherWtdrs )
          & txFee .~ 0

@@ -82,7 +82,7 @@ delegationWidget wenv model = do
         [ spacer
         , hstack_ [childSpacing] 
             [ filler
-            , label $ toText @String $ printf "Total Delegation: %D ADA" $ toADA $
+            , label $ fromString $ printf "Total Delegation: %D ADA" $ toADA $
                 model ^. delegationModel . selectedWallet . totalDelegation
             , separatorLine
             , textDropdown_ 

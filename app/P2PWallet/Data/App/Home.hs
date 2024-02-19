@@ -213,6 +213,7 @@ data ExpandedFields = ExpandedFields
   , _inputs :: Bool
   , _outputs :: Bool
   , _certificates :: Bool
+  , _withdrawals :: Bool
   } deriving (Eq,Show)
 
 instance Default ExpandedFields where
@@ -223,6 +224,7 @@ instance Default ExpandedFields where
     , _inputs = False
     , _outputs = False
     , _certificates = False
+    , _withdrawals = False
     }
 
 -------------------------------------------------

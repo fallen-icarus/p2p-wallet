@@ -458,6 +458,8 @@ data BuilderScene
   | BuilderAddChangeOutput
   -- | Open the widget for adding/editing certificates.
   | BuilderAddNewCertificate
+  -- | Open the widget for adding/editing withdrawals.
+  | BuilderAddNewWithdrawal
   -- | Open the widget for getting the export destination for exporting the
   -- tx.body file.
   | BuilderGetExportDestination

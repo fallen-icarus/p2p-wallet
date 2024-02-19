@@ -9,6 +9,7 @@ import P2PWallet.GUI.Widgets.TxBuilder.AddCertificate
 import P2PWallet.GUI.Widgets.TxBuilder.AddChangeOutput
 import P2PWallet.GUI.Widgets.TxBuilder.AddInput
 import P2PWallet.GUI.Widgets.TxBuilder.AddOutput
+import P2PWallet.GUI.Widgets.TxBuilder.AddWithdrawal
 import P2PWallet.GUI.Widgets.TxBuilder.ExportTxBody
 import P2PWallet.GUI.Widgets.TxBuilder.Summary
 
@@ -25,6 +26,8 @@ txBuilderWidget wenv model = do
           `nodeVisible` (model ^. txBuilderModel . scene == BuilderAddNewCertificate)
       , addChangeOutputWidget wenv model
           `nodeVisible` (model ^. txBuilderModel . scene == BuilderAddChangeOutput)
+      , addWithdrawalWidget wenv model
+          `nodeVisible` (model ^. txBuilderModel . scene == BuilderAddNewWithdrawal)
       , exportTxBodyWidget wenv model
           `nodeVisible` (model ^. txBuilderModel . scene == BuilderGetExportDestination)
       ]

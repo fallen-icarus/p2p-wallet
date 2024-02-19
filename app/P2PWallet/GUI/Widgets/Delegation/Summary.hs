@@ -106,7 +106,7 @@ balanceWidget wenv model = do
         , spacer
         , centerWidgetH $ 
             flip styleBasic [textFont "Medium", textSize 20] $ label $ 
-              toText @String $ printf "%D ADA" $ toADA $ wallet ^. availableRewards
+              fromString $ printf "%D ADA" $ toADA $ wallet ^. availableRewards
         , widgetIf (wallet ^. registrationStatus == NotRegistered) $ centerWidgetH $
             flip styleBasic [textSize 14] $ label $ 
               show $ tupled $ ["register to enable withdrawals"]
