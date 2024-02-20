@@ -10,7 +10,11 @@ The Delegation scene is dedicated to `StakeWallet`s.
 -}
 module P2PWallet.Data.App.Delegation where
 
+import Data.Aeson (eitherDecodeStrictText)
+import Data.Aeson.Encode.Pretty (encodePretty)
+
 import P2PWallet.Data.App.Common
+import P2PWallet.Data.FilterLang
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Wallets.StakeWallet
 import P2PWallet.Prelude
@@ -57,6 +61,44 @@ instance Default NewStakeWallet where
     }
 
 -------------------------------------------------
+-- Filters
+-------------------------------------------------
+-- | The type for a user supplied registered pool filter.
+newtype UserPoolFilters = UserPoolFilters { _rawFilters :: Text }
+  deriving (Show,Eq)
+
+instance Default UserPoolFilters where
+  def = UserPoolFilters $ decodeUtf8 $ encodePretty 
+    [ MatchAll
+        [ MatchPredicate (MatchLiveSaturation $ IsLT 90)
+        , MatchAny 
+            [ MatchPredicate (MatchMargin $ IsLT 5.0)
+            , MatchPredicate (MatchFixedCost $ IsLT 340)
+            ]
+        ]
+    ]
+
+unUserPoolFilters :: UserPoolFilters -> Text
+unUserPoolFilters (UserPoolFilters fs) = fs
+
+newtype VerifiedPoolFilters = VerifiedPoolFilters [FilterLang PoolFilterLang]
+  deriving (Show,Eq)
+
+instance Default VerifiedPoolFilters where
+  def = VerifiedPoolFilters []
+
+unVerifiedPoolFilters :: VerifiedPoolFilters -> [FilterLang PoolFilterLang]
+unVerifiedPoolFilters (VerifiedPoolFilters fs) = fs
+
+toVerifiedPoolFilters :: UserPoolFilters -> Either Text VerifiedPoolFilters
+toVerifiedPoolFilters (UserPoolFilters fs) =
+  fmap VerifiedPoolFilters $ first toText $ eitherDecodeStrictText fs
+
+fromVerifiedPoolFilters :: VerifiedPoolFilters -> UserPoolFilters
+fromVerifiedPoolFilters (VerifiedPoolFilters fs) =
+  UserPoolFilters $ decodeUtf8 $ encodePretty fs
+
+-------------------------------------------------
 -- Delegation Page Events
 -------------------------------------------------
 -- | The possible UI events on the Home page.
@@ -71,6 +113,8 @@ data DelegationEvent
   | ShowDelegationDetails DelegationDetails
   -- | Close the details overlay and return to the previous screen.
   | CloseDelegationDetails
+  -- | Filter the registered pools.
+  | FilterRegisteredPools (FilterEvent VerifiedPoolFilters)
 
 -------------------------------------------------
 -- Delegation State
@@ -84,10 +128,18 @@ data DelegationModel = DelegationModel
   , _pairing :: Bool
   -- | Whether the watching widget should be open.
   , _watching :: Bool
+  -- | Whether the filterRegisteredPools widget should be open.
+  , _filteringRegisteredPools :: Bool
   -- | The information for the new `StakeWallet` being paired.
   , _newStakeWallet :: NewStakeWallet
   -- | The target details to show.
   , _details :: Maybe DelegationDetails
+  -- | A list of all known registered pools.
+  , _registeredPools :: [Pool]
+  -- | The set filters for registered pools.
+  , _setPoolFilters :: VerifiedPoolFilters
+  -- | The new filters for registered pools.
+  , _newPoolFilters :: UserPoolFilters
   } deriving (Eq,Show)
 
 instance Default DelegationModel where
@@ -96,6 +148,10 @@ instance Default DelegationModel where
     , _selectedWallet = def 
     , _pairing = False
     , _watching = False
+    , _filteringRegisteredPools = False
     , _newStakeWallet = def
     , _details = Nothing
+    , _registeredPools = []
+    , _setPoolFilters = def
+    , _newPoolFilters = def
     }

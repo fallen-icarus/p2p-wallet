@@ -23,10 +23,16 @@ applyAssetFilters fs as = do
 assetWidget :: AppWenv -> AppModel -> AppNode
 assetWidget wenv model = 
     vstack 
-      [ vscroll_ [wheelRate 50] $ 
+      [ widgetIf hasAssets $ vscroll_ [wheelRate 50] $ 
           vstack $ map assetRow $ reverse $ sortOn (view fingerprint) $ 
             applyAssetFilters (model ^. homeModel . setFilters . assetFilters) $
               model ^. homeModel . selectedWallet . nativeAssets
+      , widgetIf (not hasAssets) $
+          centerWidget $
+            flip styleBasic [bgColor sectionBg, padding 20, radius 5] $ 
+              box $ 
+                label "This address does not have any native assets."
+                 `styleBasic` [textFont "Italics"]
       , filler
       , hstack
           [ filler
@@ -35,8 +41,14 @@ assetWidget wenv model =
           ] `styleBasic` [bgColor dimGray]
       ]
   where
+    sectionBg :: Color
+    sectionBg = wenv ^. L.theme . L.sectionColor
+
     rowBgColor :: Color
     rowBgColor = wenv ^. L.theme . L.userColorMap . at "rowBgColor" . non def
+
+    hasAssets :: Bool
+    hasAssets = [] /= model ^. homeModel . selectedWallet . nativeAssets
 
     -- Show the main information for an asset in a box that is clickable. When the box
     -- is clicked, open a more detailed view for that asset.

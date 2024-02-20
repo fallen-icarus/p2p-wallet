@@ -26,7 +26,7 @@ handleDelegationEvent model evt = case evt of
     -- the first time.
     [ Model $ model & delegationModel . scene .~ newScene 
     , Task $ do
-        if [] == (model ^. registeredPools) && newScene == DelegationPools
+        if [] == (model ^. delegationModel . registeredPools) && newScene == DelegationPools
           then return $ SyncRegisteredPools StartSync
           else return AppInit
     ]
@@ -127,3 +127,40 @@ handleDelegationEvent model evt = case evt of
                  backupWallets network' updatedWallets
                  return $ SyncWallets StartSync
              ]
+
+  -----------------------------------------------
+  -- Filtering Registered Pools
+  -----------------------------------------------
+  FilterRegisteredPools modal -> case modal of
+    StartFiltering -> 
+      -- Enable `filteringRegisteredPools` to show the pool filter widget. If the currently
+      -- set filters is [], then show a default implementation of the filter language. Otherwise, 
+      -- show the current filters.
+      let vf@(VerifiedPoolFilters setFilters') = model ^. delegationModel . setPoolFilters
+          newFilters' = if setFilters' == [] then def else fromVerifiedPoolFilters vf
+      in
+        [ Model $ model & delegationModel . filteringRegisteredPools .~ True 
+                        & delegationModel . newPoolFilters .~ newFilters'
+        ]
+    CancelFiltering -> 
+      -- Disable `filteringRegisteredPools` to close the pool filter widget. 
+      [ Model $ model & delegationModel . filteringRegisteredPools .~ False ]
+    ResetFiltering -> 
+      -- Disable `filteringRegisteredPools` and reset the `setPoolFilters`.
+      [ Model $ model & delegationModel . filteringRegisteredPools .~ False
+                      & delegationModel . setPoolFilters .~ def
+      ]
+    VerifyFilters ->
+      -- Before confirming the filters, check if they are valid. Throw an appropriate error
+      -- message if they are not.
+      [ Task $
+          either
+            (return . Alert)
+            (return . DelegationEvent . FilterRegisteredPools . ConfirmFilters)
+            (toVerifiedPoolFilters $ model ^. delegationModel . newPoolFilters)
+      ]
+    ConfirmFilters verifiedFilters -> 
+      -- Disable `filteringRegisteredPools` and assign the `newFilters` to the `setFilters`.
+      [ Model $ model & delegationModel . filteringRegisteredPools .~ False
+                      & delegationModel . setPoolFilters .~ verifiedFilters
+      ]

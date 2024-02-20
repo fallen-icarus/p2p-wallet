@@ -122,9 +122,11 @@ instance Pretty CertificateInfo where
          ]
 
 instance FromJSON CertificateInfo where
-  parseJSON value = pure $ fromMaybe (OtherInfo value) 
-                  $ parseMaybe delegationInfoParser value 
-                <|> parseMaybe stakeRegistrationInfoParser value
+  parseJSON value = 
+      pure $ fromMaybe (OtherInfo value) $ asum
+        [ parseMaybe delegationInfoParser value 
+        , parseMaybe stakeRegistrationInfoParser value
+        ]
     where
       delegationInfoParser :: Value -> Parser CertificateInfo
       delegationInfoParser = withObject "DelegationInfo" $ \o ->

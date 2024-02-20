@@ -33,6 +33,14 @@ delegationWidget wenv model = do
             , watchStakeWidget wenv model
             ] `styleBasic` [bgColor sectionBg, padding 20, radius 5]
       , detailsOverlay model `nodeVisible` (not noDetails)
+      , widgetIf (model ^. delegationModel . filteringRegisteredPools) $ 
+          flip styleBasic [bgColor filterFade] $ 
+            centerWidget $
+              box_ [alignCenter] $ vstack
+                [ hstack [filler, label "Pool Filter Settings", filler]
+                , spacer
+                , poolFilterInfo wenv model
+                ] `styleBasic` [bgColor sectionBg, padding 20, radius 5]
       ]
   where
     sectionBg :: Color
@@ -49,7 +57,7 @@ delegationWidget wenv model = do
 
     reqPoolUpdate :: AppWenv -> AppModel -> AppModel -> Bool
     reqPoolUpdate _ old new =
-      old ^. registeredPools /= new ^. registeredPools
+      old ^. delegationModel . registeredPools /= new ^. delegationModel . registeredPools
 
     noDetails :: Bool
     noDetails = isNothing $ model ^. delegationModel . details

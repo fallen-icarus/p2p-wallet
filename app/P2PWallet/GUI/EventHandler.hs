@@ -111,7 +111,7 @@ handleEvent _ _ model evt = case evt of
       -- Disable `syncing` and update the list of pools. 
       [ Model $ 
           model & syncingPools .~ False
-                & registeredPools .~ resp
+                & delegationModel . registeredPools .~ resp
       ]
 
   -----------------------------------------------

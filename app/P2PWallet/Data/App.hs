@@ -108,9 +108,6 @@ data AppModel = AppModel
     {- Wallets -}
   , _wallets :: Wallets -- ^ The currently tracked wallets.
 
-    {- Pools -}
-  , _registeredPools :: [Pool] -- ^ A list of all known registered pools.
-
     {- Scenes -}
   , _scene :: MainScene -- ^ Which main scene is currently active.
 
@@ -138,7 +135,6 @@ instance Default AppModel where
   def = AppModel
     { _config = def
     , _wallets = def
-    , _registeredPools = []
     , _scene = HomeScene 
     , _waitingOnDevice = False 
     , _syncingWallets = False 

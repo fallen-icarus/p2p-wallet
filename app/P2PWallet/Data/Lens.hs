@@ -32,6 +32,7 @@ makeFieldsNoPrefix ''UserChangeOutput
 makeFieldsNoPrefix ''UserFilters
 makeFieldsNoPrefix ''UserInput
 makeFieldsNoPrefix ''UserOutput
+makeFieldsNoPrefix ''UserPoolFilters
 makeFieldsNoPrefix ''UserWithdrawal
 makeFieldsNoPrefix ''UTxOFilters
 makeFieldsNoPrefix ''VerifiedCertificate

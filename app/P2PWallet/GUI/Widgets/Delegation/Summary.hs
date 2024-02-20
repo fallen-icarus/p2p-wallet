@@ -83,8 +83,9 @@ balanceWidget wenv model = do
               [ centerWidgetH $ label nameAndTicker `styleBasic` [textFont "Medium", textSize 24]
               , spacer
               , centerWidgetH $ flip styleBasic [textFont "Medium", textSize 16] $ 
-                  label $ fromString $ maybe "Saturation: none" (printf "Saturation: %D%%") $ 
-                    pool ^. liveSaturation
+                  label $ fromString $ 
+                    maybe "Live Saturation: none" (printf "Live Saturation: %D%%") $ 
+                      pool ^. liveSaturation
               , spacer
               , centerWidgetH $ flip styleBasic [textFont "Medium", textSize 16] $ 
                   label $ fromString $ maybe "Margin: none" (printf "Margin: %D%%") $ 

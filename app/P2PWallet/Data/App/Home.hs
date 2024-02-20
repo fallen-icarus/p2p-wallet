@@ -47,21 +47,6 @@ data HomeDetails
 -------------------------------------------------
 -- Filters
 -------------------------------------------------
--- | Filter UI steps.
-data FilterEvent
-  -- | Open the widget for editing the currently set filters.
-  = StartFiltering 
-  -- | Close the widget and keep the previously set filters.
-  | CancelFiltering 
-  -- | Close the widget and reset the previously set filters.
-  | ResetFiltering 
-  -- | Keep the widget open and validate the user input. It is kept open in case validation fails
-  -- so that users can quickly try again.
-  | VerifyFilters 
-  -- | Close the widget and replace the previously set filters with the new ones.
-  | ConfirmFilters VerifiedFilters 
-  deriving (Show,Eq)
-
 data AssetFilters = AssetFilters
   { _byPolicyId :: Maybe Text -- ^ Filter by policy id.
   , _byTokenName :: Maybe Text -- ^ Filter by asset name.
@@ -266,11 +251,11 @@ data HomeEvent
   -- | Close the details overlay and return to the previous screen.
   | CloseHomeDetails
   -- | Filter the assets in the `HomeAssets` subscene.
-  | FilterHomeAssets FilterEvent
+  | FilterHomeAssets (FilterEvent VerifiedFilters)
   -- | Filter the utxos in the `HomeUTxO` subscene.
-  | FilterHomeUTxOs FilterEvent
+  | FilterHomeUTxOs (FilterEvent VerifiedFilters)
   -- | Filter the transactions in the `HomeTransactions` subscene.
-  | FilterHomeTransactions FilterEvent
+  | FilterHomeTransactions (FilterEvent VerifiedFilters)
   -- | Pair a new `PaymentWallet`. It can only be done from the `HomeAbout` subscene.
   | PairPaymentWallet (AddWalletEvent PaymentWallet)
   -- | Watch a new `PaymentWallet`. It can only be done from the `HomeAbout` subscene.

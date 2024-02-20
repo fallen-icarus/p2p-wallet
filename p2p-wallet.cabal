@@ -88,6 +88,7 @@ executable p2p-wallet
       P2PWallet.Data.Koios.StakeReward
       P2PWallet.Data.Koios.Transaction
       P2PWallet.Data.Koios.TxSubmissionResponse
+      P2PWallet.Data.FilterLang
       P2PWallet.Data.Lens
       P2PWallet.Data.Plutus
       P2PWallet.Data.Wallets

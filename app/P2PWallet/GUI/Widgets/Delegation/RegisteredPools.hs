@@ -1,6 +1,7 @@
 module P2PWallet.GUI.Widgets.Delegation.RegisteredPools
   ( 
     registeredPoolsWidget
+  , poolFilterInfo
   ) where
 
 import Monomer
@@ -8,6 +9,7 @@ import Monomer.Lens qualified as L
 import Prettyprinter (tupled,pretty,(<+>))
 
 import P2PWallet.Data.App
+import P2PWallet.Data.FilterLang
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Lens
 import P2PWallet.GUI.Widgets.Internal.Custom
@@ -15,22 +17,44 @@ import P2PWallet.Prelude
 
 registeredPoolsWidget :: AppWenv -> AppModel -> AppNode
 registeredPoolsWidget wenv model =
-  vstack
-    [ hstack
-        [ label ("Registered Pools (" <> show (length sample) <> ")")
-            `styleBasic` [paddingL 10, paddingT 10, paddingB 10, paddingR 5]
-        , customButton wenv "Refresh Pools" remixRefreshLine (SyncRegisteredPools StartSync)
-            `styleBasic` [padding 0]
-        , filler
-        ]
-    , vscroll_ [wheelRate 50] $ 
-        vstack $ map poolRow sample
-    ]
+    vstack
+      [ hstack
+          [ label ("Registered Pools (" <> show (length sample) <> ")")
+              `styleBasic` [paddingL 10, paddingT 10, paddingB 10, paddingR 5]
+          , customButton wenv "Refresh Pools" remixRefreshLine (SyncRegisteredPools StartSync)
+              `styleBasic` [padding 0]
+          , filler
+          ]
+      , widgetIf (sample == [] && allPools == []) $
+          centerWidget spacer
+      , widgetIf (sample /= [] && allPools /= []) $ vscroll_ [wheelRate 50] $ 
+          vstack $ map poolRow sample
+      , widgetIf (sample == [] && allPools /= []) $
+          centerWidget $
+            flip styleBasic [bgColor sectionBg, padding 20, radius 5] $ 
+              box $ 
+                label "No pools match those requirements."
+                 `styleBasic` [textFont "Italics"]
+      , hstack
+          [ filler
+          , customButton wenv "Filter" remixFilter3Line $ 
+              DelegationEvent $ FilterRegisteredPools StartFiltering
+          ] `styleBasic` [bgColor dimGray]
+      ]
   where
+    sectionBg :: Color
+    sectionBg = wenv ^. L.theme . L.sectionColor
+
+    filters :: [FilterLang PoolFilterLang]
+    filters = unVerifiedPoolFilters $ model ^. delegationModel . setPoolFilters
+
+    allPools :: [Pool]
+    allPools = model ^. delegationModel . registeredPools
+
     sample :: [Pool]
     sample = 
-      reverse $ sortOn (view liveSaturation) $ 
-        filter (isJust . view info) $ model ^. registeredPools
+      reverse $ sortOn (view liveSaturation) $
+        filter (\p -> poolCheck filters p && isJust (p ^. info)) allPools
 
     rowBgColor :: Color
     rowBgColor = wenv ^. L.theme . L.userColorMap . at "rowBgColor" . non def
@@ -60,3 +84,22 @@ registeredPoolsWidget wenv model =
                `styleHover` [bgColor rowBgColor, cursorIcon CursorHand]
       in box_ [expandContent, onClick evt] content 
           `styleBasic` [padding 10, paddingT 0]
+
+poolFilterInfo :: AppWenv -> AppModel -> AppNode
+poolFilterInfo wenv model = 
+  let sectionBg = wenv ^. L.theme . L.sectionColor
+
+      editFields = 
+        scroll $ textArea (delegationModel . newPoolFilters . rawFilters)
+
+  in vstack 
+       [ editFields
+       , spacer
+       , hstack 
+           [ mainButton "Reset" $ DelegationEvent $ FilterRegisteredPools ResetFiltering
+           , filler
+           , mainButton "Confirm" $ DelegationEvent $ FilterRegisteredPools VerifyFilters
+           , spacer
+           , button "Cancel" $ DelegationEvent $ FilterRegisteredPools CancelFiltering
+           ]
+       ] `styleBasic` [bgColor sectionBg, padding 20]
