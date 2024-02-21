@@ -60,7 +60,7 @@ instance Default PaymentWallet where
     { _alias = "dummy" 
     , _paymentAddress = PaymentAddress "" 
     , _stakeAddress = Nothing 
-    , _paymentKeyPath = Just $ PaymentKeyPath 0
+    , _paymentKeyPath = Just $ PaymentKeyPath 0 0
     , _stakeKeyPath = Nothing 
     , _utxos = [] 
     , _txHistory = [] 

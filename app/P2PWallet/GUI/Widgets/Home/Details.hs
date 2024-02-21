@@ -13,6 +13,23 @@ import P2PWallet.Data.Plutus
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
+-- A close button in the lower right hand corner of the details page. Also has a button for
+-- QuickSpend.
+detailUTxOCloseButton :: TxOutRef -> WidgetNode s AppEvent
+detailUTxOCloseButton utxoRef' =
+  vstack_ [childSpacing]
+    [ filler
+    , hstack 
+        [ filler
+        , mainButton "Spend" $ HomeEvent $ QuickSpend utxoRef'
+        , spacer
+        , button "Close" $ HomeEvent CloseHomeDetails 
+        , spacer
+        , spacer
+        ]
+    , spacer
+    ]
+
 -- A close button in the lower right hand corner of the details page.
 detailCloseButton :: WidgetNode s AppEvent
 detailCloseButton =
@@ -124,7 +141,7 @@ detailsOverlay model =
                           indent 4 $ align $ vsep $ map pretty $ utxo ^. nativeAssets
                       ]
                   ]
-            , detailCloseButton
+            , detailUTxOCloseButton (utxo ^. utxoRef)
             ]
         Just (HomeTransaction tx) -> 
           vstack_ [childSpacing]

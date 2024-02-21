@@ -260,6 +260,9 @@ data HomeEvent
   | PairPaymentWallet (AddWalletEvent PaymentWallet)
   -- | Watch a new `PaymentWallet`. It can only be done from the `HomeAbout` subscene.
   | WatchPaymentWallet (AddWalletEvent PaymentWallet)
+  -- | Quickly add the UTxO currently being viewed in the details widget to the transaction as
+  -- an input being spent.
+  | QuickSpend TxOutRef
 
 -------------------------------------------------
 -- Home State

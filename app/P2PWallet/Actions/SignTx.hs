@@ -44,9 +44,11 @@ signTx network' tx = do
     path <- fromJustOrAppError ("Unknown pubkey required: " <> show pkh) mPath
     snd <$> exportHwKeyFiles (Just $ show pkh) path
   
+  putStrLn $ witnessTxCmd network' transformedTxFile regHwsFiles normalWitFiles
   -- Create the required witness files. Registation witnesses do not create a witness file.
   void $ runCmd $ witnessTxCmd network' transformedTxFile regHwsFiles normalWitFiles
 
+  putStrLn $ assembleWitnessesCmd transformedTxFile normalWitFiles signedFile
   -- Assemble the witnesses to produce the final tx.signed file.
   void $ runCmd $ assembleWitnessesCmd transformedTxFile normalWitFiles signedFile
 

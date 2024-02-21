@@ -1,3 +1,5 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module P2PWallet.GUI.EventHandler.HomeEvent
   ( 
     handleHomeEvent
@@ -10,6 +12,7 @@ import P2PWallet.Actions.BackupFiles
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.App
 import P2PWallet.Data.Lens
+import P2PWallet.Data.Plutus
 import P2PWallet.Prelude
 
 handleHomeEvent
@@ -233,3 +236,19 @@ handleHomeEvent model evt = case evt of
                  backupWallets network' updatedWallets
                  return $ SyncWallets StartSync
              ]
+
+  -----------------------------------------------
+  -- Quick Actions
+  -----------------------------------------------
+  -- Called from the details widget.
+  QuickSpend utxoRef' ->
+    -- Add an input to the TxBuilderModel for the specified utxo. 
+    -- This will also close the details page and move the user to the transaction summary page.
+    let newIn = UserInput
+          { _utxoRef = showTxOutRef utxoRef'
+          }
+    in [ Model $ model & homeModel . details .~ Nothing
+                       & txBuilderModel . newInput .~ (0,newIn)
+                       & scene .~ TxBuilderScene
+       , Task $ return $ TxBuilderEvent InsertNewInput
+       ]

@@ -104,7 +104,15 @@ runQueryStakeWalletInfo network' account = do
                 & availableRewards .~ _availableRewards
                 & delegatedPool .~ maybeHead pools
                 & rewardHistory .~ concat rewards
-    Right _ -> return $ Left "Query returned an unexpected number of arguments."
+    Right ([],rewards,pools) -> 
+      -- If a stake address has never been seen on chain before (ie, a UTxO has not been created 
+      -- at a payment address using the staking credential), the query will return the empty list.
+      -- The preset fields for the account are accurate in this scenario.
+      return $ Right account
+    Right _ -> do
+      print res
+      print account
+      return $ Left "Query returned an unexpected number of arguments."
     Left err -> return $ Left $ show err
 
 runQueryUnknownUTxOInfo :: Network -> [TxOutRef] -> IO (Either Text [AddressUTxO])

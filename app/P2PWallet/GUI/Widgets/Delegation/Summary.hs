@@ -68,7 +68,16 @@ balanceWidget wenv model = do
               , spacer
               , centerWidgetH $ 
                   label "Register the credential to enable delegation and reward withdrawals."
+              , spacer
+              , centerWidgetH $ mainButton "Register" $ DelegationEvent QuickRegister
               ]
+        -- , widgetIf (wallet ^. registrationStatus == NotRegistered) $ centerWidgetH $
+        --     vstack
+        --       [ flip styleBasic [textSize 14] $ label $ 
+        --           show $ tupled $ ["register to enable withdrawals"]
+        --       , spacer
+        --       , mainButton "Register" $ DelegationEvent QuickRegister
+        --       ]
         , widgetIf (registered && isNothing (wallet ^. delegatedPool)) $
             vstack
               [ centerWidgetH $ label "Not Delegated"
@@ -108,18 +117,14 @@ balanceWidget wenv model = do
         , centerWidgetH $ 
             flip styleBasic [textFont "Medium", textSize 20] $ label $ 
               fromString $ printf "%D ADA" $ toADA $ wallet ^. availableRewards
-        , widgetIf (wallet ^. registrationStatus == NotRegistered) $ centerWidgetH $
-            vstack
-              [ flip styleBasic [textSize 14] $ label $ 
-                  show $ tupled $ ["register to enable withdrawals"]
-              , spacer
-              , mainButton "Register" $ DelegationEvent QuickRegister
-              ]
-        , widgetIf (wallet ^. registrationStatus /= NotRegistered) $ centerWidgetH $
+        , widgetIf registered $ centerWidgetH $
             vstack
               [ spacer
               , mainButton "Withdraw" $ DelegationEvent QuickWithdraw
               ]
+        , widgetIf (not registered) $ centerWidgetH $
+            flip styleBasic [textSize 14] $ label $ 
+              show $ tupled $ ["register to enable withdrawals"]
         ]
 
 -- | Show key information about the address.
