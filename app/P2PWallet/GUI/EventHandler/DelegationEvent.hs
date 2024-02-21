@@ -1,3 +1,5 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module P2PWallet.GUI.EventHandler.DelegationEvent
   ( 
     handleDelegationEvent
@@ -164,3 +166,51 @@ handleDelegationEvent model evt = case evt of
       [ Model $ model & delegationModel . filteringRegisteredPools .~ False
                       & delegationModel . setPoolFilters .~ verifiedFilters
       ]
+
+  -----------------------------------------------
+  -- Quick Actions
+  -----------------------------------------------
+  -- Called from the details widget.
+  QuickDelegate poolId' ->
+    -- Add a delegation certificate to the TxBuilderModel for the specified pool and the
+    -- currently selected stake wallet. This will also close the details page and move
+    -- the user to the transaction summary page.
+    let newCert = UserCertificate
+          { _internalWallet = Just $ model ^. delegationModel . selectedWallet
+          , _stakeAddress = ""
+          , _certificateAction = Delegation poolId'
+          }
+    in [ Model $ model & delegationModel . details .~ Nothing
+                       & txBuilderModel . newCertificate .~ (0,newCert)
+                       & scene .~ TxBuilderScene
+       , Task $ return $ TxBuilderEvent InsertNewCertificate
+       ]
+
+  -- Called from the summary widget.
+  QuickWithdraw ->
+    -- Add the currently selected wallet to the newWithdrawal in the txBuilderModel and
+    -- take the user to the widget for getting the withdrawal amount.
+    let newWtdr = UserWithdrawal
+          { _internalWallet = Just $ model ^. delegationModel . selectedWallet
+          , _stakeAddress = ""
+          , _lovelaces = 0
+          }
+    in [ Model $ model & txBuilderModel . newWithdrawal .~ (0,newWtdr)
+                       & scene .~ TxBuilderScene
+                       & txBuilderModel . scene .~ BuilderAddNewWithdrawal
+       ]
+
+  -- Called from the summary widget.
+  QuickRegister ->
+    -- Add a registration certificate to the TxBuilderModel for the currently selected stake 
+    -- wallet. This will also move the user to the transaction summary page.
+    let newCert = UserCertificate
+          { _internalWallet = Just $ model ^. delegationModel . selectedWallet
+          , _stakeAddress = ""
+          , _certificateAction = Registration
+          }
+    in [ Model $ model & delegationModel . details .~ Nothing
+                       & txBuilderModel . newCertificate .~ (0,newCert)
+                       & scene .~ TxBuilderScene
+       , Task $ return $ TxBuilderEvent InsertNewCertificate
+       ]

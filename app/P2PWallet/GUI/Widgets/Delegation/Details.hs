@@ -12,12 +12,14 @@ import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
 -- A close button in the lower right hand corner of the details page.
-detailCloseButton :: WidgetNode s AppEvent
-detailCloseButton =
+detailCloseButton :: PoolID -> WidgetNode s AppEvent
+detailCloseButton poolId' =
   vstack_ [childSpacing]
     [ filler
     , hstack 
         [ filler
+        , mainButton "Delegate" $ DelegationEvent $ QuickDelegate poolId'
+        , spacer
         , button "Close" $ DelegationEvent CloseDelegationDetails 
         , spacer
         , spacer
@@ -78,5 +80,5 @@ detailsOverlay model =
             , detailTextField "Live Delegators:" $ maybe "none" show $ pool ^. liveDelegators
             , detailTextField "Live Saturation:" $ fromString $ 
                 maybe "none" (printf "%D%%") $ pool ^. liveSaturation
-            , detailCloseButton
+            , detailCloseButton $ pool ^. poolId
             ]

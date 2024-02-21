@@ -86,7 +86,7 @@ registeredPoolsWidget wenv model =
           `styleBasic` [padding 10, paddingT 0]
 
 poolFilterInfo :: AppWenv -> AppModel -> AppNode
-poolFilterInfo wenv model = 
+poolFilterInfo wenv _ = 
   let sectionBg = wenv ^. L.theme . L.sectionColor
 
       editFields = 

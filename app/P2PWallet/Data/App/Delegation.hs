@@ -14,6 +14,7 @@ import Data.Aeson (eitherDecodeStrictText)
 import Data.Aeson.Encode.Pretty (encodePretty)
 
 import P2PWallet.Data.App.Common
+import P2PWallet.Data.Core.PoolID
 import P2PWallet.Data.FilterLang
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Wallets.StakeWallet
@@ -115,6 +116,16 @@ data DelegationEvent
   | CloseDelegationDetails
   -- | Filter the registered pools.
   | FilterRegisteredPools (FilterEvent VerifiedPoolFilters)
+  -- | Quickly add a delegation certificate to the transaction builder for the pool
+  -- currently being view with the details widget. The currently selected wallet
+  -- is the one the certificate will be for.
+  | QuickDelegate PoolID
+  -- | Quickly set up the newWithdrawal field with the current stake wallet and open the widget
+  -- for specifing how much ADA to withdraw.
+  | QuickWithdraw
+  -- | Quickly add a registration certificate. The currently selected wallet
+  -- is the one the certificate will be for.
+  | QuickRegister
 
 -------------------------------------------------
 -- Delegation State

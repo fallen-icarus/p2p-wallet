@@ -54,17 +54,26 @@ customButtonWithName wenv name remixIcon evt = do
       btn = 
         vstack 
           [ centerWidgetH $ label remixIcon
-              `styleBasic` [
-                  textFont "Remix", 
-                  paddingT 10,
-                  paddingL 10,
-                  paddingR 10,
-                  paddingB 0,
-                  textMiddle, 
-                  textColor rowButtonColor, 
-                  bgColor transparent, 
-                  border 0 transparent]
-          , centerWidgetH $ label name `styleBasic` [padding 0, textSize 10]
+              `styleBasic`
+                  [ textFont "Remix"
+                  , paddingT 10
+                  , paddingL 10
+                  , paddingR 10
+                  , paddingB 0
+                  , textMiddle
+                  , textColor rowButtonColor
+                  , textSize 18
+                  , bgColor transparent
+                  , border 0 transparent
+                  ]
+          , centerWidgetH $ label name 
+              `styleBasic` 
+                  [ paddingT 0
+                  , paddingL 0
+                  , paddingR 0
+                  , paddingB 2
+                  , textSize 10
+                  ]
           ]
   box_ [onClick evt] btn
     `styleBasic` [paddingB 10, radius 5]

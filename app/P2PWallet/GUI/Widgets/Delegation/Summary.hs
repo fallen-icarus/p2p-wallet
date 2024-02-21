@@ -109,8 +109,17 @@ balanceWidget wenv model = do
             flip styleBasic [textFont "Medium", textSize 20] $ label $ 
               fromString $ printf "%D ADA" $ toADA $ wallet ^. availableRewards
         , widgetIf (wallet ^. registrationStatus == NotRegistered) $ centerWidgetH $
-            flip styleBasic [textSize 14] $ label $ 
-              show $ tupled $ ["register to enable withdrawals"]
+            vstack
+              [ flip styleBasic [textSize 14] $ label $ 
+                  show $ tupled $ ["register to enable withdrawals"]
+              , spacer
+              , mainButton "Register" $ DelegationEvent QuickRegister
+              ]
+        , widgetIf (wallet ^. registrationStatus /= NotRegistered) $ centerWidgetH $
+            vstack
+              [ spacer
+              , mainButton "Withdraw" $ DelegationEvent QuickWithdraw
+              ]
         ]
 
 -- | Show key information about the address.

@@ -16,8 +16,8 @@ mainMenuWidget wenv = do
     [ spacer
     , customButtonWithName wenv "Home" remixHome4Line $ ChangeMainScene HomeScene
     , customButtonWithName wenv "Staking" remixMedalLine $ ChangeMainScene DelegationScene
-    , customButtonWithName wenv "DEX" remixHome4Line $ ChangeMainScene LimitOrders
-    , customButtonWithName wenv "Liquidity" remixHome4Line $ ChangeMainScene MarketMakers
+    , customButtonWithName wenv "DEX" remixArrowLeftRightFill $ ChangeMainScene LimitOrders
+    , customButtonWithName wenv "Liquidity" remixWaterFlashLine $ ChangeMainScene MarketMakers
     , customButtonWithName wenv "Tx Builder" remixToolsLine $ ChangeMainScene TxBuilderScene
     , filler
     , customButtonWithName wenv "Settings" remixSettings3Line $ ChangeMainScene SettingsScene
