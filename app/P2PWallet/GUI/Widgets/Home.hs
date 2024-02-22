@@ -26,7 +26,7 @@ homeWidget wenv model = do
             [ hstack [ filler, label "Pairing", filler ]
             , spacer
             , pairPaymentWidget wenv model
-            ] `styleBasic` [bgColor sectionBg, padding 20, radius 5]
+            ] `styleBasic` [bgColor sectionBg, padding 20, radius 5, width 700]
       , widgetIf isAddingWatched $ centerWidget $
           box_ [alignCenter] $ vstack
             [ hstack [ filler, label "New Watched", filler ]

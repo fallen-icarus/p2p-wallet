@@ -77,6 +77,7 @@ executable p2p-wallet
       P2PWallet.Data.Core.DerivationPath
       P2PWallet.Data.Core.Network
       P2PWallet.Data.Core.PoolID
+      P2PWallet.Data.Core.Profile
       P2PWallet.Data.Core.RegistrationStatus
       P2PWallet.Data.Core.TxCBOR
       P2PWallet.Data.Core.Witness
@@ -116,6 +117,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Home.UTxOs
       P2PWallet.GUI.Widgets.Home.WatchPaymentWallet
       P2PWallet.GUI.Widgets.MainMenu
+      P2PWallet.GUI.Widgets.Profiles
       P2PWallet.GUI.Widgets.TxBuilder
       P2PWallet.GUI.Widgets.TxBuilder.AddCertificate
       P2PWallet.GUI.Widgets.TxBuilder.AddChangeOutput

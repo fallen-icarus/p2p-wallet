@@ -24,6 +24,7 @@ makeFieldsNoPrefix ''DelegationModel
 makeFieldsNoPrefix ''ExpandedFields
 makeFieldsNoPrefix ''HomeModel
 makeFieldsNoPrefix ''NewPaymentWallet
+makeFieldsNoPrefix ''NewProfile
 makeFieldsNoPrefix ''NewStakeWallet
 makeFieldsNoPrefix ''TransactionFilters
 makeFieldsNoPrefix ''TxBuilderModel
@@ -47,6 +48,7 @@ makeFieldsNoPrefix ''VerifiedWithdrawal
 -------------------------------------------------
 makeFieldsNoPrefix ''NativeAsset
 makeFieldsNoPrefix ''NormalWitness
+makeFieldsNoPrefix ''Profile
 makeFieldsNoPrefix ''RegistrationWitness
 
 makePrisms ''DerivationPath

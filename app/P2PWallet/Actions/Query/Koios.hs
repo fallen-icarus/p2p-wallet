@@ -104,7 +104,7 @@ runQueryStakeWalletInfo network' account = do
                 & availableRewards .~ _availableRewards
                 & delegatedPool .~ maybeHead pools
                 & rewardHistory .~ concat rewards
-    Right ([],rewards,pools) -> 
+    Right ([],_,_) -> 
       -- If a stake address has never been seen on chain before (ie, a UTxO has not been created 
       -- at a payment address using the staking credential), the query will return the empty list.
       -- The preset fields for the account are accurate in this scenario.

@@ -1,4 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module P2PWallet.Actions.Utils where
 
@@ -8,9 +9,11 @@ import Data.Map qualified as Map
 import Data.Maybe (fromJust)
 
 import P2PWallet.Data.App
-import P2PWallet.Data.Core.Bech32Address
 import P2PWallet.Data.Core.Asset
+import P2PWallet.Data.Core.Bech32Address
+import P2PWallet.Data.Core.DerivationPath
 import P2PWallet.Data.Core.Network
+import P2PWallet.Data.Core.Profile
 import P2PWallet.Data.Core.Witness
 import P2PWallet.Data.Koios.AddressUTxO
 import P2PWallet.Data.Lens hiding (network,wallets)
@@ -50,6 +53,26 @@ runCmd cmd =
       case reverse s of
         ('\n':xs) -> reverse xs
         _ -> s
+
+-- | Check that the profile name and accountIndex are not already in use.
+processNewProfile :: NewProfile -> [Profile] -> Either Text Profile
+processNewProfile NewProfile{..} otherProfiles
+    | any (\p -> p ^. alias == _alias) otherProfiles = 
+        Left "Another profile exists with that name."
+    | any hasDeviceAccountAlready otherProfiles = 
+        Left $ "Another profile exists for " <> showHwDevice _device <> " with that account index."
+    | _accountIndex < 0 =
+        Left "Account indices must be > 0."
+    | otherwise = 
+        Right $ Profile
+          { _alias = _alias
+          , _accountIndex = AccountIndex _accountIndex
+          , _device = _device
+          }
+  where
+    hasDeviceAccountAlready :: Profile -> Bool
+    hasDeviceAccountAlready p = p ^. accountIndex == AccountIndex _accountIndex
+                             && p ^. device == _device
 
 -- | Convert `Network` to the required flag for cardano-cli.
 toNetworkFlag :: Network -> Text

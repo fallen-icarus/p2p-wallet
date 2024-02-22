@@ -171,10 +171,11 @@ handleHomeEvent model evt = case evt of
       [ Model $ model & waitingOnDevice .~ True
       , Task $
           let network' = model ^. config . network
+              profile' = fromMaybe def $ model ^. selectedProfile
               newWallet = model ^. homeModel . newPaymentWallet
           in runActionOrAlert 
                (HomeEvent . PairPaymentWallet . AddResult)
-               (pairPaymentWallet network' newWallet)
+               (pairPaymentWallet network' (profile' ^. accountIndex) newWallet)
       ]
     AddResult w -> 
       -- Disable `pairing` and `waitingOnDevice`. Update the list of known wallets and change
@@ -184,6 +185,7 @@ handleHomeEvent model evt = case evt of
         Left err -> [ Task $ return $ Alert err ]
         Right updatedWallets ->
           let network' = model ^. config . network
+              profile' = fromMaybe def $ model ^. selectedProfile
           in [ Model $ 
                  model & homeModel . pairing .~ False 
                        & waitingOnDevice .~ False
@@ -191,7 +193,7 @@ handleHomeEvent model evt = case evt of
                        & scene .~ HomeScene
                        & wallets .~ updatedWallets
              , Task $ do
-                 backupWallets network' updatedWallets
+                 backupWallets network' profile' updatedWallets
                  return $ SyncWallets StartSync
              ]
 
@@ -227,13 +229,14 @@ handleHomeEvent model evt = case evt of
         Left err -> [ Task $ return $ Alert err ]
         Right updatedWallets ->
           let network' = model ^. config . network
+              profile' = fromMaybe def $ model ^. selectedProfile
           in [ Model $ 
                  model & homeModel . watching .~ False 
                        & homeModel . selectedWallet .~ w
                        & scene .~ HomeScene
                        & wallets .~ updatedWallets
              , Task $ do
-                 backupWallets network' updatedWallets
+                 backupWallets network' profile' updatedWallets
                  return $ SyncWallets StartSync
              ]
 

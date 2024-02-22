@@ -64,10 +64,11 @@ handleDelegationEvent model evt = case evt of
       [ Model $ model & waitingOnDevice .~ True
       , Task $
           let network' = model ^. config . network
+              profile' = fromMaybe def $ model ^. selectedProfile
               newWallet = model ^. delegationModel . newStakeWallet
           in runActionOrAlert 
                (DelegationEvent . PairStakeWallet . AddResult)
-               (pairStakeWallet network' newWallet)
+               (pairStakeWallet network' (profile' ^. accountIndex) newWallet)
       ]
     AddResult w -> 
       -- Disable `pairing` and `waitingOnDevice`. Update the list of known wallets and change
@@ -77,6 +78,7 @@ handleDelegationEvent model evt = case evt of
         Left err -> [ Task $ return $ Alert err ]
         Right updatedWallets ->
           let network' = model ^. config . network
+              profile' = fromMaybe def $ model ^. selectedProfile
           in [ Model $ 
                  model & delegationModel . pairing .~ False 
                        & waitingOnDevice .~ False
@@ -84,7 +86,7 @@ handleDelegationEvent model evt = case evt of
                        & scene .~ DelegationScene
                        & wallets .~ updatedWallets
              , Task $ do
-                 backupWallets network' updatedWallets
+                 backupWallets network' profile' updatedWallets
                  return $ SyncWallets StartSync
              ]
 
@@ -120,13 +122,14 @@ handleDelegationEvent model evt = case evt of
         Left err -> [ Task $ return $ Alert err ]
         Right updatedWallets ->
           let network' = model ^. config . network
+              profile' = fromMaybe def $ model ^. selectedProfile
           in [ Model $ 
                  model & delegationModel . watching .~ False 
                        & delegationModel . selectedWallet .~ w
                        & scene .~ DelegationScene
                        & wallets .~ updatedWallets
              , Task $ do
-                 backupWallets network' updatedWallets
+                 backupWallets network' profile' updatedWallets
                  return $ SyncWallets StartSync
              ]
 

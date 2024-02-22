@@ -47,9 +47,9 @@ data DelegationDetails
 data NewStakeWallet = NewStakeWallet
   -- | A user-friendly name for the address. This is used regardless of pairing/watching.
   { _alias :: Text 
-  -- | What derivation path to use for the stake key. This is only used when pairing a stake
-  -- wallet.
-  , _stakeKeyPath :: Text 
+  -- | What address index to use for the stake key's derivation path. The account index is set by 
+  -- the profile. This is only used when pairing a payment wallet.
+  , _stakeAddressIndex :: Int 
   -- | The new stake address to watch. This is only used when adding a watched stake wallet.
   , _stakeAddress :: Text 
   } deriving (Show,Eq)
@@ -57,7 +57,7 @@ data NewStakeWallet = NewStakeWallet
 instance Default NewStakeWallet where
   def = NewStakeWallet
     { _alias = ""
-    , _stakeKeyPath = "1852H/1815H/0H/2/0" 
+    , _stakeAddressIndex = 0
     , _stakeAddress = ""
     }
 
@@ -107,9 +107,9 @@ data DelegationEvent
   -- | Change the Delegation subscene to the specified subscene.
   = ChangeDelegationScene DelegationScene
   -- | Pair a new `StakeWallet`. It can only be done from the `DelegationSummary` subscene.
-  | PairStakeWallet (AddWalletEvent StakeWallet)
+  | PairStakeWallet (AddEvent StakeWallet)
   -- | Watch a new `StakeWallet`. It can only be done from the `DelegationSummary` subscene.
-  | WatchStakeWallet (AddWalletEvent StakeWallet)
+  | WatchStakeWallet (AddEvent StakeWallet)
   -- | Show the details overlay for the specified item.
   | ShowDelegationDetails DelegationDetails
   -- | Close the details overlay and return to the previous screen.

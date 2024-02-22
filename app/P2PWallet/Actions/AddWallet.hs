@@ -26,17 +26,19 @@ import P2PWallet.Prelude
 -- Pairing Wallets
 -------------------------------------------------
 -- | Validate and then pair the new payment wallet.
-pairPaymentWallet :: Network -> NewPaymentWallet -> IO PaymentWallet
-pairPaymentWallet network NewPaymentWallet{..} = do
+pairPaymentWallet :: Network -> AccountIndex -> NewPaymentWallet -> IO PaymentWallet
+pairPaymentWallet network accountIndex' NewPaymentWallet{..} = do
     when (_alias == "") $ throwIO $ AppError "Alias is empty."
 
     pKeyPath <- 
-      fromJustOrAppError "Invalid payment key path." $ readDerivationPath _paymentKeyPath
+      fromJustOrAppError "Invalid payment address index." $ 
+        fmap (PaymentKeyPath accountIndex') $ toAddressIndex _paymentAddressIndex
 
-    msKeyPath <- case fmap readDerivationPath _stakeKeyPath of
+    msKeyPath <- case fmap toAddressIndex _stakeAddressIndex of
       Nothing -> return Nothing -- No stake key present.
-      Just Nothing -> throwIO $ AppError "Invalid stake key path." -- Failed to read key path.
-      Just res -> return res -- Successfully read key path.
+      Just Nothing -> throwIO $ AppError "Invalid stake address index."
+      Just _ -> -- Successfully converted address index.
+        return $ Just $ StakeKeyPath accountIndex'
 
     (payAddr,mStakeAddr) <- genAddresses pKeyPath msKeyPath
 
@@ -68,12 +70,13 @@ pairPaymentWallet network NewPaymentWallet{..} = do
       fromRightOrAppError $ plutusToBech32 network $ Address paymentKeyHash mStakingKeyHash
 
 -- | Validate and then pair the new stake wallet.
-pairStakeWallet :: Network -> NewStakeWallet -> IO StakeWallet
-pairStakeWallet network NewStakeWallet{..} = do
+pairStakeWallet :: Network -> AccountIndex -> NewStakeWallet -> IO StakeWallet
+pairStakeWallet network accountIndex' NewStakeWallet{..} = do
     when (_alias == "") $ throwIO $ AppError "Alias is empty."
 
-    sKeyPath <- 
-      fromJustOrAppError "Invalid stake key path." $ readDerivationPath _stakeKeyPath
+    -- This `const` will be removed once multi-delegation is enabled.
+    sKeyPath <- const (return $ StakeKeyPath accountIndex') $ 
+      fromJustOrAppError "Invalid stake address index." $ toAddressIndex _stakeAddressIndex
 
     stakeAddr <- genStakeAddress sKeyPath
 

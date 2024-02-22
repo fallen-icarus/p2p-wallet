@@ -13,12 +13,21 @@ Types to represent the derivation paths for hardware wallet keys:
 module P2PWallet.Data.Core.DerivationPath where
 
 import Data.Aeson qualified as Aeson
+import Data.Scientific (floatingOrInteger)
 
 import P2PWallet.Prelude
 
 -- | A type representing the account field in the derivaiton path.
 newtype AccountIndex = AccountIndex Int
   deriving (Show,Eq,Ord,Num)
+
+instance Aeson.ToJSON AccountIndex where
+  toJSON (AccountIndex i) = Aeson.toJSON i
+
+instance Aeson.FromJSON AccountIndex where
+  parseJSON = 
+    Aeson.withScientific "AccountIndex" $ \s ->
+      either (const mzero) (pure . AccountIndex) $ floatingOrInteger @Double @Int s
 
 unAccountIndex :: AccountIndex -> Int
 unAccountIndex (AccountIndex i) = i
@@ -29,6 +38,11 @@ newtype AddressIndex = AddressIndex Int
 
 unAddressIndex :: AddressIndex -> Int
 unAddressIndex (AddressIndex i) = i
+
+toAddressIndex :: Int -> Maybe AddressIndex
+toAddressIndex n
+  | n >= 0 = Just $ AddressIndex n
+  | otherwise = Nothing
 
 -- | The derivation path used for a hardware wallet key.
 data DerivationPath

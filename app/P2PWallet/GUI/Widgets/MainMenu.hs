@@ -19,7 +19,8 @@ mainMenuWidget wenv = do
     , customButtonWithName wenv "DEX" remixArrowLeftRightFill $ ChangeMainScene LimitOrders
     , customButtonWithName wenv "Liquidity" remixWaterFlashLine $ ChangeMainScene MarketMakers
     , customButtonWithName wenv "Tx Builder" remixToolsLine $ ChangeMainScene TxBuilderScene
-    , filler
     , customButtonWithName wenv "Settings" remixSettings3Line $ ChangeMainScene SettingsScene
+    , filler
+    , customButtonWithName wenv "Logout" remixLogoutBoxLine $ ChangeProfile LogoutCurrentProfile
     , spacer
-    ] `styleBasic` [bgColor sectionBgColor,radiusTR 5, radiusBR 5, width 60] 
+    ] `styleBasic` [bgColor sectionBgColor, width 60] 

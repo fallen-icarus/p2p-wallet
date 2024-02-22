@@ -22,12 +22,12 @@ pairStakeWidget wenv _ = do
                   (delegationModel . newStakeWallet . alias) 
                   [placeholder "Personal Stake"]
               ]
-          , hstack 
-              [ label "Stake Derivation Path:"
-              , spacer
-              , textField_ (delegationModel . newStakeWallet . stakeKeyPath) [maxLength 19]
-                  `styleBasic` [width 200]
-              ]
+          -- , hstack 
+          --     [ label "Stake Derivation Path:"
+          --     , spacer
+          --     , textField_ (delegationModel . newStakeWallet . stakeKeyPath) [maxLength 19]
+          --         `styleBasic` [width 200]
+          --     ]
           ]
 
   vstack 

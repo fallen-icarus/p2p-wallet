@@ -221,12 +221,12 @@ instance Default ExpandedFields where
 data NewPaymentWallet = NewPaymentWallet
   -- | A user-friendly name for the address. This is used regardless of pairing/watching.
   { _alias :: Text 
-  -- | What derivation path to use for the payment key. This is only used when pairing a payment
-  -- wallet.
-  , _paymentKeyPath :: Text 
-  -- | What derivation path to use for the stake key. This is only used when pairing a payment
-  -- wallet.
-  , _stakeKeyPath :: Maybe Text 
+  -- | What address index for the payment key's derivation path. The account index is set by the
+  -- profile. This is only used when pairing a payment wallet.
+  , _paymentAddressIndex :: Int 
+  -- | What address index to use for the stake key's derivation path. The account index is set by 
+  -- the profile. This is only used when pairing a payment wallet.
+  , _stakeAddressIndex :: Maybe Int 
   -- | The new payment address to watch. This is only used when adding a watched payment wallet.
   , _paymentAddress :: Text 
   } deriving (Show,Eq)
@@ -234,8 +234,8 @@ data NewPaymentWallet = NewPaymentWallet
 instance Default NewPaymentWallet where
   def = NewPaymentWallet 
     { _alias = ""
-    , _paymentKeyPath = "1852H/1815H/0H/0/0" 
-    , _stakeKeyPath = Nothing
+    , _paymentAddressIndex = 0
+    , _stakeAddressIndex = Nothing
     , _paymentAddress = ""
     }
 
@@ -257,9 +257,9 @@ data HomeEvent
   -- | Filter the transactions in the `HomeTransactions` subscene.
   | FilterHomeTransactions (FilterEvent VerifiedFilters)
   -- | Pair a new `PaymentWallet`. It can only be done from the `HomeAbout` subscene.
-  | PairPaymentWallet (AddWalletEvent PaymentWallet)
+  | PairPaymentWallet (AddEvent PaymentWallet)
   -- | Watch a new `PaymentWallet`. It can only be done from the `HomeAbout` subscene.
-  | WatchPaymentWallet (AddWalletEvent PaymentWallet)
+  | WatchPaymentWallet (AddEvent PaymentWallet)
   -- | Quickly add the UTxO currently being viewed in the details widget to the transaction as
   -- an input being spent.
   | QuickSpend TxOutRef

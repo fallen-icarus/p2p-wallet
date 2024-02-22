@@ -16,19 +16,11 @@ import P2PWallet.Prelude
 main :: IO ()
 main = do
     handle handleError $ do 
-      (cfg,prevWallets) <- loadFromBackups
+      (cfg,profiles) <- loadFromBackups
       let initModel = 
             def & config .~ cfg -- Use the saved configs.
-                & wallets .~ prevWallets -- Load the saved wallets.
-                & homeModel . selectedWallet .~ -- Set the target wallet to the first one.
-                    fromMaybe def (maybeHead $ prevWallets ^. paymentWallets)
-                & delegationModel . selectedWallet .~ -- Set the target wallet to the first one.
-                    fromMaybe def (maybeHead $ prevWallets ^. stakeWallets)
-          initEvent = 
-            if prevWallets == def 
-            then AppInit -- No tracked wallets.
-            else SyncWallets StartSync -- Already has wallets.
-      startApp initModel handleEvent buildUI $ appCfg initEvent
+                & knownProfiles .~ profiles -- Set the known profiles to choose from upon startup.
+      startApp initModel handleEvent buildUI $ appCfg AppInit
 
   where
     appCfg :: AppEvent -> [AppConfig AppEvent]

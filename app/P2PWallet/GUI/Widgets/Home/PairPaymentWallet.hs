@@ -10,9 +10,9 @@ import P2PWallet.Data.Lens
 import P2PWallet.Prelude
 
 pairPaymentWidget :: AppWenv -> AppModel -> AppNode
-pairPaymentWidget wenv model = do
-  let boolLens' = boolLens "1852H/1815H/0H/2/0" (homeModel . newPaymentWallet . stakeKeyPath)
-      textLens' = maybeLens "" (homeModel . newPaymentWallet . stakeKeyPath)
+pairPaymentWidget wenv _ = do
+  let boolLens' = boolLens 0 (homeModel . newPaymentWallet . stakeAddressIndex)
+      -- numLens' = maybeLens 0 (homeModel . newPaymentWallet . stakeAddressIndex)
       sectionBg = wenv ^. L.theme . L.sectionColor
 
       editFields = 
@@ -21,28 +21,29 @@ pairPaymentWidget wenv model = do
               [ label "Payment Wallet Name:"
               , spacer
               , textField_ (homeModel . newPaymentWallet . alias) [placeholder "Personal"] 
+                  `styleBasic` [width 400]
               ]
           , hstack 
-              [ label "Payment Derivation Path:"
+              [ label "Payment Address Index:"
               , spacer
-              , textField_ (homeModel . newPaymentWallet . paymentKeyPath) [maxLength 19]
-                  `styleBasic` [width 200]
+              , numericField (homeModel . newPaymentWallet . paymentAddressIndex)
+                  `styleBasic` [width 100]
               ]
           , hstack 
               [ label "Enable Staking"
               , spacer
               , checkbox_ boolLens' [checkboxSquare]
               ]
-          , hstack
-              [ spacer
-              , spacer
-              , spacer
-              , spacer
-              , label "Staking Derivation Path:"
-              , spacer
-              , textField_ textLens' [maxLength 19]
-                  `styleBasic` [width 200]
-              ] `nodeVisible` (model ^# boolLens')
+          -- , hstack
+          --     [ spacer
+          --     , spacer
+          --     , spacer
+          --     , spacer
+          --     , label "Staking Address Index:"
+          --     , spacer
+          --     , numericField numLens' 
+          --         `styleBasic` [width 100]
+          --     ] `nodeVisible` (model ^# boolLens')
           ]
 
   vstack 

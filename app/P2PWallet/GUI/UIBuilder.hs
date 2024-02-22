@@ -10,8 +10,9 @@ import P2PWallet.Data.App
 import P2PWallet.Data.Lens
 import P2PWallet.GUI.Widgets.Delegation
 import P2PWallet.GUI.Widgets.Internal.Custom
-import P2PWallet.GUI.Widgets.MainMenu
 import P2PWallet.GUI.Widgets.Home
+import P2PWallet.GUI.Widgets.MainMenu
+import P2PWallet.GUI.Widgets.Profiles
 import P2PWallet.GUI.Widgets.TxBuilder
 import P2PWallet.Prelude
 
@@ -34,14 +35,22 @@ buildUI wenv model = do
           `styleBasic` [bgColor $ darkGray & L.a .~ 0.9]
       alertOverlay = customAlertMsg (fromMaybe "" $ model ^. alertMessage) CloseAlertMessage
 
+      profile' = fromMaybe def $ model ^. selectedProfile
+      sectionBgColor = wenv ^. L.theme . L.sectionColor
+
   zstack 
-    [ hstack 
-        [ 
+    [ profilesWidget wenv model `nodeVisible` isNothing (model ^. selectedProfile)
+    , hstack
+        [
           mainMenuWidget wenv
-        , delegationWidget wenv model `nodeVisible` (DelegationScene == model ^. scene)
-        , homeWidget wenv model `nodeVisible` (HomeScene == model ^. scene)
-        , txBuilderWidget wenv model `nodeVisible` (TxBuilderScene == model ^. scene)
-        ]
+        , vstack
+            [ flip styleBasic [bgColor sectionBgColor] $ centerWidgetH $ 
+                flip styleBasic [padding 10, textSize 20] $ label (profile' ^. alias) 
+            , delegationWidget wenv model `nodeVisible` (DelegationScene == model ^. scene)
+            , homeWidget wenv model `nodeVisible` (HomeScene == model ^. scene)
+            , txBuilderWidget wenv model `nodeVisible` (TxBuilderScene == model ^. scene)
+            ]
+        ] `nodeVisible` isJust (model ^. selectedProfile)
     , alertOverlay `nodeVisible` isJust (model ^. alertMessage)
     , waitingOnDeviceOverlay `nodeVisible` (model ^. waitingOnDevice)
     , syncingWalletsOverlay `nodeVisible` (model ^. syncingWallets)

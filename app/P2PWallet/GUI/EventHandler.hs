@@ -4,8 +4,8 @@ module P2PWallet.GUI.EventHandler
   ) where
 
 import Monomer
-import Data.Maybe (fromJust)
 
+import P2PWallet.Actions.BackupFiles
 import P2PWallet.Actions.LookupPools
 import P2PWallet.Actions.SignTx
 import P2PWallet.Actions.SubmitTx
@@ -64,6 +64,77 @@ handleEvent _ _ model evt = case evt of
     [ Model $ model & scene .~ newScene ]
 
   -----------------------------------------------
+  -- Changing the current profile
+  -----------------------------------------------
+  -- Change the currently selected profile and load the new wallets. If there profile has
+  -- existing wallets, sync them.
+  ChangeProfile modal -> case modal of
+    -- Remove the current profile and open the profile picker widget.
+    LogoutCurrentProfile ->
+      [ Model $ model & selectedProfile .~ Nothing ]
+    -- Set the new profile as the selectedProfile. Then try to load the wallets for that profile.
+    LoadNewProfile newProfile' ->
+      [ Model $ model & selectedProfile .~ Just newProfile'
+      , Task $
+          runActionOrAlert
+            (ChangeProfile . LoadWalletsResult)
+            (loadWallets (model ^. config . network) newProfile' >>= fromRightOrAppError)
+      ]
+    -- Initialize the model with the wallet information for the profile. Take the user
+    -- to the home page.
+    LoadWalletsResult wallets' ->
+      [ Model $ model & wallets .~ wallets'
+                      & homeModel . selectedWallet .~
+                          fromMaybe def (maybeHead $ wallets' ^. paymentWallets)
+                      & delegationModel . selectedWallet .~
+                          fromMaybe def (maybeHead $ wallets' ^. stakeWallets)
+                      & scene .~ HomeScene
+      , Task $
+          if wallets' == def
+          then return AppInit
+          else return $ SyncWallets StartSync
+      ]
+
+  -----------------------------------------------
+  -- Adding new profiles
+  -----------------------------------------------
+  AddNewProfile modal -> case modal of
+    -- Show the addNewProfile widget, clear the old information, and initialize the accountIndex
+    -- with the next index.
+    StartAdding -> 
+      let newIdx = length $ model ^. knownProfiles
+      in [ Model $ model & newProfile . accountIndex .~ newIdx
+                         & newProfile . alias .~ ""
+                         & scene .~ NewProfileScene
+                         & addingProfile .~ True
+         ]
+    CancelAdding -> 
+      -- Close the widget for getting the new info.
+      [ Model $ model & addingProfile .~ False 
+                      & scene .~ ProfilePickerScene
+      ]
+    ConfirmAdding -> 
+      -- Check if the profile name or accountIndex is already in use.
+      case processNewProfile (model ^. newProfile) (model ^. knownProfiles) of
+        Left err -> [ Task $ return $ Alert err ]
+        Right newProfile' -> [ Task $ return $ AddNewProfile $ AddResult newProfile' ]
+    AddResult newProfile' ->
+      -- Backup the new profile and take the user to the home page. Also toggle the 
+      -- addingProfile flag. Initialize the new profile's wallet file.
+      let network' = model ^. config . network
+          newProfiles = sortOn (view accountIndex) $ newProfile' : model ^. knownProfiles
+      in [ Model $ 
+             model & selectedProfile .~ Just newProfile'
+                   & knownProfiles .~ newProfiles
+                   & addingProfile .~ False
+                   & scene .~ HomeScene
+         , Task $ do
+             backupProfiles network' newProfiles
+             backupWallets network' newProfile' def
+             return AppInit
+         ]
+
+  -----------------------------------------------
   -- Syncing Wallets
   -----------------------------------------------
   SyncWallets modal -> case modal of
@@ -82,10 +153,10 @@ handleEvent _ _ model evt = case evt of
       -- the `selectedWallet`.
       let paymentTarget = model ^. homeModel . selectedWallet . alias
           updatedPaymentTarget = 
-            fromJust $ find (\w -> w ^. alias == paymentTarget) $ resp ^. paymentWallets
+            fromMaybe def $ find (\w -> w ^. alias == paymentTarget) $ resp ^. paymentWallets
           stakeTarget = model ^. delegationModel . selectedWallet . alias
           updatedStakeTarget = 
-            fromJust $ find (\w -> w ^. alias == stakeTarget) $ resp ^. stakeWallets
+            fromMaybe def $ find (\w -> w ^. alias == stakeTarget) $ resp ^. stakeWallets
       in
         [ Model $ 
             model & syncingWallets .~ False

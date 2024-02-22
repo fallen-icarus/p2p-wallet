@@ -8,19 +8,19 @@ module P2PWallet.Data.App.Common where
 import P2PWallet.Prelude
 
 -------------------------------------------------
--- Add a new wallet.
+-- Add a new `a`.
 -------------------------------------------------
--- | Add wallet UI steps for a wallet of type `a`.
-data AddWalletEvent a
-  -- | Open the widget for getting the new wallet information.
+-- | Add UI steps for something of type `a`.
+data AddEvent a
+  -- | Open the widget for getting the new information.
   = StartAdding
-  -- | Close the widget and reset the new wallet information in the form.
+  -- | Close the widget and reset the new information in the form.
   | CancelAdding
   -- | Keep the widget open, validate the information, and (if pairing) try to get the required 
   -- information from the hardware wallet. If anything fails, display an error message to the 
   -- user. The widget is kept open to allow the user to quickly try again.
   | ConfirmAdding
-  -- | Process the new wallet information and add it to the tracked wallets.
+  -- | Process the new information and add it to the list of tracked items.
   | AddResult a
   deriving (Show,Eq)
 
@@ -41,4 +41,3 @@ data FilterEvent a
   -- | Close the widget and replace the previously set filters with the new ones.
   | ConfirmFilters a 
   deriving (Show,Eq)
-
