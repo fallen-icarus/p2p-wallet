@@ -1,4 +1,8 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 
 module Main where
 
@@ -6,24 +10,34 @@ import Monomer
 import Monomer.Lens qualified as L
 import Data.FileEmbed (embedFile)
 
-import P2PWallet.Actions.BackupFiles
-import P2PWallet.Data.App
-import P2PWallet.Data.Lens
+import System.FilePath ((</>), (<.>))
+import System.Directory qualified as Dir
+
+import P2PWallet.Actions.Database
+import P2PWallet.Data.AppModel
+import P2PWallet.GUI.Colors
 import P2PWallet.GUI.EventHandler
 import P2PWallet.GUI.UIBuilder
 import P2PWallet.Prelude
 
 main :: IO ()
 main = do
-    handle handleError $ do 
-      (cfg,profiles) <- loadFromBackups
-      let initModel = 
-            def & config .~ cfg -- Use the saved configs.
-                & knownProfiles .~ profiles -- Set the known profiles to choose from upon startup.
-      startApp initModel handleEvent buildUI $ appCfg AppInit
+    -- The db file is located in the user's $XDG_DATA_HOME directory.
+    let dbName = "p2p-wallet" </> "p2p-wallet" <.> "db"
+    dbFilePath <- Dir.getXdgDirectory Dir.XdgData dbName
+
+    whenLeftM_ (initializeDatabase dbFilePath) (throwIO . AppError)
+
+    -- Get the user's current time zone.
+    timeZone <- getCurrentTimeZone
+
+    let initModel = 
+          def & #databaseFile .~ dbFilePath -- Use the full filepath for to the database.
+              & #config % #timeZone .~ timeZone
+    startApp initModel handleEvent buildUI $ appCfg AppInit
 
   where
-    appCfg :: AppEvent -> [AppConfig AppEvent]
+    appCfg :: AppEvent -> [AppConfig s AppEvent]
     appCfg x =
       [ appWindowTitle "P2P-DeFi Wallet"
       , appTheme customDarkTheme
@@ -33,12 +47,12 @@ main = do
       , appFontDefMem "Italics" $(embedFile "./assets/fonts/Roboto-Italic.ttf")
       , appFontDefMem "Remix" $(embedFile "./assets/fonts/remixicon.ttf")
       , appInitEvent x
-      , appWindowState $ MainWindowNormal (1350,850)
+      -- , appWindowState $ MainWindowNormal (700,700)
       ]
 
-    handleError :: AppError -> IO ()
-    handleError (AppError err) = startApp def handleEvent buildUI $ appCfg $ Alert err
-
     customDarkTheme :: Theme
-    customDarkTheme = darkTheme
-      & L.userColorMap . at "rowBgColor" ?~ rgbHex "#656565"
+    customDarkTheme =
+      -- This is needed to change the background color of alerts.
+      darkTheme & mergeThemeStyle L.dialogFrameStyle [bgColor customGray3]
+                & mergeThemeStyle L.emptyOverlayStyle [bgColor $ black & #a .~ 0.5]
+                -- & mergeThemeStyle L.emptyOverlayStyle [bgColor $ customGray1 & #a .~ 0.8]

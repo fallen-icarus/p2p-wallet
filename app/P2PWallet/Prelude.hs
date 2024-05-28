@@ -1,53 +1,33 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
-{-# LANGUAGE TemplateHaskell #-}
-
 module P2PWallet.Prelude
   ( -- * Text
     T.replace
 
     -- * Time
   , Time.POSIXTime
+  , Time.TimeZone
   , showLocalTime
+  , showLocalDate
+  , Time.getCurrentTimeZone
 
     -- * Defaults
   , Default.Default(..)
-
-    -- * Control.Lens re-exports
-  , Lens.view
-  , Lens.isn't
-  , Lens.non
-  , Lens.at
-  , Lens.to
-  , Lens.ALens'
-  , Lens.Lens'
-  , Lens._1
-  , Lens._2
-  , Lens._3
-  , Lens._4
-  , Lens._Just
-  , Lens.set
-  , (^.)
-  , (^#)
-  , (^?)
-  , (?~)
-  , (.~)
-  , (#~)
 
     -- * Decimal
   , Decimal
   , realFracToDecimal
   
-    -- * Hardcoded Network Parameters
-  , mainnetParams
-  , preprodParams
-
     -- * Directories
   , getTemporaryDirectory
 
     -- * Miscelleneous Functions
   , showValue
   , maybeHead
+
+    -- * Lens Helpers
+  , boolLens
+  , maybeLens
 
   -- * Exceptions
   , throwIO
@@ -56,35 +36,23 @@ module P2PWallet.Prelude
 
     -- * Other useful re-exports
   , module Relude
+  , module Optics
   , Printf.printf
   ) where
 
-import Relude
+import Relude hiding (uncons)
 import System.Directory qualified as Dir
 import Data.Text qualified as T
 import Data.Time qualified as Time
 import Data.Time.Clock.POSIX qualified as Time
 import Data.Default qualified as Default
 import Data.Decimal (Decimal,realFracToDecimal)
-import Control.Lens qualified as Lens
-import Control.Lens ((^.), (^?), (^#), (.~), (?~), (#~)) -- For some reason, `Lens.^.` doesn't work.
 import Text.Printf qualified as Printf
 import Data.Aeson.Encoding qualified as Aeson
 import Data.Aeson qualified as Aeson
 import Monomer.Core.FromFractional(FromFractional(..))
 import Control.Exception (throwIO,catch,handle)
-import Data.FileEmbed (embedFile)
-
-preprodParams :: ByteString
-preprodParams = $(embedFile "assets/network-parameters/preprod-params.json")
-
-mainnetParams :: ByteString
-mainnetParams = $(embedFile "assets/network-parameters/mainnet-params.json")
-
-showLocalTime :: String -> Time.POSIXTime -> Text
-showLocalTime f t = toText
-                  $ Time.formatTime Time.defaultTimeLocale f 
-                  $ Time.posixSecondsToUTCTime t
+import Optics
 
 showValue :: Aeson.Value -> Text
 showValue = decodeUtf8 
@@ -103,6 +71,45 @@ getTemporaryDirectory = do
   tmpDir <- (<> "/p2p-wallet") <$> Dir.getTemporaryDirectory
   Dir.createDirectoryIfMissing True tmpDir -- Create the subfolder if it doesn't exist yet.
   return tmpDir
+
+showLocalDate :: Time.TimeZone -> Time.POSIXTime -> Text
+showLocalDate zone t = 
+    toText $ Time.formatTime Time.defaultTimeLocale formatter localTime
+  where
+    utcTime = Time.posixSecondsToUTCTime t
+    localTime = Time.utcToLocalTime zone utcTime
+    formatter = "%b %d, %0Y"
+
+showLocalTime :: Time.TimeZone -> Time.POSIXTime -> Text
+showLocalTime zone t = 
+    toText $ Time.formatTime Time.defaultTimeLocale formatter localTime
+  where
+    utcTime = Time.posixSecondsToUTCTime t
+    localTime = Time.utcToLocalTime zone utcTime
+    formatter = "%I:%M %p"
+
+-------------------------------------------------
+-- Lens Helpers
+-------------------------------------------------
+-- | A lens that interprets a `Maybe a` as True or False. This is usefull for widgets
+-- that depend on a `Bool`.
+boolLens :: a -> Lens' s (Maybe a) -> Lens' s Bool
+boolLens def' targetLens = 
+  lens (\m -> isJust $ m ^. targetLens)
+       (\m b -> m & targetLens .~ if b then Just def' else Nothing)
+
+maybeLens :: a -> Lens' s (Maybe a) -> Lens' s a
+maybeLens def' targetLens = 
+  lens (\m -> fromMaybe def' $ m ^. targetLens)
+       (\m t -> m & targetLens .~ Just t)
+
+-- -- | A lens into a sum type `a` with a default choice of type `b`. The unWrapper `(a -> b)`
+-- -- must cover the cases where the other data constructors are present. This is useful for
+-- -- editing the inner `Text` for types like `CertificateAction`.
+-- sumsOfProductsLens :: (a -> b) -> (b -> a) -> A_Lens s a -> A_Lens s b
+-- sumsOfProductsLens unWrapper wrapper targetLens =
+--   lens (\m -> unWrapper $ m ^# targetLens)
+--        (\m t -> m & targetLens #~ wrapper t)
 
 -------------------------------------------------
 -- Orphans

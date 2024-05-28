@@ -1,0 +1,174 @@
+module P2PWallet.GUI.Widgets.Home.AddPaymentWallet where
+
+import Monomer
+
+import P2PWallet.Data.AppModel
+import P2PWallet.GUI.Colors
+import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.Information
+import P2PWallet.Prelude
+
+addPaymentWalletWidget :: AppModel -> AppNode
+addPaymentWalletWidget model = do
+  let isPairing = model ^. #homeModel % #newPaymentWallet % #pairing
+      offStyle = def 
+        `styleBasic` [ bgColor customGray1 , textColor white ]
+        `styleHover` [ textColor lightGray ]
+  centerWidget $ vstack
+    [ hgrid
+        [ optionButton_ "Pair" True (toLensVL $ #homeModel % #newPaymentWallet % #pairing) 
+            [optionButtonOffStyle offStyle]
+            `styleBasic` 
+              [ bgColor customGray3
+              , textColor customBlue
+              , radius 0
+              , border 0 transparent
+              ]
+        , optionButton_ "Watch" False (toLensVL $ #homeModel % #newPaymentWallet % #pairing)
+            [optionButtonOffStyle offStyle]
+            `styleBasic` 
+              [ bgColor customGray3
+              , textColor customBlue
+              , radius 0
+              , border 0 transparent
+              ]
+        ]
+    , zstack 
+        [ widgetIf isPairing $ centerWidgetH $ pairPaymentWidget model
+        , widgetIf (not isPairing) $ centerWidgetH $ watchPaymentWidget model
+        ] `styleBasic` 
+            [ bgColor customGray3
+            , paddingT 0
+            , paddingL 20
+            , paddingR 20
+            , paddingB 20
+            , radius 0
+            , width 700
+            ]
+    ]
+
+pairPaymentWidget :: AppModel -> AppNode
+pairPaymentWidget model = do
+  let boolLens' = boolLens 0 (#homeModel % #newPaymentWallet % #stakeAddressIndex)
+      numLens' = maybeLens 0 (#homeModel % #newPaymentWallet % #stakeAddressIndex)
+
+      remixIconCornerDownRightArrow = toGlyph 0XF309
+
+      editFields = 
+        vstack_ [childSpacing]
+          [ hstack
+              [ label "What is a paired wallet?"
+                  `styleBasic` [textFont "Italics"]
+              , mainButton remixInformationLine (Alert whatIsPairedWalletMsg)
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              ]
+          , hstack 
+              [ label "Payment Wallet Name:"
+              , spacer
+              , textField_ (toLensVL $ #homeModel % #newPaymentWallet % #alias) [placeholder "Personal"] 
+                  `styleBasic` [width 400]
+              ]
+          , hstack 
+              [ label "Payment Key Address Index:"
+              , spacer
+              , numericField (toLensVL $ #homeModel % #newPaymentWallet % #paymentAddressIndex)
+                  `styleBasic` [width 100]
+              , mainButton remixInformationLine (Alert paymentAddressIndexMsg)
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              ]
+          , hstack 
+              [ label "Enable Staking"
+              , spacer
+              , checkbox_ (toLensVL boolLens') [checkboxSquare]
+              ]
+          , hstack
+              [ spacer_ [width 20]
+              , label remixIconCornerDownRightArrow 
+                  `styleBasic` [paddingT 8, paddingR 5, textFont "Remix"]
+              , label "Staking Key Address Index:"
+              , spacer
+              , numericField (toLensVL numLens')
+                  `styleBasic` [width 100]
+              , mainButton remixInformationLine (Alert stakeAddressIndexMsg)
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              ] `nodeVisible` (model ^. boolLens')
+          ]
+
+  vstack 
+    [ editFields
+    , spacer
+    , hstack 
+        [ filler
+        , mainButton "Pair" $ HomeEvent $ PairPaymentWallet ConfirmAdding
+        , spacer
+        , button "Cancel" $ HomeEvent $ PairPaymentWallet CancelAdding
+        ]
+    ] `styleBasic` [bgColor transparent, padding 20]
+
+watchPaymentWidget :: AppModel -> AppNode
+watchPaymentWidget _ = do
+  let editFields = 
+        vstack_ [childSpacing]
+          [ hstack
+              [ label "What is a watched wallet?"
+                  `styleBasic` [textFont "Italics"]
+              , mainButton remixInformationLine (Alert whatIsWatchedWalletMsg)
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              ]
+          , hstack 
+              [ label "Payment Wallet Name:"
+              , spacer
+              , textField_ 
+                  (toLensVL $ #homeModel % #newPaymentWallet % #alias) 
+                  [placeholder "Personal Watched"] 
+                  `styleBasic` [width 400]
+              ]
+          , hstack 
+              [ label "Payment Address:"
+              , spacer
+              , textField (toLensVL $ #homeModel % #newPaymentWallet % #paymentAddress)
+              ]
+          ]
+
+  vstack 
+    [ editFields
+    , spacer
+    , hstack 
+        [ filler
+        , mainButton "Watch" $ HomeEvent $ WatchPaymentWallet ConfirmAdding
+        , spacer
+        , button "Cancel" $ HomeEvent $ WatchPaymentWallet CancelAdding
+        ]
+    ] `styleBasic` [bgColor transparent, padding 20]

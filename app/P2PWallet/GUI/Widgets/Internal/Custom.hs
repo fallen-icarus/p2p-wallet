@@ -1,22 +1,97 @@
 module P2PWallet.GUI.Widgets.Internal.Custom 
   (
-    copyableTextField
+    copyableLabelFor
+  , copyableLabelFor_
+  , copyableLabelSelf
+  , copyableLabelWith
+  , copyableTextField
   , copyableTextArea
-  , customButtonWithName
-  , customButton
   , centerWidget
   , centerWidgetH
   , centerWidgetV
+  , cushionWidget
+  , cushionWidgetH
+  , cushionWidgetV
   , customAlertMsg
   ) where
 
 import Monomer
-import Monomer.Lens qualified as L
 import Prettyprinter (vsep)
 import Prettyprinter.Util (reflow)
 
-import P2PWallet.Data.App
+import P2PWallet.Data.AppModel
+import P2PWallet.GUI.Colors
 import P2PWallet.Prelude
+
+-- | A label button that will copy other data.
+copyableLabelFor :: Text -> Text -> WidgetNode s AppEvent
+copyableLabelFor caption info = 
+  hstack
+    [ tooltip_ "Copy" [tooltipDelay 1000] $ button caption (CopyText info)
+        `styleBasic`
+          [ padding 0
+          , radius 5
+          , textMiddle
+          , border 0 transparent
+          , textColor customBlue
+          , bgColor transparent
+          ]
+        `styleHover` [textColor lightGray, cursorIcon CursorHand]
+    , spacer
+    , label info `styleBasic` [textColor lightGray]
+    ]
+
+-- | A version of copyableLabelFor with a customizable font size.
+copyableLabelFor_ :: Text -> Text -> Double -> WidgetNode s AppEvent
+copyableLabelFor_ caption info fontSize = 
+  hstack
+    [ tooltip_ "Copy" [tooltipDelay 1000] $ button caption (CopyText info)
+        `styleBasic`
+          [ padding 0
+          , radius 5
+          , textMiddle
+          , border 0 transparent
+          , textColor customBlue
+          , bgColor transparent
+          , textSize fontSize
+          ]
+        `styleHover` [textColor lightGray, cursorIcon CursorHand]
+    , spacer
+    , label_ info [ellipsis] `styleBasic` [textSize fontSize, textColor lightGray]
+    ]
+
+-- | A label button that will copy itself.
+copyableLabelSelf :: Text -> WidgetNode s AppEvent
+copyableLabelSelf caption = 
+  tooltip_ "Copy" [tooltipDelay 1000] $ button caption (CopyText caption)
+    `styleBasic`
+      [ padding 0
+      , radius 5
+      , textMiddle
+      , textSize 12
+      , border 0 transparent
+      , textColor white
+      , bgColor transparent
+      ]
+    `styleHover` [textColor customBlue, cursorIcon CursorHand]
+
+copyableLabelWith :: (ToText a) => Text -> (a -> Text) -> a -> WidgetNode s AppEvent
+copyableLabelWith caption modifier fullInfo = do
+  let formattedInfo = modifier fullInfo
+  hstack
+    [ tooltip_ "Copy" [tooltipDelay 1000] $ button caption (CopyText $ toText fullInfo)
+        `styleBasic`
+          [ padding 0
+          , radius 5
+          , textMiddle
+          , border 0 transparent
+          , textColor customBlue
+          , bgColor transparent
+          ]
+        `styleHover` [textColor lightGray, cursorIcon CursorHand]
+    , spacer
+    , label formattedInfo `styleBasic` [textColor lightGray]
+    ]
 
 -- | A read only text field to allow the user to copy the underlying text.
 copyableTextField :: Text -> WidgetNode s AppEvent
@@ -41,68 +116,9 @@ copyableTextArea text = do
       , border 0 transparent
       ]
 
--- | A button with an icon, a transparent background, and a tooltip.
-customButtonWithName
-  :: AppWenv
-  -> Text 
-  -> Text 
-  -> AppEvent 
-  -> AppNode
-customButtonWithName wenv name remixIcon evt = do
-  let rowBgColor = wenv ^. L.theme . L.userColorMap . at "rowBgColor" . non def
-      rowButtonColor = wenv ^. L.theme . L.userColorMap . at "rowButton" . non def
-      btn = 
-        vstack 
-          [ centerWidgetH $ label remixIcon
-              `styleBasic`
-                  [ textFont "Remix"
-                  , paddingT 10
-                  , paddingL 10
-                  , paddingR 10
-                  , paddingB 0
-                  , textMiddle
-                  , textColor rowButtonColor
-                  , textSize 18
-                  , bgColor transparent
-                  , border 0 transparent
-                  ]
-          , centerWidgetH $ label name 
-              `styleBasic` 
-                  [ paddingT 0
-                  , paddingL 0
-                  , paddingR 0
-                  , paddingB 2
-                  , textSize 10
-                  ]
-          ]
-  box_ [onClick evt] btn
-    `styleBasic` [paddingB 10, radius 5]
-    `styleHover` [bgColor rowBgColor, cursorIcon CursorHand]
-
--- | A button with an icon, a transparent background, and a tooltip.
-customButton 
-  :: AppWenv
-  -> Text 
-  -> Text 
-  -> AppEvent 
-  -> AppNode
-customButton wenv tip remixIcon evt = do
-  let rowBgColor = wenv ^. L.theme . L.userColorMap . at "rowBgColor" . non def
-      rowButtonColor = wenv ^. L.theme . L.userColorMap . at "rowButton" . non def
-  tooltip_ tip [tooltipDelay 1000] $
-    button remixIcon evt
-      `styleHover` [bgColor rowBgColor, cursorIcon CursorHand]
-      `styleBasic` [
-          textFont "Remix", 
-          padding 10,
-          textMiddle, 
-          textColor rowButtonColor, 
-          bgColor transparent, 
-          border 0 transparent]
-
 -- | Center a widget both vertically and horizontally.
 centerWidget :: WidgetNode s AppEvent -> WidgetNode s AppEvent
-centerWidget w = centerWidgetV $ centerWidgetH w
+centerWidget = centerWidgetV . centerWidgetH
 
 -- | Center a widget vertically.
 centerWidgetV :: WidgetNode s AppEvent -> WidgetNode s AppEvent
@@ -122,9 +138,31 @@ centerWidgetH w =
     , filler
     ]
 
+-- | Add a single space on all sides of a widget.
+cushionWidget :: WidgetNode s AppEvent -> WidgetNode s AppEvent
+cushionWidget = cushionWidgetV . cushionWidgetH
+
+-- | Add a single space on the top and the bottom of a widget.
+cushionWidgetV :: WidgetNode s AppEvent -> WidgetNode s AppEvent
+cushionWidgetV w =
+  vstack
+    [ spacer
+    , w
+    , spacer
+    ]
+
+-- | Add a single space to the left and the right of a widget.
+cushionWidgetH :: WidgetNode s AppEvent -> WidgetNode s AppEvent
+cushionWidgetH w =
+  hstack
+    [ spacer
+    , w
+    , spacer
+    ]
+
 -- | A custom alert box that allows the user to copy the alert message.
 -- It will try to reflow the text so that it is not one long line.
 customAlertMsg :: Text -> AppEvent -> WidgetNode AppModel AppEvent
 customAlertMsg msg closeEvt = 
-  alert closeEvt $ centerWidget $
-    copyableTextArea $ show $ vsep $ map reflow $ lines msg
+  alert closeEvt $ centerWidget $ copyableTextArea (show $ vsep $ map reflow $ lines msg)
+    `styleBasic` [textSize 12]

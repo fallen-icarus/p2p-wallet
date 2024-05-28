@@ -1,31 +1,18 @@
 cabal-version:      3.0
 name:               p2p-wallet
 version:            0.1.0.0
-
--- A short (one-line) description of the package.
--- synopsis:
-
--- A longer description of the package.
--- description:
-
--- The license under which the package is released.
 license:            Apache-2.0
-
--- The file containing the license text.
 license-file:       LICENSE
-
--- The package author(s).
 author:             fallen-icarus
-
--- An email address to which users can send suggestions, bug reports, and patches.
 maintainer:         modern.daidalos+github@gmail.com
-
--- A copyright notice.
--- copyright:
 build-type:         Simple
-
--- Extra doc files to be distributed with the package, such as a CHANGELOG or a README.
-extra-doc-files:    CHANGELOG.md
+extra-doc-files:    
+  CHANGELOG.md
+  assets/remixicon.ttf
+  assets/Roboto-Bold.ttf
+  assets/Roboto-Italic.ttf
+  assets/Roboto-Medium.ttf
+  assets/Roboto-Regular.ttf
 
 -- Extra source files to be distributed with the package, such as examples, or a tutorial module.
 -- extra-source-files:
@@ -33,106 +20,124 @@ extra-doc-files:    CHANGELOG.md
 common warnings
     ghc-options: -Wall
 
-common threaded
-    ghc-options: -threaded -rtsopts -with-rtsopts=-N
+common optimizations
+    ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
 
 common extensions
     default-language: GHC2021
     default-extensions:
+      DeriveAnyClass
+      DuplicateRecordFields
       OverloadedStrings
+      OverloadedLabels
       LambdaCase
       NoImplicitPrelude
 
 executable p2p-wallet
     import:
       , warnings
-      , threaded
+      , optimizations
       , extensions
 
-    -- .hs or .lhs file containing the Main module.
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
     other-modules:
       P2PWallet.Actions.AddWallet
-      P2PWallet.Actions.BackupFiles
-      P2PWallet.Actions.BuildTxBody
-      P2PWallet.Actions.ExportTxBody
+      -- P2PWallet.Actions.BuildTxBody
+      P2PWallet.Actions.Database
+      -- P2PWallet.Actions.ExportTxBody
       P2PWallet.Actions.ExportHwKey
-      P2PWallet.Actions.LookupPools
+      -- P2PWallet.Actions.LookupPools
       P2PWallet.Actions.Query.Koios
       P2PWallet.Actions.Utils
-      P2PWallet.Actions.SignTx
-      P2PWallet.Actions.SubmitTx
+      -- P2PWallet.Actions.SignTx
+      -- P2PWallet.Actions.SubmitTx
       P2PWallet.Actions.SyncWallets
-      P2PWallet.Data.App
-      P2PWallet.Data.App.Common
-      P2PWallet.Data.App.Config
-      P2PWallet.Data.App.Delegation
-      P2PWallet.Data.App.Home
-      P2PWallet.Data.App.TxBuilder
+      P2PWallet.Data.AppModel
+      P2PWallet.Data.AppModel.Common
+      -- P2PWallet.Data.App.Delegation
+      P2PWallet.Data.AppModel.Home
+      -- P2PWallet.Data.App.TxBuilder
       P2PWallet.Data.Core
       P2PWallet.Data.Core.Asset
       P2PWallet.Data.Core.Bech32Address
+      P2PWallet.Data.Core.Config
       P2PWallet.Data.Core.DerivationPath
+      P2PWallet.Data.Core.HardwareDevice
       P2PWallet.Data.Core.Network
+      P2PWallet.Data.Core.PaymentId
+      P2PWallet.Data.Core.ProfileId
       P2PWallet.Data.Core.PoolID
-      P2PWallet.Data.Core.Profile
-      P2PWallet.Data.Core.RegistrationStatus
+      -- P2PWallet.Data.Core.RegistrationStatus
       P2PWallet.Data.Core.TxCBOR
-      P2PWallet.Data.Core.Witness
+      -- P2PWallet.Data.Core.Witness
+      P2PWallet.Data.Database
+      P2PWallet.Data.Database.Create
+      P2PWallet.Data.Database.Delete
+      P2PWallet.Data.Database.Insert
+      P2PWallet.Data.Database.Pattern
+      P2PWallet.Data.Database.Query
       P2PWallet.Data.Files
       P2PWallet.Data.Koios.AddressUTxO
-      P2PWallet.Data.Koios.Pool
+      -- P2PWallet.Data.Koios.Pool
       P2PWallet.Data.Koios.PostTypes
-      P2PWallet.Data.Koios.StakeAccount
-      P2PWallet.Data.Koios.StakeReward
+      -- P2PWallet.Data.Koios.StakeAccount
+      -- P2PWallet.Data.Koios.StakeReward
       P2PWallet.Data.Koios.Transaction
-      P2PWallet.Data.Koios.TxSubmissionResponse
-      P2PWallet.Data.FilterLang
-      P2PWallet.Data.Lens
-      P2PWallet.Data.Plutus
+      -- P2PWallet.Data.Koios.TxSubmissionResponse
+      -- P2PWallet.Data.FilterLang
+      P2PWallet.Data.Profile
       P2PWallet.Data.Wallets
       P2PWallet.Data.Wallets.PaymentWallet
-      P2PWallet.Data.Wallets.StakeWallet
+      -- P2PWallet.Data.Wallets.StakeWallet
+      P2PWallet.GUI.Colors
       P2PWallet.GUI.EventHandler
-      P2PWallet.GUI.EventHandler.DelegationEvent
+      -- P2PWallet.GUI.EventHandler.DelegationEvent
       P2PWallet.GUI.EventHandler.HomeEvent
-      P2PWallet.GUI.EventHandler.TxBuilderEvent
+      P2PWallet.GUI.EventHandler.ProfileEvent
+      -- P2PWallet.GUI.EventHandler.TxBuilderEvent
       P2PWallet.GUI.UIBuilder
-      P2PWallet.GUI.Widgets.Delegation
-      P2PWallet.GUI.Widgets.Delegation.Details
-      P2PWallet.GUI.Widgets.Delegation.PairStakeWallet
-      P2PWallet.GUI.Widgets.Delegation.RegisteredPools
-      P2PWallet.GUI.Widgets.Delegation.RewardHistory
-      P2PWallet.GUI.Widgets.Delegation.Summary
-      P2PWallet.GUI.Widgets.Delegation.WatchStakeWallet
+      -- P2PWallet.GUI.Widgets.Delegation
+      -- P2PWallet.GUI.Widgets.Delegation.Details
+      -- P2PWallet.GUI.Widgets.Delegation.PairStakeWallet
+      -- P2PWallet.GUI.Widgets.Delegation.RegisteredPools
+      -- P2PWallet.GUI.Widgets.Delegation.RewardHistory
+      -- P2PWallet.GUI.Widgets.Delegation.Summary
+      -- P2PWallet.GUI.Widgets.Delegation.WatchStakeWallet
       P2PWallet.GUI.Widgets.Internal.Custom
+      P2PWallet.GUI.Widgets.Internal.Popup
       P2PWallet.GUI.Widgets.Home
       P2PWallet.GUI.Widgets.Home.About
-      P2PWallet.GUI.Widgets.Home.Assets
-      P2PWallet.GUI.Widgets.Home.Details
-      P2PWallet.GUI.Widgets.Home.PairPaymentWallet
-      P2PWallet.GUI.Widgets.Home.Transactions
+      P2PWallet.GUI.Widgets.Home.AddPaymentWallet
+      -- P2PWallet.GUI.Widgets.Home.Assets
+      -- P2PWallet.GUI.Widgets.Home.Details
+      -- P2PWallet.GUI.Widgets.Home.Transactions
       P2PWallet.GUI.Widgets.Home.UTxOs
-      P2PWallet.GUI.Widgets.Home.WatchPaymentWallet
       P2PWallet.GUI.Widgets.MainMenu
+      P2PWallet.GUI.Widgets.Networks
       P2PWallet.GUI.Widgets.Profiles
-      P2PWallet.GUI.Widgets.TxBuilder
-      P2PWallet.GUI.Widgets.TxBuilder.AddCertificate
-      P2PWallet.GUI.Widgets.TxBuilder.AddChangeOutput
-      P2PWallet.GUI.Widgets.TxBuilder.AddInput
-      P2PWallet.GUI.Widgets.TxBuilder.AddOutput
-      P2PWallet.GUI.Widgets.TxBuilder.AddWithdrawal
-      P2PWallet.GUI.Widgets.TxBuilder.ExportTxBody
-      P2PWallet.GUI.Widgets.TxBuilder.Summary
+      P2PWallet.GUI.Widgets.Settings
+      -- P2PWallet.GUI.Widgets.TxBuilder
+      -- P2PWallet.GUI.Widgets.TxBuilder.AddCertificate
+      -- P2PWallet.GUI.Widgets.TxBuilder.AddChangeOutput
+      -- P2PWallet.GUI.Widgets.TxBuilder.AddInput
+      -- P2PWallet.GUI.Widgets.TxBuilder.AddOutput
+      -- P2PWallet.GUI.Widgets.TxBuilder.AddWithdrawal
+      -- P2PWallet.GUI.Widgets.TxBuilder.ExportTxBody
+      -- P2PWallet.GUI.Widgets.TxBuilder.Summary
+      P2PWallet.Information
+      P2PWallet.MonomerOptics
+      P2PWallet.Plutus
       P2PWallet.Prelude
 
     -- Other library packages from which modules are imported.
     build-depends:
         base
-      , monomer ==1.5.1.0
+      -- , monomer ==1.5.1.0
+      , monomer
       , lens
+      , optics
       , text
       , data-default
       , time
@@ -157,9 +162,11 @@ executable p2p-wallet
       , unliftio
       , containers
       , cardano-swaps
+      , cardano-loans
       , relude
       , vector
       , aeson-pretty
+      , sqlite-simple
 
     -- Directories containing source files.
     hs-source-dirs:   app

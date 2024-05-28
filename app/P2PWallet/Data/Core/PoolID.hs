@@ -1,4 +1,10 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module P2PWallet.Data.Core.PoolID where
 
@@ -7,8 +13,10 @@ import Prettyprinter (Pretty(..))
 
 import P2PWallet.Prelude
 
-newtype PoolID = PoolID Text
+newtype PoolID = PoolID { unPoolId :: Text }
   deriving (Show,Eq,Ord)
+
+makeFieldLabelsNoPrefix ''PoolID
 
 instance ToJSON PoolID where
   toJSON = toJSON . unPoolId
@@ -27,6 +35,3 @@ instance ToText PoolID where
 
 instance ToString PoolID where
   toString (PoolID addr) = toString addr
-
-unPoolId :: PoolID -> Text
-unPoolId (PoolID pId) = pId

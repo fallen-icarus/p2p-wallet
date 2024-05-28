@@ -8,11 +8,11 @@ import System.FilePath ((</>), (<.>))
 import Data.String qualified as String
 
 import P2PWallet.Actions.Utils
-import P2PWallet.Prelude
-import P2PWallet.Data.App
+import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core
 import P2PWallet.Data.Files
-import P2PWallet.Data.Core.DerivationPath
-import P2PWallet.Data.Plutus
+import P2PWallet.Plutus
+import P2PWallet.Prelude
 
 -- | Export the pubkey files with an optional name.
 exportHwKeyFiles :: Maybe FilePath -> DerivationPath -> IO (PubKeyFile,HwSigningFile)
@@ -38,7 +38,7 @@ exportHwPubKeyHash key = do
   where
     hashPubKeyFileCmd = case key of
       PaymentKeyPath _ _ -> "cardano-cli address key-hash --payment-verification-key-file %s"
-      StakeKeyPath _ -> "cardano-cli stake-address key-hash --stake-verification-key-file %s"
+      StakeKeyPath _ _ -> "cardano-cli stake-address key-hash --stake-verification-key-file %s"
 
 exportPubKeyCmd :: DerivationPath -> PubKeyFile -> HwSigningFile -> String
 exportPubKeyCmd key pubKeyFile hwsKeyFile =

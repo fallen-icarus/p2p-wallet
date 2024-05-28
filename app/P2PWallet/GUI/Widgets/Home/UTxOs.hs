@@ -1,182 +1,181 @@
-module P2PWallet.GUI.Widgets.Home.UTxOs 
-  ( utxoWidget
-  , utxoFilterInfo
-  ) where
+{-# LANGUAGE RecordWildCards #-}
+
+module P2PWallet.GUI.Widgets.Home.UTxOs where
 
 import Monomer
-import Monomer.Lens qualified as L
-import Data.Text qualified as T
 
-import P2PWallet.Data.App
+import Prettyprinter (align, pretty, vsep)
+
+import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
-import P2PWallet.Data.Koios.AddressUTxO
-import P2PWallet.Data.Lens
-import P2PWallet.Data.Plutus
+import P2PWallet.Data.Wallets
+import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
-applyAddressUTxOFilters :: UTxOFilters -> [AddressUTxO] -> [AddressUTxO]
-applyAddressUTxOFilters fs us = do
-  u <- us
-  guard $ maybe True (flip hasAssetWithPolicyId u) (fs ^. byPolicyId)
-  guard $ maybe True (flip hasAssetWithTokenName u) (fs ^. byTokenName)
-  guard $ maybe True (flip hasAssetWithFingerprint u) (fs ^. byFingerprint)
-  guard $ flip (maybe True) (fs ^. byReferenceScriptHash) $ \r ->
-    if r == ""
-    then isJust $ u ^. referenceScriptHash
-    else Just r == u ^. referenceScriptHash
-  guard $ flip (maybe True) (fs ^. byDatumHash) $ \r ->
-    if r == ""
-    then isJust $ u ^. datumHash
-    else Just r == u ^. datumHash
-  guard $ flip (maybe True) (fs ^. byTxHash) $ 
-    \hash -> hash == T.takeWhile (/='#') (showTxOutRef $ u ^. utxoRef)
-  return u
-
-utxoWidget :: AppWenv -> AppModel -> AppNode
-utxoWidget wenv model =
-  vstack
-    [ label ("UTxOs (" <> show (length sample) <> ")")
-        `styleBasic` [padding 10]
-    , vscroll_ [wheelRate 50] $ 
-        vstack $ map utxoRow $ sortOn (view utxoRef) sample
-    , filler
-    , hstack
-        [ filler
-        , customButton wenv "Filter" remixFilter3Line $ HomeEvent $ FilterHomeUTxOs StartFiltering
-        ] `styleBasic` [bgColor dimGray]
-    ]
-  where
-    sample :: [AddressUTxO]
-    sample = applyAddressUTxOFilters (model ^. homeModel . setFilters . utxoFilters) $
-      model ^. homeModel . selectedWallet . utxos
-
-    rowBgColor :: Color
-    rowBgColor = wenv ^. L.theme . L.userColorMap . at "rowBgColor" . non def
-
-    -- Show the main information for a utxo in a box that is clickable. When the box
-    -- is clicked, open a more detailed view for that utxo.
-    utxoRow :: AddressUTxO -> AppNode
-    utxoRow u =
-      let content = 
-            hstack 
-              [ label_ (showTxOutRef $ u ^. utxoRef) [resizeFactor 1]
-                  `styleBasic` [textFont "Medium", textSize 16]
-              , filler
-              , label_ (fromString $ printf "%D ADA" $ toADA $ u ^. lovelaces) 
-                  [resizeFactor 1]
-              ] `styleBasic` [height 80, padding 20, radius 5]
-                `styleHover` [bgColor rowBgColor, cursorIcon CursorHand]
-      in box_ [expandContent, onClick (HomeEvent $ ShowHomeDetails $ HomeUTxO u)] content 
-          `styleBasic` [padding 10, paddingT 0]
-
-utxoFilterInfo :: AppWenv -> AppModel -> AppNode
-utxoFilterInfo wenv model = 
-  let rootLens = homeModel . newFilters . utxoFilters
-      boolLens' aLens = boolLens "" (rootLens . aLens)
-      textLens' aLens = maybeLens "" (rootLens . aLens)
-      sectionBg = wenv ^. L.theme . L.sectionColor
-
-      editFields = 
-        vstack_ [childSpacing]
-          [ hstack 
-              [ label "By Policy ID"
-              , spacer
-              , checkbox_ (boolLens' byPolicyId) [checkboxSquare]
-              ]
-          , hstack
-              [ spacer
-              , spacer
-              , spacer
-              , spacer
-              , label "*" `styleBasic` [textColor crimson]
-              , label "Policy ID:"
-              , spacer
-              , textField (textLens' byPolicyId)
-              ] `nodeVisible` (model ^# boolLens' byPolicyId) 
-          , hstack 
-              [ label "By Token Name"
-              , spacer
-              , checkbox_ (boolLens' byTokenName) [checkboxSquare]
-              ]
-          , hstack
-              [ spacer
-              , spacer
-              , spacer
-              , spacer
-              , label "*" `styleBasic` [textColor crimson]
-              , label "Token Name:"
-              , spacer
-              , textField (textLens' byTokenName)
-              ] `nodeVisible` (model ^# boolLens' byTokenName) 
-          , hstack 
-              [ label "By Asset Fingerprint"
-              , spacer
-              , checkbox_ (boolLens' byFingerprint) [checkboxSquare]
-              ]
-          , hstack
-              [ spacer
-              , spacer
-              , spacer
-              , spacer
-              , label "*" `styleBasic` [textColor crimson]
-              , label "Fingerprint:"
-              , spacer
-              , textField (textLens' byFingerprint) 
-              ] `nodeVisible` (model ^# boolLens' byFingerprint) 
-          , hstack 
-              [ label "By Reference Script"
-              , spacer
-              , checkbox_ (boolLens' byReferenceScriptHash) [checkboxSquare]
-              ]
-          , hstack
-              [ spacer
-              , spacer
-              , spacer
-              , spacer
-              , label "Reference Script Hash (leave empty to match any):"
-              , spacer
-              , textField (textLens' byReferenceScriptHash) 
-              ] `nodeVisible` (model ^# boolLens' byReferenceScriptHash) 
-          , hstack 
-              [ label "By Datum"
-              , spacer
-              , checkbox_ (boolLens' byDatumHash) [checkboxSquare]
-              ]
-          , hstack
-              [ spacer
-              , spacer
-              , spacer
-              , spacer
-              , label "Datum Hash (leave empty to match any):"
-              , spacer
-              , textField (textLens' byDatumHash) 
-              ] `nodeVisible` (model ^# boolLens' byDatumHash) 
-          , hstack 
-              [ label "By Tx Hash"
-              , spacer
-              , checkbox_ (boolLens' byTxHash) [checkboxSquare]
-              ]
-          , hstack
-              [ spacer
-              , spacer
-              , spacer
-              , spacer
-              , label "*" `styleBasic` [textColor crimson]
-              , label "Tx Hash:"
-              , spacer
-              , textField (textLens' byTxHash)
-              ] `nodeVisible` (model ^# boolLens' byTxHash) 
+utxosWidget :: AppModel -> AppNode
+utxosWidget model =
+    cushionWidgetH $ vstack
+      [ hstack 
+          [ label ("UTxOs (" <> show (length sample) <> ")")
+              `styleBasic` [textFont "Italics", textSize 14]
+          , filler
           ]
+      , flip styleBasic [padding 5] $ box $ vscroll_ [wheelRate 50] $ 
+          vstack_ [childSpacing] (map utxoRow sample)
+            `styleBasic` [padding 10]
+      , spacer
+      ] 
+  where
+    sample :: [PersonalUTxO]
+    sample = -- applyAddressUTxOFilters (model ^. homeModel . setFilters . utxoFilters) $
+      sortOn (view #utxoRef) $ model ^. #homeModel % #selectedWallet % #utxos
 
-  in vstack 
-       [ editFields
-       , spacer
-       , hstack 
-           [ mainButton "Reset" $ HomeEvent $ FilterHomeUTxOs ResetFiltering
-           , filler
-           , mainButton "Confirm" $ HomeEvent $ FilterHomeUTxOs VerifyFilters
-           , spacer
-           , button "Cancel" $ HomeEvent $ FilterHomeUTxOs CancelFiltering
-           ]
-       ] `styleBasic` [bgColor sectionBg, padding 20]
+    datumIcon :: Text
+    datumIcon = toGlyph 0XF2F5
+
+    scriptIcon :: Text
+    scriptIcon = toGlyph 0XF433
+
+    moreIcon :: Bool -> Text
+    moreIcon detailsOpen
+      | detailsOpen = remixCloseCircleLine
+      | otherwise = remixMoreLine
+
+    moreTip :: Bool -> Text
+    moreTip detailsOpen
+      | detailsOpen = "Close Details"
+      | otherwise = "Show Details"
+
+    moreOffStyle :: Style
+    moreOffStyle = 
+      def `styleBasic` 
+            [ bgColor transparent
+            , textColor customBlue
+            ]
+          `styleHover`
+            [ bgColor customGray1]
+
+    utxoRow :: PersonalUTxO -> AppNode
+    utxoRow u@PersonalUTxO{..} =
+      vstack
+        [ vstack
+            [ hstack 
+                [ copyableLabelSelf (showTxOutRef utxoRef)
+                    `styleBasic` [textSize 12]
+                , filler
+                , label (fromString $ printf "%D ADA" $ toAda lovelace) 
+                    `styleBasic` [textSize 12]
+                ]
+            , hstack
+                [ label remixCalendarLine
+                    `styleBasic` 
+                      [ textSize 10
+                      , textColor customBlue
+                      , textFont "Remix"
+                      , paddingT 5
+                      ]
+                , spacer_ [width 3]
+                , label (showLocalDate (model ^. #config % #timeZone) blockTime)
+                    `styleBasic` 
+                      [ textSize 10
+                      , textColor lightGray
+                      ]
+                , spacer
+                , label remixTimeLine
+                    `styleBasic` 
+                      [ textSize 10
+                      , textColor customBlue
+                      , textFont "Remix"
+                      , paddingT 5
+                      ]
+                , spacer_ [width 3]
+                , label (showLocalTime (model ^. #config % #timeZone) blockTime)
+                    `styleBasic` 
+                      [ textSize 10
+                      , textColor lightGray
+                      ]
+                , spacer
+                , widgetIf (not $ null nativeAssets) $ 
+                    tooltip_ "Native Assets" [tooltipDelay 500] $ label remixCoinsLine
+                      `styleBasic` 
+                        [ textSize 10
+                        , textColor customBlue
+                        , textFont "Remix"
+                        , textMiddle
+                        ]
+                , widgetIf (not $ null nativeAssets) $ spacer_ [width 3]
+                , widgetIf (isJust datumHash) $ 
+                    tooltip_ "Datum" [tooltipDelay 500] $ label datumIcon
+                      `styleBasic` 
+                        [ textSize 10
+                        , textColor customBlue
+                        , textFont "Remix"
+                        , textMiddle
+                        ]
+                , widgetIf (isJust datumHash) $ spacer_ [width 3]
+                , widgetIf (isJust referenceScriptHash) $ 
+                    tooltip_ "Reference Script" [tooltipDelay 500] $ label scriptIcon
+                      `styleBasic` 
+                        [ textSize 10
+                        , textColor customBlue
+                        , textFont "Remix"
+                        , textMiddle
+                        ]
+                , filler
+                , tooltip_ (moreTip showDetails) [tooltipDelay 1000] $
+                    toggleButton_ (moreIcon showDetails)
+                      (toLensVL $ #homeModel % #selectedWallet % #utxos % toggleDetails utxoRef)
+                      [toggleButtonOffStyle moreOffStyle]
+                      `styleBasic` 
+                        [ textSize 10
+                        , textColor customBlue
+                        , textFont "Remix"
+                        , textMiddle
+                        , padding 0
+                        , bgColor transparent
+                        , border 0 transparent
+                        ]
+                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+               ] 
+            ] `styleBasic` 
+                [ padding 10
+                , bgColor customGray2
+                , radius 5
+                , border 1 black
+                ]
+        , utxoDetails u `nodeVisible` showDetails
+        ]
+
+    utxoDetails :: PersonalUTxO -> AppNode
+    utxoDetails PersonalUTxO{..} = 
+      hstack
+        [ filler
+        , vstack
+            [ copyableLabelFor_ "Block Height:" (show @Text blockHeight) 10
+                  `styleBasic` [padding 2]
+            , widgetMaybe referenceScriptHash $ \hash ->
+                copyableLabelFor_ "Reference Script Hash:" hash 10
+                  `styleBasic` [padding 2]
+            , widgetMaybe datumHash $ \hash ->
+                copyableLabelFor_ "Datum Hash:" hash 10
+                  `styleBasic` [padding 2]
+            , widgetMaybe inlineDatum $ \x ->
+                copyableLabelFor_ "Inline Datum:" (showValue x) 10
+                  `styleBasic` [padding 2]
+            , widgetIf (not $ null nativeAssets) $
+                vstack
+                  [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
+                  , hstack
+                      [ spacer_ [width 10]
+                      , copyableTextArea (show $ align $ vsep $ map pretty nativeAssets)
+                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 700]
+                      ]
+                  ] `styleBasic` [padding 2]
+            ] `styleBasic`
+                [ bgColor black
+                , padding 10
+                , border 1 black
+                ]
+        ]

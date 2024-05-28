@@ -1,7 +1,10 @@
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-
 
@@ -20,33 +23,35 @@ import P2PWallet.Prelude
 import P2PWallet.Data.Core.Asset
 import P2PWallet.Data.Core.Bech32Address
 import P2PWallet.Data.Core.PoolID
-import P2PWallet.Data.Plutus
+import P2PWallet.Plutus
 
 -- | The type respesenting the UTxOs returned as part of the tx_info API endpoint.
 data TransactionUTxO = TransactionUTxO
-  { _paymentAddress :: PaymentAddress
-  , _stakeAddress :: Maybe StakeAddress
-  , _utxoRef :: TxOutRef
-  , _lovelaces :: Lovelace
-  , _datumHash :: Maybe Text
-  , _inlineDatum :: Maybe Value
-  , _referenceScriptHash :: Maybe Text
-  , _nativeAssets :: [NativeAsset]
+  { paymentAddress :: PaymentAddress
+  , stakeAddress :: Maybe StakeAddress
+  , utxoRef :: TxOutRef
+  , lovelaces :: Lovelace
+  , datumHash :: Maybe Text
+  , inlineDatum :: Maybe Value
+  , referenceScriptHash :: Maybe Text
+  , nativeAssets :: [NativeAsset]
   } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TransactionUTxO
 
 instance Pretty TransactionUTxO where
   pretty TransactionUTxO{..} = align $
-    vsep [ "Payment Address:" <+> pretty _paymentAddress
-         , "Stake Address:" <+> maybe "none" pretty _stakeAddress
-         , "Output Reference:" <+> pretty @Text (showTxOutRef _utxoRef)
-         , "Value:" <+> pretty @String (printf "%D ADA" $ toADA _lovelaces)
-         , "Datum Hash:" <+> maybe "none" pretty _datumHash 
-         , "Inline Datum:" <+> maybe "none" (pretty . showValue) _inlineDatum
-         , "Reference Script Hash:" <+> maybe "none" pretty _referenceScriptHash
-         , if null _nativeAssets 
+    vsep [ "Payment Address:" <+> pretty paymentAddress
+         , "Stake Address:" <+> maybe "none" pretty stakeAddress
+         , "Output Reference:" <+> pretty @Text (showTxOutRef utxoRef)
+         , "Value:" <+> pretty @String (printf "%D ADA" $ toAda lovelaces)
+         , "Datum Hash:" <+> maybe "none" pretty datumHash 
+         , "Inline Datum:" <+> maybe "none" (pretty . showValue) inlineDatum
+         , "Reference Script Hash:" <+> maybe "none" pretty referenceScriptHash
+         , if null nativeAssets 
            then "Native Assets: none"
            else vsep [ "Native Assets:"
-                     , indent 4 $ align $ vsep $ map pretty _nativeAssets
+                     , indent 4 $ align $ vsep $ map pretty nativeAssets
                      ]
          ]
 
@@ -80,6 +85,8 @@ data CertificateType
   | TreasuryMirType
   deriving (Show,Eq)
 
+makePrisms ''CertificateType
+
 instance Pretty CertificateType where
   pretty DelegationType = "Delegation"
   pretty StakeRegistrationType = "Stake Registration"
@@ -103,22 +110,24 @@ readCertificateType _ = Nothing
 
 data CertificateInfo
   = DelegationInfo
-      { _poolId :: PoolID
-      , _stakeAddress :: StakeAddress
+      { poolId :: PoolID
+      , stakeAddress :: StakeAddress
       }
   -- Both Registration and Deregistration have the same info.
   | StakeRegistrationInfo
-      { _stakeAddress :: StakeAddress
+      { stakeAddress :: StakeAddress
       }
   | OtherInfo Value
   deriving (Show,Eq)
 
+makePrisms ''CertificateInfo
+
 instance Pretty CertificateInfo where
   pretty (OtherInfo v) = "Info:" <+> pretty (showValue v)
-  pretty StakeRegistrationInfo{..} = "Stake Address:" <+> pretty (toText _stakeAddress)
+  pretty StakeRegistrationInfo{..} = "Stake Address:" <+> pretty (toText stakeAddress)
   pretty DelegationInfo{..} = 
-    vsep [ "Pool ID:" <+> pretty (toText _poolId)
-         , "Stake Address:" <+> pretty (toText _stakeAddress)
+    vsep [ "Pool ID:" <+> pretty (toText poolId)
+         , "Stake Address:" <+> pretty (toText stakeAddress)
          ]
 
 instance FromJSON CertificateInfo where
@@ -140,9 +149,11 @@ instance FromJSON CertificateInfo where
           <$> o .: "stake_address"
 
 data TransactionCertificate = TransactionCertificate
-  { _type :: CertificateType
-  , _info :: CertificateInfo
+  { certType :: CertificateType
+  , info :: CertificateInfo
   } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TransactionCertificate
 
 instance FromJSON TransactionCertificate where
   parseJSON =
@@ -153,15 +164,17 @@ instance FromJSON TransactionCertificate where
 
 instance Pretty TransactionCertificate where
   pretty TransactionCertificate{..} =
-    vsep [ "Type:" <+> pretty _type
-         , pretty _info
+    vsep [ "Type:" <+> pretty certType
+         , pretty info
          ]
 
 -- | The type representing withdrawal information in a transaction.
 data TransactionWithdrawal = TransactionWithdrawal
-  { _lovelaces :: Lovelace
-  , _stakeAddress :: StakeAddress
+  { lovelaces :: Lovelace
+  , stakeAddress :: StakeAddress
   } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TransactionWithdrawal
 
 instance FromJSON TransactionWithdrawal where
   parseJSON = withObject "TransactionWithdrawal" $ \o ->
@@ -171,31 +184,33 @@ instance FromJSON TransactionWithdrawal where
 
 instance Pretty TransactionWithdrawal where
   pretty TransactionWithdrawal{..} =
-    vsep [ "Stake Address:" <+> pretty _stakeAddress
-         , "Value:" <+> fromString (printf "%D ADA" $ toADA _lovelaces)
+    vsep [ "Stake Address:" <+> pretty stakeAddress
+         , "Value:" <+> fromString (printf "%D ADA" $ toAda lovelaces)
          ]
 
 -- | The type respesenting the overall information returned with the tx_info query.
 data Transaction = Transaction
-  { _txHash :: Text
-  , _blockTime :: POSIXTime
-  , _blockHeight :: Integer
-  , _fee :: Lovelace
-  , _size :: Integer
-  , _deposit :: Lovelace
-  , _invalidBefore :: Maybe Text
-  , _invalidAfter :: Maybe Text
-  , _collateralInputs :: [TransactionUTxO]
-  , _collateralOutput :: Maybe TransactionUTxO
-  , _referenceInputs :: [TransactionUTxO]
-  , _inputs :: [TransactionUTxO]
-  , _outputs :: [TransactionUTxO]
-  , _certificates :: [TransactionCertificate]
-  , _withdrawals :: [TransactionWithdrawal]
-  -- , _nativeAssetsMinted :: Value
-  -- , _nativeScripts :: Value
-  -- , _plutusContracts :: Value
+  { txHash :: Text
+  , blockTime :: POSIXTime
+  , blockHeight :: Integer
+  , fee :: Lovelace
+  , size :: Integer
+  , deposit :: Lovelace
+  , invalidBefore :: Maybe Text
+  , invalidAfter :: Maybe Text
+  , collateralInputs :: [TransactionUTxO]
+  , collateralOutput :: Maybe TransactionUTxO
+  , referenceInputs :: [TransactionUTxO]
+  , inputs :: [TransactionUTxO]
+  , outputs :: [TransactionUTxO]
+  , certificates :: [TransactionCertificate]
+  , withdrawals :: [TransactionWithdrawal]
+  -- , nativeAssetsMinted :: Value
+  -- , nativeScripts :: Value
+  -- , plutusContracts :: Value
   } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''Transaction
 
 instance FromJSON Transaction where
   parseJSON =

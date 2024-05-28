@@ -1,5 +1,10 @@
-{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-
 
@@ -13,46 +18,67 @@ Types to represent the derivation paths for hardware wallet keys:
 module P2PWallet.Data.Core.DerivationPath where
 
 import Data.Aeson qualified as Aeson
-import Data.Scientific (floatingOrInteger)
+
+import Database.SQLite.Simple.ToField (ToField(..))
+import Database.SQLite.Simple.FromField (FromField(..), ResultError(ConversionFailed), returnError)
+import Database.SQLite.Simple.Internal (Field(Field))
+import Database.SQLite.Simple.Ok (Ok(Ok))
+import Database.SQLite.Simple (SQLData(SQLText))
 
 import P2PWallet.Prelude
 
+-------------------------------------------------
+-- Account Index
+-------------------------------------------------
 -- | A type representing the account field in the derivaiton path.
-newtype AccountIndex = AccountIndex Int
-  deriving (Show,Eq,Ord,Num)
+newtype AccountIndex = AccountIndex { unAccountIndex :: Int }
+  deriving (Show)
+  deriving newtype (Eq,Ord,Num,ToField,FromField)
 
-instance Aeson.ToJSON AccountIndex where
-  toJSON (AccountIndex i) = Aeson.toJSON i
+makeFieldLabelsNoPrefix ''AccountIndex
 
-instance Aeson.FromJSON AccountIndex where
-  parseJSON = 
-    Aeson.withScientific "AccountIndex" $ \s ->
-      either (const mzero) (pure . AccountIndex) $ floatingOrInteger @Double @Int s
+toAccountIndex :: Int -> Maybe AccountIndex
+toAccountIndex n
+  | n >= 0 = Just $ AccountIndex n
+  | otherwise = Nothing
 
-unAccountIndex :: AccountIndex -> Int
-unAccountIndex (AccountIndex i) = i
-
+-------------------------------------------------
+-- Address Index
+-------------------------------------------------
 -- | A type representing the address_index field in the derivaiton path.
-newtype AddressIndex = AddressIndex Int
-  deriving (Show,Eq,Ord,Num)
+newtype AddressIndex = AddressIndex { unAddressIndex :: Int }
+  deriving (Show)
+  deriving newtype (Eq,Ord,Num)
 
-unAddressIndex :: AddressIndex -> Int
-unAddressIndex (AddressIndex i) = i
+makeFieldLabelsNoPrefix ''AddressIndex
 
 toAddressIndex :: Int -> Maybe AddressIndex
 toAddressIndex n
   | n >= 0 = Just $ AddressIndex n
   | otherwise = Nothing
 
+-------------------------------------------------
+-- Derivation Path
+-------------------------------------------------
 -- | The derivation path used for a hardware wallet key.
 data DerivationPath
   -- | Payment keys can increment either the account index or the address index.
   -- The chain index is fixed at `0`.
   = PaymentKeyPath AccountIndex AddressIndex
-  -- | Stake keys can only increment the account index. The chain index is fixed at `2` and 
-  -- the address_index is fixed at `0.
-  | StakeKeyPath AccountIndex
+  -- | Stake keys can increment either the account index or the address index.
+  -- The chain index is fixed at `2`.
+  | StakeKeyPath AccountIndex AddressIndex
   deriving (Show,Eq,Ord)
+
+makePrisms ''DerivationPath
+
+instance ToField DerivationPath where
+  toField = toField . showDerivationPath
+
+instance FromField DerivationPath where
+  fromField f@(Field (SQLText t) _) = 
+    maybe (returnError ConversionFailed f "not a valid derivation path") Ok  $ readDerivationPath t
+  fromField f = returnError ConversionFailed f "need a text"
 
 instance Aeson.ToJSON DerivationPath where
   toJSON = Aeson.toJSON . showDerivationPath
@@ -62,7 +88,10 @@ instance Aeson.FromJSON DerivationPath where
 
 readDerivationPath :: Text -> Maybe DerivationPath
 readDerivationPath t = case words $ replace "/" " " t of
-    ["1852H","1815H",accField,"2","0"] -> StakeKeyPath <$> readAccountField accField
+    ["1852H","1815H",accField,"2", addrIx] -> 
+      StakeKeyPath 
+        <$> readAccountField accField
+        <*> (AddressIndex <$> readIndex addrIx)
     ["1852H","1815H",accField,"0", addrIx] -> 
       PaymentKeyPath 
         <$> readAccountField accField
@@ -83,9 +112,9 @@ readDerivationPath t = case words $ replace "/" " " t of
    
 showDerivationPath :: DerivationPath -> Text
 showDerivationPath = \case
-    PaymentKeyPath accountIndex addressIndex -> fromString $
-      printf root (unAccountIndex accountIndex) (0 :: Int) (unAddressIndex addressIndex)
-    StakeKeyPath accountIndex -> fromString $
-      printf root (unAccountIndex accountIndex) (2 :: Int) (0 :: Int)
+    PaymentKeyPath (AccountIndex accIx) (AddressIndex addrIx) -> fromString $
+      printf root accIx (0 :: Int) addrIx
+    StakeKeyPath (AccountIndex accIx) (AddressIndex addrIx) -> fromString $
+      printf root accIx (2 :: Int) addrIx
   where
     root = "1852H/1815H/%dH/%d/%d"

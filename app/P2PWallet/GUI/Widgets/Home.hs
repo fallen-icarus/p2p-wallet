@@ -1,154 +1,253 @@
 module P2PWallet.GUI.Widgets.Home where
 
 import Monomer
-import Monomer.Lens qualified as L
 
-import P2PWallet.Data.App
-import P2PWallet.Data.Core.Asset
-import P2PWallet.Data.Lens
+import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core
+import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.GUI.Widgets.Home.About
-import P2PWallet.GUI.Widgets.Home.Assets
-import P2PWallet.GUI.Widgets.Home.Details
-import P2PWallet.GUI.Widgets.Home.PairPaymentWallet
-import P2PWallet.GUI.Widgets.Home.Transactions
+import P2PWallet.GUI.Widgets.Home.AddPaymentWallet
 import P2PWallet.GUI.Widgets.Home.UTxOs
-import P2PWallet.GUI.Widgets.Home.WatchPaymentWallet
 import P2PWallet.Prelude
 
-homeWidget :: AppWenv -> AppModel -> AppNode
-homeWidget wenv model = do
+homeWidget :: AppModel -> AppNode
+homeWidget model = do
     zstack
-      [ mainWidget `nodeVisible` (hasPaymentWallets && noDetails && not isAdding)
-      , addFirstWalletWidget `nodeVisible` (noDetails && not isAdding && not hasPaymentWallets)
-      , widgetIf isPairing $ centerWidget $
-          box_ [alignCenter] $ vstack
-            [ hstack [ filler, label "Pairing", filler ]
-            , spacer
-            , pairPaymentWidget wenv model
-            ] `styleBasic` [bgColor sectionBg, padding 20, radius 5, width 700]
-      , widgetIf isAddingWatched $ centerWidget $
-          box_ [alignCenter] $ vstack
-            [ hstack [ filler, label "New Watched", filler ]
-            , spacer
-            , watchPaymentWidget wenv model
-            ] `styleBasic` [bgColor sectionBg, padding 20, radius 5]
-      , detailsOverlay model `nodeVisible` (not noDetails)
-      , widgetIf (model ^. homeModel . filteringAssets) $ flip styleBasic [bgColor filterFade] $ 
-          centerWidget $
-            box_ [alignCenter] $ vstack
-              [ hstack [filler, label "Asset Filter Settings", filler]
-              , spacer
-              , assetFilterInfo wenv model
-              ] `styleBasic` [bgColor sectionBg, padding 20, radius 5]
-      , widgetIf (model ^. homeModel . filteringTxs) $ flip styleBasic [bgColor filterFade] $
-          centerWidget $
-            box_ [alignCenter] $ vstack
-              [ hstack [filler, label "Transaction Filter Settings", filler]
-              , spacer
-              , txFilterInfo wenv model
-              ] `styleBasic` [bgColor sectionBg, padding 20, radius 5]
-      , widgetIf (model ^. homeModel . filteringUtxos) $ flip styleBasic [bgColor filterFade] $
-          centerWidget $
-            box_ [alignCenter] $ vstack
-              [ hstack [filler, label "UTxO Filter Settings", filler]
-              , spacer
-              , utxoFilterInfo wenv model
-              ] `styleBasic` [bgColor sectionBg, padding 20, radius 5]
+      [ mainWidget `nodeVisible` (hasPaymentWallets && not isAdding && not isEditing && not isDeleting)
+      , addFirstWalletWidget 
+          `nodeVisible` (not isAdding && not hasPaymentWallets && not isEditing && not isDeleting)
+      , widgetIf isAdding $ addPaymentWalletWidget model
+      , widgetIf isEditing $ editPaymentWalletWidget model
+      , widgetIf isDeleting $ confirmDeleteWidget model
       ]
-
   where
-    sectionBg :: Color
-    sectionBg = wenv ^. L.theme . L.sectionColor
-
-    filterFade :: Color
-    filterFade = darkGray & L.a .~ 0.8
+    homeSceneButton :: Text -> HomeScene -> AppNode
+    homeSceneButton caption scene = do
+      let dormantColor
+            | model ^. #homeModel % #scene == scene = customBlue
+            | otherwise = white
+          hoverColor
+            | model ^. #homeModel % #scene == scene = customBlue
+            | otherwise = lightGray
+      button caption (HomeEvent $ ChangeHomeScene scene)
+        `styleBasic` [bgColor transparent, textColor dormantColor, border 0 transparent]
+        `styleHover` [bgColor transparent, textColor hoverColor]
 
     reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
     reqUpdate _ old new 
-      | old ^. wallets . paymentWallets /= new ^. wallets . paymentWallets = True
-      | old ^. homeModel . selectedWallet /= new ^. homeModel . selectedWallet = True
+      | old ^. #knownWallets % #paymentWallets /= new ^. #knownWallets % #paymentWallets = True
+      | old ^. #homeModel % #selectedWallet /= new ^. #homeModel % #selectedWallet = True
       | otherwise = False
 
-    hasPaymentWallets :: Bool
-    hasPaymentWallets = model ^. wallets . paymentWallets /= []
+    -- Shows an icon representing where the address is paired or watched.
+    walletTypeLabel :: AppNode
+    walletTypeLabel
+      | isNothing $ model ^. #homeModel % #selectedWallet % #paymentKeyPath = 
+          tooltip_ "Watched" [tooltipDelay 1000] $ label remixEyeLine
+            `styleBasic` [textFont "Remix", paddingT 10]
+      | otherwise = 
+          tooltip_ "Paired" [tooltipDelay 1000] $ label remixLinksLine
+            `styleBasic` [textFont "Remix", paddingT 10]
 
-    noDetails :: Bool
-    noDetails = isNothing $ model ^. homeModel . details
-
-    isPairing :: Bool
-    isPairing = model ^. homeModel . pairing
-
-    isAddingWatched :: Bool
-    isAddingWatched = model ^. homeModel . watching
-
-    isAdding :: Bool
-    isAdding = isPairing || isAddingWatched
-
-    isWatched :: Bool
-    isWatched = isNothing $ model ^. homeModel . selectedWallet . paymentKeyPath
-
-    walletTypeIcon :: Text
-    walletTypeIcon
-      | isWatched = remixEyeLine
-      | otherwise = remixLinksLine
+    headerWidget :: AppNode
+    headerWidget = do
+      let innerDormantStyle = 
+            def `styleBasic` [bgColor customGray3, border 1 black]
+                `styleHover` [bgColor customGray2, border 1 black]
+          innerFocusedStyle = 
+            def `styleFocus` [bgColor customGray3, border 1 customBlue]
+                `styleFocusHover` [bgColor customGray2, border 1 customBlue]
+      hstack
+        [ label $ fromString $ printf "%D ADA" $ toAda $
+            model ^. #homeModel % #selectedWallet % #lovelace
+        , spacer
+        , textDropdown_ 
+              (toLensVL $ #homeModel % #selectedWallet) 
+              (model ^. #knownWallets % #paymentWallets) 
+              (view #alias) 
+              [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+            `styleBasic` 
+              [ bgColor customGray3
+              , width 150
+              , border 1 black
+              ]
+            `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+        , spacer
+        , walletTypeLabel 
+        , spacer
+        , tooltip_ "Refresh" [tooltipDelay 1000] $
+            button remixRefreshLine (SyncWallets StartSync)
+            `styleBasic`
+              [ border 0 transparent
+              , radius 20
+              , padding 0
+              , bgColor transparent
+              , textColor customBlue
+              , textMiddle
+              , textFont "Remix"
+              ]
+            `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+        , spacer
+        , morePopup model
+        ]
 
     -- The main widget that should only be shown if there are currently tracked payment wallets
     -- AND no details need to be shown.
     mainWidget :: AppNode
     mainWidget =
-      vstack
+      vstack_ [childSpacing]
         [ spacer
-        , hstack_ [childSpacing] 
-            [ filler
-            , label $ fromString $ printf "UTxO Balance: %D ADA" $ toADA $
-                model ^. homeModel . selectedWallet . lovelaces
-            , separatorLine
-            , textDropdown_ 
-                  (homeModel . selectedWallet) 
-                  (model ^. wallets . paymentWallets) 
-                  (view alias) 
-                  []
-                `styleBasic` [width 200]
-            , label walletTypeIcon 
-                `styleBasic` [textFont "Remix",paddingT 15]
-            , separatorLine
-            , customButton wenv "Refresh" remixRefreshLine (SyncWallets StartSync)
-            , filler
-            ] 
-        , spacer
-        , hgrid_ [childSpacing] 
-            [ button "About" $ HomeEvent $ ChangeHomeScene HomeAbout
-            , button "Transactions" $ HomeEvent $ ChangeHomeScene HomeTransactions
-            , button "UTxOs" $ HomeEvent $ ChangeHomeScene HomeUTxOs
-            , button "Assets" $ HomeEvent $ ChangeHomeScene HomeAssets
-            ]
-        , spacer
-        , box_ [mergeRequired reqUpdate] (aboutWidget wenv model)
-            `nodeVisible` (model ^. homeModel . scene == HomeAbout)
-        , box_ [mergeRequired reqUpdate] (utxoWidget wenv model)
-            `nodeVisible` (model ^. homeModel . scene == HomeUTxOs)
-        , box_ [mergeRequired reqUpdate] (assetWidget wenv model)
-            `nodeVisible` (model ^. homeModel . scene == HomeAssets)
-        , box_ [mergeRequired reqUpdate] (txWidget wenv model)
-            `nodeVisible` (model ^. homeModel . scene == HomeTransactions)
+        , centerWidgetH headerWidget
+        , centerWidgetH $ hstack 
+            [ spacer
+            , homeSceneButton "About" HomeAbout
+            , spacer
+            , separatorLine `styleBasic` [paddingT 5, paddingB 5]
+            , spacer
+            , homeSceneButton "Transactions" HomeTransactions
+            , spacer
+            , separatorLine `styleBasic` [paddingT 5, paddingB 5]
+            , spacer
+            , homeSceneButton "UTxOs" HomeUTxOs
+            , spacer
+            , separatorLine `styleBasic` [paddingT 5, paddingB 5]
+            , spacer
+            , homeSceneButton "Native Assets" HomeAssets
+            , spacer
+            ] `styleBasic`
+                [ bgColor customGray2
+                , radius 10
+                , border 1 black
+                ]
+        , box_ [mergeRequired reqUpdate] (aboutWidget model)
+            `nodeVisible` (model ^. #homeModel % #scene == HomeAbout)
+        , box_ [mergeRequired reqUpdate] (utxosWidget model)
+            `nodeVisible` (model ^. #homeModel % #scene == HomeUTxOs)
         ] 
+
+    hasPaymentWallets :: Bool
+    hasPaymentWallets = model ^. #knownWallets % #paymentWallets /= []
+
+    isAdding :: Bool
+    isAdding = model ^. #homeModel % #addingWallet
+
+    isEditing :: Bool
+    isEditing = model ^. #homeModel % #editingWallet
+
+    isDeleting :: Bool
+    isDeleting = model ^. #homeModel % #deletingWallet
 
     -- A welcome message when there are currently no tracked payment wallets.
     addFirstWalletWidget :: AppNode
     addFirstWalletWidget =
       vstack
         [ centerWidget $
-            flip styleBasic [bgColor sectionBg, padding 20, radius 5] $ 
+            flip styleBasic [bgColor transparent, padding 20, radius 5] $ 
               box $ 
                 label "Add your first payment wallet to begin!" 
                  `styleBasic` [textFont "Italics"]
         , filler
         , hstack
             [ filler
-            , box (mainButton "Pair" $ HomeEvent $ PairPaymentWallet StartAdding) 
-                `styleBasic` [paddingR 5, paddingB 20, paddingL 20, paddingT 20]
-            , box (mainButton "Watch" $ HomeEvent $ WatchPaymentWallet StartAdding) 
-                `styleBasic` [paddingL 5, paddingB 20, paddingR 20, paddingT 20]
+            -- The widget is initialized using PairPaymentWallet. It is the same for all wallet 
+            -- types.
+            , box (mainButton "Add Wallet" $ HomeEvent $ PairPaymentWallet StartAdding) 
+                `styleBasic` [padding 20]
             ]
         ] `nodeVisible` (not isAdding)
+
+morePopup :: AppModel -> AppNode
+morePopup _ = do
+  vstack
+    [ tooltip_ "More" [tooltipDelay 1000] $
+        button remixMoreLine (HomeEvent ShowMorePopup)
+        `styleBasic`
+          [ border 0 transparent
+          , radius 20
+          , paddingL 0
+          , paddingR 0
+          , bgColor transparent
+          , textColor customBlue
+          , textMiddle
+          , textFont "Remix"
+          ]
+        `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+    , customPopup (toLensVL $ #homeModel % #showMorePopup) $
+        vstack
+          [ button "Add Wallet" (HomeEvent $ PairPaymentWallet StartAdding)
+              `styleBasic`
+                [ border 0 transparent
+                , textSize 12
+                , bgColor transparent
+                , textColor customBlue
+                , textMiddle
+                ]
+              `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          , button "Edit Name" (HomeEvent $ ChangePaymentWalletName StartAdding)
+              `styleBasic`
+                [ border 0 transparent
+                , textSize 12
+                , bgColor transparent
+                , textColor customBlue
+                , textMiddle
+                ]
+              `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          , separatorLine `styleBasic` [fgColor black, padding 5]
+          , button "Delete Wallet" (HomeEvent $ DeletePaymentWallet GetDeleteConfirmation)
+              `styleBasic`
+                [ border 0 transparent
+                , textSize 12
+                , bgColor transparent
+                , textColor customRed
+                , textMiddle
+                ]
+              `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          ] `styleBasic`
+              [ bgColor customGray3
+              , border 1 black
+              , padding 5
+              ]
+    ] `styleBasic` [paddingL 0, paddingR 0]
+
+editPaymentWalletWidget :: AppModel -> AppNode
+editPaymentWalletWidget _ = do
+  let editFields = 
+        vstack_ [childSpacing]
+          [ hstack 
+              [ label "Wallet Name:"
+              , spacer
+              , textField (toLensVL $ #extraTextField) 
+                  `styleBasic` [width 500]
+              ]
+          ]
+
+  centerWidget $ vstack 
+    [ editFields
+    , spacer
+    , hstack 
+        [ filler
+        , mainButton "Confirm" $ HomeEvent $ ChangePaymentWalletName ConfirmAdding
+        , spacer
+        , button "Cancel" $ HomeEvent $ ChangePaymentWalletName CancelAdding
+        ]
+    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+
+confirmDeleteWidget :: AppModel -> AppNode
+confirmDeleteWidget model = do
+  centerWidget $ vstack_ [childSpacing]
+    [ spacer
+    , centerWidgetH $ label $ mconcat
+        [ "Are you sure you would like to delete '"
+        , model ^. #homeModel % #selectedWallet % #alias
+        , "'?"
+        ]
+    , hstack 
+        [ filler
+        , mainButton "Confirm" $ HomeEvent $ DeletePaymentWallet ConfirmDeletion
+        , spacer
+        , button "Cancel" $ HomeEvent $ DeletePaymentWallet CancelDeletion
+        ]
+    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+
