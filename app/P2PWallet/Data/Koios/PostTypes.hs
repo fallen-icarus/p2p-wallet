@@ -6,10 +6,8 @@ module P2PWallet.Data.Koios.PostTypes where
 import Data.Aeson
 import Data.Vector (Vector)
 
-import P2PWallet.Data.Core.Bech32Address
-import P2PWallet.Data.Core.PoolID
-import P2PWallet.Data.Core.TxCBOR
-import P2PWallet.Data.Plutus
+import P2PWallet.Data.Core
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------

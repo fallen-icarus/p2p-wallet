@@ -1,5 +1,10 @@
-{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-
 
@@ -11,24 +16,25 @@ module P2PWallet.Data.Koios.AddressUTxO where
 
 import Data.Aeson
 
+import P2PWallet.Data.Core
+import P2PWallet.Plutus
 import P2PWallet.Prelude
-import P2PWallet.Data.Core.Bech32Address
-import P2PWallet.Data.Core.Asset
-import P2PWallet.Data.Plutus
 
 -- | The type representing the information returned with the address_utxos API endpoint.
 data AddressUTxO = AddressUTxO
-  { _paymentAddress :: PaymentAddress
-  , _stakeAddress :: Maybe StakeAddress
-  , _utxoRef :: TxOutRef
-  , _lovelaces :: Lovelace
-  , _datumHash :: Maybe Text
-  , _inlineDatum :: Maybe Value
-  , _referenceScriptHash :: Maybe Text
-  , _nativeAssets :: [NativeAsset]
-  , _blockTime :: POSIXTime
-  , _blockHeight :: Integer
+  { paymentAddress :: PaymentAddress
+  , stakeAddress :: Maybe StakeAddress
+  , utxoRef :: TxOutRef
+  , lovelace :: Lovelace
+  , datumHash :: Maybe Text
+  , inlineDatum :: Maybe Value
+  , referenceScriptHash :: Maybe Text
+  , nativeAssets :: [NativeAsset]
+  , blockTime :: POSIXTime
+  , blockHeight :: Integer
   } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''AddressUTxO
 
 instance FromJSON AddressUTxO where
   parseJSON =

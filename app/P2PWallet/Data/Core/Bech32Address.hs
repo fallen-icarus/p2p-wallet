@@ -1,16 +1,18 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module P2PWallet.Data.Core.Bech32Address
   ( -- * Bech32 Encoded Addresses
     PaymentAddress(..)
   , readPaymentAddress
-  , unPaymentAddress
+  , showAddressFormatted
   , StakeAddress(..)
   , readStakeAddress
-  , unStakeAddress
 
     -- * Conversions
   , plutusToBech32
@@ -25,6 +27,10 @@ module P2PWallet.Data.Core.Bech32Address
 import Data.Aeson qualified as Aeson
 import Data.Maybe (fromJust)
 import Prettyprinter (Pretty(..))
+import Data.Text qualified as Text
+
+import Database.SQLite.Simple.ToField (ToField(..))
+import Database.SQLite.Simple.FromField (FromField(..))
 
 import Cardano.Address.Style.Shelley qualified as Address
 import Cardano.Address (fromBech32,bech32,bech32With)
@@ -33,15 +39,16 @@ import Cardano.Address.Derivation (Depth(..))
 import Cardano.Codec.Bech32.Prefixes (stake_test,stake)
 
 import P2PWallet.Data.Core.Network
-import P2PWallet.Data.Plutus as PV1
+import P2PWallet.Plutus as PV1
 import P2PWallet.Prelude
 
 -------------------------------------------------
 -- Bech32 Encoded Payment Addresses
 -------------------------------------------------
 -- | A wrapper around a bech32 encoded payment address.
-newtype PaymentAddress = PaymentAddress Text
-  deriving (Show,Eq,Ord)
+newtype PaymentAddress = PaymentAddress { unPaymentAddress :: Text }
+  deriving (Show)
+  deriving newtype (Eq,Ord,ToField,FromField)
 
 instance Aeson.ToJSON PaymentAddress where
   toJSON (PaymentAddress addr) = Aeson.toJSON addr
@@ -61,15 +68,24 @@ instance ToText PaymentAddress where
 instance ToString PaymentAddress where
   toString (PaymentAddress addr) = toString addr
 
-unPaymentAddress :: PaymentAddress -> Text
-unPaymentAddress (PaymentAddress addr) = addr
+makeFieldLabelsNoPrefix ''PaymentAddress
+
+-- | An address with delegation can be very long and exceed the length of the window. This
+-- function will add an ellipsis in the middle if the address is likely to overflow.
+showAddressFormatted :: PaymentAddress -> Text
+showAddressFormatted (PaymentAddress text)
+    | Text.length text > 80 = newText
+    | otherwise = text
+  where
+    newText = Text.take 40 text <> "..." <> Text.drop 80 text
 
 -------------------------------------------------
 -- Bech32 Encoded Stake Addresses
 -------------------------------------------------
 -- | A wrapper around a bech32 encoded stake address.
-newtype StakeAddress = StakeAddress Text
-  deriving (Show,Eq,Ord)
+newtype StakeAddress = StakeAddress { unStakeAddress :: Text }
+  deriving (Show)
+  deriving newtype (Eq,Ord,ToField,FromField)
 
 instance Aeson.ToJSON StakeAddress where
   toJSON (StakeAddress addr) = Aeson.toJSON addr
@@ -89,8 +105,7 @@ instance ToText StakeAddress where
 instance ToString StakeAddress where
   toString (StakeAddress addr) = toString addr
 
-unStakeAddress :: StakeAddress -> Text
-unStakeAddress (StakeAddress addr) = addr
+makeFieldLabelsNoPrefix ''StakeAddress
 
 -------------------------------------------------
 -- Inspecting Bech32 Addresses
