@@ -32,6 +32,28 @@ data HomeScene
   | HomeAssets 
   deriving (Eq,Show)
 
+-- | The filter widget subscene
+data FilterScene
+  = FilterScene
+  | SortScene
+  | SearchScene
+  deriving (Show,Eq)
+
+instance Default FilterScene where
+  def = FilterScene
+
+data SortDirection
+  = SortAscending
+  | SortDescending
+  deriving (Show,Eq,Enum)
+
+displaySortDirection :: SortDirection -> Text
+displaySortDirection SortAscending = "Ascending"
+displaySortDirection SortDescending = "Descending"
+
+sortingDirections :: [SortDirection]
+sortingDirections = enumFrom SortAscending
+
 -------------------------------------------------
 -- Home Page Events
 -------------------------------------------------
@@ -49,6 +71,47 @@ data HomeEvent
   | DeletePaymentWallet (DeleteWithConfirmationEvent PaymentWallet)
   -- | Open the more popup widget
   | ShowMorePopup
+  -- | Reset UTxO Filters.
+  | ResetUTxOFilters
+
+-------------------------------------------------
+-- UTxO Filter Model
+-------------------------------------------------
+-- | Possible sortings.
+data UTxOSortMethod
+  = UTxOLexicographical
+  | UTxOBalance
+  | UTxOTime
+  deriving (Show,Eq,Enum)
+
+displayUTxOSortMethod :: UTxOSortMethod -> Text
+displayUTxOSortMethod UTxOLexicographical = "Lexicographically"
+displayUTxOSortMethod UTxOBalance = "Ada Quantity"
+displayUTxOSortMethod UTxOTime = "Chronologically"
+
+utxoSortingMethods :: [UTxOSortMethod]
+utxoSortingMethods = enumFrom UTxOLexicographical
+
+data UTxOFilterModel = UTxOFilterModel
+  { hasReferenceScript :: Maybe Bool
+  , hasDatum :: Maybe Bool
+  , hasNativeAssets :: Maybe Bool
+  , sortingMethod :: UTxOSortMethod
+  , sortingDirection :: SortDirection
+  , search :: Text
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''UTxOFilterModel
+
+instance Default UTxOFilterModel where
+  def = UTxOFilterModel
+    { hasReferenceScript = Nothing
+    , hasDatum = Nothing
+    , hasNativeAssets = Nothing
+    , sortingMethod = UTxOLexicographical
+    , sortingDirection = SortAscending
+    , search = ""
+    }
 
 -------------------------------------------------
 -- Home State
@@ -68,6 +131,12 @@ data HomeModel = HomeModel
   , showMorePopup :: Bool
   -- | The information for the new `PaymentWallet` being paired.
   , newPaymentWallet :: NewPaymentWallet
+  -- | Whether to show the filter widget for UTxOs.
+  , showUTxOFilter :: Bool
+  -- | The active scene for the utxo filter widget.
+  , utxoFilterScene :: FilterScene
+  -- | The current filter settings for the Home UTxOs.
+  , utxoFilterModel :: UTxOFilterModel
   } deriving (Eq,Show)
 
 instance Default HomeModel where
@@ -79,6 +148,9 @@ instance Default HomeModel where
     , deletingWallet = False
     , showMorePopup = False
     , newPaymentWallet = def
+    , showUTxOFilter = False
+    , utxoFilterScene = def
+    , utxoFilterModel = def
     }
 
 makeFieldLabelsNoPrefix ''HomeModel
