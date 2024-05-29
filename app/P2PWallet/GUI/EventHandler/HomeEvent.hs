@@ -199,3 +199,10 @@ handleHomeEvent model@AppModel{..} evt = case evt of
                          & #knownWallets % #paymentWallets .~ newWallets
                          & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead newWallets)
          ]
+
+  -----------------------------------------------
+  -- Reset UTxO Filters
+  -----------------------------------------------
+  ResetUTxOFilters -> 
+    [ Model $ model & #homeModel % #utxoFilterModel .~ def ]
+

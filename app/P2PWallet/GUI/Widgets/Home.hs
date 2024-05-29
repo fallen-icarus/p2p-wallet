@@ -37,15 +37,24 @@ homeWidget model = do
 
     reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
     reqUpdate _ old new 
-      | old ^. #knownWallets % #paymentWallets /= new ^. #knownWallets % #paymentWallets = True
-      | old ^. #homeModel % #selectedWallet /= new ^. #homeModel % #selectedWallet = True
-      | otherwise = False
+      | old ^. #extraTextField /= new ^. #extraTextField = False
+      | old ^. #homeModel % #utxoFilterModel % #search /= new ^. #homeModel % #utxoFilterModel % #search = False
+      | otherwise = True
+
+    -- reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
+    -- reqUpdate _ old new 
+    --   | old ^. #knownWallets % #paymentWallets /= new ^. #knownWallets % #paymentWallets = True
+    --   | old ^. #homeModel % #selectedWallet /= new ^. #homeModel % #selectedWallet = True
+    --   | old ^. #homeModel % #showUTxOFilter /= new ^. #homeModel % #showUTxOFilter = True
+    --   | old ^. #homeModel % #utxoFilterScene /= new ^. #homeModel % #utxoFilterScene = True
+    --   | old ^. #homeModel % #utxoFilterModel /= new ^. #homeModel % #utxoFilterModel = True
+    --   | otherwise = False
 
     -- Shows an icon representing where the address is paired or watched.
     walletTypeLabel :: AppNode
     walletTypeLabel
       | isNothing $ model ^. #homeModel % #selectedWallet % #paymentKeyPath = 
-          tooltip_ "Watched" [tooltipDelay 1000] $ label remixEyeLine
+          tooltip_ "Watched" [tooltipDelay 1000] $ label remixTv2Line
             `styleBasic` [textFont "Remix", paddingT 10]
       | otherwise = 
           tooltip_ "Paired" [tooltipDelay 1000] $ label remixLinksLine
@@ -213,18 +222,15 @@ morePopup _ = do
 
 editPaymentWalletWidget :: AppModel -> AppNode
 editPaymentWalletWidget _ = do
-  let editFields = 
-        vstack_ [childSpacing]
-          [ hstack 
-              [ label "Wallet Name:"
-              , spacer
-              , textField (toLensVL $ #extraTextField) 
-                  `styleBasic` [width 500]
-              ]
-          ]
-
   centerWidget $ vstack 
-    [ editFields
+    [ vstack_ [childSpacing]
+        [ hstack 
+            [ label "Wallet Name:"
+            , spacer
+            , textField (toLensVL $ #extraTextField) 
+                `styleBasic` [width 500]
+            ]
+        ]
     , spacer
     , hstack 
         [ filler
