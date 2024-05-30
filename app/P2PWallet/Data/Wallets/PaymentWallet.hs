@@ -112,6 +112,7 @@ data PaymentWallet = PaymentWallet
   , stakeKeyPath :: Maybe DerivationPath
   , utxos :: [PersonalUTxO]
   , lovelace :: Lovelace
+  , nativeAssets :: [NativeAsset]
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''PaymentWallet
@@ -131,6 +132,7 @@ instance Default PaymentWallet where
     , stakeKeyPath = Nothing 
     , utxos = []
     , lovelace = 0
+    , nativeAssets = []
     }
 
 instance FromRow PaymentWallet where
@@ -145,6 +147,7 @@ instance FromRow PaymentWallet where
     stakeKeyPath <- field
     utxos <- fromMaybe mzero . decode <$> field
     lovelace <- field
+    nativeAssets <- fromMaybe mzero . decode <$> field
     return $ PaymentWallet
       { network = network
       , profileId = profileId
@@ -156,6 +159,7 @@ instance FromRow PaymentWallet where
       , stakeKeyPath = stakeKeyPath
       , utxos = utxos
       , lovelace = lovelace
+      , nativeAssets = nativeAssets
       }
 
 instance ToRow PaymentWallet where
@@ -170,6 +174,7 @@ instance ToRow PaymentWallet where
     , toField stakeKeyPath
     , toField $ encode utxos
     , toField lovelace
+    , toField $ encode nativeAssets
     ]
 
 instance TableName PaymentWallet where
@@ -188,6 +193,7 @@ instance Creatable PaymentWallet where
     ,  " stake_key_path TEXT,"
     ,  " utxos BLOB,"
     ,  " lovelace INTEGER NOT NULL,"
+    ,  " native_assets BLOB,"
     ,  " UNIQUE(network,profile_id,alias)"
     , ");"
     ]
@@ -204,8 +210,9 @@ instance Insertable PaymentWallet where
     ,  " stake_address,"
     ,  " stake_key_path,"
     ,  " utxos,"
-    ,  " lovelace"
-    , ") VALUES (?,?,?,?,?,?,?,?,?,?);"
+    ,  " lovelace,"
+    ,  " native_assets"
+    , ") VALUES (?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 instance Queryable PaymentWallet where

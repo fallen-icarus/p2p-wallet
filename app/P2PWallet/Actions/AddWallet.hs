@@ -46,6 +46,7 @@ pairPaymentWallet network Profile{profileId,accountIndex} paymentId NewPaymentWa
       , stakeKeyPath = msKeyPath 
       , utxos = []
       , lovelace = 0
+      , nativeAssets = []
       }
 
   where
@@ -87,6 +88,7 @@ watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} = d
       , stakeKeyPath = Nothing 
       , utxos = [] 
       , lovelace = 0
+      , nativeAssets = []
       }
 
   where

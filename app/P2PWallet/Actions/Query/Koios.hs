@@ -19,6 +19,7 @@ import Servant.API ((:<|>)(..), JSON, Post, Get, (:>), ReqBody, Required, QueryP
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Data.Aeson 
+import Data.List qualified as List
 
 import P2PWallet.Data.Core
 import P2PWallet.Data.Koios.AddressUTxO
@@ -71,16 +72,24 @@ runEvaluateTx network txFile = do
 
 runQueryPaymentWalletInfo :: Network -> PaymentWallet -> IO (Either Text PaymentWallet)
 runQueryPaymentWalletInfo network wallet = do
-  manager <- newManager tlsManagerSettings
-  let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
-  runClientM (queryPaymentWalletInfo $ wallet ^. #paymentAddress) env >>= \case
-    Right (us,_,_) -> 
-      return $ Right $ 
-        wallet & #utxos .~ map toPersonalUTxO us
-               & #lovelace .~ sum (map (view #lovelace) us)
-               -- & #txHistory .~ txs
-               -- & #nativeAssets .~ as
-    Left err -> return $ Left $ show err
+    manager <- newManager tlsManagerSettings
+    let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+    runClientM (queryPaymentWalletInfo $ wallet ^. #paymentAddress) env >>= \case
+      Right (us,_,as) -> do
+        return $ Right $ 
+          wallet & #utxos .~ map toPersonalUTxO us
+                 & #lovelace .~ sum (map (view #lovelace) us)
+                 -- & #txHistory .~ txs
+                 & #nativeAssets .~ as
+      Left err -> return $ Left $ show err
+  where
+    sumAsset :: NativeAsset -> NativeAsset -> NativeAsset
+    sumAsset NativeAsset{..} NativeAsset{quantity=q2} = NativeAsset
+      { policyId
+      , tokenName
+      , fingerprint
+      , quantity = quantity + q2
+      }
 
 -------------------------------------------------
 -- Low-Level API
@@ -124,13 +133,27 @@ submitApi
 
 queryPaymentWalletInfo :: PaymentAddress -> ClientM ([AddressUTxO],[Transaction],[NativeAsset])
 queryPaymentWalletInfo addr = 
-  (,,) <$> queryAddressUTxOs [addr]
+  (,,)  <$> queryAddressUTxOs [addr]
        <*> return [] -- queryAddressTransactions [addr]
        <*> queryAddressAssets [addr]
 
 queryAddressUTxOs :: [PaymentAddress] -> ClientM [AddressUTxO]
-queryAddressUTxOs addrs = 
-    addressUTxOsApi select "eq.false" Nothing $ ExtendedPaymentAddresses addrs
+queryAddressUTxOs addrs = do
+    -- Since koios may occassionally return incorrect UTxOs if the instance queried is not properly
+    -- synced, this would create a lot of problems for this program. To account for this, the
+    -- address UTxOs are queried three times; the results should match for at least two of them. If
+    -- they don't match, query another three and try again.
+    (r1,r2) <- 
+      (,) <$> addressUTxOsApi select "eq.false" Nothing (ExtendedPaymentAddresses addrs)
+          <*> addressUTxOsApi select "eq.false" Nothing (ExtendedPaymentAddresses addrs)
+
+    -- Only query a third time if necessary.
+    if r1 == r2 then return r1 
+    else do
+      r3 <- addressUTxOsApi select "eq.false" Nothing (ExtendedPaymentAddresses addrs)
+      if r3 == r1 then return r1
+      else if r3 == r2 then return r2
+      else queryAddressUTxOs addrs -- try again
   where
     select =
       mconcat $ intersperse ","
@@ -149,7 +172,22 @@ queryAddressUTxOs addrs =
         ]
 
 queryAddressAssets :: [PaymentAddress] -> ClientM [NativeAsset]
-queryAddressAssets addrs = addressAssetsApi select $ PaymentAddresses addrs
+queryAddressAssets addrs = do
+    -- Since koios may occassionally return incorrect results if the instance queried is not
+    -- properly synced, this would create a lot of problems for this program. To account for this,
+    -- the address UTxOs are queried three times; the results should match for at least two of them.
+    -- If they don't match, query another three and try again.
+    (r1,r2) <- 
+      (,) <$> addressAssetsApi select (PaymentAddresses addrs)
+          <*> addressAssetsApi select (PaymentAddresses addrs)
+
+    -- Only query a third time if necessary.
+    if r1 == r2 then return r1 
+    else do
+      r3 <- addressAssetsApi select (PaymentAddresses addrs)
+      if r3 == r1 then return r1
+      else if r3 == r2 then return r2
+      else queryAddressAssets addrs -- try again
   where
     select =
       mconcat $ intersperse ","

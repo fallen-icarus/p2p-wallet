@@ -20,7 +20,7 @@ utxosWidget model =
     zstack
       [ cushionWidgetH $ vstack
           [ hstack 
-              [ label ("UTxOs (" <> show (length sample) <> ")")
+              [ label ("UTxOs (" <> fractionShown <> ")")
                   `styleBasic` [textFont "Italics", textSize 14]
               , spacer_ [width 5]
               , tooltip_ "Sort/Filter/Search" [tooltipDelay 1000] $
@@ -50,6 +50,11 @@ utxosWidget model =
       , utxoFilterWidget model `nodeVisible` (model ^. #homeModel % #showUTxOFilter)
       ]
   where
+    fractionShown :: Text
+    fractionShown = show (length sample) 
+                 <> "/" 
+                 <> show (length $ model ^. #homeModel % #selectedWallet % #utxos)
+
     filterModel :: UTxOFilterModel
     filterModel = model ^. #homeModel % #utxoFilterModel
 
@@ -61,6 +66,15 @@ utxosWidget model =
 
     searchTarget :: Text
     searchTarget = filterModel ^. #search
+
+    targetQuantity :: PersonalUTxO -> Maybe Integer
+    targetQuantity p
+      | searchTarget == "" = Nothing
+      | otherwise = fmap (view #quantity) $
+          flip find (p ^. #nativeAssets) $ \NativeAsset{..} -> or
+            [ policyId <> "." <> tokenName == searchTarget
+            , fingerprint == searchTarget
+            ]
 
     searchFilter :: [PersonalUTxO] -> [PersonalUTxO]
     searchFilter
@@ -76,10 +90,11 @@ utxosWidget model =
               ]
           ]
 
-    sorter
-      | sortMethodSetting == UTxOLexicographical = sortOn (view #utxoRef)
-      | sortMethodSetting == UTxOBalance = sortOn (view #lovelace)
-      | otherwise = sortOn (view #blockTime)
+    sorter = case sortMethodSetting of
+      UTxOLexicographical -> sortOn (view #utxoRef)
+      UTxOAdaBalance -> sortOn (view #lovelace)
+      UTxOTime -> sortOn (view #blockTime)
+      UTxOSearchTokenBalance -> sortOn targetQuantity
 
     orderer
       | sortOrderSetting == SortAscending = id
@@ -94,8 +109,11 @@ utxosWidget model =
       return u
 
     sample :: [PersonalUTxO]
-    sample = searchFilter $ filterer $
-      orderer $ sorter $ model ^. #homeModel % #selectedWallet % #utxos
+    sample = orderer 
+           $ sorter 
+           $ searchFilter 
+           $ filterer 
+           $ model ^. #homeModel % #selectedWallet % #utxos
 
     menuSearchIcon :: Text
     menuSearchIcon = toGlyph 0XF3D1
@@ -264,7 +282,7 @@ utxoFilterWidget model = do
         `styleBasic` [ bgColor customGray1 , textColor white ]
         `styleHover` [ textColor lightGray, border 1 customBlue ]
   vstack
-    [ centerWidgetV $ hstack
+    [ centerWidget $ hstack
         [ vstack
             [ vgrid
                 [ optionButton_ "Filter" FilterScene (toLensVL $ #homeModel % #utxoFilterScene) 
@@ -312,7 +330,7 @@ utxoFilterWidget model = do
                     [ filler
                     , button "Reset" $ HomeEvent ResetUTxOFilters
                     , spacer
-                    , toggleButton "Close" (toLensVL $ #homeModel % #showUTxOFilter)
+                    , toggleButton "Confirm" (toLensVL $ #homeModel % #showUTxOFilter)
                     ] `styleBasic` [padding 10]
                 ] `styleBasic`
                     [ bgColor customGray3
@@ -383,6 +401,9 @@ utxoFilterWidget model = do
           innerFocusedStyle = 
             def `styleFocus` [bgColor customGray2, border 1 customBlue]
                 `styleFocusHover` [bgColor customGray1, border 1 customBlue]
+          possibleSortingMethods
+            | model ^. #homeModel % #utxoFilterModel % #search == "" = take 3 utxoSortingMethods
+            | otherwise = utxoSortingMethods
       vstack_ [childSpacing]
         [ spacer
         , hstack
@@ -391,7 +412,7 @@ utxoFilterWidget model = do
             , spacer
             , textDropdown_
                   (toLensVL $ #homeModel % #utxoFilterModel % #sortingMethod) 
-                  utxoSortingMethods
+                  possibleSortingMethods
                   displayUTxOSortMethod 
                   [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
                 `styleBasic` 
