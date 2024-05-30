@@ -119,6 +119,8 @@ data AppModel = AppModel
   , syncingWallets :: Bool
   -- | Useful when the user must specify a one-time use input such as a filepath or new alias.
   , extraTextField :: Text
+  -- | This is useful for forcing the redraw of the UI when a text field is changed.
+  , forceRedraw :: Bool
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''AppModel
@@ -139,6 +141,7 @@ instance Default AppModel where
     , waitingOnDevice = False
     , syncingWallets = False
     , extraTextField = ""
+    , forceRedraw = False
     }
 
 -------------------------------------------------

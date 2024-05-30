@@ -206,3 +206,9 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   ResetUTxOFilters -> 
     [ Model $ model & #homeModel % #utxoFilterModel .~ def ]
 
+  -----------------------------------------------
+  -- Reset Asset Filters
+  -----------------------------------------------
+  ResetAssetFilters -> 
+    [ Model $ model & #homeModel % #assetFilterModel .~ def ]
+

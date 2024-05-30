@@ -73,6 +73,8 @@ data HomeEvent
   | ShowMorePopup
   -- | Reset UTxO Filters.
   | ResetUTxOFilters
+  -- | Reset Asset Filters.
+  | ResetAssetFilters
 
 -------------------------------------------------
 -- UTxO Filter Model
@@ -80,14 +82,16 @@ data HomeEvent
 -- | Possible sortings.
 data UTxOSortMethod
   = UTxOLexicographical
-  | UTxOBalance
+  | UTxOAdaBalance
   | UTxOTime
+  | UTxOSearchTokenBalance
   deriving (Show,Eq,Enum)
 
 displayUTxOSortMethod :: UTxOSortMethod -> Text
 displayUTxOSortMethod UTxOLexicographical = "Lexicographically"
-displayUTxOSortMethod UTxOBalance = "Ada Quantity"
+displayUTxOSortMethod UTxOAdaBalance = "Ada Quantity"
 displayUTxOSortMethod UTxOTime = "Chronologically"
+displayUTxOSortMethod UTxOSearchTokenBalance = "Search Token Quantity"
 
 utxoSortingMethods :: [UTxOSortMethod]
 utxoSortingMethods = enumFrom UTxOLexicographical
@@ -114,6 +118,20 @@ instance Default UTxOFilterModel where
     }
 
 -------------------------------------------------
+-- Asset Filter Model
+-------------------------------------------------
+data AssetFilterModel = AssetFilterModel
+  { search :: Text
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''AssetFilterModel
+
+instance Default AssetFilterModel where
+  def = AssetFilterModel
+    { search = ""
+    }
+
+-------------------------------------------------
 -- Home State
 -------------------------------------------------
 data HomeModel = HomeModel
@@ -137,6 +155,10 @@ data HomeModel = HomeModel
   , utxoFilterScene :: FilterScene
   -- | The current filter settings for the Home UTxOs.
   , utxoFilterModel :: UTxOFilterModel
+  -- | The current filter settings for the Home Assets.
+  , assetFilterModel :: AssetFilterModel
+  -- | Whether to show the filter widget for assets.
+  , showAssetFilter :: Bool
   } deriving (Eq,Show)
 
 instance Default HomeModel where
@@ -151,6 +173,8 @@ instance Default HomeModel where
     , showUTxOFilter = False
     , utxoFilterScene = def
     , utxoFilterModel = def
+    , assetFilterModel = def
+    , showAssetFilter = False
     }
 
 makeFieldLabelsNoPrefix ''HomeModel

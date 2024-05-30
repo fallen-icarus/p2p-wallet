@@ -117,3 +117,9 @@ readNativeAsset t = case words $ replace "." " " t of
     void $ readHex name
     return $ NativeAsset policy name "" n
   _ -> Nothing
+
+fullName :: Getter NativeAsset Text
+fullName = to fullName'
+  where
+    fullName' :: NativeAsset -> Text
+    fullName' NativeAsset{policyId,tokenName} = policyId <> "." <> tokenName

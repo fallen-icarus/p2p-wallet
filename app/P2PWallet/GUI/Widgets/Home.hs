@@ -9,6 +9,7 @@ import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.GUI.Widgets.Home.About
 import P2PWallet.GUI.Widgets.Home.AddPaymentWallet
+import P2PWallet.GUI.Widgets.Home.NativeAssets
 import P2PWallet.GUI.Widgets.Home.UTxOs
 import P2PWallet.Prelude
 
@@ -37,8 +38,14 @@ homeWidget model = do
 
     reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
     reqUpdate _ old new 
-      | old ^. #extraTextField /= new ^. #extraTextField = False
-      | old ^. #homeModel % #utxoFilterModel % #search /= new ^. #homeModel % #utxoFilterModel % #search = False
+      | old ^. #forceRedraw /= new ^. #forceRedraw = True
+      | old ^. #extraTextField /= 
+        new ^. #extraTextField = False
+      | old ^. #homeModel % #utxoFilterModel /= def && new ^. #homeModel % #utxoFilterModel == def = True
+      | old ^. #homeModel % #utxoFilterModel % #search /= 
+        new ^. #homeModel % #utxoFilterModel % #search = False
+      | old ^. #homeModel % #assetFilterModel % #search /= 
+        new ^. #homeModel % #assetFilterModel % #search = False
       | otherwise = True
 
     -- reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
@@ -134,6 +141,8 @@ homeWidget model = do
             `nodeVisible` (model ^. #homeModel % #scene == HomeAbout)
         , box_ [mergeRequired reqUpdate] (utxosWidget model)
             `nodeVisible` (model ^. #homeModel % #scene == HomeUTxOs)
+        , box_ [mergeRequired reqUpdate] (nativeAssetsWidget model)
+            `nodeVisible` (model ^. #homeModel % #scene == HomeAssets)
         ] 
 
     hasPaymentWallets :: Bool
