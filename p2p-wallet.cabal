@@ -88,6 +88,7 @@ executable p2p-wallet
       -- P2PWallet.Data.Koios.TxSubmissionResponse
       -- P2PWallet.Data.FilterLang
       P2PWallet.Data.Profile
+      P2PWallet.Data.Transaction
       P2PWallet.Data.Wallets
       P2PWallet.Data.Wallets.PaymentWallet
       -- P2PWallet.Data.Wallets.StakeWallet
@@ -111,7 +112,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Home.About
       P2PWallet.GUI.Widgets.Home.AddPaymentWallet
       P2PWallet.GUI.Widgets.Home.NativeAssets
-      -- P2PWallet.GUI.Widgets.Home.Transactions
+      P2PWallet.GUI.Widgets.Home.Transactions
       P2PWallet.GUI.Widgets.Home.UTxOs
       P2PWallet.GUI.Widgets.MainMenu
       P2PWallet.GUI.Widgets.Networks

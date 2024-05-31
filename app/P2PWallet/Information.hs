@@ -121,3 +121,43 @@ whatIsWatchedWalletMsg = unlines
       , "tx.signed files for submission to the blockchain."
       ]
   ]
+
+utxoSearchMsg :: Text
+utxoSearchMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "You can search through all of the UTxOs for specific native tokens, reference script"
+      , "hashes, datum hashes, or tx hashes. You can even search for UTxOs containing a"
+      , "combination of targets by separating them with commas."
+      ]
+  , ""
+  , "Native asset criteria must be one of:"
+  , "1. policy_id.asset_name"
+  , "2. policy_id"
+  , "3. asset_name"
+  , "4. fingerprint"
+  ]
+
+utxoSortMsg :: Text
+utxoSortMsg = unlines
+  [ "UTxOs can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Based on the balance of Ada"
+  , "3. Chronologically based on the time the UTxO was created"
+  , "4. Based on the balance of a specific native asset"
+  , ""
+  , mconcat $ intersperse " "
+      [ "The last option is only possible when search is being used for the UTxOs. This option"
+      , "will be hidden if search is not being used. The asset that will be sorted on will"
+      , "be the FIRST criteria used in the search. Make sure the first"
+      , "criteria is actually an asset... To sort based off of a different native asset, move that"
+      , "asset so that it is first in the search criteria."
+      ]
+  ]
+
+depositSignMsg :: Text
+depositSignMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "Negative means the deposit was paid. Positive means the deposit was reclaimed."
+      , "When stake registration deposits are paid/reclaimed, they will appear here."
+      ]
+  ]

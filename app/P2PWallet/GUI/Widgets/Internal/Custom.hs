@@ -27,7 +27,7 @@ import P2PWallet.Prelude
 copyableLabelFor :: Text -> Text -> WidgetNode s AppEvent
 copyableLabelFor caption info = 
   hstack
-    [ tooltip_ "Copy" [tooltipDelay 1000] $ button caption (CopyText info)
+    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
         `styleBasic`
           [ padding 0
           , radius 5
@@ -45,7 +45,7 @@ copyableLabelFor caption info =
 copyableLabelFor_ :: Text -> Text -> Double -> WidgetNode s AppEvent
 copyableLabelFor_ caption info fontSize = 
   hstack
-    [ tooltip_ "Copy" [tooltipDelay 1000] $ button caption (CopyText info)
+    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
         `styleBasic`
           [ padding 0
           , radius 5
@@ -63,7 +63,7 @@ copyableLabelFor_ caption info fontSize =
 -- | A label button that will copy itself.
 copyableLabelSelf :: Text -> WidgetNode s AppEvent
 copyableLabelSelf caption = 
-  tooltip_ "Copy" [tooltipDelay 1000] $ button caption (CopyText caption)
+  tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
     `styleBasic`
       [ padding 0
       , radius 5
@@ -79,7 +79,7 @@ copyableLabelWith :: (ToText a) => Text -> (a -> Text) -> a -> WidgetNode s AppE
 copyableLabelWith caption modifier fullInfo = do
   let formattedInfo = modifier fullInfo
   hstack
-    [ tooltip_ "Copy" [tooltipDelay 1000] $ button caption (CopyText $ toText fullInfo)
+    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText $ toText fullInfo)
         `styleBasic`
           [ padding 0
           , radius 5

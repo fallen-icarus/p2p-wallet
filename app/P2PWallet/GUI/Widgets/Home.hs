@@ -10,6 +10,7 @@ import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.GUI.Widgets.Home.About
 import P2PWallet.GUI.Widgets.Home.AddPaymentWallet
 import P2PWallet.GUI.Widgets.Home.NativeAssets
+import P2PWallet.GUI.Widgets.Home.Transactions
 import P2PWallet.GUI.Widgets.Home.UTxOs
 import P2PWallet.Prelude
 
@@ -22,6 +23,10 @@ homeWidget model = do
       , widgetIf isAdding $ addPaymentWalletWidget model
       , widgetIf isEditing $ editPaymentWalletWidget model
       , widgetIf isDeleting $ confirmDeleteWidget model
+        -- The inspected transaction is here since only one transaction can be inspected at a time.
+        -- It doesn't make sense to move to other home scenes while inspecting a transaction.
+      , widgetMaybe (model ^. #homeModel % #inspectedTransaction) $ \tx -> 
+          inspectionWidget tx model
       ]
   where
     homeSceneButton :: Text -> HomeScene -> AppNode
@@ -139,6 +144,8 @@ homeWidget model = do
                 ]
         , box_ [mergeRequired reqUpdate] (aboutWidget model)
             `nodeVisible` (model ^. #homeModel % #scene == HomeAbout)
+        , box_ [mergeRequired reqUpdate] (transactionsWidget model)
+            `nodeVisible` (model ^. #homeModel % #scene == HomeTransactions)
         , box_ [mergeRequired reqUpdate] (utxosWidget model)
             `nodeVisible` (model ^. #homeModel % #scene == HomeUTxOs)
         , box_ [mergeRequired reqUpdate] (nativeAssetsWidget model)

@@ -26,7 +26,9 @@ syncWallets databaseFile network ws@Wallets{..} = do
       mapM fromRightOrAppError
   
   -- Save the new payment wallet states and throw an error if there is an issue saving.
-  mapM_ (addNewPaymentWallet databaseFile >=> fromRightOrAppError) updatedPaymentWallets
+  flip mapM_ updatedPaymentWallets $ \paymentWallet -> do
+    addNewPaymentWallet databaseFile paymentWallet >>= fromRightOrAppError
+    addNewTransactions databaseFile (paymentWallet ^. #transactions) >>= fromRightOrAppError
 
   -- updatedStakeWallets <- 
   --   pooledMapConcurrently (runQueryStakeWalletInfo network') _stakeWallets >>= 
