@@ -53,6 +53,11 @@ import Data.Aeson qualified as Aeson
 import Monomer.Core.FromFractional(FromFractional(..))
 import Control.Exception (throwIO,catch,handle)
 import Optics
+import Database.SQLite.Simple (SQLData(SQLText))
+import Database.SQLite.Simple.FromField (FromField(..), returnError, ResultError(ConversionFailed))
+import Database.SQLite.Simple.ToField (ToField(..))
+import Database.SQLite.Simple.Ok (Ok(Ok))
+import Database.SQLite.Simple.Internal (Field(..))
 
 showValue :: Aeson.Value -> Text
 showValue = decodeUtf8 
@@ -124,3 +129,10 @@ instance Printf.PrintfArg Decimal where
   formatArg x fmt | Printf.fmtChar (Printf.vFmt 'D' fmt) == 'D' =
     Printf.formatString (show x) (fmt { Printf.fmtChar = 's', Printf.fmtPrecision = Nothing })
   formatArg _ fmt = Printf.errorBadFormat $ Printf.fmtChar fmt
+
+instance FromField Time.POSIXTime where
+  fromField (Field (SQLText t) _) = maybe mzero Ok $ readMaybe $ toString t
+  fromField f = returnError ConversionFailed f "need a text"
+
+instance ToField Time.POSIXTime where
+  toField = toField . show @Text

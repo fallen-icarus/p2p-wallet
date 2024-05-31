@@ -16,6 +16,7 @@ import Database.SQLite.Simple.ToField (toField)
 import P2PWallet.Data.Core
 import P2PWallet.Data.Database
 import P2PWallet.Data.Koios.AddressUTxO
+import P2PWallet.Data.Transaction
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
@@ -113,6 +114,7 @@ data PaymentWallet = PaymentWallet
   , utxos :: [PersonalUTxO]
   , lovelace :: Lovelace
   , nativeAssets :: [NativeAsset]
+  , transactions :: [Transaction] -- These are stored separately.
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''PaymentWallet
@@ -133,6 +135,7 @@ instance Default PaymentWallet where
     , utxos = []
     , lovelace = 0
     , nativeAssets = []
+    , transactions = []
     }
 
 instance FromRow PaymentWallet where
@@ -160,6 +163,7 @@ instance FromRow PaymentWallet where
       , utxos = utxos
       , lovelace = lovelace
       , nativeAssets = nativeAssets
+      , transactions = []
       }
 
 instance ToRow PaymentWallet where

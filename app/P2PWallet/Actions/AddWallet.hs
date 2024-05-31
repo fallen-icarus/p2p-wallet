@@ -47,6 +47,7 @@ pairPaymentWallet network Profile{profileId,accountIndex} paymentId NewPaymentWa
       , utxos = []
       , lovelace = 0
       , nativeAssets = []
+      , transactions = []
       }
 
   where
@@ -89,6 +90,7 @@ watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} = d
       , utxos = [] 
       , lovelace = 0
       , nativeAssets = []
+      , transactions = []
       }
 
   where

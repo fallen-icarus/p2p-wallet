@@ -201,14 +201,25 @@ handleHomeEvent model@AppModel{..} evt = case evt of
          ]
 
   -----------------------------------------------
-  -- Reset UTxO Filters
+  -- Reset Filters
   -----------------------------------------------
   ResetUTxOFilters -> 
     [ Model $ model & #homeModel % #utxoFilterModel .~ def ]
-
-  -----------------------------------------------
-  -- Reset Asset Filters
-  -----------------------------------------------
   ResetAssetFilters -> 
     [ Model $ model & #homeModel % #assetFilterModel .~ def ]
 
+  -----------------------------------------------
+  -- UTxO details
+  -----------------------------------------------
+  ShowAllUTxODetails -> 
+    [ Model $ model & #homeModel % #selectedWallet % #utxos %~ map (set #showDetails True) ]
+  HideAllUTxODetails -> 
+    [ Model $ model & #homeModel % #selectedWallet % #utxos %~ map (set #showDetails False) ]
+
+  -----------------------------------------------
+  -- Inspecting Transactions
+  -----------------------------------------------
+  InspectHomeTransaction tx -> 
+    [ Model $ model & #homeModel % #inspectedTransaction .~ Just tx ]
+  CloseInspectedHomeTransaction -> 
+    [ Model $ model & #homeModel % #inspectedTransaction .~ Nothing ]

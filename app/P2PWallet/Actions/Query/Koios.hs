@@ -25,6 +25,7 @@ import P2PWallet.Data.Core
 import P2PWallet.Data.Koios.AddressUTxO
 import P2PWallet.Data.Koios.PostTypes
 import P2PWallet.Data.Koios.Transaction
+import P2PWallet.Data.Transaction qualified as P2P
 import P2PWallet.Data.Wallets
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -75,21 +76,13 @@ runQueryPaymentWalletInfo network wallet = do
     manager <- newManager tlsManagerSettings
     let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
     runClientM (queryPaymentWalletInfo $ wallet ^. #paymentAddress) env >>= \case
-      Right (us,_,as) -> do
+      Right (us,txs,as) -> do
         return $ Right $ 
           wallet & #utxos .~ map toPersonalUTxO us
                  & #lovelace .~ sum (map (view #lovelace) us)
-                 -- & #txHistory .~ txs
+                 & #transactions .~ map (P2P.toTransaction $ wallet ^. #paymentId) txs
                  & #nativeAssets .~ as
       Left err -> return $ Left $ show err
-  where
-    sumAsset :: NativeAsset -> NativeAsset -> NativeAsset
-    sumAsset NativeAsset{..} NativeAsset{quantity=q2} = NativeAsset
-      { policyId
-      , tokenName
-      , fingerprint
-      , quantity = quantity + q2
-      }
 
 -------------------------------------------------
 -- Low-Level API
@@ -134,7 +127,7 @@ submitApi
 queryPaymentWalletInfo :: PaymentAddress -> ClientM ([AddressUTxO],[Transaction],[NativeAsset])
 queryPaymentWalletInfo addr = 
   (,,)  <$> queryAddressUTxOs [addr]
-       <*> return [] -- queryAddressTransactions [addr]
+       <*> queryAddressTransactions [addr]
        <*> queryAddressAssets [addr]
 
 queryAddressUTxOs :: [PaymentAddress] -> ClientM [AddressUTxO]

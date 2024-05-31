@@ -38,7 +38,7 @@ nativeAssetsWidget model =
                   , spacer_ [width 5]
                   , textField_ 
                       (toLensVL $ #homeModel % #assetFilterModel % #search) 
-                      [placeholder "full name, policy id, asset name, fingerprint"] 
+                      [placeholder "one of: full name, policy id, asset name, fingerprint"] 
                       `styleBasic`
                         [ textSize 12
                         , width 500
@@ -162,10 +162,10 @@ nativeAssetsWidget model =
             ]
 
 assetFilterWidget :: AppModel -> AppNode
-assetFilterWidget model = do
+assetFilterWidget _ = do
   vstack
     [ centerWidget $ vstack
-        [ centerWidget $ label "DeFi Filters"
+        [ centerWidget $ label "DeFi Filters - Finding Key NFTs for p2p protocols"
         , filler
         , hstack 
             [ filler

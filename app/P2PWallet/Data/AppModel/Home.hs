@@ -15,6 +15,7 @@ module P2PWallet.Data.AppModel.Home where
 
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.Wallets.PaymentWallet
+import P2PWallet.Data.Transaction
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -75,6 +76,14 @@ data HomeEvent
   | ResetUTxOFilters
   -- | Reset Asset Filters.
   | ResetAssetFilters
+  -- | Show all UTxO detials.
+  | ShowAllUTxODetails
+  -- | Hide all UTxO detials.
+  | HideAllUTxODetails
+  -- | Inspect the target transaction.
+  | InspectHomeTransaction Transaction
+  -- | Stop inspecting transaction.
+  | CloseInspectedHomeTransaction
 
 -------------------------------------------------
 -- UTxO Filter Model
@@ -159,6 +168,8 @@ data HomeModel = HomeModel
   , assetFilterModel :: AssetFilterModel
   -- | Whether to show the filter widget for assets.
   , showAssetFilter :: Bool
+  -- | Focused transaction details.
+  , inspectedTransaction :: Maybe Transaction
   } deriving (Eq,Show)
 
 instance Default HomeModel where
@@ -175,6 +186,7 @@ instance Default HomeModel where
     , utxoFilterModel = def
     , assetFilterModel = def
     , showAssetFilter = False
+    , inspectedTransaction = Nothing
     }
 
 makeFieldLabelsNoPrefix ''HomeModel
