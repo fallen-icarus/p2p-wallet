@@ -21,7 +21,11 @@ common warnings
     ghc-options: -Wall
 
 common optimizations
-    ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
+    ghc-options: 
+      -threaded 
+      -rtsopts 
+      -with-rtsopts=-N 
+      -O2
 
 common extensions
     default-language: GHC2021
@@ -76,7 +80,6 @@ executable p2p-wallet
       P2PWallet.Data.Database.Create
       P2PWallet.Data.Database.Delete
       P2PWallet.Data.Database.Insert
-      P2PWallet.Data.Database.Pattern
       P2PWallet.Data.Database.Query
       P2PWallet.Data.Files
       P2PWallet.Data.Koios.AddressUTxO
@@ -98,6 +101,8 @@ executable p2p-wallet
       P2PWallet.GUI.EventHandler.HomeEvent
       P2PWallet.GUI.EventHandler.ProfileEvent
       -- P2PWallet.GUI.EventHandler.TxBuilderEvent
+      P2PWallet.GUI.HelpMessages
+      P2PWallet.GUI.Icons
       P2PWallet.GUI.UIBuilder
       -- P2PWallet.GUI.Widgets.Delegation
       -- P2PWallet.GUI.Widgets.Delegation.Details
@@ -126,7 +131,6 @@ executable p2p-wallet
       -- P2PWallet.GUI.Widgets.TxBuilder.AddWithdrawal
       -- P2PWallet.GUI.Widgets.TxBuilder.ExportTxBody
       -- P2PWallet.GUI.Widgets.TxBuilder.Summary
-      P2PWallet.Information
       P2PWallet.MonomerOptics
       P2PWallet.Plutus
       P2PWallet.Prelude

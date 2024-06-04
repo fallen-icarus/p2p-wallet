@@ -1,9 +1,13 @@
-module P2PWallet.GUI.Widgets.Settings where
+module P2PWallet.GUI.Widgets.Settings 
+  ( 
+    settingsWidget
+  ) where
 
 import Monomer
 
 import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
@@ -30,28 +34,30 @@ settingsWidget model = do
             , label "Profile Name:" `styleBasic` [textFont "Italics", textSize 18]
             , flip styleBasic [textSize 18] $ 
                 label $ fromMaybe "" $ model ^? #selectedProfile % _Just % #alias
-            , button remixEdit2Line (ProfileEvent $ ChangeProfileName StartAdding)
-                `styleBasic`
-                  [ textFont "Remix"
-                  , padding 0
-                  , radius 5
-                  , textMiddle
-                  , border 0 transparent
-                  , textColor customBlue
-                  , bgColor transparent
-                  ]
-                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-            , button remixDeleteBinLine (ProfileEvent $ DeleteProfile GetDeleteConfirmation)
-                `styleBasic`
-                  [ textFont "Remix"
-                  , padding 0
-                  , radius 5
-                  , textMiddle
-                  , border 0 transparent
-                  , textColor customRed
-                  , bgColor transparent
-                  ]
-                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , tooltip_ "Change Profile Name" [tooltipDelay 0] $
+                button editIcon (ProfileEvent $ ChangeProfileName StartAdding)
+                  `styleBasic`
+                    [ textFont "Remix"
+                    , padding 0
+                    , radius 5
+                    , textMiddle
+                    , border 0 transparent
+                    , textColor customBlue
+                    , bgColor transparent
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , tooltip_ "Delete Profile" [tooltipDelay 0] $
+                button deleteIcon (ProfileEvent $ DeleteProfile GetDeleteConfirmation)
+                  `styleBasic`
+                    [ textFont "Remix"
+                    , padding 0
+                    , radius 5
+                    , textMiddle
+                    , border 0 transparent
+                    , textColor customRed
+                    , bgColor transparent
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             , filler
             ]
         , separatorLine `styleBasic` [paddingL 30, paddingR 30]

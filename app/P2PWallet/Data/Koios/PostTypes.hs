@@ -4,7 +4,6 @@
 module P2PWallet.Data.Koios.PostTypes where
 
 import Data.Aeson
-import Data.Vector (Vector)
 
 import P2PWallet.Data.Core
 import P2PWallet.Plutus
@@ -61,6 +60,16 @@ instance ToJSON ExtendedPaymentAddresses where
            , "_extended" .= True
            ]
 
+-- | A newtype for submitting a list of payment addresses with the "_after_block_height" flag.
+data PaymentAddressesAfterBlock = PaymentAddressesAfterBlock [PaymentAddress] Integer
+  deriving (Show)
+
+instance ToJSON PaymentAddressesAfterBlock where
+  toJSON (PaymentAddressesAfterBlock as lastBlock) = 
+    object [ "_addresses" .= map unPaymentAddress as 
+           , "_after_block_height" .= lastBlock
+           ]
+
 -------------------------------------------------
 -- Stake Addresses
 -------------------------------------------------
@@ -78,14 +87,14 @@ instance ToJSON StakeAddresses where
 -------------------------------------------------
 -- | A newtype for submitting a list of transaction hashes. This is also the return type for
 -- an intermediate query.
-newtype TxHashes = TxHashes (Vector Text) deriving (Show)
+newtype TxHashes = TxHashes [Text] deriving (Show)
 
 instance ToJSON TxHashes where
   toJSON (TxHashes txs) = object [ "_tx_hashes" .= txs ]
 
 instance FromJSON TxHashes where
   parseJSON = 
-    withArray "TxHashes" $ fmap TxHashes . mapM (withObject "TxHash" (.: "tx_hash"))
+    withArray "TxHashes" $ fmap (TxHashes . toList) . mapM (withObject "TxHash" (.: "tx_hash"))
 
 -------------------------------------------------
 -- Unknown UTxOs

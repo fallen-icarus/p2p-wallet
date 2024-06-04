@@ -5,11 +5,17 @@ module P2PWallet.Prelude
     T.replace
 
     -- * Time
+  , Time.Day(..)
+  , beginningOfDay
+  , endOfDay
+  , localTimeToPosixTime
   , Time.POSIXTime
   , Time.TimeZone
   , showLocalTime
   , showLocalDate
   , Time.getCurrentTimeZone
+  , getCurrentDay
+  , Time.addDays
 
     -- * Defaults
   , Default.Default(..)
@@ -35,6 +41,7 @@ module P2PWallet.Prelude
   , handle
 
     -- * Other useful re-exports
+  , Sqlite.Query(..)
   , module Relude
   , module Optics
   , Printf.printf
@@ -54,6 +61,7 @@ import Monomer.Core.FromFractional(FromFractional(..))
 import Control.Exception (throwIO,catch,handle)
 import Optics
 import Database.SQLite.Simple (SQLData(SQLText))
+import Database.SQLite.Simple qualified as Sqlite
 import Database.SQLite.Simple.FromField (FromField(..), returnError, ResultError(ConversionFailed))
 import Database.SQLite.Simple.ToField (ToField(..))
 import Database.SQLite.Simple.Ok (Ok(Ok))
@@ -77,6 +85,9 @@ getTemporaryDirectory = do
   Dir.createDirectoryIfMissing True tmpDir -- Create the subfolder if it doesn't exist yet.
   return tmpDir
 
+-------------------------------------------------
+-- Time
+-------------------------------------------------
 showLocalDate :: Time.TimeZone -> Time.POSIXTime -> Text
 showLocalDate zone t = 
     toText $ Time.formatTime Time.defaultTimeLocale formatter localTime
@@ -92,6 +103,20 @@ showLocalTime zone t =
     utcTime = Time.posixSecondsToUTCTime t
     localTime = Time.utcToLocalTime zone utcTime
     formatter = "%I:%M %p"
+
+beginningOfDay :: Time.Day -> Time.LocalTime
+beginningOfDay day = Time.LocalTime day Time.midnight
+
+endOfDay :: Time.Day -> Time.LocalTime
+endOfDay day = Time.LocalTime (Time.addDays 1 day) Time.midnight
+
+localTimeToPosixTime :: Time.TimeZone -> Time.LocalTime -> Time.POSIXTime
+localTimeToPosixTime timeZone localTime = 
+  Time.utcTimeToPOSIXSeconds $ Time.localTimeToUTC timeZone localTime
+
+getCurrentDay :: Time.TimeZone -> IO Time.Day
+getCurrentDay timeZone = 
+  Time.localDay . Time.utcToLocalTime timeZone <$> Time.getCurrentTime
 
 -------------------------------------------------
 -- Lens Helpers
@@ -136,3 +161,7 @@ instance FromField Time.POSIXTime where
 
 instance ToField Time.POSIXTime where
   toField = toField . show @Text
+
+instance Default.Default Time.Day where
+  -- The default is the beginning of utc time.
+  def = Time.localDay $ Time.utcToLocalTime Time.utc $ Time.posixSecondsToUTCTime 0

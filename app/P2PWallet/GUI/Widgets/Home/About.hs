@@ -1,4 +1,7 @@
-module P2PWallet.GUI.Widgets.Home.About where
+module P2PWallet.GUI.Widgets.Home.About 
+  ( 
+    aboutWidget
+  ) where
 
 import Monomer
 import Prettyprinter (pretty)
@@ -89,3 +92,42 @@ addressInfoWidget model = do
         , radius 20
         , bgColor customGray3
         ]
+
+-------------------------------------------------
+-- Helper Widgets
+-------------------------------------------------
+-- | A label button that will copy other data.
+copyableLabelFor :: Text -> Text -> WidgetNode s AppEvent
+copyableLabelFor caption info = 
+  hstack
+    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
+        `styleBasic`
+          [ padding 0
+          , radius 5
+          , textMiddle
+          , border 0 transparent
+          , textColor customBlue
+          , bgColor transparent
+          ]
+        `styleHover` [textColor lightGray, cursorIcon CursorHand]
+    , spacer
+    , label info `styleBasic` [textColor lightGray]
+    ]
+
+copyableLabelWith :: (ToText a) => Text -> (a -> Text) -> a -> WidgetNode s AppEvent
+copyableLabelWith caption modifier fullInfo = do
+  let formattedInfo = modifier fullInfo
+  hstack
+    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText $ toText fullInfo)
+        `styleBasic`
+          [ padding 0
+          , radius 5
+          , textMiddle
+          , border 0 transparent
+          , textColor customBlue
+          , bgColor transparent
+          ]
+        `styleHover` [textColor lightGray, cursorIcon CursorHand]
+    , spacer
+    , label formattedInfo `styleBasic` [textColor lightGray]
+    ]

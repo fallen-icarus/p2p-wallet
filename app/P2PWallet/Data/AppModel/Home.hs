@@ -13,6 +13,8 @@ The Home scene is dedicated to `PaymentWallet`s.
 -}
 module P2PWallet.Data.AppModel.Home where
 
+import Data.Time.Format qualified as Time
+
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.Wallets.PaymentWallet
 import P2PWallet.Data.Transaction
@@ -33,7 +35,7 @@ data HomeScene
   | HomeAssets 
   deriving (Eq,Show)
 
--- | The filter widget subscene
+-- | The filter widget subscene. This is used for all home filter widgets.
 data FilterScene
   = FilterScene
   | SortScene
@@ -43,6 +45,10 @@ data FilterScene
 instance Default FilterScene where
   def = FilterScene
 
+-------------------------------------------------
+-- Sorting Directions
+-------------------------------------------------
+-- | Sorting Direction.
 data SortDirection
   = SortAscending
   | SortDescending
@@ -52,6 +58,7 @@ displaySortDirection :: SortDirection -> Text
 displaySortDirection SortAscending = "Ascending"
 displaySortDirection SortDescending = "Descending"
 
+-- | A list of possible sorting directions. This is useful for dropdown menus.
 sortingDirections :: [SortDirection]
 sortingDirections = enumFrom SortAscending
 
@@ -76,6 +83,8 @@ data HomeEvent
   | ResetUTxOFilters
   -- | Reset Asset Filters.
   | ResetAssetFilters
+  -- | Reset Tx Filters.
+  | ResetTxFilters
   -- | Show all UTxO detials.
   | ShowAllUTxODetails
   -- | Hide all UTxO detials.
@@ -102,15 +111,22 @@ displayUTxOSortMethod UTxOAdaBalance = "Ada Quantity"
 displayUTxOSortMethod UTxOTime = "Chronologically"
 displayUTxOSortMethod UTxOSearchTokenBalance = "Search Token Quantity"
 
+-- | The list of possible sorting methods. This is useful for dropdown menus.
 utxoSortingMethods :: [UTxOSortMethod]
 utxoSortingMethods = enumFrom UTxOLexicographical
 
 data UTxOFilterModel = UTxOFilterModel
+  -- | Whether the UTxO should have a reference script. When `Nothing`, it will match either way.
   { hasReferenceScript :: Maybe Bool
+  -- | Whether the UTxO should have a datum. When `Nothing`, it will match either way.
   , hasDatum :: Maybe Bool
+  -- | Whether the UTxO should have native assets. When `Nothing`, it will match either way.
   , hasNativeAssets :: Maybe Bool
+  -- | The current sorting method for the UTxOs.
   , sortingMethod :: UTxOSortMethod
+  -- | The current sorting direction for the UTxOs.
   , sortingDirection :: SortDirection
+  -- | The targets to search for.
   , search :: Text
   } deriving (Show,Eq)
 
@@ -130,6 +146,7 @@ instance Default UTxOFilterModel where
 -- Asset Filter Model
 -------------------------------------------------
 data AssetFilterModel = AssetFilterModel
+  -- | The targets to search for.
   { search :: Text
   } deriving (Show,Eq)
 
@@ -139,6 +156,46 @@ instance Default AssetFilterModel where
   def = AssetFilterModel
     { search = ""
     }
+
+-------------------------------------------------
+-- Transaction Filter Model
+-------------------------------------------------
+data TxFilterModel = TxFilterModel
+  -- | The targets to search for.
+  { search :: Text
+  -- | The date range for displaying transactions.
+  , dateRange :: (Maybe Day, Maybe Day)
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TxFilterModel
+
+instance Default TxFilterModel where
+  def = TxFilterModel
+    { search = ""
+    , dateRange = (Nothing,Nothing)
+    }
+
+lowerBoundText :: Lens' TxFilterModel Text
+lowerBoundText = lens getLowerBoundText setLowerBoundText
+  where
+    getLowerBoundText :: TxFilterModel -> Text
+    getLowerBoundText tx = 
+      maybe "" (toText . Time.formatTime Time.defaultTimeLocale "%m-%d-%Y") $ tx ^. #dateRange % _1
+
+    setLowerBoundText :: TxFilterModel -> Text -> TxFilterModel
+    setLowerBoundText tx date = 
+      tx & #dateRange % _1 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
+
+upperBoundText :: Lens' TxFilterModel Text
+upperBoundText = lens getLowerBoundText setLowerBoundText
+  where
+    getLowerBoundText :: TxFilterModel -> Text
+    getLowerBoundText tx = 
+      maybe "" (toText . Time.formatTime Time.defaultTimeLocale "%m-%d-%Y") $ tx ^. #dateRange % _2
+
+    setLowerBoundText :: TxFilterModel -> Text -> TxFilterModel
+    setLowerBoundText tx date = 
+      tx & #dateRange % _2 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
 
 -------------------------------------------------
 -- Home State
@@ -170,6 +227,12 @@ data HomeModel = HomeModel
   , showAssetFilter :: Bool
   -- | Focused transaction details.
   , inspectedTransaction :: Maybe Transaction
+  -- | The current filter settings for the Home Transactions.
+  , txFilterModel :: TxFilterModel
+  -- | Whether to show the widget for filtering transactions.
+  , showTransactionFilter :: Bool
+  -- | The active scene for the tx filter widget.
+  , txFilterScene :: FilterScene
   } deriving (Eq,Show)
 
 instance Default HomeModel where
@@ -187,6 +250,9 @@ instance Default HomeModel where
     , assetFilterModel = def
     , showAssetFilter = False
     , inspectedTransaction = Nothing
+    , txFilterModel = def
+    , showTransactionFilter = False
+    , txFilterScene = FilterScene
     }
 
 makeFieldLabelsNoPrefix ''HomeModel

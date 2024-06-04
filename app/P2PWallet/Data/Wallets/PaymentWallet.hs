@@ -10,7 +10,7 @@ module P2PWallet.Data.Wallets.PaymentWallet where
 
 import Data.Aeson
 
-import Database.SQLite.Simple (field,Query(..),ToRow(..),FromRow(..))
+import Database.SQLite.Simple (field,ToRow(..),FromRow(..))
 import Database.SQLite.Simple.ToField (toField)
 
 import P2PWallet.Data.Core
@@ -185,45 +185,46 @@ instance TableName PaymentWallet where
   tableName = "payment_wallets"
 
 instance Creatable PaymentWallet where
-  createStmt = Query $ unlines
+  createStmt = Query $ unwords
     [ "CREATE TABLE " <> tableName @PaymentWallet
-    , "( network TEXT NOT NULL,"
-    ,  " profile_id INTEGER REFERENCES profiles (profile_id),"
-    ,  " payment_id INTEGER PRIMARY KEY,"
-    ,  " alias TEXT NOT NULL,"
-    ,  " payment_address TEXT NOT NULL,"
-    ,  " payment_key_path TEXT,"
-    ,  " stake_address TEXT,"
-    ,  " stake_key_path TEXT,"
-    ,  " utxos BLOB,"
-    ,  " lovelace INTEGER NOT NULL,"
-    ,  " native_assets BLOB,"
-    ,  " UNIQUE(network,profile_id,alias)"
+    , "("
+    , unwords $ intersperse ","
+        [ "network TEXT NOT NULL"
+        , "profile_id INTEGER REFERENCES profiles (profile_id)"
+        , "payment_id INTEGER PRIMARY KEY"
+        , "alias TEXT NOT NULL"
+        , "payment_address TEXT NOT NULL"
+        , "payment_key_path TEXT"
+        , "stake_address TEXT"
+        , "stake_key_path TEXT"
+        , "utxos BLOB"
+        , "lovelace INTEGER NOT NULL"
+        , "native_assets BLOB"
+        , "UNIQUE(network,profile_id,alias)"
+        ]
     , ");"
     ]
 
 instance Insertable PaymentWallet where
-  insertStmt = Query $ unlines
+  insertStmt = Query $ unwords
     [ "INSERT OR REPLACE INTO " <> tableName @PaymentWallet
-    , "( network,"
-    ,  " profile_id,"
-    ,  " payment_id,"
-    ,  " alias,"
-    ,  " payment_address,"
-    ,  " payment_key_path,"
-    ,  " stake_address,"
-    ,  " stake_key_path,"
-    ,  " utxos,"
-    ,  " lovelace,"
-    ,  " native_assets"
-    , ") VALUES (?,?,?,?,?,?,?,?,?,?,?);"
+    , "("
+    , unwords $ intersperse ","
+        [ "network"
+        , "profile_id"
+        , "payment_id"
+        , "alias"
+        , "payment_address"
+        , "payment_key_path"
+        , "stake_address"
+        , "stake_key_path"
+        , "utxos"
+        , "lovelace"
+        , "native_assets"
+        ]
+    , ")"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?);"
     ]
-
-instance Queryable PaymentWallet where
-  queryStmt = Query $ "SELECT * FROM " <> tableName @PaymentWallet
-
-instance Deletable PaymentWallet where
-  deleteStmt = Query $ "DELETE FROM " <> tableName @PaymentWallet
 
 -------------------------------------------------
 -- New Payment Wallet

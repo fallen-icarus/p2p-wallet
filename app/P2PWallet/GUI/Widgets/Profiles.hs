@@ -1,4 +1,7 @@
-module P2PWallet.GUI.Widgets.Profiles where
+module P2PWallet.GUI.Widgets.Profiles 
+  ( 
+    profilesWidget
+  ) where
 
 import Monomer
 import Prettyprinter (tupled)
@@ -7,8 +10,9 @@ import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
 import P2PWallet.Data.Profile
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.HelpMessages
+import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
-import P2PWallet.Information
 import P2PWallet.Prelude
 
 profilesWidget :: AppModel -> AppNode
@@ -40,7 +44,7 @@ profilesWidget model = do
     newProfileBox =
       let content =
             vstack
-              [ centerWidgetH $ label remixUserAddLine
+              [ centerWidgetH $ label newUserIcon
                   `styleBasic` [textFont "Remix", textSize 24, paddingT 10]
               , centerWidgetH $ label "New Profile" `styleBasic` [textFont "Medium", textSize 20]
               ] `styleBasic` [width 200, padding 20, radius 5]
@@ -98,7 +102,7 @@ addProfileWidget _ = do
               , spacer
               , numericField_ (toLensVL $ #newProfile % #accountIndex) [decimals 0]
                   `styleBasic` [width 100]
-              , mainButton remixInformationLine (Alert accountIdInfoMsg)
+              , mainButton helpIcon (Alert accountIdInfoMsg)
                   `styleBasic`
                     [ border 0 transparent
                     , radius 20

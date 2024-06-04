@@ -1,4 +1,7 @@
-module P2PWallet.GUI.Widgets.Networks where
+module P2PWallet.GUI.Widgets.Networks 
+  ( 
+    networksWidget
+  ) where
 
 import Monomer
 

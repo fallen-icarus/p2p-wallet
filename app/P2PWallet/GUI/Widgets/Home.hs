@@ -1,10 +1,14 @@
-module P2PWallet.GUI.Widgets.Home where
+module P2PWallet.GUI.Widgets.Home 
+  ( 
+    homeWidget
+  ) where
 
 import Monomer
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.GUI.Widgets.Home.About
@@ -51,25 +55,20 @@ homeWidget model = do
         new ^. #homeModel % #utxoFilterModel % #search = False
       | old ^. #homeModel % #assetFilterModel % #search /= 
         new ^. #homeModel % #assetFilterModel % #search = False
+      | old ^. #homeModel % #txFilterModel % #search /= 
+        new ^. #homeModel % #txFilterModel % #search = False
+      | old ^. #homeModel % #txFilterModel % #dateRange /= 
+        new ^. #homeModel % #txFilterModel % #dateRange = False
       | otherwise = True
-
-    -- reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
-    -- reqUpdate _ old new 
-    --   | old ^. #knownWallets % #paymentWallets /= new ^. #knownWallets % #paymentWallets = True
-    --   | old ^. #homeModel % #selectedWallet /= new ^. #homeModel % #selectedWallet = True
-    --   | old ^. #homeModel % #showUTxOFilter /= new ^. #homeModel % #showUTxOFilter = True
-    --   | old ^. #homeModel % #utxoFilterScene /= new ^. #homeModel % #utxoFilterScene = True
-    --   | old ^. #homeModel % #utxoFilterModel /= new ^. #homeModel % #utxoFilterModel = True
-    --   | otherwise = False
 
     -- Shows an icon representing where the address is paired or watched.
     walletTypeLabel :: AppNode
     walletTypeLabel
       | isNothing $ model ^. #homeModel % #selectedWallet % #paymentKeyPath = 
-          tooltip_ "Watched" [tooltipDelay 1000] $ label remixTv2Line
+          tooltip_ "Watched" [tooltipDelay 0] $ label watchedIcon
             `styleBasic` [textFont "Remix", paddingT 10]
       | otherwise = 
-          tooltip_ "Paired" [tooltipDelay 1000] $ label remixLinksLine
+          tooltip_ "Paired" [tooltipDelay 0] $ label pairedIcon
             `styleBasic` [textFont "Remix", paddingT 10]
 
     headerWidget :: AppNode
@@ -98,8 +97,8 @@ homeWidget model = do
         , spacer
         , walletTypeLabel 
         , spacer
-        , tooltip_ "Refresh" [tooltipDelay 1000] $
-            button remixRefreshLine (SyncWallets StartSync)
+        , tooltip_ "Refresh" [tooltipDelay 0] $
+            button refreshIcon (SyncWallets StartSync)
             `styleBasic`
               [ border 0 transparent
               , radius 20
@@ -186,8 +185,8 @@ homeWidget model = do
 morePopup :: AppModel -> AppNode
 morePopup _ = do
   vstack
-    [ tooltip_ "More" [tooltipDelay 1000] $
-        button remixMoreLine (HomeEvent ShowMorePopup)
+    [ tooltip_ "More" [tooltipDelay 0] $
+        button horizontalMoreIcon (HomeEvent ShowMorePopup)
         `styleBasic`
           [ border 0 transparent
           , radius 20

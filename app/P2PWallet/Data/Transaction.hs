@@ -17,7 +17,7 @@ module P2PWallet.Data.Transaction where
 
 import Data.Aeson
 
-import Database.SQLite.Simple (field,Query(..),ToRow(..),FromRow(..))
+import Database.SQLite.Simple (field,ToRow(..),FromRow(..))
 import Database.SQLite.Simple.ToField (toField)
 
 import P2PWallet.Data.Core
@@ -104,6 +104,7 @@ toggleDetails ref = lens (getToggleDetails ref) (setToggleDetails ref)
 -------------------------------------------------
 data Transaction = Transaction
   { txHash :: Text
+  , profileId :: ProfileId
   , paymentId :: PaymentId
   , blockTime :: POSIXTime
   , blockHeight :: Integer
@@ -134,6 +135,7 @@ makeFieldLabelsNoPrefix ''Transaction
 instance FromRow Transaction where
   fromRow = do
     txHash <- field
+    profileId <- field
     paymentId <- field
     blockTime <- field
     blockHeight <- field
@@ -149,6 +151,7 @@ instance FromRow Transaction where
     outputs <- fromMaybe mzero . decode <$> field
     return $ Transaction
       { txHash = txHash
+      , profileId = profileId
       , paymentId = paymentId
       , blockTime = blockTime
       , blockHeight = blockHeight
@@ -172,6 +175,7 @@ instance FromRow Transaction where
 instance ToRow Transaction where
   toRow Transaction{..} =
     [ toField txHash
+    , toField profileId
     , toField paymentId
     , toField blockTime
     , toField blockHeight
@@ -191,52 +195,59 @@ instance TableName Transaction where
   tableName = "transactions"
 
 instance Creatable Transaction where
-  createStmt = Query $ unlines
+  createStmt = Query $ unwords
     [ "CREATE TABLE " <> tableName @Transaction
-    , "( tx_hash TEXT PRIMARY KEY,"
-    ,  " payment_id INTEGER REFERENCES payment_wallets (payment_id),"
-    ,  " block_time INTEGER NOT NULL,"
-    ,  " block_height INTEGER NOT NULL,"
-    ,  " fee INTEGER NOT NULL,"
-    ,  " size INTEGER NOT NULL,"
-    ,  " deposit INTEGER NOT NULL,"
-    ,  " invalid_before INTEGER,"
-    ,  " invalid_after INTEGER,"
-    ,  " collateral_inputs BLOB,"
-    ,  " collateral_output BLOB,"
-    ,  " reference_inputs BLOB,"
-    ,  " inputs BLOB,"
-    ,  " outputs BLOB"
+    , "("
+    , unwords $ intersperse ","
+        [ "tx_hash TEXT PRIMARY KEY"
+        , "profile_id INTEGER REFERENCES profiles (profile_id)"
+        , "payment_id INTEGER REFERENCES payment_wallets (payment_id)"
+        , "block_time TEXT NOT NULL"
+        , "block_height INTEGER NOT NULL"
+        , "fee INTEGER NOT NULL"
+        , "size INTEGER NOT NULL"
+        , "deposit INTEGER NOT NULL"
+        , "invalid_before TEXT"
+        , "invalid_after TEXT"
+        , "collateral_inputs BLOB"
+        , "collateral_output BLOB"
+        , "reference_inputs BLOB"
+        , "inputs BLOB"
+        , "outputs BLOB"
+        ]
     , ");"
     ]
 
 instance Insertable Transaction where
-  insertStmt = Query $ unlines
+  insertStmt = Query $ unwords
     [ "INSERT OR REPLACE INTO " <> tableName @Transaction
-    , "( tx_hash,"
-    ,  " payment_id,"
-    ,  " block_time,"
-    ,  " block_height,"
-    ,  " fee,"
-    ,  " size,"
-    ,  " deposit,"
-    ,  " invalid_before,"
-    ,  " invalid_after,"
-    ,  " collateral_inputs,"
-    ,  " collateral_output,"
-    ,  " reference_inputs,"
-    ,  " inputs,"
-    ,  " outputs"
-    , ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+    , "("
+    , unwords $ intersperse ","
+        [ "tx_hash"
+        , "profile_id"
+        , "payment_id"
+        , "block_time"
+        , "block_height"
+        , "fee"
+        , "size"
+        , "deposit"
+        , "invalid_before"
+        , "invalid_after"
+        , "collateral_inputs"
+        , "collateral_output"
+        , "reference_inputs"
+        , "inputs"
+        , "outputs"
+        ]
+    , ")"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
-instance Queryable Transaction where
-  queryStmt = Query $ "SELECT * FROM " <> tableName @Transaction
-
 -- | Convert a Koios Transaction to a P2PWallet Transaction.
-toTransaction :: PaymentId -> Koios.Transaction -> Transaction
-toTransaction paymentId Koios.Transaction{..} = Transaction
+toTransaction :: ProfileId -> PaymentId -> Koios.Transaction -> Transaction
+toTransaction profileId paymentId Koios.Transaction{..} = Transaction
   { txHash = txHash
+  , profileId = profileId
   , paymentId = paymentId
   , blockTime = blockTime
   , blockHeight = blockHeight

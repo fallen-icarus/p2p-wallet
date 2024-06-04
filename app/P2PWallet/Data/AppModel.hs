@@ -68,6 +68,8 @@ data AppEvent
   | HomeEvent HomeEvent 
   -- | Sync the currently tracked wallets.
   | SyncWallets (SyncEvent Wallets)
+  -- | Update the current date.
+  | UpdateCurrentDate Day
 
 
 data ProfileEvent
@@ -117,6 +119,8 @@ data AppModel = AppModel
   , waitingOnDevice :: Bool
   -- | The app is syncing the wallets.
   , syncingWallets :: Bool
+  -- | The app is loading the wallets.
+  , loadingWallets :: Bool
   -- | Useful when the user must specify a one-time use input such as a filepath or new alias.
   , extraTextField :: Text
   -- | This is useful for forcing the redraw of the UI when a text field is changed.
@@ -140,6 +144,7 @@ instance Default AppModel where
     , knownWallets = def
     , waitingOnDevice = False
     , syncingWallets = False
+    , loadingWallets = False
     , extraTextField = ""
     , forceRedraw = False
     }

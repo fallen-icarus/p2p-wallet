@@ -4,8 +4,9 @@ import Monomer
 
 import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.HelpMessages
+import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
-import P2PWallet.Information
 import P2PWallet.Prelude
 
 addPaymentWalletWidget :: AppModel -> AppNode
@@ -52,14 +53,12 @@ pairPaymentWidget model = do
   let boolLens' = boolLens 0 (#homeModel % #newPaymentWallet % #stakeAddressIndex)
       numLens' = maybeLens 0 (#homeModel % #newPaymentWallet % #stakeAddressIndex)
 
-      remixIconCornerDownRightArrow = toGlyph 0XF309
-
       editFields = 
         vstack_ [childSpacing]
           [ hstack
               [ label "What is a paired wallet?"
                   `styleBasic` [textFont "Italics"]
-              , mainButton remixInformationLine (Alert whatIsPairedWalletMsg)
+              , mainButton helpIcon (Alert whatIsPairedWalletMsg)
                   `styleBasic`
                     [ border 0 transparent
                     , radius 20
@@ -81,7 +80,7 @@ pairPaymentWidget model = do
               , spacer
               , numericField (toLensVL $ #homeModel % #newPaymentWallet % #paymentAddressIndex)
                   `styleBasic` [width 100]
-              , mainButton remixInformationLine (Alert paymentAddressIndexMsg)
+              , mainButton helpIcon (Alert paymentAddressIndexMsg)
                   `styleBasic`
                     [ border 0 transparent
                     , radius 20
@@ -99,13 +98,13 @@ pairPaymentWidget model = do
               ]
           , hstack
               [ spacer_ [width 20]
-              , label remixIconCornerDownRightArrow 
+              , label cornerDownRightArrowIcon 
                   `styleBasic` [paddingT 8, paddingR 5, textFont "Remix"]
               , label "Staking Key Address Index:"
               , spacer
               , numericField (toLensVL numLens')
                   `styleBasic` [width 100]
-              , mainButton remixInformationLine (Alert stakeAddressIndexMsg)
+              , mainButton helpIcon (Alert stakeAddressIndexMsg)
                   `styleBasic`
                     [ border 0 transparent
                     , radius 20
@@ -136,7 +135,7 @@ watchPaymentWidget _ = do
           [ hstack
               [ label "What is a watched wallet?"
                   `styleBasic` [textFont "Italics"]
-              , mainButton remixInformationLine (Alert whatIsWatchedWalletMsg)
+              , mainButton helpIcon (Alert whatIsWatchedWalletMsg)
                   `styleBasic`
                     [ border 0 transparent
                     , radius 20

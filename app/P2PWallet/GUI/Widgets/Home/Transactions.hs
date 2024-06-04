@@ -1,17 +1,22 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module P2PWallet.GUI.Widgets.Home.Transactions where
+module P2PWallet.GUI.Widgets.Home.Transactions 
+  ( 
+    transactionsWidget
+  , inspectionWidget
+  ) where
 
 import Monomer
 import Prettyprinter (align, pretty, vsep)
+import Data.Text qualified as Text
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
 import P2PWallet.Data.Transaction
-import P2PWallet.Data.Wallets hiding (toggleDetails)
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.HelpMessages
+import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
-import P2PWallet.Information
 import P2PWallet.MonomerOptics()
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -20,44 +25,137 @@ import P2PWallet.Prelude
 txValueFromWallet :: PaymentAddress -> Transaction -> Ada
 txValueFromWallet addr tx = 
   let isFromAddress x = x ^. #paymentAddress == addr
-      collateralReturned =
-        maybe 0 (\o -> if isFromAddress o then toAda $ o ^. #lovelace else 0) (tx ^. #collateralOutput)
-      spent = 
-          sum (map (toAda . view #lovelace) $ filter isFromAddress $ tx ^. #inputs)
-        + sum (map (toAda . view #lovelace) $ filter isFromAddress $ tx ^. #collateralInputs)
-      received = 
-          sum (map (toAda . view #lovelace) $ filter isFromAddress $ tx ^. #outputs)
-        + collateralReturned
-  in received - spent
+      spent = sum $ map (view #lovelace) $ filter isFromAddress $ tx ^. #inputs
+      received = sum $ map (view #lovelace) $ filter isFromAddress $ tx ^. #outputs
+  in toAda $ received - spent
 
 transactionsWidget :: AppModel -> AppNode
-transactionsWidget model =
-    cushionWidgetH $ vstack
-      [ flip styleBasic [padding 5] $ box $ vscroll_ [wheelRate 50] $ 
-          vstack_ [childSpacing] (map txRow sample)
-            `styleBasic` [padding 10]
-      , filler
+transactionsWidget model@AppModel{homeModel=HomeModel{..},config} =
+    zstack
+      [ cushionWidgetH $ vstack
+          [ centerWidgetH $ hstack
+              [ label shownDateRange
+                  `styleBasic` 
+                    [ padding 0
+                    , textMiddle
+                    , textFont "Bold"
+                    ]
+              , spacer_ [width 5]
+              , tooltip_ "Filter/Search" [tooltipDelay 0] $
+                  toggleButton_ menuSearchIcon
+                    (toLensVL $ #homeModel % #showTransactionFilter)
+                    [toggleButtonOffStyle toggleOffStyle]
+                    `styleBasic`
+                      [ border 0 transparent
+                      , radius 20
+                      , paddingT 0
+                      , paddingB 0
+                      , paddingL 5
+                      , paddingR 5
+                      , bgColor transparent
+                      , textColor customBlue
+                      , textMiddle
+                      , textFont "Remix"
+                      ]
+                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              ]
+          , widgetIf (sample /= []) $ flip styleBasic [padding 5] $ box $ vscroll_ [wheelRate 50] $ 
+              vstack_ [childSpacing] (map txRow sample)
+                `styleBasic` [padding 10]
+          , widgetIf (sample == []) $ 
+              centerWidget $
+                label "No transactions found."
+                 `styleBasic` [textFont "Italics"]
+          , filler
+          ]
+      , txFilterWidget model `nodeVisible` (model ^. #homeModel % #showTransactionFilter)
       ]
   where
-    wallet :: PaymentWallet
-    wallet = model ^. #homeModel % #selectedWallet
+    toggleOffStyle :: Style
+    toggleOffStyle = 
+      def `styleBasic` [ bgColor transparent , textColor customBlue ]
+          `styleHover` [ bgColor customGray1 ]
+
+    timeZone :: TimeZone
+    timeZone = config ^. #timeZone
+
+    today :: Day
+    today = config ^. #currentDay
+
+    (mLowerDay,mUpperDay) = txFilterModel ^. #dateRange
+
+    startTime :: POSIXTime
+    startTime = maybe 0 (localTimeToPosixTime timeZone . beginningOfDay) mLowerDay
+
+    endTime :: POSIXTime
+    endTime = localTimeToPosixTime timeZone 
+            $ endOfDay
+            $ fromMaybe today mUpperDay
+
+    shownDateRange :: Text
+    shownDateRange = unwords
+      [ maybe "Beginning" (const $ showLocalDate timeZone startTime) mLowerDay 
+      , "-"
+      , maybe "Present" (const $ showLocalDate timeZone endTime) mUpperDay 
+      ]
+
+
+    withinDateRange :: Transaction -> Bool
+    withinDateRange Transaction{blockTime} = do
+      blockTime >= startTime && blockTime <= endTime
+
+    searchTargets :: [Text]
+    searchTargets = words $ replace "," " " $ txFilterModel ^. #search
+
+    applySearchFilter :: [Text] -> [Transaction] -> [Transaction]
+    applySearchFilter [] xs = xs
+    applySearchFilter (target:ts) xs = applySearchFilter ts $ searchFilter target xs
+
+    matchesUTxO :: Text -> TransactionUTxO -> Bool
+    matchesUTxO searchTarget TransactionUTxO{..} = or
+      [ -- Only match the payment address if it is not the selected wallet's address.
+        paymentAddress /= selectedWallet ^. #paymentAddress && 
+          paymentAddress == PaymentAddress searchTarget
+        -- Only match the stake address if it is not the selected wallet's stake address.
+      , stakeAddress /= selectedWallet ^. #stakeAddress && 
+          stakeAddress == Just (StakeAddress searchTarget)
+      , referenceScriptHash == Just searchTarget
+      , datumHash == Just searchTarget
+      , Text.isPrefixOf searchTarget $ showTxOutRef utxoRef
+      , flip any nativeAssets $ \NativeAsset{..} -> or
+          [ policyId == searchTarget
+          , tokenName == searchTarget
+          , policyId <> "." <> tokenName == searchTarget
+          , fingerprint == searchTarget
+          ]
+      ]
+
+    searchFilter :: Text -> [Transaction] -> [Transaction]
+    searchFilter searchTarget
+      | searchTarget == "" = filter (const True)
+      | otherwise = filter $ \Transaction{..} -> or
+          [ any (matchesUTxO searchTarget) inputs
+          , any (matchesUTxO searchTarget) outputs
+          , any (matchesUTxO searchTarget) referenceInputs
+          ]
 
     sample :: [Transaction]
-    sample = wallet ^. #transactions
+    sample = applySearchFilter searchTargets 
+           $ filter withinDateRange 
+           $ selectedWallet ^. #transactions
 
     txRow :: Transaction -> AppNode
     txRow tx@Transaction{..} = do
-      let txValueFlux = txValueFromWallet (wallet ^. #paymentAddress) tx
-      let valueColor
+      let txValueFlux = txValueFromWallet (selectedWallet ^. #paymentAddress) tx
+          valueColor
             | txValueFlux >= 0 = customBlue
             | otherwise = customRed
       vstack
         [ hstack 
-            [ copyableLabelMain txHash
-                `styleBasic` [textSize 12]
+            [ copyableLabelSelf txHash
             , spacer_ [width 2]
             , tooltip_ "Inspect" [tooltipDelay 0] $
-                button remixSearchLine (HomeEvent $ InspectHomeTransaction tx)
+                button inspectIcon (HomeEvent $ InspectHomeTransaction tx)
                   `styleBasic` 
                     [ textSize 10
                     , textColor customBlue
@@ -78,7 +176,7 @@ transactionsWidget model =
                   ]
             ]
         , hstack
-            [ label remixCalendarLine
+            [ label calendarIcon
                 `styleBasic` 
                   [ textSize 10
                   , textColor customBlue
@@ -86,13 +184,13 @@ transactionsWidget model =
                   , paddingT 5
                   ]
             , spacer_ [width 3]
-            , label (showLocalDate (model ^. #config % #timeZone) blockTime)
+            , label (showLocalDate (config ^. #timeZone) blockTime)
                 `styleBasic` 
                   [ textSize 10
                   , textColor lightGray
                   ]
             , spacer
-            , label remixTimeLine
+            , label clockIcon
                 `styleBasic` 
                   [ textSize 10
                   , textColor customBlue
@@ -100,7 +198,7 @@ transactionsWidget model =
                   , paddingT 5
                   ]
             , spacer_ [width 3]
-            , label (showLocalTime (model ^. #config % #timeZone) blockTime)
+            , label (showLocalTime (config ^. #timeZone) blockTime)
                 `styleBasic` 
                   [ textSize 10
                   , textColor lightGray
@@ -120,62 +218,59 @@ transactionsWidget model =
             ]
 
 inspectionWidget :: Transaction -> AppModel -> AppNode
-inspectionWidget Transaction{..} model = do
+inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config} = do
     vstack
-      [ centerWidget $ vscroll_ [wheelRate 100] $ vstack_ [childSpacing_ 5]
+      [ vstack
           [ centerWidgetH $ label "Transaction Summary" 
               `styleBasic` 
                 [ textFont "Italics"
                 , paddingB 10
                 ]
-          , copyableLabelDetail "Tx Hash:" txHash
-          , copyableLabelDetail "Block Time:" $ show blockTime
-          , copyableLabelDetail "Block Height:" $ show blockHeight
-          , copyableLabelDetail "Fee:" $ fromString $ printf "%D ADA" $ toAda fee
-          , hstack
-              [ copyableLabelDetail "Deposit:" $ fromString $ printf "%D ADA" $ toAda deposit
-              , mainButton remixInformationLine (Alert depositSignMsg)
-                  `styleBasic`
-                    [ border 0 transparent
-                    , radius 20
-                    , paddingT 0
-                    , paddingB 0
-                    , bgColor transparent
-                    , textColor customBlue
-                    , textMiddle
-                    , textFont "Remix"
-                    ]
-                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-              ]
-          , copyableLabelDetail "Invalid Before:" $ 
-              maybe "none" (fromString . printf "slot %s") invalidBefore
-          , copyableLabelDetail "Invalid After:" $ 
-              maybe "none" (fromString . printf "slot %s") invalidAfter
-          , utxoField "Reference Inputs:" 
-              senderSymbol
-              #showReferenceInputs 
-              #referenceInputs 
-              referenceInputs
-          , utxoField "Collateral Inputs:" 
-              senderSymbol
-              #showCollateralInputs 
-              #collateralInputs 
-              collateralInputs
-          , utxoField "Collateral output:" 
-              receiverSymbol
-              #showCollateralOutput 
-              collateralOutputLens
-              (maybe [] (:[]) collateralOutput)
-          , utxoField "Inputs:" 
-              senderSymbol
-              #showInputs 
-              #inputs 
-              inputs
-          , utxoField "Outputs:" 
-              receiverSymbol
-              #showOutputs 
-              #outputs 
-              outputs
+          , cushionWidget $ vscroll_ [wheelRate 100] $ vstack_ [childSpacing_ 5]
+              [ copyableLabelFor 12 "Tx Hash:" txHash
+              , copyableLabelFor 12 "Block Time:" $ show blockTime
+              , copyableLabelFor 12 "Block Height:" $ show blockHeight
+              , copyableLabelFor 12 "Fee:" $ fromString $ printf "%D ADA" $ toAda fee
+              , hstack
+                  [ copyableLabelFor 12 "Deposit:" $ fromString $ printf "%D ADA" $ toAda deposit
+                  , mainButton helpIcon (Alert depositSignMsg)
+                      `styleBasic`
+                        [ border 0 transparent
+                        , radius 20
+                        , paddingT 0
+                        , paddingB 0
+                        , bgColor transparent
+                        , textColor customBlue
+                        , textMiddle
+                        , textFont "Remix"
+                        ]
+                      `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+                  ]
+              , copyableLabelFor 12 "Invalid Before:" $ 
+                  maybe "none" (fromString . printf "slot %s") invalidBefore
+              , copyableLabelFor 12 "Invalid After:" $ 
+                  maybe "none" (fromString . printf "slot %s") invalidAfter
+              , utxoField "Reference Inputs:" 
+                  Nothing
+                  #showReferenceInputs 
+                  #referenceInputs 
+                  referenceInputs
+              , utxoField "Collateral Inputs:" 
+                  Nothing
+                  #showCollateralInputs 
+                  #collateralInputs 
+                  collateralInputs
+              , utxoField "Inputs:" 
+                  (Just senderSymbol)
+                  #showInputs 
+                  #inputs 
+                  inputs
+              , utxoField "Outputs:" 
+                  (Just receiverSymbol)
+                  #showOutputs 
+                  #outputs 
+                  outputs
+              ] 
           , filler
           , hstack
               [ filler
@@ -188,33 +283,30 @@ inspectionWidget Transaction{..} model = do
               ]
       ] `styleBasic` 
           [ bgColor $ black & #a .~ 0.4
-          , paddingT 30
-          , paddingB 30
-          , paddingL 30
-          , paddingR 30
+          , padding 30
           , radius 10
           ]
   where
     senderSymbol :: AppNode
-    senderSymbol = tooltip_ "From this wallet" [tooltipDelay 0] $ label remixUserSharedLine
+    senderSymbol = tooltip_ "From this wallet" [tooltipDelay 0] $ label userSharedIcon
       `styleBasic` [textSize 10, padding 0, textMiddle, textColor customRed, textFont "Remix"]
 
     receiverSymbol :: AppNode
-    receiverSymbol = tooltip_ "To this wallet" [tooltipDelay 0] $ label remixUserReceivedLine
+    receiverSymbol = tooltip_ "To this wallet" [tooltipDelay 0] $ label userReceivedIcon
       `styleBasic` [textSize 10, padding 0, textMiddle, textColor customBlue, textFont "Remix"]
 
     moreIcon :: Bool -> Text
     moreIcon detailsOpen
-      | detailsOpen = remixCloseCircleLine
-      | otherwise = remixMoreLine
+      | detailsOpen = closeCircleIcon
+      | otherwise = horizontalMoreIcon
 
     moreTip :: Bool -> Text
     moreTip detailsOpen
       | detailsOpen = "Close Details"
       | otherwise = "Show Details"
 
-    moreOffStyle :: Style
-    moreOffStyle = 
+    specificUtxoMoreOffStyle :: Style
+    specificUtxoMoreOffStyle = 
       def `styleBasic` 
             [ bgColor transparent
             , textColor customBlue
@@ -238,7 +330,7 @@ inspectionWidget Transaction{..} model = do
 
     utxoField 
       :: Text
-      -> AppNode
+      -> Maybe AppNode
       -> Lens' Transaction Bool 
       -> Lens' Transaction [TransactionUTxO] 
       -> [TransactionUTxO] 
@@ -274,7 +366,7 @@ inspectionWidget Transaction{..} model = do
                     , bgColor transparent
                     ]
               , spacer
-              , toggleButton_ remixMoreLine (toLensVL $ showRoot % toggleShow finalLens)
+              , toggleButton_ horizontalMoreIcon (toLensVL $ showRoot % toggleShow finalLens)
                   [toggleButtonOffStyle txMoreOffStyle]
                   `styleBasic` 
                     [ textSize 10
@@ -297,7 +389,7 @@ inspectionWidget Transaction{..} model = do
                   `styleBasic` [padding 10]
           ]
 
-    utxoRow :: AppNode -> Lens' Transaction [TransactionUTxO] -> TransactionUTxO -> AppNode
+    utxoRow :: Maybe AppNode -> Lens' Transaction [TransactionUTxO] -> TransactionUTxO -> AppNode
     utxoRow userSymbol finalLens u@TransactionUTxO{..} =
       vstack
         [ vstack
@@ -309,7 +401,7 @@ inspectionWidget Transaction{..} model = do
                     `styleBasic` [textSize 12]
                 ]
             , hstack
-                [ label remixCalendarLine
+                [ label calendarIcon
                     `styleBasic` 
                       [ textSize 10
                       , textColor customBlue
@@ -317,13 +409,13 @@ inspectionWidget Transaction{..} model = do
                       , paddingT 5
                       ]
                 , spacer_ [width 3]
-                , label (showLocalDate (model ^. #config % #timeZone) blockTime)
+                , label (showLocalDate (config ^. #timeZone) blockTime)
                     `styleBasic` 
                       [ textSize 10
                       , textColor lightGray
                       ]
                 , spacer
-                , label remixTimeLine
+                , label clockIcon
                     `styleBasic` 
                       [ textSize 10
                       , textColor customBlue
@@ -331,14 +423,14 @@ inspectionWidget Transaction{..} model = do
                       , paddingT 5
                       ]
                 , spacer_ [width 3]
-                , label (showLocalTime (model ^. #config % #timeZone) blockTime)
+                , label (showLocalTime (config ^. #timeZone) blockTime)
                     `styleBasic` 
                       [ textSize 10
                       , textColor lightGray
                       ]
                 , spacer
                 , widgetIf (not $ null nativeAssets) $ 
-                    tooltip_ "Native Assets" [tooltipDelay 0] $ label remixCoinsLine
+                    tooltip_ "Native Assets" [tooltipDelay 0] $ label coinsIcon
                       `styleBasic` 
                         [ textSize 10
                         , textColor customBlue
@@ -364,16 +456,16 @@ inspectionWidget Transaction{..} model = do
                         , textMiddle
                         ]
                 , filler
-                , widgetIf 
-                    (paymentAddress == model ^. #homeModel % #selectedWallet % #paymentAddress)
-                    userSymbol
+                , widgetMaybe userSymbol $ \sym -> widgetIf 
+                    (paymentAddress == selectedWallet ^. #paymentAddress)
+                    sym
                 , spacer_ [width 3]
                 , tooltip_ (moreTip showDetails) [tooltipDelay 0] $
                     toggleButton_ (moreIcon showDetails)
                       (toLensVL $ #homeModel 
                                 % #inspectedTransaction 
                                 % toggleShow (finalLens % toggleDetails utxoRef))
-                      [toggleButtonOffStyle moreOffStyle]
+                      [toggleButtonOffStyle specificUtxoMoreOffStyle]
                       `styleBasic` 
                         [ textSize 10
                         , textColor customBlue
@@ -391,32 +483,26 @@ inspectionWidget Transaction{..} model = do
                 , radius 5
                 , border 1 black
                 ]
-        , widgetIf showDetails $ utxoDetails u -- `nodeVisible` showDetails
+        , widgetIf showDetails $ utxoDetails u
         ]
-
-    datumIcon :: Text
-    datumIcon = toGlyph 0XF2F5
-
-    scriptIcon :: Text
-    scriptIcon = toGlyph 0XF433
 
     utxoDetails :: TransactionUTxO -> AppNode
     utxoDetails TransactionUTxO{..} = 
       hstack
         [ filler
         , vstack
-            [ copyableLabelFor_ "Payment Address:" (toText paymentAddress) 10
+            [ copyableLabelFor 10 "Payment Address:" (toText paymentAddress)
                 `styleBasic` [padding 2]
-            , copyableLabelFor_ "Stake Address:" (maybe "none" toText stakeAddress) 10
+            , copyableLabelFor 10 "Stake Address:" (maybe "none" toText stakeAddress)
                 `styleBasic` [padding 2]
             , widgetMaybe referenceScriptHash $ \hash ->
-                copyableLabelFor_ "Reference Script Hash:" hash 10
+                copyableLabelFor 10 "Reference Script Hash:" hash
                   `styleBasic` [padding 2]
             , widgetMaybe datumHash $ \hash ->
-                copyableLabelFor_ "Datum Hash:" hash 10
+                copyableLabelFor 10 "Datum Hash:" hash
                   `styleBasic` [padding 2]
             , widgetMaybe inlineDatum $ \x ->
-                copyableLabelFor_ "Inline Datum:" (showValue x) 10
+                copyableLabelFor 10 "Inline Datum:" (showValue x)
                   `styleBasic` [padding 2]
             , widgetIf (not $ null nativeAssets) $
                 vstack
@@ -434,10 +520,149 @@ inspectionWidget Transaction{..} model = do
                 ]
         ]
 
+txFilterWidget :: AppModel -> AppNode
+txFilterWidget model = do
+  let currentScene = model ^. #homeModel % #txFilterScene
+      offStyle = def 
+        `styleBasic` [ bgColor customGray1 , textColor white ]
+        `styleHover` [ textColor lightGray, border 1 customBlue ]
+  vstack
+    [ centerWidget $ hstack
+        [ vstack
+            [ vgrid
+                [ optionButton_ "Filter" FilterScene (toLensVL $ #homeModel % #txFilterScene) 
+                    [optionButtonOffStyle offStyle]
+                    `styleBasic` 
+                      [ bgColor customGray3
+                      , textColor customBlue
+                      , radiusTL 10
+                      , radiusBL 0
+                      , radiusTR 0
+                      , radiusBR 0
+                      , border 1 black
+                      ]
+                , optionButton_ "Search" SearchScene (toLensVL $ #homeModel % #txFilterScene) 
+                    [optionButtonOffStyle offStyle]
+                    `styleBasic` 
+                      [ bgColor customGray3
+                      , textColor customBlue
+                      , radiusBL 10
+                      , radiusTL 0
+                      , radiusTR 0
+                      , radiusBR 0
+                      , border 1 black
+                      ]
+                ] `styleBasic` [height 100]
+            , filler
+            ]
+        , vstack
+            [ vstack 
+                [ zstack
+                    [ widgetIf (currentScene == FilterScene) filterWidget
+                    , widgetIf (currentScene == SearchScene) searchWidget
+                    ]
+                , spacer
+                , hstack 
+                    [ filler
+                    , button "Reset" $ HomeEvent ResetTxFilters
+                    , spacer
+                    , toggleButton "Confirm" (toLensVL $ #homeModel % #showTransactionFilter)
+                    ] `styleBasic` [padding 10]
+                ] `styleBasic`
+                    [ bgColor customGray3
+                    , radiusTL 0
+                    , radiusTR 10
+                    , radiusBR 10
+                    , radiusBL 10
+                    , border 1 black
+                    ]
+            , filler
+            ]
+        ]
+    ] `styleBasic` 
+        [ bgColor $ black & #a .~ 0.4
+        , paddingT 50
+        , paddingB 50
+        , paddingL 30
+        , paddingR 30
+        , radius 10
+        ]
+  where
+    filterWidget :: AppNode
+    filterWidget = do
+      let rootLens = #homeModel % #txFilterModel
+      vstack
+        [ spacer
+        , vstack
+            [ hstack 
+                [ spacer_ [width 20]
+                , label "Start Date:"
+                , spacer
+                , textField_ (toLensVL $ rootLens % lowerBoundText) [placeholder "MM-DD-YYYY"]
+                    `styleBasic` [width 150]
+                , mainButton helpIcon (Alert txStartDateMsg)
+                    `styleBasic`
+                      [ border 0 transparent
+                      , radius 20
+                      , bgColor transparent
+                      , textColor customBlue
+                      , textMiddle
+                      , textFont "Remix"
+                      ]
+                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+                ]
+            , spacer
+            , hstack 
+                [ spacer_ [width 20]
+                , label "End Date:"
+                , spacer
+                , textField_ (toLensVL $ rootLens % upperBoundText) [placeholder "MM-DD-YYYY"]
+                    `styleBasic` [width 150]
+                , mainButton helpIcon (Alert txEndDateMsg)
+                    `styleBasic`
+                      [ border 0 transparent
+                      , radius 20
+                      , bgColor transparent
+                      , textColor customBlue
+                      , textMiddle
+                      , textFont "Remix"
+                      ]
+                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+                ]
+            ]
+        ]
 
+    searchWidget :: AppNode
+    searchWidget = do
+      vstack_ [childSpacing]
+        [ spacer
+        , hstack 
+            [ spacer
+            , label "Find:"
+            , spacer
+            , textField_ 
+                (toLensVL $ #homeModel % #txFilterModel % #search) 
+                [placeholder "many of: address, native asset, script hash, datum hash"] 
+            , mainButton helpIcon (Alert txSearchMsg)
+                `styleBasic`
+                  [ border 0 transparent
+                  , radius 20
+                  , bgColor transparent
+                  , textColor customBlue
+                  , textMiddle
+                  , textFont "Remix"
+                  ]
+                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer
+            ]
+        ]
+
+-------------------------------------------------
+-- Helper Widgets
+-------------------------------------------------
 -- | A label button that will copy itself.
-copyableLabelMain :: Text -> WidgetNode s AppEvent
-copyableLabelMain caption = 
+copyableLabelSelf :: Text -> WidgetNode s AppEvent
+copyableLabelSelf caption = 
   tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
     `styleBasic`
       [ padding 0
@@ -447,31 +672,24 @@ copyableLabelMain caption =
       , border 0 transparent
       , textColor white
       , bgColor transparent
-      , textFont "Italics"
       ]
     `styleHover` [textColor customBlue, cursorIcon CursorHand]
 
--- | A label button that will copy other data.
-copyableLabelDetail :: Text -> Text -> WidgetNode s AppEvent
-copyableLabelDetail caption info = 
+-- | A label button that will copy other data. The font size is configurable.
+copyableLabelFor :: Double -> Text -> Text -> WidgetNode s AppEvent
+copyableLabelFor fontSize caption info = 
   hstack
-    [ tooltip_ "Copy" [tooltipDelay 0] $ 
-        button caption (CopyText info)
-          `styleBasic`
-            [ padding 0
-            , radius 5
-            , textMiddle
-            , textSize 12
-            , border 0 transparent
-            , textColor customBlue
-            , bgColor transparent
-            ]
-          `styleHover` [textColor lightGray, cursorIcon CursorHand]
-    , spacer
-    , label info 
-        `styleBasic` 
-          [ textColor lightGray
-          , textSize 12
+    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
+        `styleBasic`
+          [ padding 0
+          , radius 5
+          , textMiddle
+          , border 0 transparent
+          , textColor customBlue
+          , bgColor transparent
+          , textSize fontSize
           ]
+        `styleHover` [textColor lightGray, cursorIcon CursorHand]
+    , spacer
+    , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize 10]
     ]
-
