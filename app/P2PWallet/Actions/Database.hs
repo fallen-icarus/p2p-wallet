@@ -38,11 +38,12 @@ initializeDatabase dbFile = do
   exists <- Dir.doesFileExist dbFile
 
   if exists then return $ Right () else do
-    -- Create the tables in the database.
-    create @Profile dbFile
-    create @PaymentWallet dbFile
-    create @Transaction dbFile
-    return $ Right ()
+    handle @SomeException (return . Left . ("Could not create database: " <>) . show) $ do
+      -- Create the tables in the database.
+      create @Profile dbFile
+      create @PaymentWallet dbFile
+      create @Transaction dbFile
+      return $ Right ()
 
 -------------------------------------------------
 -- Profiles
@@ -51,8 +52,14 @@ initializeDatabase dbFile = do
 -- one and return and empty list.
 loadProfiles :: FilePath -> Network -> IO (Either Text [Profile])
 loadProfiles dbFile network = do
-  handle @SomeException (return . Left . ("Could not load profiles: " <>) . show) $
-    Right <$> query @Profile dbFile [MatchNetwork network]
+    handle @SomeException (return . Left . ("Could not load profiles: " <>) . show) $
+      Right <$> query dbFile queryStmt
+  where
+    queryStmt :: Query
+    queryStmt = Query $ unwords
+      [ "SELECT * FROM " <> tableName @Profile
+      , "WHERE network = " <> show (toString network) -- it must be wrapped in quotes
+      ]
 
 -- | Add a new profile to the database. This also updates profiles.
 addNewProfile :: FilePath -> Profile -> IO (Either Text ())
@@ -61,16 +68,37 @@ addNewProfile dbFile profile = do
     Right <$> insert @Profile dbFile profile
 
 deleteProfile :: FilePath -> ProfileId -> IO (Either Text ())
-deleteProfile dbFile profileId = 
-  handle @SomeException (return . Left . ("Failed to delete profile: " <>) . show) $
-    Right <$> delete @Profile dbFile [MatchProfileId profileId]
+deleteProfile dbFile (ProfileId profileId) = 
+    handle @SomeException (return . Left . ("Failed to delete profile: " <>) . show) $ do
+      delete dbFile deleteProfileStmt
+      delete dbFile deletePaymentWalletStmt
+      delete dbFile deleteTxStmt
+      return $ Right ()
+  where
+    deleteProfileStmt :: Query
+    deleteProfileStmt = Query $ unwords
+      [ "DELETE FROM " <> tableName @Profile
+      , "WHERE profile_id = " <> show profileId
+      ]
+
+    deletePaymentWalletStmt :: Query
+    deletePaymentWalletStmt = Query $ unwords
+      [ "DELETE FROM " <> tableName @PaymentWallet
+      , "WHERE profile_id = " <> show profileId
+      ]
+
+    deleteTxStmt :: Query
+    deleteTxStmt = Query $ unwords
+      [ "DELETE FROM " <> tableName @Transaction
+      , "WHERE profile_id = " <> show profileId
+      ]
 
 getNextProfileId :: FilePath -> IO (Either Text ProfileId)
 getNextProfileId dbFile =
     handle @SomeException (return . Left . ("Could not get next profile id: " <>) . show) $
       -- If the result is the empty list, this is the first profile entry.
       maybe (Right 0) (Right . ProfileId . (+1) . Sqlite.fromOnly) . maybeHead <$> 
-        queryRaw dbFile stmt
+        query dbFile stmt
   where
     stmt = Sqlite.Query $ mconcat $ intersperse " "
       [ "SELECT profile_id FROM"
@@ -87,7 +115,7 @@ getNextPaymentId dbFile =
     handle @SomeException (return . Left . ("Could not get next payment id: " <>) . show) $
       -- If the result is the empty list, this is the first profile entry.
       maybe (Right 0) (Right . PaymentId . (+1) . Sqlite.fromOnly) . maybeHead <$> 
-        queryRaw dbFile stmt
+        query dbFile stmt
   where
     stmt = Sqlite.Query $ mconcat $ intersperse " "
       [ "SELECT payment_id FROM"
@@ -107,8 +135,7 @@ loadWallets :: FilePath -> Profile -> IO (Either Text Wallets)
 loadWallets dbFile Profile{..} = do
   handle @SomeException (return . Left . ("Could not load wallets: " <>) . show) $ do
     -- Load the payment wallets.
-    paymentWalletsWithoutTxHistories <- 
-      sort <$> query @PaymentWallet dbFile [MatchNetwork network, MatchProfileId profileId]
+    paymentWalletsWithoutTxHistories <- loadPaymentWallets dbFile profileId >>= fromRightOrAppError
 
     -- Load the transaction histories for each payment wallet.
     paymentWalletsWithTxHistories <- flip mapM paymentWalletsWithoutTxHistories $ 
@@ -120,10 +147,37 @@ loadWallets dbFile Profile{..} = do
       { paymentWallets = paymentWalletsWithTxHistories
       }
 
+-- | Load the payment wallets for the specified profile
+loadPaymentWallets :: FilePath -> ProfileId -> IO (Either Text [PaymentWallet])
+loadPaymentWallets dbFile (ProfileId profileId) = do
+    handle @SomeException (return . Left . ("Could not load payment wallets : " <>) . show) $ do
+      Right <$> query dbFile queryStmt
+  where
+    queryStmt :: Query
+    queryStmt = Query $ unwords
+      [ "SELECT * FROM " <> tableName @PaymentWallet
+      , "WHERE profile_id = " <> show profileId
+      , "ORDER BY payment_id ASC;"
+      ]
+
 deletePaymentWallet :: FilePath -> PaymentId -> IO (Either Text ())
-deletePaymentWallet dbFile paymentId = 
-  handle @SomeException (return . Left . ("Failed to delete payment wallet: " <>) . show) $
-    Right <$> delete @PaymentWallet dbFile [MatchPaymentId paymentId]
+deletePaymentWallet dbFile (PaymentId paymentId) = 
+  handle @SomeException (return . Left . ("Failed to delete payment wallet: " <>) . show) $ do
+    delete dbFile deletePaymentWalletStmt
+    delete dbFile deleteTxStmt
+    return $ Right ()
+  where
+    deletePaymentWalletStmt :: Query
+    deletePaymentWalletStmt = Query $ unwords
+      [ "DELETE FROM " <> tableName @PaymentWallet
+      , "WHERE payment_id = " <> show paymentId
+      ]
+
+    deleteTxStmt :: Query
+    deleteTxStmt = Query $ unwords
+      [ "DELETE FROM " <> tableName @Transaction
+      , "WHERE payment_id = " <> show paymentId
+      ]
 
 -------------------------------------------------
 -- Transactions
@@ -136,6 +190,13 @@ addNewTransactions dbFile txs = do
 
 -- | Load the transactions for the specified payment wallet.
 loadTransactions :: FilePath -> PaymentId -> IO (Either Text [Transaction])
-loadTransactions dbFile paymentId = do
-  handle @SomeException (return . Left . ("Could not load transactions: " <>) . show) $ do
-    Right . sortOn (negate . view #blockTime) <$> query @Transaction dbFile [MatchPaymentId paymentId]
+loadTransactions dbFile (PaymentId paymentId) = do
+    handle @SomeException (return . Left . ("Could not load transactions: " <>) . show) $ do
+      Right <$> query dbFile queryStmt
+  where
+    queryStmt :: Query
+    queryStmt = Query $ unwords
+      [ "SELECT * FROM " <> tableName @Transaction
+      , "WHERE payment_id = " <> show paymentId
+      , "ORDER BY block_height DESC;"
+      ]

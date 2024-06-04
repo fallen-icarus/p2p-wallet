@@ -1,9 +1,13 @@
-module P2PWallet.GUI.Widgets.MainMenu where
+module P2PWallet.GUI.Widgets.MainMenu 
+  ( 
+    mainMenuWidget
+  ) where
 
 import Monomer
 
 import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
@@ -11,12 +15,12 @@ import P2PWallet.Prelude
 mainMenuWidget :: AppModel -> AppNode
 mainMenuWidget model = do
     vstack 
-      [ changeSceneButton "Home" remixHome4Line HomeScene
+      [ changeSceneButton "Home" homeIcon HomeScene
       -- , changeSceneButton "Staking" remixMedalLine DelegationScene
       -- , changeSceneButton "DEX" remixArrowLeftRightFill LimitOrders
       -- , changeSceneButton "Liquidity" remixWaterFlashLine MarketMakers
       -- , changeSceneButton "Builder" remixToolsLine TxBuilderScene
-      , changeSceneButton "Settings" remixSettings3Line SettingsScene
+      , changeSceneButton "Settings" settingsIcon SettingsScene
       , filler
       , logOutButton
       , spacer
@@ -62,7 +66,7 @@ mainMenuWidget model = do
     logOutButton = do
       let btn = 
             vstack 
-              [ centerWidgetH $ label remixLogoutBoxLine
+              [ centerWidgetH $ label logoutIcon
                   `styleBasic`
                       [ textFont "Remix"
                       , paddingT 8

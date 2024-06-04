@@ -54,6 +54,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
     [ Model $ model & #alertMessage .~ Just msg 
                     & #waitingOnDevice .~ False
                     & #syncingWallets .~ False
+                    & #loadingWallets .~ False
     ]
   CloseAlertMessage -> 
     -- Close the alert widget and reset the alert message.
@@ -113,4 +114,13 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
             model & #syncingWallets .~ False
                   & #knownWallets .~ resp
                   & #homeModel % #selectedWallet .~ updatedPaymentTarget
+        , Task $
+            runActionOrAlert UpdateCurrentDate $ getCurrentDay (config ^. #timeZone)
         ]
+
+  -----------------------------------------------
+  -- Updating the current date
+  -----------------------------------------------
+  UpdateCurrentDate day -> 
+    [ Model $ model & #config % #currentDay .~ day ]
+

@@ -1,4 +1,4 @@
-module P2PWallet.Information where
+module P2PWallet.GUI.HelpMessages where
 
 import P2PWallet.Prelude
 
@@ -28,6 +28,17 @@ accountIdInfoMsg = unlines
   , mconcat $ intersperse " "
       [ "The p2p-wallet will use this account index when pairing any hardware wallet keys with"
       , "this profile."
+      ]
+  , ""
+  , mconcat $ intersperse " "
+      [ "NOTE: Derivation paths can also be written with 'H' instead of '''; they are equivalent."
+      , "For example, the path for the first payment key from account 0 can also be written as:"
+      ]
+  , "1852H/1815H/0H/0/0"
+  , ""
+  , mconcat $ intersperse " "
+      [ "Since the single quote sometimes has a special meaning inside programming languages, the"
+      , "'H' is occasionally used instead."
       ]
   ]
 
@@ -59,6 +70,17 @@ paymentAddressIndexMsg = unlines
       [ "The p2p-wallet will use the account index set for this profile"
       , "when pairing the new hardware wallet keys."
       ]
+  , ""
+  , mconcat $ intersperse " "
+      [ "NOTE: Derivation paths can also be written with 'H' instead of '''; they are equivalent."
+      , "For example, the path for the first payment key from account 0 can also be written as:"
+      ]
+  , "1852H/1815H/0H/0/0"
+  , ""
+  , mconcat $ intersperse " "
+      [ "Since the single quote sometimes has a special meaning inside programming languages, the"
+      , "'H' is occasionally used instead."
+      ]
   ]
 
 stakeAddressIndexMsg :: Text
@@ -88,6 +110,17 @@ stakeAddressIndexMsg = unlines
   , mconcat $ intersperse " "
       [ "The p2p-wallet will use the account index set for this profile"
       , "when pairing the new hardware wallet keys."
+      ]
+  , ""
+  , mconcat $ intersperse " "
+      [ "NOTE: Derivation paths can also be written with 'H' instead of '''; they are equivalent."
+      , "For example, the path for the first payment key from account 0 can also be written as:"
+      ]
+  , "1852H/1815H/0H/0/0"
+  , ""
+  , mconcat $ intersperse " "
+      [ "Since the single quote sometimes has a special meaning inside programming languages, the"
+      , "'H' is occasionally used instead."
       ]
   ]
 
@@ -159,5 +192,47 @@ depositSignMsg = unlines
   [ mconcat $ intersperse " "
       [ "Negative means the deposit was paid. Positive means the deposit was reclaimed."
       , "When stake registration deposits are paid/reclaimed, they will appear here."
+      ]
+  ]
+
+txSearchMsg :: Text
+txSearchMsg = unlines
+  [ "You can search through all of the transactions for any of the following criteria:"
+  , "1. Native assets"
+  , "2. Payment addresses"
+  , "3. Stake addresses"
+  , "4. Reference script hashes"
+  , "5. Datum hashes"
+  , "6. UTxO output reference"
+  , ""
+  , "You can even use a combination of criteria by separating them with commas."
+  , ""
+  , "Native asset criteria must be one of:"
+  , "1. policy_id.asset_name"
+  , "2. policy_id"
+  , "3. asset_name"
+  , "4. fingerprint"
+  , ""
+  , "The search will try to match against any of:"
+  , "1. Inputs"
+  , "2. Outputs"
+  , "3. Reference inputs"
+  , "4. Reward withdrawals"
+  , "5. Certificates"
+  ]
+
+txStartDateMsg :: Text
+txStartDateMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "Show only transactions after the specfied date. Leave it blank to show transactions since"
+      , "the beginning. The default setting is to only show transactions within the past 30 days."
+      ]
+  ]
+
+txEndDateMsg :: Text
+txEndDateMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "Show only transactions up through the specfied date. Leave it blank to show transactions"
+      , "up through the present."
       ]
   ]

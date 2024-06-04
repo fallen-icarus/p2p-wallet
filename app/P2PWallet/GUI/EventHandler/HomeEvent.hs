@@ -204,9 +204,18 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   -- Reset Filters
   -----------------------------------------------
   ResetUTxOFilters -> 
-    [ Model $ model & #homeModel % #utxoFilterModel .~ def ]
+    [ Model $ model & #homeModel % #utxoFilterModel .~ def
+                    & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
   ResetAssetFilters -> 
-    [ Model $ model & #homeModel % #assetFilterModel .~ def ]
+    [ Model $ model & #homeModel % #assetFilterModel .~ def
+                    & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
+  ResetTxFilters -> 
+    let newDefault = def & #dateRange % _1 .~ Just (addDays (-30) $ config ^. #currentDay) in
+    [ Model $ model & #homeModel % #txFilterModel .~ newDefault 
+                    & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
 
   -----------------------------------------------
   -- UTxO details

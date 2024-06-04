@@ -1,6 +1,9 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module P2PWallet.GUI.Widgets.Home.NativeAssets where
+module P2PWallet.GUI.Widgets.Home.NativeAssets
+  ( 
+    nativeAssetsWidget
+  ) where
 
 import Monomer
 
@@ -8,6 +11,7 @@ import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
 import P2PWallet.Data.Wallets
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.MonomerOptics()
 import P2PWallet.Prelude
@@ -18,7 +22,7 @@ nativeAssetsWidget model =
       [ vstack 
           [ widgetIf (allAssets /= []) $ vstack
               [ centerWidgetH $ hstack
-                  [ tooltip_ "Sort/Filter/Search" [tooltipDelay 1000] $
+                  [ tooltip_ "Sort/Filter/Search" [tooltipDelay 0] $
                       toggleButton_ menuSearchIcon
                         (toLensVL $ #homeModel % #showAssetFilter)
                         [toggleButtonOffStyle menuOffStyle]
@@ -98,9 +102,6 @@ nativeAssetsWidget model =
           `styleHover`
             [ bgColor lightGray ]
 
-    menuSearchIcon :: Text
-    menuSearchIcon = toGlyph 0XF3D1
-
     wallet :: PaymentWallet
     wallet = model ^. #homeModel % #selectedWallet
 
@@ -137,7 +138,7 @@ nativeAssetsWidget model =
             ]
         , spacer_ [width 2]
         , hstack 
-            [ label remixFingerprintLine
+            [ label fingerprintIcon
                 `styleBasic` 
                   [ textSize 10
                   , textColor customBlue
@@ -187,7 +188,7 @@ assetFilterWidget _ = do
 -- | A label button that will copy itself.
 copyableLabelMain :: Text -> WidgetNode s AppEvent
 copyableLabelMain caption = 
-  tooltip_ "Copy" [tooltipDelay 1000] $ button caption (CopyText caption)
+  tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
     `styleBasic`
       [ padding 0
       , radius 5
@@ -202,7 +203,7 @@ copyableLabelMain caption =
 -- | A label button that will copy itself.
 copyableLabelSub :: Text -> WidgetNode s AppEvent
 copyableLabelSub caption = 
-  tooltip_ "Copy" [tooltipDelay 1000] $ button caption (CopyText caption)
+  tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
     `styleBasic`
       [ padding 0
       , radius 5
@@ -213,4 +214,3 @@ copyableLabelSub caption =
       , bgColor transparent
       ]
     `styleHover` [textColor customBlue, cursorIcon CursorHand]
-

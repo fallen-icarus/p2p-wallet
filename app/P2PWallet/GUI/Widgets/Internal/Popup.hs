@@ -1,7 +1,8 @@
 {-
 This module is adapted from https://github.com/fjvallarino/monomer/blob/5c6239365e3a37686b6547bc91c29270ae5487c6/src/Monomer/Widgets/Containers/Popup.hs
 
-The original popup does not automatically close when a button is clicked.
+The original popup does not automatically close when a button is clicked; this results in a frozen
+UI when used for opening new widgets.
 -}
 {-# OPTIONS_GHC -Wno-all #-}
 

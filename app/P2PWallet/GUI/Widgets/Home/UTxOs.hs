@@ -1,6 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module P2PWallet.GUI.Widgets.Home.UTxOs where
+module P2PWallet.GUI.Widgets.Home.UTxOs 
+  ( utxosWidget
+  ) where
 
 import Monomer
 
@@ -11,24 +13,25 @@ import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
 import P2PWallet.Data.Wallets
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.HelpMessages
+import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
-import P2PWallet.Information
 import P2PWallet.MonomerOptics()
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 utxosWidget :: AppModel -> AppNode
-utxosWidget model =
+utxosWidget model@AppModel{homeModel=HomeModel{..}} =
     zstack
       [ cushionWidgetH $ vstack
           [ hstack 
               [ label ("UTxOs (" <> fractionShown <> ")")
                   `styleBasic` [textFont "Italics", textSize 14]
               , spacer_ [width 5]
-              , tooltip_ "Sort/Filter/Search" [tooltipDelay 1000] $
+              , tooltip_ "Sort/Filter/Search" [tooltipDelay 0] $
                   toggleButton_ menuSearchIcon
                     (toLensVL $ #homeModel % #showUTxOFilter)
-                    [toggleButtonOffStyle menuOffStyle]
+                    [toggleButtonOffStyle toggleOffStyle]
                     `styleBasic`
                       [ border 0 transparent
                       , radius 20
@@ -43,7 +46,7 @@ utxosWidget model =
                       ]
                     `styleHover` [bgColor customGray2, cursorIcon CursorHand]
               , filler
-              , tooltip_ "Expand All Details" [tooltipDelay 1000] $
+              , tooltip_ "Expand All Details" [tooltipDelay 0] $
                   mainButton expandAllIcon (HomeEvent ShowAllUTxODetails)
                     `styleBasic`
                       [ border 0 transparent
@@ -55,7 +58,7 @@ utxosWidget model =
                       , padding 0
                       ]
                     `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-              , tooltip_ "Collapse All Details" [tooltipDelay 1000] $
+              , tooltip_ "Collapse All Details" [tooltipDelay 0] $
                   mainButton collapseAllIcon (HomeEvent HideAllUTxODetails)
                     `styleBasic`
                       [ border 0 transparent
@@ -73,25 +76,22 @@ utxosWidget model =
                 `styleBasic` [padding 10]
           , filler
           ] 
-      , utxoFilterWidget model `nodeVisible` (model ^. #homeModel % #showUTxOFilter)
+      , utxoFilterWidget model `nodeVisible` showUTxOFilter
       ]
   where
     fractionShown :: Text
     fractionShown = show (length sample) 
                  <> "/" 
-                 <> show (length $ model ^. #homeModel % #selectedWallet % #utxos)
-
-    filterModel :: UTxOFilterModel
-    filterModel = model ^. #homeModel % #utxoFilterModel
+                 <> show (length $ selectedWallet ^. #utxos)
 
     sortMethodSetting :: UTxOSortMethod
-    sortMethodSetting = filterModel ^. #sortingMethod
+    sortMethodSetting = utxoFilterModel ^. #sortingMethod
 
     sortOrderSetting :: SortDirection
-    sortOrderSetting = filterModel ^. #sortingDirection
+    sortOrderSetting = utxoFilterModel ^. #sortingDirection
 
     searchTargets :: [Text]
-    searchTargets = words $ replace "," " " $ filterModel ^. #search
+    searchTargets = words $ replace "," " " $ utxoFilterModel ^. #search
 
     targetQuantity :: PersonalUTxO -> Maybe Integer
     targetQuantity p =
@@ -125,7 +125,7 @@ utxosWidget model =
       UTxOLexicographical -> sortOn (view #utxoRef)
       UTxOAdaBalance -> sortOn (view #lovelace)
       UTxOTime -> sortOn (view #blockTime)
-      UTxOSearchTokenBalance -> sortOn targetQuantity
+      UTxOSearchTokenBalance -> sortOn targetQuantity -- Only used with search
 
     orderer
       | sortOrderSetting == SortAscending = id
@@ -134,9 +134,9 @@ utxosWidget model =
     filterer :: [PersonalUTxO] -> [PersonalUTxO]
     filterer us = do
       u@PersonalUTxO{..} <- us
-      guard $ maybe True (isJust referenceScriptHash ==) (filterModel ^. #hasReferenceScript)
-      guard $ maybe True (isJust datumHash ==) (filterModel ^. #hasDatum)
-      guard $ maybe True (not (null nativeAssets) ==) (filterModel ^. #hasNativeAssets)
+      guard $ maybe True (isJust referenceScriptHash ==) (utxoFilterModel ^. #hasReferenceScript)
+      guard $ maybe True (isJust datumHash ==) (utxoFilterModel ^. #hasDatum)
+      guard $ maybe True (not (null nativeAssets) ==) (utxoFilterModel ^. #hasNativeAssets)
       return u
 
     sample :: [PersonalUTxO]
@@ -144,50 +144,24 @@ utxosWidget model =
            $ sorter 
            $ applySearchFilter searchTargets
            $ filterer 
-           $ model ^. #homeModel % #selectedWallet % #utxos
+           $ selectedWallet ^. #utxos
 
-    menuSearchIcon :: Text
-    menuSearchIcon = toGlyph 0XF3D1
+    -- This is used for all toggleButton off styles.
+    toggleOffStyle :: Style
+    toggleOffStyle = 
+      def `styleBasic` [ bgColor transparent , textColor customBlue ]
+          `styleHover` [ bgColor customGray1 ]
 
-    expandAllIcon :: Text
-    expandAllIcon = toGlyph 0XF326
-
-    collapseAllIcon :: Text
-    collapseAllIcon = toGlyph 0XF302
-
-    menuOffStyle :: Style
-    menuOffStyle = 
-      def `styleBasic` 
-            [ bgColor transparent
-            , textColor customBlue
-            ]
-          `styleHover`
-            [ bgColor customGray1]
-
-    datumIcon :: Text
-    datumIcon = toGlyph 0XF2F5
-
-    scriptIcon :: Text
-    scriptIcon = toGlyph 0XF433
-
+    -- This is the button icon for showing/hiding UTxO details.
     moreIcon :: Bool -> Text
     moreIcon detailsOpen
-      | detailsOpen = remixCloseCircleLine
-      | otherwise = remixMoreLine
+      | detailsOpen = closeCircleIcon
+      | otherwise = horizontalMoreIcon
 
     moreTip :: Bool -> Text
     moreTip detailsOpen
       | detailsOpen = "Close Details"
       | otherwise = "Show Details"
-
-    moreOffStyle :: Style
-    moreOffStyle = 
-      def `styleBasic` 
-            [ bgColor transparent
-            , textColor customBlue
-            ]
-          `styleHover`
-            [ bgColor customGray1]
 
     utxoRow :: PersonalUTxO -> AppNode
     utxoRow u@PersonalUTxO{..} =
@@ -201,7 +175,7 @@ utxosWidget model =
                     `styleBasic` [textSize 12]
                 ]
             , hstack
-                [ label remixCalendarLine
+                [ label calendarIcon
                     `styleBasic` 
                       [ textSize 10
                       , textColor customBlue
@@ -215,7 +189,7 @@ utxosWidget model =
                       , textColor lightGray
                       ]
                 , spacer
-                , label remixTimeLine
+                , label clockIcon
                     `styleBasic` 
                       [ textSize 10
                       , textColor customBlue
@@ -230,7 +204,7 @@ utxosWidget model =
                       ]
                 , spacer
                 , widgetIf (not $ null nativeAssets) $ 
-                    tooltip_ "Native Assets" [tooltipDelay 500] $ label remixCoinsLine
+                    tooltip_ "Native Assets" [tooltipDelay 500] $ label coinsIcon
                       `styleBasic` 
                         [ textSize 10
                         , textColor customBlue
@@ -256,10 +230,10 @@ utxosWidget model =
                         , textMiddle
                         ]
                 , filler
-                , tooltip_ (moreTip showDetails) [tooltipDelay 1000] $
+                , tooltip_ (moreTip showDetails) [tooltipDelay 0] $
                     toggleButton_ (moreIcon showDetails)
                       (toLensVL $ #homeModel % #selectedWallet % #utxos % toggleDetails utxoRef)
-                      [toggleButtonOffStyle moreOffStyle]
+                      [toggleButtonOffStyle toggleOffStyle]
                       `styleBasic` 
                         [ textSize 10
                         , textColor customBlue
@@ -285,16 +259,16 @@ utxosWidget model =
       hstack
         [ filler
         , vstack
-            [ copyableLabelFor_ "Block Height:" (show @Text blockHeight) 10
+            [ copyableLabelFor "Block Height:" (show @Text blockHeight)
                   `styleBasic` [padding 2]
             , widgetMaybe referenceScriptHash $ \hash ->
-                copyableLabelFor_ "Reference Script Hash:" hash 10
+                copyableLabelFor "Reference Script Hash:" hash
                   `styleBasic` [padding 2]
             , widgetMaybe datumHash $ \hash ->
-                copyableLabelFor_ "Datum Hash:" hash 10
+                copyableLabelFor "Datum Hash:" hash
                   `styleBasic` [padding 2]
             , widgetMaybe inlineDatum $ \x ->
-                copyableLabelFor_ "Inline Datum:" (showValue x) 10
+                copyableLabelFor "Inline Datum:" (showValue x)
                   `styleBasic` [padding 2]
             , widgetIf (not $ null nativeAssets) $
                 vstack
@@ -313,9 +287,8 @@ utxosWidget model =
         ]
 
 utxoFilterWidget:: AppModel -> AppNode
-utxoFilterWidget model = do
-  let currentScene = model ^. #homeModel % #utxoFilterScene
-      offStyle = def 
+utxoFilterWidget AppModel{homeModel=HomeModel{..}} = do
+  let offStyle = def 
         `styleBasic` [ bgColor customGray1 , textColor white ]
         `styleHover` [ textColor lightGray, border 1 customBlue ]
   vstack
@@ -358,9 +331,9 @@ utxoFilterWidget model = do
         , vstack
             [ vstack 
                 [ zstack
-                    [ widgetIf (currentScene == FilterScene) filterWidget
-                    , widgetIf (currentScene == SortScene) sortWidget
-                    , widgetIf (currentScene == SearchScene) searchWidget
+                    [ widgetIf (utxoFilterScene == FilterScene) filterWidget
+                    , widgetIf (utxoFilterScene == SortScene) sortWidget
+                    , widgetIf (utxoFilterScene == SearchScene) searchWidget
                     ]
                 , spacer
                 , hstack 
@@ -391,7 +364,7 @@ utxoFilterWidget model = do
   where
     filterWidget :: AppNode
     filterWidget = do
-      let rooLens = #homeModel % #utxoFilterModel
+      let rootLens = #homeModel % #utxoFilterModel
           offStyle = def 
             `styleBasic` [ bgColor customGray1 , textColor white ]
             `styleHover` [ bgColor customBlue ]
@@ -414,10 +387,10 @@ utxoFilterWidget model = do
         , vstack
             [ cushionWidgetH $ hstack_ [childSpacing]
                 [ label "Reference Script:"
-                , choiceButton "Yes" (Just True) (toLensVL $ rooLens % #hasReferenceScript)
-                , choiceButton "No" (Just False) (toLensVL $ rooLens % #hasReferenceScript)
-                , choiceButton "Either" Nothing (toLensVL $ rooLens % #hasReferenceScript)
-                , mainButton remixInformationLine (Alert "Does the UTxO have a reference script?")
+                , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #hasReferenceScript)
+                , choiceButton "No" (Just False) (toLensVL $ rootLens % #hasReferenceScript)
+                , choiceButton "Either" Nothing (toLensVL $ rootLens % #hasReferenceScript)
+                , mainButton helpIcon (Alert "Does the UTxO have a reference script?")
                     `styleBasic`
                       [ border 0 transparent
                       , radius 20
@@ -431,10 +404,10 @@ utxoFilterWidget model = do
                 ] `styleBasic` [height 30]
             , cushionWidgetH $ hstack_ [childSpacing]
                 [ label "Datum:"
-                , choiceButton "Yes" (Just True) (toLensVL $ rooLens % #hasDatum)
-                , choiceButton "No" (Just False) (toLensVL $ rooLens % #hasDatum)
-                , choiceButton "Either" Nothing (toLensVL $ rooLens % #hasDatum)
-                , mainButton remixInformationLine (Alert "Does the UTxO have a datum?")
+                , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #hasDatum)
+                , choiceButton "No" (Just False) (toLensVL $ rootLens % #hasDatum)
+                , choiceButton "Either" Nothing (toLensVL $ rootLens % #hasDatum)
+                , mainButton helpIcon (Alert "Does the UTxO have a datum?")
                     `styleBasic`
                       [ border 0 transparent
                       , radius 20
@@ -448,10 +421,10 @@ utxoFilterWidget model = do
                 ] `styleBasic` [height 30]
             , cushionWidgetH $ hstack_ [childSpacing]
                 [ label "Native Assets:"
-                , choiceButton "Yes" (Just True) (toLensVL $ rooLens % #hasNativeAssets)
-                , choiceButton "No" (Just False) (toLensVL $ rooLens % #hasNativeAssets)
-                , choiceButton "Either" Nothing (toLensVL $ rooLens % #hasNativeAssets)
-                , mainButton remixInformationLine (Alert "Does the UTxO have native assets?")
+                , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #hasNativeAssets)
+                , choiceButton "No" (Just False) (toLensVL $ rootLens % #hasNativeAssets)
+                , choiceButton "Either" Nothing (toLensVL $ rootLens % #hasNativeAssets)
+                , mainButton helpIcon (Alert "Does the UTxO have native assets?")
                     `styleBasic`
                       [ border 0 transparent
                       , radius 20
@@ -475,7 +448,7 @@ utxoFilterWidget model = do
             def `styleFocus` [bgColor customGray2, border 1 customBlue]
                 `styleFocusHover` [bgColor customGray1, border 1 customBlue]
           possibleSortingMethods
-            | model ^. #homeModel % #utxoFilterModel % #search == "" = take 3 utxoSortingMethods
+            | utxoFilterModel ^. #search == "" = take 3 utxoSortingMethods
             | otherwise = utxoSortingMethods
       vstack_ [childSpacing]
         [ spacer
@@ -494,7 +467,7 @@ utxoFilterWidget model = do
                   , border 1 black
                   ]
                 `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-            , mainButton remixInformationLine (Alert utxoSortMsg)
+            , mainButton helpIcon (Alert utxoSortMsg)
                 `styleBasic`
                   [ border 0 transparent
                   , radius 20
@@ -534,7 +507,7 @@ utxoFilterWidget model = do
             , textField_ 
                 (toLensVL $ #homeModel % #utxoFilterModel % #search) 
                 [placeholder "many of: native token, reference script hash, datum hash, tx hash"] 
-            , mainButton remixInformationLine (Alert utxoSearchMsg)
+            , mainButton helpIcon (Alert utxoSearchMsg)
                 `styleBasic`
                   [ border 0 transparent
                   , radius 20
@@ -548,3 +521,39 @@ utxoFilterWidget model = do
             ]
         ]
 
+-------------------------------------------------
+-- Helper Widgets
+-------------------------------------------------
+-- | A label button that will copy itself.
+copyableLabelSelf :: Text -> WidgetNode s AppEvent
+copyableLabelSelf caption = 
+  tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
+    `styleBasic`
+      [ padding 0
+      , radius 5
+      , textMiddle
+      , textSize 12
+      , border 0 transparent
+      , textColor white
+      , bgColor transparent
+      ]
+    `styleHover` [textColor customBlue, cursorIcon CursorHand]
+
+-- | A label button that will copy other data.
+copyableLabelFor :: Text -> Text -> WidgetNode s AppEvent
+copyableLabelFor caption info = 
+  hstack
+    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
+        `styleBasic`
+          [ padding 0
+          , radius 5
+          , textMiddle
+          , border 0 transparent
+          , textColor customBlue
+          , bgColor transparent
+          , textSize 10
+          ]
+        `styleHover` [textColor lightGray, cursorIcon CursorHand]
+    , spacer
+    , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize 10]
+    ]

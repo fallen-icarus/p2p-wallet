@@ -31,9 +31,15 @@ main = do
     -- Get the user's current time zone.
     timeZone <- getCurrentTimeZone
 
-    let initModel = 
+    -- Get the current date for the user.
+    currentDate <- getCurrentDay timeZone
+
+    let thirtyDaysAgo = addDays (-30) currentDate
+        initModel = 
           def & #databaseFile .~ dbFilePath -- Use the full filepath for to the database.
               & #config % #timeZone .~ timeZone
+              & #config % #currentDay .~ currentDate
+              & #homeModel % #txFilterModel % #dateRange % _1 .~ Just thirtyDaysAgo
     startApp initModel handleEvent buildUI $ appCfg AppInit
 
   where

@@ -25,7 +25,7 @@ There can be multiple profiles dedicated to a given account index.
 -}
 module P2PWallet.Data.Profile where
 
-import Database.SQLite.Simple (Query(..),ToRow(..),FromRow(..))
+import Database.SQLite.Simple (ToRow(..),FromRow(..))
 
 import P2PWallet.Data.Core
 import P2PWallet.Data.Database
@@ -58,33 +58,34 @@ instance TableName Profile where
   tableName = "profiles"
 
 instance Creatable Profile where
-  createStmt = Query $ unlines
+  createStmt = Query $ unwords
     [ "CREATE TABLE " <> tableName @Profile
-    , "( network TEXT NOT NULL,"
-    ,  " profile_id INTEGER PRIMARY KEY,"
-    ,  " account_index INTEGER NOT NULL,"
-    ,  " alias TEXT NOT NULL,"
-    ,  " device TEXT NOT NULL,"
-    ,  " UNIQUE(network,profile_id,alias)"
+    , "("
+    , unwords $ intersperse ","
+        [ "network TEXT NOT NULL"
+        , "profile_id INTEGER PRIMARY KEY"
+        , "account_index INTEGER NOT NULL"
+        , "alias TEXT NOT NULL"
+        , "device TEXT NOT NULL"
+        , "UNIQUE(network,profile_id,alias)"
+        ]
     , ");"
     ]
 
 instance Insertable Profile where
-  insertStmt = Query $ unlines
+  insertStmt = Query $ unwords
     [ "INSERT OR REPLACE INTO " <> tableName @Profile
-    , "( network,"
-    ,  " profile_id,"
-    ,  " account_index,"
-    ,  " alias,"
-    ,  " device"
-    , ") VALUES (?,?,?,?,?);"
+    , "("
+    , unwords $ intersperse ","
+        [ "network"
+        , "profile_id"
+        , "account_index"
+        , "alias"
+        , "device"
+        ]
+    , ")"
+    , "VALUES (?,?,?,?,?);"
     ]
-
-instance Queryable Profile where
-  queryStmt = Query $ "SELECT * FROM " <> tableName @Profile
-
-instance Deletable Profile where
-  deleteStmt = Query $ "DELETE FROM " <> tableName @Profile
 
 -------------------------------------------------
 -- User Info for a new profile

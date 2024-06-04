@@ -25,6 +25,9 @@ buildUI _ model = do
       syncingWalletsOverlay = 
         box (label "Syncing Wallets..." `styleBasic` [textSize 20, textColor black])
           `styleBasic` [bgColor (darkGray & #a .~ 0.8)]
+      loadingWalletsOverlay = 
+        box (label "Loading Wallets..." `styleBasic` [textSize 20, textColor black])
+          `styleBasic` [bgColor (darkGray & #a .~ 0.8)]
 
   zstack 
     [ networksWidget model `nodeVisible` (NetworksScene == model ^. #scene)
@@ -39,4 +42,5 @@ buildUI _ model = do
     , alertOverlay `nodeVisible` (isJust $ model ^. #alertMessage)
     , waitingOnDeviceOverlay `nodeVisible` (model ^. #waitingOnDevice)
     , syncingWalletsOverlay `nodeVisible` (model ^. #syncingWallets)
+    , loadingWalletsOverlay `nodeVisible` (model ^. #loadingWallets)
     ] `styleBasic` [bgColor customGray4]

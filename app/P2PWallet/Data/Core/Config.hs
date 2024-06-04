@@ -20,13 +20,15 @@ import P2PWallet.Prelude
 
 data Config = Config
   { network :: Network -- ^ Which network to use.
-  , timeZone :: TimeZone
+  , timeZone :: TimeZone -- ^ The user's current time zone.
+  , currentDay :: Day -- ^ The current date.
   } deriving (Show,Eq)
 
 instance Default Config where
   def = Config
     { network = def
     , timeZone = utc
+    , currentDay = def
     }
 
 makeFieldLabelsNoPrefix ''Config

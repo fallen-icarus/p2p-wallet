@@ -1,10 +1,6 @@
 module P2PWallet.GUI.Widgets.Internal.Custom 
   (
-    copyableLabelFor
-  , copyableLabelFor_
-  , copyableLabelSelf
-  , copyableLabelWith
-  , copyableTextField
+    copyableTextField
   , copyableTextArea
   , centerWidget
   , centerWidgetH
@@ -20,78 +16,7 @@ import Prettyprinter (vsep)
 import Prettyprinter.Util (reflow)
 
 import P2PWallet.Data.AppModel
-import P2PWallet.GUI.Colors
 import P2PWallet.Prelude
-
--- | A label button that will copy other data.
-copyableLabelFor :: Text -> Text -> WidgetNode s AppEvent
-copyableLabelFor caption info = 
-  hstack
-    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
-        `styleBasic`
-          [ padding 0
-          , radius 5
-          , textMiddle
-          , border 0 transparent
-          , textColor customBlue
-          , bgColor transparent
-          ]
-        `styleHover` [textColor lightGray, cursorIcon CursorHand]
-    , spacer
-    , label info `styleBasic` [textColor lightGray]
-    ]
-
--- | A version of copyableLabelFor with a customizable font size.
-copyableLabelFor_ :: Text -> Text -> Double -> WidgetNode s AppEvent
-copyableLabelFor_ caption info fontSize = 
-  hstack
-    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
-        `styleBasic`
-          [ padding 0
-          , radius 5
-          , textMiddle
-          , border 0 transparent
-          , textColor customBlue
-          , bgColor transparent
-          , textSize fontSize
-          ]
-        `styleHover` [textColor lightGray, cursorIcon CursorHand]
-    , spacer
-    , label_ info [ellipsis] `styleBasic` [textSize fontSize, textColor lightGray]
-    ]
-
--- | A label button that will copy itself.
-copyableLabelSelf :: Text -> WidgetNode s AppEvent
-copyableLabelSelf caption = 
-  tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
-    `styleBasic`
-      [ padding 0
-      , radius 5
-      , textMiddle
-      , textSize 12
-      , border 0 transparent
-      , textColor white
-      , bgColor transparent
-      ]
-    `styleHover` [textColor customBlue, cursorIcon CursorHand]
-
-copyableLabelWith :: (ToText a) => Text -> (a -> Text) -> a -> WidgetNode s AppEvent
-copyableLabelWith caption modifier fullInfo = do
-  let formattedInfo = modifier fullInfo
-  hstack
-    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText $ toText fullInfo)
-        `styleBasic`
-          [ padding 0
-          , radius 5
-          , textMiddle
-          , border 0 transparent
-          , textColor customBlue
-          , bgColor transparent
-          ]
-        `styleHover` [textColor lightGray, cursorIcon CursorHand]
-    , spacer
-    , label formattedInfo `styleBasic` [textColor lightGray]
-    ]
 
 -- | A read only text field to allow the user to copy the underlying text.
 copyableTextField :: Text -> WidgetNode s AppEvent

@@ -9,3 +9,9 @@ All used wallets are currently located in ~/.local/share/p2p-wallet/testnet/wall
 ## To still fix
 
 1. Exporting keys does not account for trezor's legacy icarus derivation.
+
+## Importing Wallets and Derivation Paths
+
+This may be needed to explain different keys since some wallets do not use the hardened paths:
+
+https://learnmeabitcoin.com/technical/keys/hd-wallets/derivation-paths/#notation

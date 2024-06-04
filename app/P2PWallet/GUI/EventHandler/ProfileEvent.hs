@@ -25,9 +25,8 @@ handleProfileEvent model@AppModel{..} evt = case evt of
 
   -- Set the desired profile to selected and get the associated wallets from the database.
   LoadSelectedProfile profile -> 
-    -- When a user selectes a profile, move the user to the home screen for that profile.
     [ Model $ model & #selectedProfile .~ Just profile 
-                    & #scene .~ HomeScene
+                    & #loadingWallets .~ True
     , Task $ runActionOrAlert (ProfileEvent . LoadKnownWallets) $
         loadWallets databaseFile profile >>= fromRightOrAppError
     ]
@@ -35,6 +34,8 @@ handleProfileEvent model@AppModel{..} evt = case evt of
   -- After loading the wallets from the database, update the model.
   LoadKnownWallets wallets@Wallets{..} -> 
     [ Model $ model & #knownWallets .~ wallets
+                    & #scene .~ HomeScene
+                    & #loadingWallets .~ False
                     & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead paymentWallets)
     -- , Task $ return $ SyncWallets StartSync
     ]

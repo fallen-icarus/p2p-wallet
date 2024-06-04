@@ -72,15 +72,17 @@ runEvaluateTx network txFile = do
         Left err -> return $ Left $ show err
 
 runQueryPaymentWalletInfo :: Network -> PaymentWallet -> IO (Either Text PaymentWallet)
-runQueryPaymentWalletInfo network wallet = do
+runQueryPaymentWalletInfo network wallet@PaymentWallet{paymentId,profileId} = do
     manager <- newManager tlsManagerSettings
     let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
-    runClientM (queryPaymentWalletInfo $ wallet ^. #paymentAddress) env >>= \case
+        lastBlock = fromMaybe 0 $ fmap (view #blockHeight) $ maybeHead $ wallet ^. #transactions
+    runClientM (queryPaymentWalletInfo (wallet ^. #paymentAddress) lastBlock) env >>= \case
       Right (us,txs,as) -> do
         return $ Right $ 
           wallet & #utxos .~ map toPersonalUTxO us
                  & #lovelace .~ sum (map (view #lovelace) us)
-                 & #transactions .~ map (P2P.toTransaction $ wallet ^. #paymentId) txs
+                 & #transactions %~ mappend 
+                     (sortOn (negate . view #blockTime) $ map (P2P.toTransaction profileId paymentId) txs)
                  & #nativeAssets .~ as
       Left err -> return $ Left $ show err
 
@@ -97,17 +99,20 @@ type KoiosApi
   :<|>  "address_utxos"
      :> QueryParam' '[Required] "select" Text
      :> QueryParam' '[Required] "is_spent" Text
+     :> QueryParam' '[Required] "offset" Int
      :> QueryParam "asset_list" Text
      :> ReqBody '[JSON] ExtendedPaymentAddresses
      :> Post '[JSON] [AddressUTxO]
 
   :<|> "address_txs"
      :> QueryParam' '[Required] "select" Text
-     :> ReqBody '[JSON] PaymentAddresses
+     :> QueryParam' '[Required] "offset" Int
+     :> ReqBody '[JSON] PaymentAddressesAfterBlock
      :> Post '[JSON] TxHashes
 
   :<|> "address_assets"
      :> QueryParam' '[Required] "select" Text
+     :> QueryParam' '[Required] "offset" Int
      :> ReqBody '[JSON] PaymentAddresses
      :> Post '[JSON] [NativeAsset]
 
@@ -124,30 +129,51 @@ submitApi
   :<|> txInfoApi 
   = client (Proxy :: Proxy KoiosApi)
 
-queryPaymentWalletInfo :: PaymentAddress -> ClientM ([AddressUTxO],[Transaction],[NativeAsset])
-queryPaymentWalletInfo addr = 
-  (,,)  <$> queryAddressUTxOs [addr]
-       <*> queryAddressTransactions [addr]
+queryPaymentWalletInfo 
+  :: PaymentAddress 
+  -> Integer 
+  -> ClientM ([AddressUTxO],[Transaction],[NativeAsset])
+queryPaymentWalletInfo addr lastBlock = 
+  (,,) <$> queryAddressUTxOs [addr]
+       <*> queryAddressTransactions [addr] lastBlock
        <*> queryAddressAssets [addr]
 
 queryAddressUTxOs :: [PaymentAddress] -> ClientM [AddressUTxO]
 queryAddressUTxOs addrs = do
     -- Since koios may occassionally return incorrect UTxOs if the instance queried is not properly
     -- synced, this would create a lot of problems for this program. To account for this, the
-    -- address UTxOs are queried three times; the results should match for at least two of them. If
-    -- they don't match, query another three and try again.
+    -- address UTxOs are queried up to three times; the results should match for at least two of
+    -- them. If they don't match, query another three and try again.
     (r1,r2) <- 
-      (,) <$> addressUTxOsApi select "eq.false" Nothing (ExtendedPaymentAddresses addrs)
-          <*> addressUTxOsApi select "eq.false" Nothing (ExtendedPaymentAddresses addrs)
+      (,) <$> queryUTxOs 0 []
+          <*> queryUTxOs 0 []
 
     -- Only query a third time if necessary.
-    if r1 == r2 then return r1 
+    if r1 == r2 then 
+      -- Two results matched so return one of them.
+      return r1 
     else do
-      r3 <- addressUTxOsApi select "eq.false" Nothing (ExtendedPaymentAddresses addrs)
-      if r3 == r1 then return r1
-      else if r3 == r2 then return r2
-      else queryAddressUTxOs addrs -- try again
+      -- Query a third time and compare against the previous two.
+      r3 <- queryUTxOs 0 []
+      if r3 == r1 || r3 == r2 then 
+        -- At least two matched.
+        return r3
+      else 
+        -- Query another three times since they did not match.
+        queryAddressUTxOs addrs
+
   where
+    queryUTxOs :: Int -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryUTxOs offset !acc = do
+      !res <- addressUTxOsApi select "eq.false" offset Nothing (ExtendedPaymentAddresses addrs)
+      if length res == 1000 then 
+        -- Query again since there may be more.
+        queryUTxOs (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+    select :: Text
     select =
       mconcat $ intersperse ","
         [ "is_spent"
@@ -171,17 +197,35 @@ queryAddressAssets addrs = do
     -- the address UTxOs are queried three times; the results should match for at least two of them.
     -- If they don't match, query another three and try again.
     (r1,r2) <- 
-      (,) <$> addressAssetsApi select (PaymentAddresses addrs)
-          <*> addressAssetsApi select (PaymentAddresses addrs)
+      (,) <$> queryAssets 0 []
+          <*> queryAssets 0 []
 
     -- Only query a third time if necessary.
-    if r1 == r2 then return r1 
+    if r1 == r2 then 
+      -- Two results matched so return one of them.
+      return r1 
     else do
-      r3 <- addressAssetsApi select (PaymentAddresses addrs)
-      if r3 == r1 then return r1
-      else if r3 == r2 then return r2
-      else queryAddressAssets addrs -- try again
+      -- Query a third time and compare against the previous two.
+      r3 <- queryAssets 0 []
+      if r3 == r1 || r3 == r2 then 
+        -- At least two matched.
+        return r3
+      else 
+        -- Query another three times since they did not match.
+        queryAddressAssets addrs
+
   where
+    queryAssets :: Int -> [NativeAsset] -> ClientM [NativeAsset]
+    queryAssets offset !acc = do
+      !res <- addressAssetsApi select offset (PaymentAddresses addrs)
+      if length res == 1000 then 
+        -- Query again since there may be more.
+        queryAssets (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+    select :: Text
     select =
       mconcat $ intersperse ","
         [ "policy_id"
@@ -190,10 +234,24 @@ queryAddressAssets addrs = do
         , "quantity"
         ]
 
-queryAddressTransactions :: [PaymentAddress] -> ClientM [Transaction]
-queryAddressTransactions addrs =
-    addressTxsApi "tx_hash" (PaymentAddresses addrs) >>= txInfoApi select
+queryAddressTransactions :: [PaymentAddress] -> Integer -> ClientM [Transaction]
+queryAddressTransactions addrs lastBlock =
+    queryTxHashes 0 [] >>= 
+      -- Tx info can be quite large so only 50 transactions are queried at a time.
+      fmap concat . mapM (txInfoApi select . TxHashes) . groupInto 50
   where
+    queryTxHashes :: Int -> [Text] -> ClientM [Text]
+    queryTxHashes offset !acc = do
+      (TxHashes hashes) <- 
+        addressTxsApi "tx_hash" offset (PaymentAddressesAfterBlock addrs lastBlock)
+      if length hashes == 1000 then 
+        -- Query again since there may be more.
+        queryTxHashes (offset + 1000) $ acc <> hashes
+      else
+        -- That should be the last of the results.
+        return $ acc <> hashes
+
+    select :: Text
     select = 
       mconcat $ intersperse ","
         [ "tx_hash"
