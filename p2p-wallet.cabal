@@ -60,7 +60,7 @@ executable p2p-wallet
       P2PWallet.Actions.SyncWallets
       P2PWallet.Data.AppModel
       P2PWallet.Data.AppModel.Common
-      -- P2PWallet.Data.App.Delegation
+      P2PWallet.Data.AppModel.Delegation
       P2PWallet.Data.AppModel.Home
       -- P2PWallet.Data.App.TxBuilder
       P2PWallet.Data.Core
@@ -73,7 +73,8 @@ executable p2p-wallet
       P2PWallet.Data.Core.PaymentId
       P2PWallet.Data.Core.ProfileId
       P2PWallet.Data.Core.PoolID
-      -- P2PWallet.Data.Core.RegistrationStatus
+      P2PWallet.Data.Core.RegistrationStatus
+      P2PWallet.Data.Core.StakeId
       P2PWallet.Data.Core.TxCBOR
       -- P2PWallet.Data.Core.Witness
       P2PWallet.Data.Database
@@ -83,30 +84,32 @@ executable p2p-wallet
       P2PWallet.Data.Database.Query
       P2PWallet.Data.Files
       P2PWallet.Data.Koios.AddressUTxO
-      -- P2PWallet.Data.Koios.Pool
+      P2PWallet.Data.Koios.LinkedPaymentAddresses
+      P2PWallet.Data.Koios.Pool
       P2PWallet.Data.Koios.PostTypes
-      -- P2PWallet.Data.Koios.StakeAccount
-      -- P2PWallet.Data.Koios.StakeReward
+      P2PWallet.Data.Koios.StakeAccount
+      P2PWallet.Data.Koios.StakeReward
       P2PWallet.Data.Koios.Transaction
       -- P2PWallet.Data.Koios.TxSubmissionResponse
       -- P2PWallet.Data.FilterLang
       P2PWallet.Data.Profile
+      P2PWallet.Data.StakeReward
       P2PWallet.Data.Transaction
       P2PWallet.Data.Wallets
       P2PWallet.Data.Wallets.PaymentWallet
-      -- P2PWallet.Data.Wallets.StakeWallet
+      P2PWallet.Data.Wallets.StakeWallet
       P2PWallet.GUI.Colors
       P2PWallet.GUI.EventHandler
-      -- P2PWallet.GUI.EventHandler.DelegationEvent
+      P2PWallet.GUI.EventHandler.DelegationEvent
       P2PWallet.GUI.EventHandler.HomeEvent
       P2PWallet.GUI.EventHandler.ProfileEvent
       -- P2PWallet.GUI.EventHandler.TxBuilderEvent
       P2PWallet.GUI.HelpMessages
       P2PWallet.GUI.Icons
       P2PWallet.GUI.UIBuilder
-      -- P2PWallet.GUI.Widgets.Delegation
+      P2PWallet.GUI.Widgets.Delegation
       -- P2PWallet.GUI.Widgets.Delegation.Details
-      -- P2PWallet.GUI.Widgets.Delegation.PairStakeWallet
+      P2PWallet.GUI.Widgets.Delegation.AddStakeWallet
       -- P2PWallet.GUI.Widgets.Delegation.RegisteredPools
       -- P2PWallet.GUI.Widgets.Delegation.RewardHistory
       -- P2PWallet.GUI.Widgets.Delegation.Summary

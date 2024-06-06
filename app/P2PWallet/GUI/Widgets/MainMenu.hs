@@ -16,7 +16,7 @@ mainMenuWidget :: AppModel -> AppNode
 mainMenuWidget model = do
     vstack 
       [ changeSceneButton "Home" homeIcon HomeScene
-      -- , changeSceneButton "Staking" remixMedalLine DelegationScene
+      , changeSceneButton "Staking" delegationCenterIcon DelegationScene
       -- , changeSceneButton "DEX" remixArrowLeftRightFill LimitOrders
       -- , changeSceneButton "Liquidity" remixWaterFlashLine MarketMakers
       -- , changeSceneButton "Builder" remixToolsLine TxBuilderScene

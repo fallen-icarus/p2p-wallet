@@ -48,6 +48,7 @@ module P2PWallet.Prelude
   ) where
 
 import Relude hiding (uncons)
+import Relude.Unsafe qualified as Unsafe
 import System.Directory qualified as Dir
 import Data.Text qualified as T
 import Data.Time qualified as Time
@@ -147,13 +148,16 @@ maybeLens def' targetLens =
 instance FromFractional Decimal where
   fromFractional = realToFrac
 
-instance Aeson.FromJSON Decimal where
-  parseJSON = Aeson.withScientific "Decimal" (maybe mzero return . readMaybe . show)
-
 instance Printf.PrintfArg Decimal where
   formatArg x fmt | Printf.fmtChar (Printf.vFmt 'D' fmt) == 'D' =
     Printf.formatString (show x) (fmt { Printf.fmtChar = 's', Printf.fmtPrecision = Nothing })
   formatArg _ fmt = Printf.errorBadFormat $ Printf.fmtChar fmt
+
+instance Aeson.FromJSON Decimal where
+  parseJSON = Aeson.withScientific "Decimal" (maybe mzero return . readMaybe . show)
+
+instance Aeson.ToJSON Decimal where
+  toJSON = Aeson.toJSON @Double . Unsafe.read . show
 
 instance FromField Time.POSIXTime where
   fromField (Field (SQLText t) _) = maybe mzero Ok $ readMaybe $ toString t

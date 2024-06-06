@@ -18,6 +18,9 @@ coinsIcon = remixCoinsLine
 horizontalMoreIcon :: Text
 horizontalMoreIcon = remixMoreLine
 
+verticalMoreIcon :: Text
+verticalMoreIcon = remixMore2Line
+
 closeCircleIcon :: Text
 closeCircleIcon = remixCloseCircleLine
 
@@ -78,3 +81,14 @@ expandAllIcon = toGlyph 0XF326
 menuSearchIcon :: Text
 menuSearchIcon = toGlyph 0XF3D1
 
+delegationCenterIcon :: Text
+delegationCenterIcon = remixMedalLine
+
+withdrawRewardsIcon :: Text
+withdrawRewardsIcon = remixDownloadLine
+
+deregisterIcon :: Text
+deregisterIcon = remixCloseCircleLine
+
+registerIcon :: Text
+registerIcon = remixFileList3Line

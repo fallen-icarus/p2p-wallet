@@ -236,3 +236,65 @@ txEndDateMsg = unlines
       , "up through the present."
       ]
   ]
+
+totalDelegatedMsg :: Text
+totalDelegatedMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "The total amount delegated across all payment addresses using this staking credential +"
+      , "the current reward balance."
+      ]
+  ]
+
+pledgeMsg :: Text
+pledgeMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "The amount of ADA the stake pool owners have committed as pledge. If this is not met,"
+      , "the stake pool will be penalized."
+      ]
+  ]
+
+activePledgeMsg :: Text
+activePledgeMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "The actual amount of ADA pledged by the stake pool owners. It must be at the pledge"
+      , "amount to avoid penalties."
+      ]
+  ]
+
+fixedCostMsg :: Text
+fixedCostMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "A fixed amount of ADA deducted from the total rewards to cover the stake pool's"
+      , "operating expenses."
+      ]
+  ]
+
+marginMsg :: Text
+marginMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "The percentage of the pool's total rewards that will be taken by the stake pool operator"
+      , "after the fixed cost."
+      ]
+  ]
+
+liveSaturationMsg :: Text
+liveSaturationMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "The percent saturation for this pool."
+      ]
+  ]
+
+activeLinkedAddressesMsg :: Text
+activeLinkedAddressesMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "Payment addresses with non-zero balances that are using this staking credential."
+      ]
+  ]
+
+spendableEpochMsg :: Text
+spendableEpochMsg = unlines
+  [ mconcat $ intersperse " "
+      [ "The epoch when these rewards became spendable."
+      ]
+  ]
+

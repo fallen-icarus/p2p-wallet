@@ -11,6 +11,8 @@ import P2PWallet.Actions.AddWallet
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core
+import P2PWallet.Data.Wallets
 import P2PWallet.Prelude
 
 handleHomeEvent :: AppModel -> HomeEvent -> [AppEventResponse AppModel AppEvent]
@@ -24,7 +26,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- Open the More Popup
   -----------------------------------------------
-  ShowMorePopup -> 
+  ShowHomeMorePopup -> 
     [ Model $ model & #homeModel % #showMorePopup .~ True ]
 
   -----------------------------------------------
@@ -62,14 +64,43 @@ handleHomeEvent model@AppModel{..} evt = case evt of
 
           return verifiedPaymentWallet
       ]
-    AddResult verifiedPaymentWallet -> 
+    AddResult verifiedPaymentWallet@PaymentWallet{..} ->
        [ Model $
           model & #knownWallets % #paymentWallets %~ flip snoc verifiedPaymentWallet
                 & #waitingOnDevice .~ False
                 & #homeModel % #addingWallet .~ False
                 & #homeModel % #selectedWallet .~ verifiedPaymentWallet
                 & #scene .~ HomeScene
-       , Task $ return $ SyncWallets StartSync
+       , Task $ do
+           let knownStakeAddresses = map (Just . view #stakeAddress) $ 
+                 model ^. #knownWallets % #stakeWallets
+           -- If this is a new stake address, add it to the database as well.
+           if stakeAddress /= Nothing && stakeAddress `notElem` knownStakeAddresses then do
+              -- Get the new stake id for the new entry into the stake_wallet table.
+              stakeId <- getNextStakeId databaseFile >>= fromRightOrAppError
+          
+              let newStakeWallet = StakeWallet
+                    { network = network
+                    , profileId = profileId
+                    , stakeId = stakeId
+                    , alias = alias <> "_stake"
+                    , stakeAddress = fromMaybe "" stakeAddress 
+                    , stakeKeyPath = stakeKeyPath 
+                    , registrationStatus = NotRegistered
+                    , totalDelegation = 0
+                    , utxoBalance = 0
+                    , availableRewards = 0
+                    , delegatedPool = Nothing
+                    , rewardHistory = [] 
+                    , linkedAddresses = []
+                    }
+
+              -- Add the new wallet to the database.
+              addNewStakeWallet databaseFile newStakeWallet >>= fromRightOrAppError
+
+              return $ HomeEvent $ AddCorrespondingStakeWallet newStakeWallet
+           else
+             return $ SyncWallets StartSync
        ]
 
   -----------------------------------------------
@@ -105,15 +136,54 @@ handleHomeEvent model@AppModel{..} evt = case evt of
 
           return verifiedPaymentWallet
       ]
-    AddResult verifiedPaymentWallet -> 
+    AddResult verifiedPaymentWallet@PaymentWallet{..} -> 
        [ Model $
           model & #knownWallets % #paymentWallets %~ flip snoc verifiedPaymentWallet
                 & #homeModel % #addingWallet .~ False
                 & #homeModel % #selectedWallet .~ verifiedPaymentWallet
                 & #scene .~ HomeScene
-       , Task $ return $ SyncWallets StartSync
+       , Task $ do
+           let knownStakeAddresses = map (Just . view #stakeAddress) $ 
+                 model ^. #knownWallets % #stakeWallets
+           -- If this is a new stake address, add it to the database as well.
+           if stakeAddress /= Nothing && stakeAddress `notElem` knownStakeAddresses then do
+              -- Get the new stake id for the new entry into the stake_wallet table.
+              stakeId <- getNextStakeId databaseFile >>= fromRightOrAppError
+          
+              let newStakeWallet = StakeWallet
+                    { network = network
+                    , profileId = profileId
+                    , stakeId = stakeId
+                    , alias = alias <> "_stake"
+                    , stakeAddress = fromMaybe "" stakeAddress 
+                    , stakeKeyPath = Nothing 
+                    , registrationStatus = NotRegistered
+                    , totalDelegation = 0
+                    , utxoBalance = 0
+                    , availableRewards = 0
+                    , delegatedPool = Nothing
+                    , rewardHistory = [] 
+                    , linkedAddresses = []
+                    }
+
+              -- Add the new wallet to the database.
+              addNewStakeWallet databaseFile newStakeWallet >>= fromRightOrAppError
+
+              return $ HomeEvent $ AddCorrespondingStakeWallet newStakeWallet
+           else
+             return $ SyncWallets StartSync
        ]
 
+  -----------------------------------------------
+  -- Add the corresponding stake wallet when adding a payment wallet
+  -----------------------------------------------
+  AddCorrespondingStakeWallet newStakeWallet ->
+    [ Model $
+        model & #knownWallets % #stakeWallets %~ flip snoc newStakeWallet
+              & #delegationModel % #selectedWallet .~ newStakeWallet
+    , Task $ return $ SyncWallets StartSync
+    ]
+  
   -----------------------------------------------
   -- Change Payment Wallet Name
   -----------------------------------------------

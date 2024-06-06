@@ -11,6 +11,7 @@ import P2PWallet.Actions.Database
 import P2PWallet.Actions.SyncWallets
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
+import P2PWallet.GUI.EventHandler.DelegationEvent
 import P2PWallet.GUI.EventHandler.HomeEvent
 import P2PWallet.GUI.EventHandler.ProfileEvent
 import P2PWallet.Prelude
@@ -91,6 +92,11 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   HomeEvent modal -> handleHomeEvent model modal
 
   -----------------------------------------------
+  -- Delegation Events
+  -----------------------------------------------
+  DelegationEvent modal -> handleDelegationEvent model modal
+
+  -----------------------------------------------
   -- Syncing Wallets
   -----------------------------------------------
   SyncWallets modal -> case modal of
@@ -109,11 +115,15 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
       let paymentTarget = model ^. #homeModel % #selectedWallet % #alias
           updatedPaymentTarget = 
             fromMaybe def $ find (\w -> w ^. #alias == paymentTarget) $ resp ^. #paymentWallets
+          stakeTarget = model ^. #delegationModel % #selectedWallet % #alias
+          updatedStakeTarget = 
+            fromMaybe def $ find (\w -> w ^. #alias == stakeTarget) $ resp ^. #stakeWallets
       in
         [ Model $ 
             model & #syncingWallets .~ False
                   & #knownWallets .~ resp
                   & #homeModel % #selectedWallet .~ updatedPaymentTarget
+                  & #delegationModel % #selectedWallet .~ updatedStakeTarget
         , Task $
             runActionOrAlert UpdateCurrentDate $ getCurrentDay (config ^. #timeZone)
         ]
