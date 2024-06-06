@@ -11,6 +11,7 @@ module P2PWallet.Actions.Query.Koios
     runSubmitTx
   , runEvaluateTx
   , runQueryPaymentWalletInfo
+  , runQueryStakeWalletInfo
   ) where
 
 import Servant.Client (client, ClientM, runClientM, Scheme(Https), BaseUrl(..), mkClientEnv)
@@ -19,13 +20,17 @@ import Servant.API ((:<|>)(..), JSON, Post, Get, (:>), ReqBody, Required, QueryP
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Data.Aeson 
-import Data.List qualified as List
 
 import P2PWallet.Data.Core
 import P2PWallet.Data.Koios.AddressUTxO
+import P2PWallet.Data.Koios.LinkedPaymentAddresses
+import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Koios.PostTypes
+import P2PWallet.Data.Koios.StakeAccount
+import P2PWallet.Data.Koios.StakeReward
 import P2PWallet.Data.Koios.Transaction
 import P2PWallet.Data.Transaction qualified as P2P
+import P2PWallet.Data.StakeReward qualified as P2P
 import P2PWallet.Data.Wallets
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -86,6 +91,30 @@ runQueryPaymentWalletInfo network wallet@PaymentWallet{paymentId,profileId} = do
                  & #nativeAssets .~ as
       Left err -> return $ Left $ show err
 
+runQueryStakeWalletInfo :: Network -> StakeWallet -> IO (Either Text StakeWallet)
+runQueryStakeWalletInfo network' wallet@StakeWallet{stakeId,profileId} = do
+  manager' <- newManager tlsManagerSettings
+  let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network') 443 "api/v1")
+  res <- runClientM (queryStakeWalletInfo $ wallet ^. #stakeAddress) env
+  case res of
+    Right ([StakeAccount{..}],rewards,pools,linkedAddresses) -> 
+      return $ Right $
+        wallet & #registrationStatus .~ registrationStatus
+               & #totalDelegation .~ totalDelegation
+               & #utxoBalance .~ utxoBalance
+               & #availableRewards .~ availableRewards
+               & #delegatedPool .~ maybeHead pools
+               & #rewardHistory .~ map (P2P.toStakeReward profileId stakeId) rewards
+               & #linkedAddresses .~ linkedAddresses
+    Right ([],_,_,_) -> 
+      -- If a stake address has never been seen on chain before (ie, a UTxO has not been created 
+      -- at a payment address using the staking credential), the query will return the empty list.
+      -- The preset fields for the account are accurate in this scenario.
+      return $ Right wallet
+    Right _ -> do
+      return $ Left "Stake wallet query returned an unexpected number of arguments."
+    Left err -> return $ Left $ show err
+
 -------------------------------------------------
 -- Low-Level API
 -------------------------------------------------
@@ -121,12 +150,38 @@ type KoiosApi
      :> ReqBody '[JSON] TxHashes
      :> Post '[JSON] [Transaction]
 
+  :<|>  "account_info"
+     :> QueryParam' '[Required] "select" Text
+     :> ReqBody '[JSON] StakeAddresses
+     :> Post '[JSON] [StakeAccount]
+
+  :<|>  "account_rewards"
+     :> QueryParam' '[Required] "select" Text
+     :> ReqBody '[JSON] StakeAddresses
+     :> Post '[JSON] [StakeRewards]
+
+  :<|>  "pool_info"
+     :> QueryParam' '[Required] "select" Text
+     :> QueryParam "sigma" Text
+     :> QueryParam "meta_json" Text
+     :> ReqBody '[JSON] Pools
+     :> Post '[JSON] [Pool]
+
+  :<|>  "account_addresses"
+     :> QueryParam' '[Required] "select" Text
+     :> ReqBody '[JSON] NonEmptyStakeAddresses
+     :> Post '[JSON] LinkedPaymentAddresses
+
 submitApi
   :<|> evaluateApi 
   :<|> addressUTxOsApi 
   :<|> addressTxsApi
   :<|> addressAssetsApi 
   :<|> txInfoApi 
+  :<|> stakeAccountApi
+  :<|> stakeRewardsApi
+  :<|> poolInfoApi
+  :<|> linkedPaymentAddressesApi
   = client (Proxy :: Proxy KoiosApi)
 
 queryPaymentWalletInfo 
@@ -137,6 +192,15 @@ queryPaymentWalletInfo addr lastBlock =
   (,,) <$> queryAddressUTxOs [addr]
        <*> queryAddressTransactions [addr] lastBlock
        <*> queryAddressAssets [addr]
+
+queryStakeWalletInfo :: StakeAddress -> ClientM ([StakeAccount],[StakeReward],[Pool],[PaymentAddress])
+queryStakeWalletInfo addr = do
+  acc <- queryStakeAccounts [addr]
+
+  (acc,,,) 
+    <$> queryStakeRewards [addr] 
+    <*> (queryPoolInfo Nothing Nothing $ Pools $ catMaybes $ map (view #delegatedPool) acc)
+    <*> queryLinkedPaymentAddresses [addr] 
 
 queryAddressUTxOs :: [PaymentAddress] -> ClientM [AddressUTxO]
 queryAddressUTxOs addrs = do
@@ -272,6 +336,62 @@ queryAddressTransactions addrs lastBlock =
         -- , "assets_minted"
         -- , "native_scripts"
         -- , "plutus_contracts" 
+        ]
+
+queryStakeAccounts :: [StakeAddress] -> ClientM [StakeAccount]
+queryStakeAccounts addrs = stakeAccountApi select $ StakeAddresses addrs
+  where
+    select =
+      toText $ intercalate ","
+        [ "stake_address"
+        , "status"
+        , "delegated_pool"
+        , "total_balance"
+        , "utxo"
+        , "rewards_available"
+        ]
+
+queryStakeRewards :: [StakeAddress] -> ClientM [StakeReward]
+queryStakeRewards addrs = 
+    concatMap unStakeRewards <$> 
+      stakeRewardsApi select (StakeAddresses addrs)
+  where
+    select =
+      toText $ intercalate ","
+        [ "rewards" ]
+
+-- Some pools will have `Nothing` for a lot of correlated fields. The sigma filter
+-- can be used to filter out these pools. Another possible filter is whethere a pool
+-- has registered metadata.
+queryPoolInfo :: Maybe Text -> Maybe Text -> Pools -> ClientM [Pool]
+queryPoolInfo _ _ (Pools []) = return []
+queryPoolInfo sigmaFilter metaFilter pools = poolInfoApi select sigmaFilter metaFilter pools
+  where
+    select =
+      toText $ intercalate ","
+        [ "pool_id_bech32"
+        , "margin"
+        , "fixed_cost"
+        , "pledge"
+        , "meta_json"
+        , "pool_status"
+        , "retiring_epoch"
+        , "active_stake"
+        , "sigma"
+        , "block_count"
+        , "live_pledge"
+        , "live_stake"
+        , "live_delegators"
+        , "live_saturation"
+        ]
+
+queryLinkedPaymentAddresses :: [StakeAddress] -> ClientM [PaymentAddress]
+queryLinkedPaymentAddresses addrs = 
+    unLinkedPaymentAddresses <$> linkedPaymentAddressesApi select (NonEmptyStakeAddresses addrs)
+  where
+    select =
+      toText $ intercalate ","
+        [ "addresses"
         ]
 
 -------------------------------------------------

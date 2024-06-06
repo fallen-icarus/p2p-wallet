@@ -80,8 +80,9 @@ homeWidget model = do
             def `styleFocus` [bgColor customGray3, border 1 customBlue]
                 `styleFocusHover` [bgColor customGray2, border 1 customBlue]
       hstack
-        [ label $ fromString $ printf "%D ADA" $ toAda $
-            model ^. #homeModel % #selectedWallet % #lovelace
+        [ tooltip_ "Total Balance" [tooltipDelay 0] $
+            label $ fromString $ printf "%D ADA" $ toAda $
+              model ^. #homeModel % #selectedWallet % #lovelace
         , spacer
         , textDropdown_ 
               (toLensVL $ #homeModel % #selectedWallet) 
@@ -186,7 +187,7 @@ morePopup :: AppModel -> AppNode
 morePopup _ = do
   vstack
     [ tooltip_ "More" [tooltipDelay 0] $
-        button horizontalMoreIcon (HomeEvent ShowMorePopup)
+        button horizontalMoreIcon (HomeEvent ShowHomeMorePopup)
         `styleBasic`
           [ border 0 transparent
           , radius 20
@@ -271,4 +272,3 @@ confirmDeleteWidget model = do
         , button "Cancel" $ HomeEvent $ DeletePaymentWallet CancelDeletion
         ]
     ] `styleBasic` [bgColor customGray3, padding 20, width 700]
-

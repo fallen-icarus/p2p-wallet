@@ -1,6 +1,6 @@
-module P2PWallet.GUI.Widgets.Home.AddPaymentWallet 
+module P2PWallet.GUI.Widgets.Delegation.AddStakeWallet 
   (
-    addPaymentWalletWidget
+    addStakeWalletWidget
   ) where
 
 import Monomer
@@ -12,15 +12,15 @@ import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
-addPaymentWalletWidget :: AppModel -> AppNode
-addPaymentWalletWidget model = do
-  let isPairing = model ^. #homeModel % #newPaymentWallet % #pairing
+addStakeWalletWidget :: AppModel -> AppNode
+addStakeWalletWidget model = do
+  let isPairing = model ^. #delegationModel % #newStakeWallet % #pairing
       offStyle = def 
         `styleBasic` [ bgColor customGray1 , textColor white ]
         `styleHover` [ textColor lightGray ]
   centerWidget $ vstack
     [ hgrid
-        [ optionButton_ "Pair" True (toLensVL $ #homeModel % #newPaymentWallet % #pairing) 
+        [ optionButton_ "Pair" True (toLensVL $ #delegationModel % #newStakeWallet % #pairing) 
             [optionButtonOffStyle offStyle]
             `styleBasic` 
               [ bgColor customGray3
@@ -28,7 +28,7 @@ addPaymentWalletWidget model = do
               , radius 0
               , border 0 transparent
               ]
-        , optionButton_ "Watch" False (toLensVL $ #homeModel % #newPaymentWallet % #pairing)
+        , optionButton_ "Watch" False (toLensVL $ #delegationModel % #newStakeWallet % #pairing)
             [optionButtonOffStyle offStyle]
             `styleBasic` 
               [ bgColor customGray3
@@ -38,8 +38,8 @@ addPaymentWalletWidget model = do
               ]
         ]
     , zstack 
-        [ widgetIf isPairing $ centerWidgetH $ pairPaymentWidget model
-        , widgetIf (not isPairing) $ centerWidgetH $ watchPaymentWidget model
+        [ widgetIf isPairing $ centerWidgetH $ pairStakeWidget model
+        , widgetIf (not isPairing) $ centerWidgetH $ watchStakeWidget model
         ] `styleBasic` 
             [ bgColor customGray3
             , paddingT 0
@@ -51,12 +51,9 @@ addPaymentWalletWidget model = do
             ]
     ]
 
-pairPaymentWidget :: AppModel -> AppNode
-pairPaymentWidget model = do
-  let boolLens' = boolLens 0 (#homeModel % #newPaymentWallet % #stakeAddressIndex)
-      numLens' = maybeLens 0 (#homeModel % #newPaymentWallet % #stakeAddressIndex)
-
-      editFields = 
+pairStakeWidget :: AppModel -> AppNode
+pairStakeWidget _ = do
+  let editFields = 
         vstack_ [childSpacing]
           [ hstack
               [ label "What is a paired wallet?"
@@ -73,39 +70,16 @@ pairPaymentWidget model = do
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
               ]
           , hstack 
-              [ label "Payment Wallet Name:"
+              [ label "Stake Wallet Name:"
               , spacer
-              , textField_ (toLensVL $ #homeModel % #newPaymentWallet % #alias) [placeholder "Personal"] 
+              , textField_ (toLensVL $ #delegationModel % #newStakeWallet % #alias) 
+                  [placeholder "Personal Stake"]
                   `styleBasic` [width 400]
               ]
           , hstack 
-              [ label "Payment Key Address Index:"
+              [ label "Stake Key Address Index:"
               , spacer
-              , numericField (toLensVL $ #homeModel % #newPaymentWallet % #paymentAddressIndex)
-                  `styleBasic` [width 100]
-              , mainButton helpIcon (Alert paymentAddressIndexMsg)
-                  `styleBasic`
-                    [ border 0 transparent
-                    , radius 20
-                    , bgColor transparent
-                    , textColor customBlue
-                    , textMiddle
-                    , textFont "Remix"
-                    ]
-                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-              ]
-          , hstack 
-              [ label "Enable Staking"
-              , spacer
-              , checkbox_ (toLensVL boolLens') [checkboxSquare]
-              ]
-          , hstack
-              [ spacer_ [width 20]
-              , label cornerDownRightArrowIcon 
-                  `styleBasic` [paddingT 8, paddingR 5, textFont "Remix"]
-              , label "Staking Key Address Index:"
-              , spacer
-              , numericField (toLensVL numLens')
+              , numericField (toLensVL $ #delegationModel % #newStakeWallet % #stakeAddressIndex)
                   `styleBasic` [width 100]
               , mainButton helpIcon (Alert stakeAddressIndexMsg)
                   `styleBasic`
@@ -117,7 +91,7 @@ pairPaymentWidget model = do
                     , textFont "Remix"
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-              ] `nodeVisible` (model ^. boolLens')
+              ]
           ]
 
   vstack 
@@ -125,14 +99,14 @@ pairPaymentWidget model = do
     , spacer
     , hstack 
         [ filler
-        , mainButton "Pair" $ HomeEvent $ PairPaymentWallet ConfirmAdding
+        , mainButton "Pair" $ DelegationEvent $ PairStakeWallet ConfirmAdding
         , spacer
-        , button "Cancel" $ HomeEvent $ PairPaymentWallet CancelAdding
+        , button "Cancel" $ DelegationEvent $ PairStakeWallet CancelAdding
         ]
     ] `styleBasic` [bgColor transparent, padding 20]
 
-watchPaymentWidget :: AppModel -> AppNode
-watchPaymentWidget _ = do
+watchStakeWidget :: AppModel -> AppNode
+watchStakeWidget _ = do
   let editFields = 
         vstack_ [childSpacing]
           [ hstack
@@ -150,17 +124,17 @@ watchPaymentWidget _ = do
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
               ]
           , hstack 
-              [ label "Payment Wallet Name:"
+              [ label "Stake Wallet Name:"
               , spacer
               , textField_ 
-                  (toLensVL $ #homeModel % #newPaymentWallet % #alias) 
-                  [placeholder "Personal Watched"] 
+                  (toLensVL $ #delegationModel % #newStakeWallet % #alias) 
+                  [placeholder "Personal Stake Watched"] 
                   `styleBasic` [width 400]
               ]
           , hstack 
-              [ label "Payment Address:"
+              [ label "Stake Address:"
               , spacer
-              , textField (toLensVL $ #homeModel % #newPaymentWallet % #paymentAddress)
+              , textField (toLensVL $ #delegationModel % #newStakeWallet % #stakeAddress)
               ]
           ]
 
@@ -169,8 +143,8 @@ watchPaymentWidget _ = do
     , spacer
     , hstack 
         [ filler
-        , mainButton "Watch" $ HomeEvent $ WatchPaymentWallet ConfirmAdding
+        , mainButton "Watch" $ DelegationEvent $ WatchStakeWallet ConfirmAdding
         , spacer
-        , button "Cancel" $ HomeEvent $ WatchPaymentWallet CancelAdding
+        , button "Cancel" $ DelegationEvent $ WatchStakeWallet CancelAdding
         ]
     ] `styleBasic` [bgColor transparent, padding 20]

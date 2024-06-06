@@ -15,6 +15,11 @@ module P2PWallet.Actions.Database
   , deletePaymentWallet
   , addNewTransactions
   , loadTransactions
+  , getNextStakeId
+  , loadStakeWallets
+  , deleteStakeWallet
+  , addNewStakeWallet
+  , addNewRewards
   ) where
 
 import System.Directory qualified as Dir
@@ -25,6 +30,7 @@ import P2PWallet.Data.Core
 import P2PWallet.Data.Database
 import P2PWallet.Data.Profile
 import P2PWallet.Data.Transaction
+import P2PWallet.Data.StakeReward
 import P2PWallet.Data.Wallets
 
 import P2PWallet.Prelude
@@ -42,6 +48,8 @@ initializeDatabase dbFile = do
       -- Create the tables in the database.
       create @Profile dbFile
       create @PaymentWallet dbFile
+      create @StakeReward dbFile
+      create @StakeWallet dbFile
       create @Transaction dbFile
       return $ Right ()
 
@@ -107,6 +115,33 @@ getNextProfileId dbFile =
       , "LIMIT 1;"
       ]
 
+-- | Load the wallets for the specified profile.
+loadWallets :: FilePath -> Profile -> IO (Either Text Wallets)
+loadWallets dbFile Profile{..} = do
+  handle @SomeException (return . Left . ("Could not load wallets: " <>) . show) $ do
+    -- Load the payment wallets.
+    paymentWalletsWithoutTxHistories <- loadPaymentWallets dbFile profileId >>= fromRightOrAppError
+
+    -- Load the transaction histories for each payment wallet.
+    paymentWalletsWithTxHistories <- flip mapM paymentWalletsWithoutTxHistories $ 
+      \paymentWallet -> do
+        txs <- loadTransactions dbFile (paymentWallet ^. #paymentId) >>= fromRightOrAppError
+        return $ paymentWallet & #transactions .~ txs
+
+    -- Load the stake wallets.
+    stakeWalletsWithoutRewardHistory <- loadStakeWallets dbFile profileId >>= fromRightOrAppError
+
+    -- Load the reward histories for each stake wallet.
+    stakeWalletsWithRewardHistory <- flip mapM stakeWalletsWithoutRewardHistory $ 
+      \stakeWallet -> do
+        rewards <- loadRewards dbFile (stakeWallet ^. #stakeId) >>= fromRightOrAppError
+        return $ stakeWallet & #rewardHistory .~ rewards
+
+    return $ Right $ Wallets
+      { paymentWallets = paymentWalletsWithTxHistories
+      , stakeWallets = stakeWalletsWithRewardHistory
+      }
+
 -------------------------------------------------
 -- Payment Wallet
 -------------------------------------------------
@@ -130,22 +165,6 @@ addNewPaymentWallet dbFile paymentWallet = do
   handle @SomeException (return . Left . ("Failed to insert payment wallet: " <>) . show) $
     Right <$> insert @PaymentWallet dbFile paymentWallet
 
--- | Load the wallets for the specified profile.
-loadWallets :: FilePath -> Profile -> IO (Either Text Wallets)
-loadWallets dbFile Profile{..} = do
-  handle @SomeException (return . Left . ("Could not load wallets: " <>) . show) $ do
-    -- Load the payment wallets.
-    paymentWalletsWithoutTxHistories <- loadPaymentWallets dbFile profileId >>= fromRightOrAppError
-
-    -- Load the transaction histories for each payment wallet.
-    paymentWalletsWithTxHistories <- flip mapM paymentWalletsWithoutTxHistories $ 
-      \paymentWallet -> do
-        txs <- loadTransactions dbFile (paymentWallet ^. #paymentId) >>= fromRightOrAppError
-        return $ paymentWallet & #transactions .~ txs
-
-    return $ Right $ Wallets
-      { paymentWallets = paymentWalletsWithTxHistories
-      }
 
 -- | Load the payment wallets for the specified profile
 loadPaymentWallets :: FilePath -> ProfileId -> IO (Either Text [PaymentWallet])
@@ -200,3 +219,81 @@ loadTransactions dbFile (PaymentId paymentId) = do
       , "WHERE payment_id = " <> show paymentId
       , "ORDER BY block_height DESC;"
       ]
+
+-------------------------------------------------
+-- Stake Wallet
+-------------------------------------------------
+getNextStakeId :: FilePath -> IO (Either Text StakeId)
+getNextStakeId dbFile =
+    handle @SomeException (return . Left . ("Could not get next stake id: " <>) . show) $
+      -- If the result is the empty list, this is the first entry.
+      maybe (Right 0) (Right . StakeId . (+1) . Sqlite.fromOnly) . maybeHead <$> 
+        query dbFile stmt
+  where
+    stmt = Sqlite.Query $ mconcat $ intersperse " "
+      [ "SELECT stake_id FROM"
+      , tableName @StakeWallet
+      , "ORDER BY stake_id DESC"
+      , "LIMIT 1;"
+      ]
+
+-- | Load the stake wallets for the specified profile
+loadStakeWallets :: FilePath -> ProfileId -> IO (Either Text [StakeWallet])
+loadStakeWallets dbFile (ProfileId profileId) = do
+    handle @SomeException (return . Left . ("Could not load stake wallets : " <>) . show) $ do
+      Right <$> query dbFile queryStmt
+  where
+    queryStmt :: Query
+    queryStmt = Query $ unwords
+      [ "SELECT * FROM " <> tableName @StakeWallet
+      , "WHERE profile_id = " <> show profileId
+      , "ORDER BY stake_id ASC;"
+      ]
+
+-- | Add a new stake wallet to the database. This also updates stake wallets.
+addNewStakeWallet :: FilePath -> StakeWallet -> IO (Either Text ())
+addNewStakeWallet dbFile stakeWallet = do
+  handle @SomeException (return . Left . ("Failed to insert stake wallet: " <>) . show) $
+    Right <$> insert @StakeWallet dbFile stakeWallet
+
+deleteStakeWallet :: FilePath -> StakeId -> IO (Either Text ())
+deleteStakeWallet dbFile (StakeId stakeId) = 
+  handle @SomeException (return . Left . ("Failed to delete stake wallet: " <>) . show) $ do
+    delete dbFile deleteStakeWalletStmt
+    delete dbFile deleteRewardStmt
+    return $ Right ()
+  where
+    deleteStakeWalletStmt :: Query
+    deleteStakeWalletStmt = Query $ unwords
+      [ "DELETE FROM " <> tableName @StakeWallet
+      , "WHERE stake_id = " <> show stakeId
+      ]
+
+    deleteRewardStmt :: Query
+    deleteRewardStmt = Query $ unwords
+      [ "DELETE FROM " <> tableName @StakeReward
+      , "WHERE stake_id = " <> show stakeId
+      ]
+
+-------------------------------------------------
+-- Stake Rewards
+-------------------------------------------------
+-- | Add a new stake reward to the database.
+addNewRewards :: FilePath -> [StakeReward] -> IO (Either Text ())
+addNewRewards dbFile txs = do
+  handle @SomeException (return . Left . ("Failed to insert rewards: " <>) . show) $
+    fmap sequence_ $ mapM (fmap Right . insert @StakeReward dbFile) txs
+
+-- | Load the rewards for the specified stake wallet.
+loadRewards :: FilePath -> StakeId -> IO (Either Text [StakeReward])
+loadRewards dbFile (StakeId stakeId) = do
+    handle @SomeException (return . Left . ("Could not load rewards: " <>) . show) $ do
+      Right <$> query dbFile queryStmt
+  where
+    queryStmt :: Query
+    queryStmt = Query $ unwords
+      [ "SELECT * FROM " <> tableName @StakeReward
+      , "WHERE stake_id = " <> show stakeId
+      , "ORDER BY earned_epoch DESC;"
+      ]
+

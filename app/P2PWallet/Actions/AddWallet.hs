@@ -3,7 +3,9 @@
 module P2PWallet.Actions.AddWallet
   ( 
     pairPaymentWallet
+  , pairStakeWallet
   , watchPaymentWallet
+  , watchStakeWallet
   ) where
 
 import P2PWallet.Actions.ExportHwKey
@@ -65,13 +67,55 @@ pairPaymentWallet network Profile{profileId,accountIndex} paymentId NewPaymentWa
 
       fromRightOrAppError $ plutusToBech32 network $ Address paymentKeyHash mStakingKeyHash
 
+-- | Validate and then pair the new stake wallet.
+pairStakeWallet :: Network -> Profile -> StakeId -> NewStakeWallet -> IO StakeWallet
+pairStakeWallet network Profile{profileId,accountIndex} stakeId NewStakeWallet{..} = do
+    when (alias == "") $ throwIO $ AppError "Wallet name is empty."
+
+    sKeyPath <- 
+      fromJustOrAppError "Invalid stake address index." $ 
+        fmap (StakeKeyPath accountIndex) $ toAddressIndex stakeAddressIndex
+
+    stakeAddr <- genStakeAddress sKeyPath
+
+    return $ StakeWallet 
+      { network = network
+      , profileId = profileId
+      , stakeId = stakeId
+      , alias = alias
+      , stakeAddress = stakeAddr 
+      , stakeKeyPath = Just sKeyPath 
+      , registrationStatus = NotRegistered
+      , totalDelegation = 0
+      , utxoBalance = 0
+      , availableRewards = 0
+      , delegatedPool = Nothing
+      , rewardHistory = [] 
+      , linkedAddresses = []
+      }
+
+  where
+    genStakeAddress
+      :: DerivationPath 
+      -> IO StakeAddress
+    genStakeAddress stakeKey = do
+      stakeKeyCred <- PubKeyCredential <$> exportHwPubKeyHash stakeKey
+
+      -- Get the stake address. The payment credential does not matter so the stake key
+      -- is used for both.
+      (_,mStakeAddr) <- 
+        fromRightOrAppError $ plutusToBech32 network $
+          Address stakeKeyCred (Just $ StakingHash stakeKeyCred)
+
+      fromJustOrAppError "Failed to generate a bech32 stake address" mStakeAddr
+
 -------------------------------------------------
 -- Watching Wallets
 -------------------------------------------------
 -- | Validate and then watch the new wallet.
 watchPaymentWallet :: Network -> Profile -> PaymentId -> NewPaymentWallet -> IO PaymentWallet
 watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} = do
-    when (alias == "") $ throwIO $ AppError "Alias is empty."
+    when (alias == "") $ throwIO $ AppError "Wallet name is empty."
 
     -- Check if the paymentAddress is a valid bech32 payment address. If it is, convert
     -- it to `PlutusAddress` and then back again since `plutusToBech32` will also generate
@@ -97,3 +141,27 @@ watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} = d
     genAddresses :: Text -> Either Text (PaymentAddress, Maybe StakeAddress)
     genAddresses = 
       readPaymentAddress network >=> paymentAddressToPlutusAddress >=> plutusToBech32 network
+
+-- | Validate and then watch the new wallet.
+watchStakeWallet :: Network -> Profile -> StakeId -> NewStakeWallet -> IO StakeWallet
+watchStakeWallet network Profile {profileId} stakeId NewStakeWallet{..} = do
+    when (alias == "") $ throwIO $ AppError "Wallet name is empty."
+
+    -- Check if the stakeAddress is a valid bech32 stake address. 
+    stakeAddr <- fromRightOrAppError $ readStakeAddress network stakeAddress
+
+    return $ StakeWallet 
+      { network = network
+      , profileId = profileId
+      , stakeId = stakeId
+      , alias = alias
+      , stakeAddress = stakeAddr 
+      , stakeKeyPath = Nothing 
+      , registrationStatus = NotRegistered
+      , totalDelegation = 0
+      , utxoBalance = 0
+      , availableRewards = 0
+      , delegatedPool = Nothing
+      , rewardHistory = [] 
+      , linkedAddresses = []
+      }

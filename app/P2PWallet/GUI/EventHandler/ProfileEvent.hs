@@ -37,6 +37,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
                     & #scene .~ HomeScene
                     & #loadingWallets .~ False
                     & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead paymentWallets)
+                    & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead stakeWallets)
     -- , Task $ return $ SyncWallets StartSync
     ]
 

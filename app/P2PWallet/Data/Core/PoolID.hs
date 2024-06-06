@@ -11,18 +11,16 @@ module P2PWallet.Data.Core.PoolID where
 import Data.Aeson 
 import Prettyprinter (Pretty(..))
 
+import Database.SQLite.Simple.ToField (ToField(..))
+import Database.SQLite.Simple.FromField (FromField(..))
+
 import P2PWallet.Prelude
 
 newtype PoolID = PoolID { unPoolId :: Text }
-  deriving (Show,Eq,Ord)
+  deriving (Show)
+  deriving newtype (Eq,Ord,ToField,FromField,FromJSON,ToJSON)
 
 makeFieldLabelsNoPrefix ''PoolID
-
-instance ToJSON PoolID where
-  toJSON = toJSON . unPoolId
-
-instance FromJSON PoolID where
-  parseJSON = withText "PoolID" (return . PoolID)
 
 instance Pretty PoolID where
   pretty (PoolID addr) = pretty addr

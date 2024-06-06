@@ -7,11 +7,12 @@ import Monomer
 
 import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
-import P2PWallet.GUI.Widgets.Networks
-import P2PWallet.GUI.Widgets.Profiles
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.GUI.Widgets.Delegation
 import P2PWallet.GUI.Widgets.Home
 import P2PWallet.GUI.Widgets.MainMenu
+import P2PWallet.GUI.Widgets.Networks
+import P2PWallet.GUI.Widgets.Profiles
 import P2PWallet.GUI.Widgets.Settings
 import P2PWallet.MonomerOptics()
 import P2PWallet.Prelude
@@ -37,6 +38,7 @@ buildUI _ model = do
         , vstack
             [ settingsWidget model `nodeVisible` (SettingsScene == model ^. #scene)
             , homeWidget model `nodeVisible` (HomeScene == model ^. #scene)
+            , delegationWidget model `nodeVisible` (DelegationScene == model ^. #scene)
             ]
         ] `nodeVisible` (isJust $ model ^. #selectedProfile)
     , alertOverlay `nodeVisible` (isJust $ model ^. #alertMessage)

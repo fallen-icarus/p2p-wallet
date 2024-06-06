@@ -22,12 +22,14 @@ module P2PWallet.Data.AppModel
 
     -- * Re-exports
   , module P2PWallet.Data.AppModel.Common
+  , module P2PWallet.Data.AppModel.Delegation
   , module P2PWallet.Data.AppModel.Home
   ) where
 
 import Monomer qualified as Monomer
 
 import P2PWallet.Data.AppModel.Common
+import P2PWallet.Data.AppModel.Delegation
 import P2PWallet.Data.AppModel.Home
 import P2PWallet.Data.Core
 import P2PWallet.Data.Profile
@@ -42,6 +44,7 @@ data MainScene
   = NetworksScene
   | ProfilesScene
   | HomeScene
+  | DelegationScene
   | SettingsScene
   deriving (Show,Eq)
 
@@ -66,6 +69,8 @@ data AppEvent
   | ProfileEvent ProfileEvent
   -- | An event for the Home page.
   | HomeEvent HomeEvent 
+  -- | An event for the Delegation page.
+  | DelegationEvent DelegationEvent
   -- | Sync the currently tracked wallets.
   | SyncWallets (SyncEvent Wallets)
   -- | Update the current date.
@@ -113,6 +118,8 @@ data AppModel = AppModel
   , deletingProfile :: Bool
   -- | The model for the home scene.
   , homeModel :: HomeModel
+  -- | The model for the delegation scene.
+  , delegationModel :: DelegationModel
   -- | The known wallets for the selected profile.
   , knownWallets :: Wallets
   -- | The app is waiting for the hardware wallet.
@@ -141,6 +148,7 @@ instance Default AppModel where
     , addingProfile = False
     , deletingProfile = False
     , homeModel = def
+    , delegationModel = def
     , knownWallets = def
     , waitingOnDevice = False
     , syncingWallets = False

@@ -30,10 +30,16 @@ syncWallets databaseFile network ws@Wallets{..} = do
     addNewPaymentWallet databaseFile paymentWallet >>= fromRightOrAppError
     addNewTransactions databaseFile (paymentWallet ^. #transactions) >>= fromRightOrAppError
 
-  -- updatedStakeWallets <- 
-  --   pooledMapConcurrently (runQueryStakeWalletInfo network') _stakeWallets >>= 
-  --     mapM fromRightOrAppError
+  updatedStakeWallets <- 
+    pooledMapConcurrently (runQueryStakeWalletInfo network) stakeWallets >>= 
+      -- Throw an error is syncing failed.
+      mapM fromRightOrAppError
+
+  -- Save the new stake wallet states and throw an error if there is an issue saving.
+  flip mapM_ updatedStakeWallets $ \stakeWallet -> do
+    addNewStakeWallet databaseFile stakeWallet >>= fromRightOrAppError
+    addNewRewards databaseFile (stakeWallet ^. #rewardHistory) >>= fromRightOrAppError
 
   return $ 
     ws & #paymentWallets .~ updatedPaymentWallets
-       -- & #stakeWallets .~ updatedStakeWallets
+       & #stakeWallets .~ updatedStakeWallets

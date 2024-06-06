@@ -4,10 +4,11 @@ module P2PWallet.GUI.Widgets.Home.About
   ) where
 
 import Monomer
-import Prettyprinter (pretty)
+import Prettyprinter (pretty,tupled)
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
+import P2PWallet.Data.Wallets
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Plutus
@@ -34,10 +35,14 @@ aboutWidget model = do
 addressInfoWidget :: AppModel -> AppNode
 addressInfoWidget model = do
   let wallet = model ^. #homeModel % #selectedWallet
-      hasStaking = isJust $ wallet ^. #stakeAddress
+      mStakeAddress = wallet ^. #stakeAddress
+      knownStakeWallets = model ^. #knownWallets % #stakeWallets
+      hasStaking = isJust mStakeAddress
       addrInfo = inspectBech32Address $ wallet ^. #paymentAddress % #unPaymentAddress
       spendingKeyHash = fromMaybe "" $ either (const Nothing) infoSpendingKeyHash addrInfo
       stakeKeyHash = either (const Nothing) infoStakeKeyHash addrInfo
+      mTrackedStakeWallet = flip (maybe Nothing) mStakeAddress $ 
+        \addr -> find (\StakeWallet{stakeAddress} -> addr == stakeAddress) knownStakeWallets
 
   vstack 
     [ centerWidgetH $ label "Address Info" 
@@ -69,6 +74,17 @@ addressInfoWidget model = do
         [ hstack
             [ spacer_ [width 10]
             , label "Stake Credential" `styleBasic` [textColor lightGray, textFont "Italics"]
+            , spacer
+            , widgetMaybe mTrackedStakeWallet $ \StakeWallet{alias} ->
+                label (show $ tupled [pretty alias])
+                  `styleBasic`
+                    [ padding 0
+                    , radius 5
+                    , textMiddle
+                    , border 0 transparent
+                    , textColor lightGray
+                    , bgColor transparent
+                    ]
             ] `styleBasic` [padding 5]
         , hstack
             [ spacer_ [width 20]
@@ -80,10 +96,10 @@ addressInfoWidget model = do
                 fromMaybe "" $ show . PubKeyHash . BuiltinByteString <$> stakeKeyHash
             ] `styleBasic` [padding 5]
               `nodeVisible` hasStaking
-        , hstack
+        , widgetMaybe (wallet ^. #stakeKeyPath) $ \keyPath -> hstack
             [ spacer_ [width 20]
-            , copyableLabelFor "Derivation Path:" $ fromMaybe "" $
-                show . pretty . showDerivationPath <$> wallet ^. #stakeKeyPath
+            , copyableLabelFor "Derivation Path:" $
+                show $ pretty $ showDerivationPath keyPath
             ] `styleBasic` [padding 5]
               `nodeVisible` hasStaking
         ]

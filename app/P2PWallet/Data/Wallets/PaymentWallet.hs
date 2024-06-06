@@ -200,7 +200,7 @@ instance Creatable PaymentWallet where
         , "utxos BLOB"
         , "lovelace INTEGER NOT NULL"
         , "native_assets BLOB"
-        , "UNIQUE(network,profile_id,alias)"
+        , "UNIQUE(network,profile_id,payment_id,alias)"
         ]
     , ");"
     ]

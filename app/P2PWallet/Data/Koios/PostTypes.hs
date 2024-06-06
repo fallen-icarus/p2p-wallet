@@ -82,6 +82,16 @@ instance ToJSON StakeAddresses where
     object [ "_stake_addresses" .= map unStakeAddress as 
            ]
 
+-- | A newtype for submitting a list of stake addresses to get the linked payment addresses.
+newtype NonEmptyStakeAddresses = NonEmptyStakeAddresses [StakeAddress] 
+  deriving (Show)
+
+instance ToJSON NonEmptyStakeAddresses where
+  toJSON (NonEmptyStakeAddresses as) = 
+    object [ "_stake_addresses" .= map unStakeAddress as 
+           , "_empty" .= False
+           ]
+
 -------------------------------------------------
 -- Transactions
 -------------------------------------------------
@@ -120,6 +130,3 @@ instance FromJSON Pools where
 
 instance ToJSON Pools where
   toJSON (Pools pools) = object [ "_pool_bech32_ids" .= pools ]
-
-instance Semigroup Pools where
-  (Pools !p1) <> (Pools !p2) = Pools $ p1 <> p2

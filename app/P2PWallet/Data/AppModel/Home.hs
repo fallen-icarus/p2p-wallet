@@ -16,7 +16,7 @@ module P2PWallet.Data.AppModel.Home where
 import Data.Time.Format qualified as Time
 
 import P2PWallet.Data.AppModel.Common
-import P2PWallet.Data.Wallets.PaymentWallet
+import P2PWallet.Data.Wallets
 import P2PWallet.Data.Transaction
 import P2PWallet.Prelude
 
@@ -73,12 +73,14 @@ data HomeEvent
   | PairPaymentWallet (AddEvent PaymentWallet)
   -- | Watch a new `PaymentWallet`. It can only be done from the `HomeAbout` subscene.
   | WatchPaymentWallet (AddEvent PaymentWallet)
+  -- | Add the corresponding stake wallet to the database.
+  | AddCorrespondingStakeWallet StakeWallet
   -- | Change a payment wallet name.
   | ChangePaymentWalletName (AddEvent Text)
   -- | Delete a payment wallet.
   | DeletePaymentWallet (DeleteWithConfirmationEvent PaymentWallet)
   -- | Open the more popup widget
-  | ShowMorePopup
+  | ShowHomeMorePopup
   -- | Reset UTxO Filters.
   | ResetUTxOFilters
   -- | Reset Asset Filters.
@@ -213,7 +215,7 @@ data HomeModel = HomeModel
   , deletingWallet :: Bool
   -- | Whether to show the more popup.
   , showMorePopup :: Bool
-  -- | The information for the new `PaymentWallet` being paired.
+  -- | The information for the new `PaymentWallet` being added.
   , newPaymentWallet :: NewPaymentWallet
   -- | Whether to show the filter widget for UTxOs.
   , showUTxOFilter :: Bool
