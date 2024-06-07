@@ -32,6 +32,7 @@ import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.Delegation
 import P2PWallet.Data.AppModel.Home
 import P2PWallet.Data.Core
+import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Profile
 import P2PWallet.Data.Wallets
 import P2PWallet.Prelude
@@ -73,6 +74,8 @@ data AppEvent
   | DelegationEvent DelegationEvent
   -- | Sync the currently tracked wallets.
   | SyncWallets (SyncEvent Wallets)
+  -- | Sync all registered pools.
+  | SyncRegisteredPools (SyncEvent [Pool])
   -- | Update the current date.
   | UpdateCurrentDate Day
 
@@ -126,6 +129,8 @@ data AppModel = AppModel
   , waitingOnDevice :: Bool
   -- | The app is syncing the wallets.
   , syncingWallets :: Bool
+  -- | The app is syncing the pools.
+  , syncingPools :: Bool
   -- | The app is loading the wallets.
   , loadingWallets :: Bool
   -- | Useful when the user must specify a one-time use input such as a filepath or new alias.
@@ -152,6 +157,7 @@ instance Default AppModel where
     , knownWallets = def
     , waitingOnDevice = False
     , syncingWallets = False
+    , syncingPools = False
     , loadingWallets = False
     , extraTextField = ""
     , forceRedraw = False

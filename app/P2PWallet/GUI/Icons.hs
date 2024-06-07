@@ -92,3 +92,12 @@ deregisterIcon = remixCloseCircleLine
 
 registerIcon :: Text
 registerIcon = remixFileList3Line
+
+ascendingSortIcon :: Text
+ascendingSortIcon = remixArrowUpSFill
+
+descendingSortIcon :: Text
+descendingSortIcon = remixArrowDownSFill
+
+circleCheckboxFillIcon :: Text
+circleCheckboxFillIcon = remixCheckboxCircleFill

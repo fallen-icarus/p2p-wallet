@@ -52,7 +52,7 @@ executable p2p-wallet
       P2PWallet.Actions.Database
       -- P2PWallet.Actions.ExportTxBody
       P2PWallet.Actions.ExportHwKey
-      -- P2PWallet.Actions.LookupPools
+      P2PWallet.Actions.LookupPools
       P2PWallet.Actions.Query.Koios
       P2PWallet.Actions.Utils
       -- P2PWallet.Actions.SignTx
@@ -110,7 +110,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Delegation
       -- P2PWallet.GUI.Widgets.Delegation.Details
       P2PWallet.GUI.Widgets.Delegation.AddStakeWallet
-      -- P2PWallet.GUI.Widgets.Delegation.RegisteredPools
+      P2PWallet.GUI.Widgets.Delegation.PoolPicker
       -- P2PWallet.GUI.Widgets.Delegation.RewardHistory
       -- P2PWallet.GUI.Widgets.Delegation.Summary
       -- P2PWallet.GUI.Widgets.Delegation.WatchStakeWallet

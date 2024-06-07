@@ -18,6 +18,7 @@ import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Delegation.AddStakeWallet
+import P2PWallet.GUI.Widgets.Delegation.PoolPicker
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.Prelude
@@ -26,12 +27,19 @@ delegationWidget :: AppModel -> AppNode
 delegationWidget model = do
     zstack
       [ mainWidget model 
-          `nodeVisible` (hasStakeWallets && not isAdding && not isEditing && not isDeleting)
+          `nodeVisible` and
+            [ hasStakeWallets
+            , not isAdding
+            , not isEditing
+            , not isDeleting
+            ]
       , addFirstWalletWidget 
           `nodeVisible` (not isAdding && not hasStakeWallets && not isEditing && not isDeleting)
       , widgetIf isAdding $ addStakeWalletWidget model
       , widgetIf isEditing $ editStakeWalletWidget model
       , widgetIf isDeleting $ confirmDeleteWidget model
+      , widgetIf (model ^. #delegationModel % #showPoolPicker) $ poolPickerWidget model
+      , widgetIf (model ^. #delegationModel % #showPoolFilter) $ poolFilterWidget model
       ]
   where
     hasStakeWallets :: Bool
@@ -126,12 +134,11 @@ mainWidget model =
                 label "There are no active linked payment addresses."
                   `styleBasic` [textSize 12, textColor lightGray]
           , widgetIf(linkedAddresses /= []) $
-              vscroll_ [scrollOverlay, wheelRate 50, thumbWidth 3] $ vstack_ [childSpacing_ 1] $ 
-                flip map linkedAddresses $ \addr ->
-                  centerWidgetH $ copyableLabelSelf 12 lightGray (toText addr)
-                    `styleBasic` [radius 20, padding 5, bgColor customGray4]
-                  -- box (copyableLabelSelf 12 lightGray (toText addr))
-                  --   `styleBasic` [radius 20, padding 5, bgColor customGray4, textLeft]
+              vscroll_ [scrollOverlay, wheelRate 50, barWidth 3, thumbWidth 3] $ 
+                vstack_ [childSpacing_ 1] $ 
+                  flip map linkedAddresses $ \addr ->
+                    centerWidgetH $ copyableLabelSelf 12 lightGray (toText addr)
+                      `styleBasic` [radius 20, padding 5, bgColor customGray4]
           ] `styleBasic` [radius 15, bgColor customGray2, padding 10]
       ] `styleBasic` [padding 10]
   where
@@ -173,7 +180,7 @@ mainWidget model =
             ] `styleBasic` [padding 5, bgColor customGray4, radiusTL 5, radiusTR 5]
         , spacer_ [width 1]
         , vscroll_ [scrollOverlay, wheelRate 50, thumbWidth 3] $ vstack_ [childSpacing_ 1] $ 
-            flip map (take 20 rewardHistory) $ \StakeReward{..} ->
+            flip map (take 50 rewardHistory) $ \StakeReward{..} ->
               hgrid_ [childSpacing]
                 [ centerWidgetH $ label (show spendableEpoch) 
                     `styleBasic` [textSize 12, textColor lightGray]
@@ -185,20 +192,21 @@ mainWidget model =
 
     changeDelegationButton :: AppNode
     changeDelegationButton = do
-      tooltip_ "Change Delegation" [tooltipDelay 0] $ box_ [onClick AppInit] $ 
-        label "Change"
-          `styleBasic`
-            [ textSize 10
-            , bgColor customBlue
-            , padding 3
-            , textMiddle
-            , radius 10
-            , textColor lightGray
-            ]
-          `styleHover`
-            [ bgColor customGray1 
-            , cursorIcon CursorHand
-            ]
+      tooltip_ "Change Delegation" [tooltipDelay 0] $ 
+        box_ [onClick $ DelegationEvent OpenPoolPicker] $ 
+          label "Change"
+            `styleBasic`
+              [ textSize 10
+              , bgColor customBlue
+              , padding 3
+              , textMiddle
+              , radius 10
+              , textColor lightGray
+              ]
+            `styleHover`
+              [ bgColor customGray1 
+              , cursorIcon CursorHand
+              ]
 
     poolInfoWidget :: Pool -> AppNode
     poolInfoWidget Pool{..} = do
@@ -257,7 +265,7 @@ mainWidget model =
                     `styleBasic` [ textColor customRed, textSize 12 ]
                 ]
           , spacer
-          , centerWidgetH $ mainButton "Delegate" AppInit
+          , centerWidgetH $ mainButton "Delegate" $ DelegationEvent OpenPoolPicker
           ]
 
     withdrawButton :: AppNode
