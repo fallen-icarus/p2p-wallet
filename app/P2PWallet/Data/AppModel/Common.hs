@@ -44,3 +44,20 @@ data SyncEvent a
   = StartSync
   | SyncResults a
   deriving (Show,Eq)
+
+-------------------------------------------------
+-- Sorting Directions
+-------------------------------------------------
+-- | Sorting Direction.
+data SortDirection
+  = SortAscending
+  | SortDescending
+  deriving (Show,Eq,Enum)
+
+displaySortDirection :: SortDirection -> Text
+displaySortDirection SortAscending = "Ascending"
+displaySortDirection SortDescending = "Descending"
+
+-- | A list of possible sorting directions. This is useful for dropdown menus.
+sortingDirections :: [SortDirection]
+sortingDirections = enumFrom SortAscending

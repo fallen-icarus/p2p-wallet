@@ -8,6 +8,7 @@ module P2PWallet.GUI.EventHandler
 import Monomer
 
 import P2PWallet.Actions.Database
+import P2PWallet.Actions.LookupPools
 import P2PWallet.Actions.SyncWallets
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
@@ -55,6 +56,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
     [ Model $ model & #alertMessage .~ Just msg 
                     & #waitingOnDevice .~ False
                     & #syncingWallets .~ False
+                    & #syncingPools .~ False
                     & #loadingWallets .~ False
     ]
   CloseAlertMessage -> 
@@ -127,6 +129,24 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
         , Task $
             runActionOrAlert UpdateCurrentDate $ getCurrentDay (config ^. #timeZone)
         ]
+
+  -----------------------------------------------
+  -- Syncing Registered Pools
+  -----------------------------------------------
+  SyncRegisteredPools modal -> case modal of
+    StartSync -> 
+      -- Set `syncing` to True to let users know syncing is happening.
+      [ Model $ model & #syncingPools .~ True 
+      , Task $ do
+          let network = config ^. #network
+          runActionOrAlert (SyncRegisteredPools . SyncResults) $ lookupRegisteredPools network
+      ]
+    SyncResults resp -> 
+      -- Disable `syncing` and update the list of pools. 
+      [ Model $ 
+          model & #syncingPools .~ False
+                & #delegationModel % #registeredPools .~ resp
+      ]
 
   -----------------------------------------------
   -- Updating the current date

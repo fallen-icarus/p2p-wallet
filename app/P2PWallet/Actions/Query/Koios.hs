@@ -12,14 +12,24 @@ module P2PWallet.Actions.Query.Koios
   , runEvaluateTx
   , runQueryPaymentWalletInfo
   , runQueryStakeWalletInfo
+  , runQueryAllRegisteredPools
   ) where
 
-import Servant.Client (client, ClientM, runClientM, Scheme(Https), BaseUrl(..), mkClientEnv)
+import Servant.Client 
+  ( client
+  , ClientM
+  , runClientM
+  , Scheme(Https)
+  , BaseUrl(..)
+  , mkClientEnv
+  )
 import Servant.Client qualified as Client
 import Servant.API ((:<|>)(..), JSON, Post, Get, (:>), ReqBody, Required, QueryParam', QueryParam)
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Data.Aeson 
+import Data.Text qualified as Text
+import UnliftIO.Async (mapConcurrently)
 
 import P2PWallet.Data.Core
 import P2PWallet.Data.Koios.AddressUTxO
@@ -32,7 +42,6 @@ import P2PWallet.Data.Koios.Transaction
 import P2PWallet.Data.Transaction qualified as P2P
 import P2PWallet.Data.StakeReward qualified as P2P
 import P2PWallet.Data.Wallets
-import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -41,6 +50,17 @@ import P2PWallet.Prelude
 toNetworkURL :: Network -> String
 toNetworkURL Mainnet = "api.koios.rest"
 toNetworkURL Testnet = "preprod.koios.rest"
+
+-- | Koios occassionally takes too long to respond. When this happens, the query should just
+-- be retried.
+handleTimeoutError :: IO (Either Client.ClientError a) -> IO (Either Client.ClientError a)
+handleTimeoutError query = query >>= \case
+    Left err -> if isTimeoutError err then handleTimeoutError query else return $ Left err
+    Right res -> return $ Right res
+  where
+    isTimeoutError :: Client.ClientError -> Bool
+    isTimeoutError err =
+      "ResponseTimeout)" == Text.takeEnd 16 (show err)
 
 runSubmitTx :: Network -> FilePath -> IO (Either Text Value)
 runSubmitTx network txFile = do
@@ -89,7 +109,12 @@ runQueryPaymentWalletInfo network wallet@PaymentWallet{paymentId,profileId} = do
                  & #transactions %~ mappend 
                      (sortOn (negate . view #blockTime) $ map (P2P.toTransaction profileId paymentId) txs)
                  & #nativeAssets .~ as
-      Left err -> return $ Left $ show err
+      Left err -> do
+        let errText = show @Text err
+        if "ResponseTimeout)" == Text.takeEnd 16 errText then
+          return $ Left "Server timed out"
+        else
+          return $ Left errText
 
 runQueryStakeWalletInfo :: Network -> StakeWallet -> IO (Either Text StakeWallet)
 runQueryStakeWalletInfo network' wallet@StakeWallet{stakeId,profileId} = do
@@ -114,6 +139,26 @@ runQueryStakeWalletInfo network' wallet@StakeWallet{stakeId,profileId} = do
     Right _ -> do
       return $ Left "Stake wallet query returned an unexpected number of arguments."
     Left err -> return $ Left $ show err
+
+runQueryAllRegisteredPools :: Network -> IO (Either Text [Pool])
+runQueryAllRegisteredPools network = do
+    manager' <- newManager tlsManagerSettings
+    let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+
+    -- Get the list of pool ids. Group them 70 at a time so that the next query is not too large.
+    poolIds <- handleTimeoutError $ fmap (groupInto 70) <$> runClientM (queryPoolIds 0 []) env
+
+    -- If the previous query returned an error, just return the error. Otherwise, try to get
+    -- the information for each pool.
+    info <- 
+      flip (either (return . Left)) poolIds $ 
+        fmap sequence . mapConcurrently
+          (\ids -> handleTimeoutError $ 
+            runClientM (queryPoolInfo (Just "not.is.null") (Just "not.is.null") $ Pools ids) env)
+
+    case info of
+      Right rs -> return $ Right $ concat rs
+      Left err -> return $ Left $ show err
 
 -------------------------------------------------
 -- Low-Level API
@@ -172,6 +217,12 @@ type KoiosApi
      :> ReqBody '[JSON] NonEmptyStakeAddresses
      :> Post '[JSON] LinkedPaymentAddresses
 
+  :<|> "pool_list"
+     :> QueryParam' '[Required] "select" Text
+     :> QueryParam' '[Required] "offset" Int
+     :> QueryParam' '[Required] "pool_status" Text
+     :> Get '[JSON] Pools
+
 submitApi
   :<|> evaluateApi 
   :<|> addressUTxOsApi 
@@ -182,6 +233,7 @@ submitApi
   :<|> stakeRewardsApi
   :<|> poolInfoApi
   :<|> linkedPaymentAddressesApi
+  :<|> poolListApi
   = client (Proxy :: Proxy KoiosApi)
 
 queryPaymentWalletInfo 
@@ -393,6 +445,16 @@ queryLinkedPaymentAddresses addrs =
       toText $ intercalate ","
         [ "addresses"
         ]
+
+queryPoolIds :: Int -> [PoolID] -> ClientM [PoolID]
+queryPoolIds offset !acc = do
+  (Pools poolIds) <- poolListApi "pool_id_bech32,pool_status" offset "eq.registered"
+  if length poolIds == 1000 then
+    -- Query again since there may be more.
+    queryPoolIds (offset + 1000) $ acc <> poolIds
+  else
+    -- That should be the last of the results.
+    return $ acc <> poolIds
 
 -------------------------------------------------
 -- Helper Functions

@@ -16,16 +16,28 @@ import P2PWallet.Prelude
 handleDelegationEvent :: AppModel -> DelegationEvent -> [AppEventResponse AppModel AppEvent]
 handleDelegationEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
-  -- Changing Scenes
-  -----------------------------------------------
-  ChangeDelegationScene newScene -> 
-    [ Model $ model & #delegationModel % #scene .~ newScene ]
-
-  -----------------------------------------------
   -- Open the More Popup
   -----------------------------------------------
   ShowDelegationMorePopup -> 
     [ Model $ model & #delegationModel % #showMorePopup .~ True ]
+
+  -----------------------------------------------
+  -- Change the pool sort method
+  -----------------------------------------------
+  ChangePoolPickerSortMethod method -> 
+    [ Model $ model & #delegationModel % #poolFilterModel % #sortMethod .~ method ]
+
+  -----------------------------------------------
+  -- Open the Pool Picker Widget
+  -----------------------------------------------
+  OpenPoolPicker ->
+    [ Model $ model & #delegationModel % #showPoolPicker .~ True
+    , Task $ 
+        if model ^. #delegationModel % #registeredPools == [] then
+          return $ SyncRegisteredPools StartSync
+        else 
+          return AppInit
+    ]
 
   -----------------------------------------------
   -- Pairing Wallets
@@ -198,3 +210,11 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
                          & #knownWallets % #stakeWallets .~ newWallets
                          & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead newWallets)
          ]
+
+  -----------------------------------------------
+  -- Reset Filters
+  -----------------------------------------------
+  ResetPoolFilters -> 
+    [ Model $ model & #delegationModel % #poolFilterModel .~ def
+                    & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
