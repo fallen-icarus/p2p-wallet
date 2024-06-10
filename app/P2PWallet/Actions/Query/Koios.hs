@@ -379,7 +379,7 @@ queryAddressTransactions addrs lastBlock =
         , "invalid_before"
         , "invalid_after"
         , "collateral_inputs"
-        , "collateral_output"
+        -- , "collateral_output"
         , "reference_inputs"
         , "inputs"
         , "outputs"

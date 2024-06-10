@@ -152,7 +152,7 @@ data Transaction = Transaction
   , invalidBefore :: Maybe Text
   , invalidAfter :: Maybe Text
   , collateralInputs :: [TransactionUTxO]
-  , collateralOutput :: Maybe TransactionUTxO
+  -- , collateralOutput :: Maybe TransactionUTxO
   , referenceInputs :: [TransactionUTxO]
   , inputs :: [TransactionUTxO]
   , outputs :: [TransactionUTxO]
@@ -178,7 +178,7 @@ instance FromJSON Transaction where
         <*> o .: "invalid_before"
         <*> o .: "invalid_after"
         <*> o .: "collateral_inputs"
-        <*> o .: "collateral_output"
+        -- <*> o .: "collateral_output"
         <*> o .: "reference_inputs"
         <*> o .: "inputs"
         <*> o .: "outputs"

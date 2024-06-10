@@ -159,10 +159,13 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
       , spacer
       , hstack
           [ filler
-          , pageButton "Previous" previousPage
-              `nodeEnabled` (previousPage /= -1)
+          , let shouldBeEnabled = previousPage /= -1 in 
+              pageButton "Previous" previousPage (not shouldBeEnabled)
+                `nodeEnabled` shouldBeEnabled
           , spacer_ [width 3]
-          , pageButton "Next" nextPage
+          , let shouldBeEnabled = actualSampleSize == poolFilterModel ^. #sampleSize in
+              pageButton "Next" nextPage (not shouldBeEnabled)
+                `nodeEnabled` shouldBeEnabled
           ]
       ] `styleBasic`
           [ bgColor customGray2 
@@ -180,10 +183,10 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
     nextPage :: Int
     nextPage = (poolFilterModel ^. #currentPage) + 1
 
-    pageButton :: Text -> Int -> AppNode
-    pageButton caption pageNum = do
+    pageButton :: Text -> Int -> Bool -> AppNode
+    pageButton caption pageNum isDisabled = do
       let targetColor
-            | pageNum == -1 = darkGray
+            | isDisabled = darkGray
             | otherwise = customBlue
           offStyle = def 
             `styleBasic`
@@ -259,6 +262,9 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
            $ sorter 
            $ filterer 
            $ searchFilter registeredPools
+
+    actualSampleSize :: Int
+    actualSampleSize = length sample
 
     sortButton :: Text -> PoolSortMethod -> AppNode
     sortButton icon method = do

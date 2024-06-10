@@ -115,8 +115,8 @@ data Transaction = Transaction
   , invalidAfter :: Maybe Text
   , collateralInputs :: [TransactionUTxO]
   , showCollateralInputs :: Bool
-  , collateralOutput :: Maybe TransactionUTxO
-  , showCollateralOutput :: Bool
+  -- , collateralOutput :: Maybe TransactionUTxO
+  -- , showCollateralOutput :: Bool
   , referenceInputs :: [TransactionUTxO]
   , showReferenceInputs :: Bool
   , inputs :: [TransactionUTxO]
@@ -145,7 +145,7 @@ instance FromRow Transaction where
     invalidBefore <- field
     invalidAfter <- field
     collateralInputs <- fromMaybe mzero . decode <$> field
-    collateralOutput <- fromMaybe mzero . decode <$> field
+    -- collateralOutput <- fromMaybe mzero . decode <$> field
     referenceInputs <- fromMaybe mzero . decode <$> field
     inputs <- fromMaybe mzero . decode <$> field
     outputs <- fromMaybe mzero . decode <$> field
@@ -161,12 +161,12 @@ instance FromRow Transaction where
       , invalidBefore = invalidBefore
       , invalidAfter = invalidAfter
       , collateralInputs = collateralInputs
-      , collateralOutput = collateralOutput
+      -- , collateralOutput = collateralOutput
       , referenceInputs = referenceInputs
       , inputs = inputs
       , outputs = outputs
       , showCollateralInputs = False
-      , showCollateralOutput = False
+      -- , showCollateralOutput = False
       , showReferenceInputs = False
       , showInputs = False
       , showOutputs = False
@@ -185,7 +185,7 @@ instance ToRow Transaction where
     , toField invalidBefore
     , toField invalidAfter
     , toField $ encode collateralInputs
-    , toField $ encode collateralOutput
+    -- , toField $ encode collateralOutput
     , toField $ encode referenceInputs
     , toField $ encode inputs
     , toField $ encode outputs
@@ -210,7 +210,7 @@ instance Creatable Transaction where
         , "invalid_before TEXT"
         , "invalid_after TEXT"
         , "collateral_inputs BLOB"
-        , "collateral_output BLOB"
+        -- , "collateral_output BLOB"
         , "reference_inputs BLOB"
         , "inputs BLOB"
         , "outputs BLOB"
@@ -234,13 +234,13 @@ instance Insertable Transaction where
         , "invalid_before"
         , "invalid_after"
         , "collateral_inputs"
-        , "collateral_output"
+        -- , "collateral_output"
         , "reference_inputs"
         , "inputs"
         , "outputs"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 -- | Convert a Koios Transaction to a P2PWallet Transaction.
@@ -257,12 +257,12 @@ toTransaction profileId paymentId Koios.Transaction{..} = Transaction
   , invalidBefore = invalidBefore
   , invalidAfter = invalidAfter
   , collateralInputs = map toTransactionUTxO collateralInputs
-  , collateralOutput = fmap toTransactionUTxO collateralOutput
+  -- , collateralOutput = fmap toTransactionUTxO collateralOutput
   , referenceInputs = map toTransactionUTxO referenceInputs
   , inputs = map toTransactionUTxO inputs
   , outputs = map toTransactionUTxO outputs
   , showCollateralInputs = False
-  , showCollateralOutput = False
+  -- , showCollateralOutput = False
   , showReferenceInputs = False
   , showInputs = False
   , showOutputs = False
@@ -278,12 +278,12 @@ toggleShow finalLens = lens getToggleShow setToggleShow
     setToggleShow :: Maybe Transaction -> Bool -> Maybe Transaction
     setToggleShow maybeTx b = fmap (set finalLens b) maybeTx
 
-collateralOutputLens :: Lens' Transaction [TransactionUTxO]
-collateralOutputLens = lens getOutput setOutput
-  where
-    getOutput :: Transaction -> [TransactionUTxO]
-    getOutput = maybe [] (:[]) . view #collateralOutput
-
-    setOutput :: Transaction -> [TransactionUTxO] -> Transaction
-    setOutput tx output = tx & #collateralOutput .~ maybeHead output
+-- collateralOutputLens :: Lens' Transaction [TransactionUTxO]
+-- collateralOutputLens = lens getOutput setOutput
+--   where
+--     getOutput :: Transaction -> [TransactionUTxO]
+--     getOutput = maybe [] (:[]) . view #collateralOutput
+--
+--     setOutput :: Transaction -> [TransactionUTxO] -> Transaction
+--     setOutput tx output = tx & #collateralOutput .~ maybeHead output
 
