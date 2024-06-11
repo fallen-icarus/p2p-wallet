@@ -35,7 +35,7 @@ settingsWidget model = do
             , flip styleBasic [textSize 18] $ 
                 label $ fromMaybe "" $ model ^? #selectedProfile % _Just % #alias
             , tooltip_ "Change Profile Name" [tooltipDelay 0] $
-                button editIcon (ProfileEvent $ ChangeProfileName StartAdding)
+                button editIcon (ProfileEvent $ ChangeProfileName $ StartAdding Nothing)
                   `styleBasic`
                     [ textFont "Remix"
                     , padding 0
@@ -47,7 +47,7 @@ settingsWidget model = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             , tooltip_ "Delete Profile" [tooltipDelay 0] $
-                button deleteIcon (ProfileEvent $ DeleteProfile GetDeleteConfirmation)
+                button deleteIcon (ProfileEvent $ DeleteProfile $ GetDeleteConfirmation Nothing)
                   `styleBasic`
                     [ textFont "Remix"
                     , padding 0
@@ -79,9 +79,9 @@ confirmDeleteWidget model = do
         ]
     , hstack 
         [ filler
-        , mainButton "Confirm" $ ProfileEvent $ DeleteProfile ConfirmDeletion
-        , spacer
         , button "Cancel" $ ProfileEvent $ DeleteProfile CancelDeletion
+        , spacer
+        , mainButton "Confirm" $ ProfileEvent $ DeleteProfile ConfirmDeletion
         ]
     ] `styleBasic` [bgColor customGray3, padding 20, width 700]
 
@@ -99,8 +99,8 @@ editProfileWidget _ = do
     , spacer
     , hstack 
         [ filler
-        , mainButton "Confirm" $ ProfileEvent $ ChangeProfileName ConfirmAdding
-        , spacer
         , button "Cancel" $ ProfileEvent $ ChangeProfileName CancelAdding
+        , spacer
+        , mainButton "Confirm" $ ProfileEvent $ ChangeProfileName ConfirmAdding
         ]
     ] `styleBasic` [bgColor customGray3, padding 20, width 700]

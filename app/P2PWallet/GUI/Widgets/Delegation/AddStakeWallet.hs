@@ -99,9 +99,9 @@ pairStakeWidget _ = do
     , spacer
     , hstack 
         [ filler
-        , mainButton "Pair" $ DelegationEvent $ PairStakeWallet ConfirmAdding
-        , spacer
         , button "Cancel" $ DelegationEvent $ PairStakeWallet CancelAdding
+        , spacer
+        , mainButton "Pair" $ DelegationEvent $ PairStakeWallet ConfirmAdding
         ]
     ] `styleBasic` [bgColor transparent, padding 20]
 
@@ -143,8 +143,8 @@ watchStakeWidget _ = do
     , spacer
     , hstack 
         [ filler
-        , mainButton "Watch" $ DelegationEvent $ WatchStakeWallet ConfirmAdding
-        , spacer
         , button "Cancel" $ DelegationEvent $ WatchStakeWallet CancelAdding
+        , spacer
+        , mainButton "Watch" $ DelegationEvent $ WatchStakeWallet ConfirmAdding
         ]
     ] `styleBasic` [bgColor transparent, padding 20]

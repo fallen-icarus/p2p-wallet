@@ -21,16 +21,21 @@ module P2PWallet.Data.AppModel
   , AppModel(..)
 
     -- * Re-exports
+  , module P2PWallet.Data.AppModel.AddressBook
   , module P2PWallet.Data.AppModel.Common
   , module P2PWallet.Data.AppModel.Delegation
   , module P2PWallet.Data.AppModel.Home
+  , module P2PWallet.Data.AppModel.TxBuilder
   ) where
 
 import Monomer qualified as Monomer
 
+import P2PWallet.Data.AppModel.AddressBook
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.Delegation
 import P2PWallet.Data.AppModel.Home
+import P2PWallet.Data.AppModel.TxBuilder
+import P2PWallet.Data.AddressBook
 import P2PWallet.Data.Core
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Profile
@@ -46,6 +51,8 @@ data MainScene
   | ProfilesScene
   | HomeScene
   | DelegationScene
+  | TxBuilderScene
+  | AddressBookScene
   | SettingsScene
   deriving (Show,Eq)
 
@@ -72,6 +79,10 @@ data AppEvent
   | HomeEvent HomeEvent 
   -- | An event for the Delegation page.
   | DelegationEvent DelegationEvent
+  -- | An event for the AddressBook page.
+  | AddressBookEvent AddressBookEvent 
+  -- | An event for the Tx Builder page.
+  | TxBuilderEvent TxBuilderEvent 
   -- | Sync the currently tracked wallets.
   | SyncWallets (SyncEvent Wallets)
   -- | Sync all registered pools.
@@ -85,14 +96,14 @@ data ProfileEvent
   = LoadKnownProfiles [Profile]
   -- | Load selected profile.
   | LoadSelectedProfile Profile
-  -- | Load known wallets for this profile.
-  | LoadKnownWallets Wallets
+  -- | Load known information for this profile.
+  | LoadProfileInfo (Wallets,[AddressEntry])
   -- | Log out of current profile.
   | LogoutProfile
   -- | Add a new profile.
-  | AddNewProfile (AddEvent Profile)
+  | AddNewProfile (AddEvent Profile Profile)
   -- | Change a profile name.
-  | ChangeProfileName (AddEvent Text)
+  | ChangeProfileName (AddEvent Text Text)
   -- | Delete a profile.
   | DeleteProfile (DeleteWithConfirmationEvent Profile)
 
@@ -123,6 +134,8 @@ data AppModel = AppModel
   , homeModel :: HomeModel
   -- | The model for the delegation scene.
   , delegationModel :: DelegationModel
+  -- | The model for the tx builder scene.
+  , txBuilderModel :: TxBuilderModel
   -- | The known wallets for the selected profile.
   , knownWallets :: Wallets
   -- | The app is waiting for the hardware wallet.
@@ -131,8 +144,12 @@ data AppModel = AppModel
   , syncingWallets :: Bool
   -- | The app is syncing the pools.
   , syncingPools :: Bool
-  -- | The app is loading the wallets.
-  , loadingWallets :: Bool
+  -- | The app is loading the profile.
+  , loadingProfile :: Bool
+  -- | The address book for this profile.
+  , addressBook :: [AddressEntry]
+  -- | The address book model
+  , addressBookModel :: AddressBookModel
   -- | Useful when the user must specify a one-time use input such as a filepath or new alias.
   , extraTextField :: Text
   -- | This is useful for forcing the redraw of the UI when a text field is changed.
@@ -154,13 +171,16 @@ instance Default AppModel where
     , deletingProfile = False
     , homeModel = def
     , delegationModel = def
+    , addressBookModel = def
+    , txBuilderModel = def
     , knownWallets = def
     , waitingOnDevice = False
     , syncingWallets = False
     , syncingPools = False
-    , loadingWallets = False
+    , loadingProfile = False
     , extraTextField = ""
     , forceRedraw = False
+    , addressBook = []
     }
 
 -------------------------------------------------

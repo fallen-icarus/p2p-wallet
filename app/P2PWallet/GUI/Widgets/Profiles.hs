@@ -49,7 +49,7 @@ profilesWidget model = do
               , centerWidgetH $ label "New Profile" `styleBasic` [textFont "Medium", textSize 20]
               ] `styleBasic` [width 200, padding 20, radius 5]
                 `styleHover` [bgColor customBlue, cursorIcon CursorHand]
-      in box_ [expandContent, onClick $ ProfileEvent $ AddNewProfile StartAdding] content 
+      in box_ [expandContent, onClick $ ProfileEvent $ AddNewProfile $ StartAdding Nothing] content 
            `styleBasic` [bgColor customGray1, radius 5]
 
     profilePickerWidget :: AppNode
@@ -120,8 +120,8 @@ addProfileWidget _ = do
     , spacer
     , hstack 
         [ filler
-        , mainButton "Confirm" $ ProfileEvent $ AddNewProfile ConfirmAdding
-        , spacer
         , button "Cancel" $ ProfileEvent $ AddNewProfile CancelAdding
+        , spacer
+        , mainButton "Confirm" $ ProfileEvent $ AddNewProfile ConfirmAdding
         ]
     ] `styleBasic` [bgColor customGray3, padding 20, width 700]

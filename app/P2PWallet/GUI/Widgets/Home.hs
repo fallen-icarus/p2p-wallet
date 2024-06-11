@@ -178,7 +178,7 @@ homeWidget model = do
             [ filler
             -- The widget is initialized using PairPaymentWallet. It is the same for all wallet 
             -- types.
-            , box (mainButton "Add Wallet" $ HomeEvent $ PairPaymentWallet StartAdding) 
+            , box (mainButton "Add Wallet" $ HomeEvent $ PairPaymentWallet $ StartAdding Nothing) 
                 `styleBasic` [padding 20]
             ]
         ] `nodeVisible` (not isAdding)
@@ -201,7 +201,7 @@ morePopup _ = do
         `styleHover` [bgColor customGray2, cursorIcon CursorHand]
     , customPopup (toLensVL $ #homeModel % #showMorePopup) $
         vstack
-          [ button "Add Wallet" (HomeEvent $ PairPaymentWallet StartAdding)
+          [ button "Add Wallet" (HomeEvent $ PairPaymentWallet $ StartAdding Nothing)
               `styleBasic`
                 [ border 0 transparent
                 , textSize 12
@@ -210,7 +210,7 @@ morePopup _ = do
                 , textMiddle
                 ]
               `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-          , button "Edit Name" (HomeEvent $ ChangePaymentWalletName StartAdding)
+          , button "Edit Name" (HomeEvent $ ChangePaymentWalletName $ StartAdding Nothing)
               `styleBasic`
                 [ border 0 transparent
                 , textSize 12
@@ -220,7 +220,7 @@ morePopup _ = do
                 ]
               `styleHover` [bgColor customGray2, cursorIcon CursorHand]
           , separatorLine `styleBasic` [fgColor black, padding 5]
-          , button "Delete Wallet" (HomeEvent $ DeletePaymentWallet GetDeleteConfirmation)
+          , button "Delete Wallet" (HomeEvent $ DeletePaymentWallet $ GetDeleteConfirmation Nothing)
               `styleBasic`
                 [ border 0 transparent
                 , textSize 12
@@ -250,9 +250,9 @@ editPaymentWalletWidget _ = do
     , spacer
     , hstack 
         [ filler
-        , mainButton "Confirm" $ HomeEvent $ ChangePaymentWalletName ConfirmAdding
-        , spacer
         , button "Cancel" $ HomeEvent $ ChangePaymentWalletName CancelAdding
+        , spacer
+        , mainButton "Confirm" $ HomeEvent $ ChangePaymentWalletName ConfirmAdding
         ]
     ] `styleBasic` [bgColor customGray3, padding 20, width 700]
 
@@ -267,8 +267,8 @@ confirmDeleteWidget model = do
         ]
     , hstack 
         [ filler
-        , mainButton "Confirm" $ HomeEvent $ DeletePaymentWallet ConfirmDeletion
-        , spacer
         , button "Cancel" $ HomeEvent $ DeletePaymentWallet CancelDeletion
+        , spacer
+        , mainButton "Confirm" $ HomeEvent $ DeletePaymentWallet ConfirmDeletion
         ]
     ] `styleBasic` [bgColor customGray3, padding 20, width 700]

@@ -26,18 +26,20 @@ handleProfileEvent model@AppModel{..} evt = case evt of
   -- Set the desired profile to selected and get the associated wallets from the database.
   LoadSelectedProfile profile -> 
     [ Model $ model & #selectedProfile .~ Just profile 
-                    & #loadingWallets .~ True
-    , Task $ runActionOrAlert (ProfileEvent . LoadKnownWallets) $
-        loadWallets databaseFile profile >>= fromRightOrAppError
+                    & #loadingProfile .~ True
+    , Task $ runActionOrAlert (ProfileEvent . LoadProfileInfo) $
+        (,) <$> (loadWallets databaseFile profile >>= fromRightOrAppError)
+            <*> (loadAddressBook databaseFile profile >>= fromRightOrAppError)
     ]
 
-  -- After loading the wallets from the database, update the model.
-  LoadKnownWallets wallets@Wallets{..} -> 
+  -- After loading the profile info from the database, update the model.
+  LoadProfileInfo (wallets@Wallets{..},contacts) -> 
     [ Model $ model & #knownWallets .~ wallets
                     & #scene .~ HomeScene
-                    & #loadingWallets .~ False
+                    & #loadingProfile .~ False
                     & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead paymentWallets)
                     & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead stakeWallets)
+                    & #addressBook .~ contacts
     -- , Task $ return $ SyncWallets StartSync
     ]
 
@@ -47,6 +49,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
     [ Model $ model & #scene .~ ProfilesScene 
                     & #selectedProfile .~ Nothing
                     & #knownWallets .~ def
+                    & #addressBook .~ []
     ]
 
   -----------------------------------------------
@@ -54,7 +57,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   AddNewProfile modal -> case modal of
     -- Show the addNewProfile widget and clear the old information.
-    StartAdding -> 
+    StartAdding _ -> 
       [ Model $ model & #newProfile .~ def
                       & #addingProfile .~ True
       ]
@@ -88,7 +91,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   ChangeProfileName modal -> case modal of
     -- Show the edit widget and set the newProfile information to the current profile.
-    StartAdding -> 
+    StartAdding _ -> 
       [ Model $ model & #extraTextField .~ fromMaybe "" (selectedProfile ^? _Just % #alias)
                       & #addingProfile .~ True
       ]
@@ -138,7 +141,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   DeleteProfile modal -> case modal of
     -- Show the confirmation widget.
-    GetDeleteConfirmation -> 
+    GetDeleteConfirmation _ -> 
       [ Model $ model & #deletingProfile .~ True
       ]
     CancelDeletion -> 

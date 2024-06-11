@@ -60,5 +60,5 @@ main = do
     customDarkTheme =
       -- This is needed to change the background color of alerts.
       darkTheme & mergeThemeStyle L.dialogFrameStyle [bgColor customGray3]
-                & mergeThemeStyle L.emptyOverlayStyle [bgColor $ black & #a .~ 0.2]
+                & mergeThemeStyle L.emptyOverlayStyle [bgColor $ black & #a .~ 0.4]
                 -- & mergeThemeStyle L.emptyOverlayStyle [bgColor $ customGray1 & #a .~ 0.8]

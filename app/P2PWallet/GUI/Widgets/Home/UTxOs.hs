@@ -230,6 +230,19 @@ utxosWidget model@AppModel{homeModel=HomeModel{..}} =
                         , textMiddle
                         ]
                 , filler
+                , tooltip_ "Spend UTxO" [tooltipDelay 0] $
+                    button spendUTxOIcon (HomeEvent $ AddSelectedUserInput u)
+                      `styleBasic` 
+                        [ textSize 10
+                        , textColor customBlue
+                        , textFont "Remix"
+                        , textMiddle
+                        , padding 0
+                        , bgColor transparent
+                        , border 0 transparent
+                        ]
+                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
                 , tooltip_ (moreTip showDetails) [tooltipDelay 0] $
                     toggleButton_ (moreIcon showDetails)
                       (toLensVL $ #homeModel % #selectedWallet % #utxos % toggleDetails utxoRef)
@@ -557,3 +570,24 @@ copyableLabelFor caption info =
     , spacer
     , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize 10]
     ]
+
+-------------------------------------------------
+-- Helper Lens
+-------------------------------------------------
+-- | A lens to toggle the `showDetails` field of the `PersonalUTxO`.
+toggleDetails :: TxOutRef -> Lens' [PersonalUTxO] Bool
+toggleDetails ref = lens (getToggleDetails ref) (setToggleDetails ref)
+  where
+    getToggleDetails :: TxOutRef -> [PersonalUTxO] -> Bool
+    getToggleDetails _ [] = False
+    getToggleDetails targetRef (u:us) =
+      if u ^. #utxoRef == targetRef 
+      then u ^. #showDetails
+      else getToggleDetails targetRef us
+
+    setToggleDetails :: TxOutRef -> [PersonalUTxO] -> Bool -> [PersonalUTxO]
+    setToggleDetails _ [] _ = []
+    setToggleDetails targetRef (u:us) b =
+      if u ^. #utxoRef == targetRef 
+      then (u & #showDetails .~ b) : us
+      else u : setToggleDetails targetRef us b

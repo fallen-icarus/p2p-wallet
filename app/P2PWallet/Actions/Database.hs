@@ -20,12 +20,17 @@ module P2PWallet.Actions.Database
   , deleteStakeWallet
   , addNewStakeWallet
   , addNewRewards
+  , getNextAddressEntryId
+  , addNewAddressEntry
+  , loadAddressBook
+  , deleteAddressEntry
   ) where
 
 import System.Directory qualified as Dir
 import Database.SQLite.Simple qualified as Sqlite
 
 import P2PWallet.Actions.Utils
+import P2PWallet.Data.AddressBook
 import P2PWallet.Data.Core
 import P2PWallet.Data.Database
 import P2PWallet.Data.Profile
@@ -51,6 +56,7 @@ initializeDatabase dbFile = do
       create @StakeReward dbFile
       create @StakeWallet dbFile
       create @Transaction dbFile
+      create @AddressEntry dbFile
       return $ Right ()
 
 -------------------------------------------------
@@ -280,9 +286,9 @@ deleteStakeWallet dbFile (StakeId stakeId) =
 -------------------------------------------------
 -- | Add a new stake reward to the database.
 addNewRewards :: FilePath -> [StakeReward] -> IO (Either Text ())
-addNewRewards dbFile txs = do
+addNewRewards dbFile rs = do
   handle @SomeException (return . Left . ("Failed to insert rewards: " <>) . show) $
-    fmap sequence_ $ mapM (fmap Right . insert @StakeReward dbFile) txs
+    fmap sequence_ $ mapM (fmap Right . insert @StakeReward dbFile) rs
 
 -- | Load the rewards for the specified stake wallet.
 loadRewards :: FilePath -> StakeId -> IO (Either Text [StakeReward])
@@ -297,3 +303,50 @@ loadRewards dbFile (StakeId stakeId) = do
       , "ORDER BY earned_epoch DESC;"
       ]
 
+-------------------------------------------------
+-- Address Book
+-------------------------------------------------
+getNextAddressEntryId :: FilePath -> IO (Either Text AddressEntryId)
+getNextAddressEntryId dbFile =
+    handle @SomeException (return . Left . ("Could not get next address entry id: " <>) . show) $
+      -- If the result is the empty list, this is the first profile entry.
+      maybe (Right 0) (Right . AddressEntryId . (+1) . Sqlite.fromOnly) . maybeHead <$> 
+        query dbFile stmt
+  where
+    stmt = Sqlite.Query $ mconcat $ intersperse " "
+      [ "SELECT address_entry_id FROM"
+      , tableName @AddressEntry
+      , "ORDER BY address_entry_id DESC"
+      , "LIMIT 1;"
+      ]
+
+-- | Add a new address entry to the database.
+addNewAddressEntry :: FilePath -> [AddressEntry] -> IO (Either Text ())
+addNewAddressEntry dbFile entries = do
+  handle @SomeException (return . Left . ("Failed to insert address entry: " <>) . show) $
+    fmap sequence_ $ mapM (fmap Right . insert @AddressEntry dbFile) entries
+
+-- | Load the address book for the specified profile id.
+loadAddressBook :: FilePath -> Profile -> IO (Either Text [AddressEntry])
+loadAddressBook dbFile Profile{profileId=ProfileId profileId} = do
+    handle @SomeException (return . Left . ("Could not load address book: " <>) . show) $ do
+      Right <$> query dbFile queryStmt
+  where
+    queryStmt :: Query
+    queryStmt = Query $ unwords
+      [ "SELECT * FROM " <> tableName @AddressEntry
+      , "WHERE profile_id = " <> show profileId
+      , "ORDER BY alias ASC;"
+      ]
+
+deleteAddressEntry :: FilePath -> AddressEntryId -> IO (Either Text ())
+deleteAddressEntry dbFile (AddressEntryId entryId) = 
+  handle @SomeException (return . Left . ("Failed to delete address entry: " <>) . show) $ do
+    delete dbFile deleteSmt
+    return $ Right ()
+  where
+    deleteSmt :: Query
+    deleteSmt = Query $ unwords
+      [ "DELETE FROM " <> tableName @AddressEntry
+      , "WHERE address_entry_id = " <> show entryId
+      ]

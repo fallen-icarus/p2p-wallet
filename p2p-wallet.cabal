@@ -58,12 +58,18 @@ executable p2p-wallet
       -- P2PWallet.Actions.SignTx
       -- P2PWallet.Actions.SubmitTx
       P2PWallet.Actions.SyncWallets
+      P2PWallet.Data.AddressBook
       P2PWallet.Data.AppModel
+      P2PWallet.Data.AppModel.AddressBook
       P2PWallet.Data.AppModel.Common
       P2PWallet.Data.AppModel.Delegation
       P2PWallet.Data.AppModel.Home
-      -- P2PWallet.Data.App.TxBuilder
+      P2PWallet.Data.AppModel.TxBuilder
+      P2PWallet.Data.AppModel.TxBuilder.ChangeOutput
+      P2PWallet.Data.AppModel.TxBuilder.UserInput
+      P2PWallet.Data.AppModel.TxBuilder.UserOutput
       P2PWallet.Data.Core
+      P2PWallet.Data.Core.AddressEntryId
       P2PWallet.Data.Core.Asset
       P2PWallet.Data.Core.Bech32Address
       P2PWallet.Data.Core.Config
@@ -100,20 +106,18 @@ executable p2p-wallet
       P2PWallet.Data.Wallets.StakeWallet
       P2PWallet.GUI.Colors
       P2PWallet.GUI.EventHandler
+      P2PWallet.GUI.EventHandler.AddressBookEvent
       P2PWallet.GUI.EventHandler.DelegationEvent
       P2PWallet.GUI.EventHandler.HomeEvent
       P2PWallet.GUI.EventHandler.ProfileEvent
-      -- P2PWallet.GUI.EventHandler.TxBuilderEvent
+      P2PWallet.GUI.EventHandler.TxBuilderEvent
       P2PWallet.GUI.HelpMessages
       P2PWallet.GUI.Icons
       P2PWallet.GUI.UIBuilder
+      P2PWallet.GUI.Widgets.AddressBook
       P2PWallet.GUI.Widgets.Delegation
-      -- P2PWallet.GUI.Widgets.Delegation.Details
       P2PWallet.GUI.Widgets.Delegation.AddStakeWallet
       P2PWallet.GUI.Widgets.Delegation.PoolPicker
-      -- P2PWallet.GUI.Widgets.Delegation.RewardHistory
-      -- P2PWallet.GUI.Widgets.Delegation.Summary
-      -- P2PWallet.GUI.Widgets.Delegation.WatchStakeWallet
       P2PWallet.GUI.Widgets.Internal.Custom
       P2PWallet.GUI.Widgets.Internal.Popup
       P2PWallet.GUI.Widgets.Home
@@ -126,7 +130,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Networks
       P2PWallet.GUI.Widgets.Profiles
       P2PWallet.GUI.Widgets.Settings
-      -- P2PWallet.GUI.Widgets.TxBuilder
+      P2PWallet.GUI.Widgets.TxBuilder
       -- P2PWallet.GUI.Widgets.TxBuilder.AddCertificate
       -- P2PWallet.GUI.Widgets.TxBuilder.AddChangeOutput
       -- P2PWallet.GUI.Widgets.TxBuilder.AddInput

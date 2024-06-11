@@ -7,10 +7,14 @@ import P2PWallet.Prelude
 -------------------------------------------------
 -- Add/Edit an `a`
 -------------------------------------------------
--- | Add UI steps for something of type `a`. This is also used for editing.
-data AddEvent a
-  -- | Open the widget for getting the new information.
-  = StartAdding
+-- | Add UI steps for something of type `a`. This is also used for editing. The returned type
+-- can be different than the initializing type in `StartAdding`. This flexibility is useful for
+-- adding something to the builder while initializing the new data with some other data type.
+data AddEvent a b
+  -- | Open the widget for getting the new information. Optionally take the info for setting aside
+  -- until after changes are made. This is used when a model does not normally use a `selected` 
+  -- field.
+  = StartAdding (Maybe a)
   -- | Close the widget and reset the new information in the form.
   | CancelAdding
   -- | Keep the widget open, validate the information, and (if pairing) try to get the required 
@@ -18,7 +22,7 @@ data AddEvent a
   -- user. The widget is kept open to allow the user to quickly try again.
   | ConfirmAdding
   -- | Process the new information and update the database.
-  | AddResult a
+  | AddResult b
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -26,8 +30,10 @@ data AddEvent a
 -------------------------------------------------
 -- | Delete UI steps for something of type `a`.
 data DeleteWithConfirmationEvent a
-  -- | Open the widget for confirming the deletion.
-  = GetDeleteConfirmation
+  -- | Open the widget for confirming the deletion. Optionally take the info for setting aside
+  -- until after changes are made. This is used when a model does not normally use a `selected` 
+  -- field.
+  = GetDeleteConfirmation (Maybe a)
   -- | Close the widget without deleting the item.
   | CancelDeletion
   -- | Delete the item.

@@ -7,6 +7,7 @@ import Monomer
 
 import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.Widgets.AddressBook
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Delegation
 import P2PWallet.GUI.Widgets.Home
@@ -14,6 +15,7 @@ import P2PWallet.GUI.Widgets.MainMenu
 import P2PWallet.GUI.Widgets.Networks
 import P2PWallet.GUI.Widgets.Profiles
 import P2PWallet.GUI.Widgets.Settings
+import P2PWallet.GUI.Widgets.TxBuilder
 import P2PWallet.MonomerOptics()
 import P2PWallet.Prelude
 
@@ -26,8 +28,8 @@ buildUI _ model = do
       syncingWalletsOverlay = 
         box (label "Syncing Wallets..." `styleBasic` [textSize 20, textColor black])
           `styleBasic` [bgColor (darkGray & #a .~ 0.8)]
-      loadingWalletsOverlay = 
-        box (label "Loading Wallets..." `styleBasic` [textSize 20, textColor black])
+      loadingProfileOverlay = 
+        box (label "Loading Profile..." `styleBasic` [textSize 20, textColor black])
           `styleBasic` [bgColor (darkGray & #a .~ 0.8)]
       syncingPoolsOverlay = 
         box (label "Syncing Pools..." `styleBasic` [textSize 20, textColor black])
@@ -42,11 +44,13 @@ buildUI _ model = do
             [ settingsWidget model `nodeVisible` (SettingsScene == model ^. #scene)
             , homeWidget model `nodeVisible` (HomeScene == model ^. #scene)
             , delegationWidget model `nodeVisible` (DelegationScene == model ^. #scene)
+            , txBuilderWidget model `nodeVisible` (TxBuilderScene == model ^. #scene)
+            , addressBookWidget model `nodeVisible` (AddressBookScene == model ^. #scene)
             ]
         ] `nodeVisible` (isJust $ model ^. #selectedProfile)
     , alertOverlay `nodeVisible` (isJust $ model ^. #alertMessage)
     , waitingOnDeviceOverlay `nodeVisible` (model ^. #waitingOnDevice)
     , syncingWalletsOverlay `nodeVisible` (model ^. #syncingWallets)
     , syncingPoolsOverlay `nodeVisible` (model ^. #syncingPools)
-    , loadingWalletsOverlay `nodeVisible` (model ^. #loadingWallets)
+    , loadingProfileOverlay `nodeVisible` (model ^. #loadingProfile)
     ] `styleBasic` [bgColor customGray4]

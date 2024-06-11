@@ -23,7 +23,7 @@ aboutWidget model = do
           [ filler
           -- The widget is initialized using PairPaymentWallet. It is the same for all wallet 
           -- types.
-          , box (mainButton "Add Wallet" $ HomeEvent $ PairPaymentWallet StartAdding) 
+          , box (mainButton "Add Wallet" $ HomeEvent $ PairPaymentWallet $ StartAdding Nothing) 
               `styleBasic` [padding 20]
           ]
       ] `nodeVisible` (not isAdding)
