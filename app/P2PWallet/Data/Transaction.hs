@@ -81,24 +81,6 @@ toTransactionUTxO Koios.TransactionUTxO{..} = TransactionUTxO
   , showDetails = False
   }
 
--- | A lens to toggle the `showDetails` field of the `TransactionUTxO`.
-toggleDetails :: TxOutRef -> Lens' [TransactionUTxO] Bool
-toggleDetails ref = lens (getToggleDetails ref) (setToggleDetails ref)
-  where
-    getToggleDetails :: TxOutRef -> [TransactionUTxO] -> Bool
-    getToggleDetails _ [] = False
-    getToggleDetails targetRef (u:us) =
-      if u ^. #utxoRef == targetRef 
-      then u ^. #showDetails
-      else getToggleDetails targetRef us
-
-    setToggleDetails :: TxOutRef -> [TransactionUTxO] -> Bool -> [TransactionUTxO]
-    setToggleDetails _ [] _ = []
-    setToggleDetails targetRef (u:us) b =
-      if u ^. #utxoRef == targetRef 
-      then (u & #showDetails .~ b) : us
-      else u : setToggleDetails targetRef us b
-
 -------------------------------------------------
 -- Transaction
 -------------------------------------------------
@@ -267,16 +249,6 @@ toTransaction profileId paymentId Koios.Transaction{..} = Transaction
   , showInputs = False
   , showOutputs = False
   }
-
--- | A lens to toggle the `show` field of the `Transaction`.
-toggleShow :: Lens' Transaction Bool -> Lens' (Maybe Transaction) Bool
-toggleShow finalLens = lens getToggleShow setToggleShow
-  where
-    getToggleShow :: Maybe Transaction -> Bool
-    getToggleShow = maybe False (view finalLens)
-
-    setToggleShow :: Maybe Transaction -> Bool -> Maybe Transaction
-    setToggleShow maybeTx b = fmap (set finalLens b) maybeTx
 
 -- collateralOutputLens :: Lens' Transaction [TransactionUTxO]
 -- collateralOutputLens = lens getOutput setOutput

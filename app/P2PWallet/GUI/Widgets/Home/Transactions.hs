@@ -693,3 +693,34 @@ copyableLabelFor fontSize caption info =
     , spacer
     , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize 10]
     ]
+
+-------------------------------------------------
+-- Helper Lens
+-------------------------------------------------
+-- | A lens to toggle the `showDetails` field of the `TransactionUTxO`.
+toggleDetails :: TxOutRef -> Lens' [TransactionUTxO] Bool
+toggleDetails ref = lens (getToggleDetails ref) (setToggleDetails ref)
+  where
+    getToggleDetails :: TxOutRef -> [TransactionUTxO] -> Bool
+    getToggleDetails _ [] = False
+    getToggleDetails targetRef (u:us) =
+      if u ^. #utxoRef == targetRef 
+      then u ^. #showDetails
+      else getToggleDetails targetRef us
+
+    setToggleDetails :: TxOutRef -> [TransactionUTxO] -> Bool -> [TransactionUTxO]
+    setToggleDetails _ [] _ = []
+    setToggleDetails targetRef (u:us) b =
+      if u ^. #utxoRef == targetRef 
+      then (u & #showDetails .~ b) : us
+      else u : setToggleDetails targetRef us b
+
+-- | A lens to toggle the `show` field of the `Transaction`.
+toggleShow :: Lens' Transaction Bool -> Lens' (Maybe Transaction) Bool
+toggleShow finalLens = lens getToggleShow setToggleShow
+  where
+    getToggleShow :: Maybe Transaction -> Bool
+    getToggleShow = maybe False (view finalLens)
+
+    setToggleShow :: Maybe Transaction -> Bool -> Maybe Transaction
+    setToggleShow maybeTx b = fmap (set finalLens b) maybeTx

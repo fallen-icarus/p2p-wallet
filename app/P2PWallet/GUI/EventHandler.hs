@@ -12,9 +12,11 @@ import P2PWallet.Actions.LookupPools
 import P2PWallet.Actions.SyncWallets
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
+import P2PWallet.GUI.EventHandler.AddressBookEvent
 import P2PWallet.GUI.EventHandler.DelegationEvent
 import P2PWallet.GUI.EventHandler.HomeEvent
 import P2PWallet.GUI.EventHandler.ProfileEvent
+import P2PWallet.GUI.EventHandler.TxBuilderEvent
 import P2PWallet.Prelude
 
 handleEvent
@@ -57,7 +59,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
                     & #waitingOnDevice .~ False
                     & #syncingWallets .~ False
                     & #syncingPools .~ False
-                    & #loadingWallets .~ False
+                    & #loadingProfile .~ False
     ]
   CloseAlertMessage -> 
     -- Close the alert widget and reset the alert message.
@@ -97,6 +99,16 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   -- Delegation Events
   -----------------------------------------------
   DelegationEvent modal -> handleDelegationEvent model modal
+
+  -----------------------------------------------
+  -- Address Book Events
+  -----------------------------------------------
+  AddressBookEvent modal -> handleAddressBookEvent model modal
+
+  -----------------------------------------------
+  -- TxBuilder Events
+  -----------------------------------------------
+  TxBuilderEvent modal -> handleTxBuilderEvent model modal
 
   -----------------------------------------------
   -- Syncing Wallets

@@ -24,11 +24,11 @@ import P2PWallet.Prelude
 -- | The possible UI events on the Home page.
 data DelegationEvent
   -- | Pair a new `StakeWallet`. It can only be done from the `HomeAbout` subscene.
-  = PairStakeWallet (AddEvent StakeWallet)
+  = PairStakeWallet (AddEvent StakeWallet StakeWallet)
   -- | Watch a new `StakeWallet`. It can only be done from the `HomeAbout` subscene.
-  | WatchStakeWallet (AddEvent StakeWallet)
+  | WatchStakeWallet (AddEvent StakeWallet StakeWallet)
   -- | Change a payment wallet name.
-  | ChangeStakeWalletName (AddEvent Text)
+  | ChangeStakeWalletName (AddEvent Text Text)
   -- | Delete a payment wallet.
   | DeleteStakeWallet (DeleteWithConfirmationEvent StakeWallet)
   -- | Open the more popup widget

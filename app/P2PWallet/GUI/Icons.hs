@@ -101,3 +101,18 @@ descendingSortIcon = remixArrowDownSFill
 
 circleCheckboxFillIcon :: Text
 circleCheckboxFillIcon = remixCheckboxCircleFill
+
+txBuilderIcon :: Text
+txBuilderIcon = remixHammerLine
+
+addIcon :: Text
+addIcon = remixAddLine
+
+largeAddIcon :: Text
+largeAddIcon = toGlyph 0XF4B2
+
+spendUTxOIcon :: Text
+spendUTxOIcon = remixMailSendFill
+
+contactsBookIcon :: Text
+contactsBookIcon = remixContactsBook2Line

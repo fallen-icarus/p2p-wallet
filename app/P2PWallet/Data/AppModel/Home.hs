@@ -53,13 +53,13 @@ data HomeEvent
   -- | Change the Home subscene to the specified subscene.
   = ChangeHomeScene HomeScene
   -- | Pair a new `PaymentWallet`. It can only be done from the `HomeAbout` subscene.
-  | PairPaymentWallet (AddEvent PaymentWallet)
+  | PairPaymentWallet (AddEvent PaymentWallet PaymentWallet)
   -- | Watch a new `PaymentWallet`. It can only be done from the `HomeAbout` subscene.
-  | WatchPaymentWallet (AddEvent PaymentWallet)
+  | WatchPaymentWallet (AddEvent PaymentWallet PaymentWallet)
   -- | Add the corresponding stake wallet to the database.
   | AddCorrespondingStakeWallet StakeWallet
   -- | Change a payment wallet name.
-  | ChangePaymentWalletName (AddEvent Text)
+  | ChangePaymentWalletName (AddEvent Text Text)
   -- | Delete a payment wallet.
   | DeletePaymentWallet (DeleteWithConfirmationEvent PaymentWallet)
   -- | Open the more popup widget
@@ -78,6 +78,8 @@ data HomeEvent
   | InspectHomeTransaction Transaction
   -- | Stop inspecting transaction.
   | CloseInspectedHomeTransaction
+  -- | Add the selected user input to the tx builder.
+  | AddSelectedUserInput PersonalUTxO
 
 -------------------------------------------------
 -- UTxO Filter Model

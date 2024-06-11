@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module P2PWallet.Actions.Utils where
 
 import System.Exit (ExitCode(ExitSuccess))
@@ -38,3 +40,15 @@ runCmd cmd =
       case reverse s of
         ('\n':xs) -> reverse xs
         _ -> s
+
+-- | Re-index the lists while preserving ordering.
+reIndex :: [(Int,a)] -> [(Int,a)]
+reIndex xs = go xs 1
+  where
+    go [] _ = []
+    go ((_,y):ys) i = (i,y) : go ys (i+1)
+
+-- | Remove the item from the list and re-index after.
+removeAction :: Int -> [(Int,a)] -> [(Int,a)]
+removeAction idx xs = reIndex $ filter ((/=idx) . fst) xs
+

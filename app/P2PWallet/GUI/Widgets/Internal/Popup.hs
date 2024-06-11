@@ -15,6 +15,13 @@ UI when used for opening new widgets.
 module P2PWallet.GUI.Widgets.Internal.Popup (
   customPopup,
   customPopup_,
+  popupAnchor,
+  alignTop,
+  popupAlignToOuterV,
+  popupAlignToOuterH,
+  popupOffset,
+  alignLeft,
+  alignRight
 ) where
 
 import Control.Applicative ((<|>))

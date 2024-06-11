@@ -45,7 +45,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
   PairStakeWallet modal -> case modal of
     -- A paired stake wallet is an address using a hardware wallet stake key and 
     -- possibly a hardware wallet stake key. Scripts are not part of paired stake wallets.
-    StartAdding -> 
+    StartAdding _ -> 
       -- Set `pairing` to `True` to display the widget for getting the new stake wallet info.
       -- Also reset the `newStakeWallet` field so that the last information is cleared.
       [ Model $ model & #delegationModel % #addingWallet .~ True -- Show widget.
@@ -90,7 +90,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
   WatchStakeWallet modal -> case modal of
     -- A watched stake wallet can be any kind of stake wallet. However, it cannot be used
     -- to sign since only signing with hardware wallets is supported.
-    StartAdding -> 
+    StartAdding _ -> 
       -- Set `addingWallet` to `True` to display the widget for getting the new wallet info.
       -- Also reset the `newStakeWallet` field so that the last information is cleared.
       [ Model $ model & #delegationModel % #addingWallet .~ True -- Show widget.
@@ -131,7 +131,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   ChangeStakeWalletName modal -> case modal of
     -- Show the edit widget and set the extraTextField to the current alias.
-    StartAdding -> 
+    StartAdding _ -> 
       [ Model $ model & #delegationModel % #editingWallet .~ True
                       & #delegationModel % #showMorePopup .~ False
                       & #extraTextField .~ (delegationModel ^. #selectedWallet % #alias)
@@ -186,7 +186,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   DeleteStakeWallet modal -> case modal of
     -- Show the confirmation widget.
-    GetDeleteConfirmation -> 
+    GetDeleteConfirmation _ -> 
       [ Model $ model & #delegationModel % #deletingWallet .~ True
                       & #delegationModel % #showMorePopup .~ False
       ]

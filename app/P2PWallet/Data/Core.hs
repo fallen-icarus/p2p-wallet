@@ -1,6 +1,7 @@
 module P2PWallet.Data.Core
   (
-    module P2PWallet.Data.Core.Asset
+    module P2PWallet.Data.Core.AddressEntryId
+  , module P2PWallet.Data.Core.Asset
   , module P2PWallet.Data.Core.Bech32Address
   , module P2PWallet.Data.Core.Config
   , module P2PWallet.Data.Core.DerivationPath
@@ -14,6 +15,7 @@ module P2PWallet.Data.Core
   , module P2PWallet.Data.Core.TxCBOR
   ) where
 
+import P2PWallet.Data.Core.AddressEntryId
 import P2PWallet.Data.Core.Asset
 import P2PWallet.Data.Core.Bech32Address
 import P2PWallet.Data.Core.Config

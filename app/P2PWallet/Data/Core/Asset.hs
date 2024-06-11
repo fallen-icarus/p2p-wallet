@@ -13,6 +13,7 @@ import Prettyprinter (hsep,tupled,Pretty(..))
 import Text.Printf qualified as Printf
 import Database.SQLite.Simple.ToField (ToField(..))
 import Database.SQLite.Simple.FromField (FromField(..))
+import Data.Decimal (decimalPlaces)
 
 import P2PWallet.Prelude
 import P2PWallet.Plutus
@@ -54,6 +55,22 @@ instance Printf.PrintfArg Ada where
   formatArg _ fmt = Printf.errorBadFormat $ Printf.fmtChar fmt
 
 makeFieldLabelsNoPrefix ''Ada
+
+-- | Read the amount of ada meant for a new UTxO. Zero is not a valid amount of ada since
+-- all UTxOs must have at least some ada.
+readAda :: Text -> Either Text Ada
+readAda text = do
+  -- It must be a number.
+  decimal <- maybeToRight "Not a valid number" $ readMaybe @Decimal $ toString text
+
+  -- The number can have no more than 6 decimal places.
+  when (decimalPlaces decimal > 6) $ Left "Ada only has up to 6 decimal places."
+
+  -- The number must be greater than 0. All UTxOs require ada.
+  when (decimal <= 0) $ Left "All UTxOs require at least some ada."
+
+  return $ Ada decimal
+
 
 -------------------------------------------------
 -- Ada <-> Lovelace
@@ -123,3 +140,31 @@ fullName = to fullName'
   where
     fullName' :: NativeAsset -> Text
     fullName' NativeAsset{policyId,tokenName} = policyId <> "." <> tokenName
+
+fullNameAndQuantity :: Getter NativeAsset Text
+fullNameAndQuantity = to get'
+  where
+    get' :: NativeAsset -> Text
+    get' NativeAsset{quantity,policyId,tokenName} = 
+      show quantity <> " " <> policyId <> "." <> tokenName
+
+-- | Native assets are supposed to be of the form '# policy_id.asset_name' and separated
+-- by newlines. All quantities must be greater than or equal to 0. This is meant to be used
+-- on one line at a time like: `sequence . map parseNativeAsset . lines`.
+parseNativeAsset :: Text -> Either Text NativeAsset
+parseNativeAsset assetLine = do
+  asset@NativeAsset{quantity} <- flip maybeToRight (readNativeAsset assetLine) $
+    unlines
+      [ "Invalid native asset entry. Must be of the form '# policy_id.asset_name'."
+      , "Native assets must be separated by newlines."
+      , ""
+      , "Could not parse: '" <> assetLine <> "'"
+      ]
+
+  if quantity >= 0 then Right asset else 
+    Left $
+      unlines 
+        [ "Native asset quantities must be greater than or equal to 0."
+        , ""
+        , "Invalid quantity: '" <> assetLine <> "'"
+        ]

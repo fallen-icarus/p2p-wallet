@@ -19,7 +19,8 @@ mainMenuWidget model = do
       , changeSceneButton "Staking" delegationCenterIcon DelegationScene
       -- , changeSceneButton "DEX" remixArrowLeftRightFill LimitOrders
       -- , changeSceneButton "Liquidity" remixWaterFlashLine MarketMakers
-      -- , changeSceneButton "Builder" remixToolsLine TxBuilderScene
+      , changeSceneButton "Contacts" contactsBookIcon AddressBookScene
+      , changeSceneButton "Builder" txBuilderIcon TxBuilderScene
       , changeSceneButton "Settings" settingsIcon SettingsScene
       , filler
       , logOutButton

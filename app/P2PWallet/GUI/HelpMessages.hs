@@ -298,3 +298,13 @@ spendableEpochMsg = unlines
       ]
   ]
 
+nativeAssetAreaEntryMsg :: Text
+nativeAssetAreaEntryMsg = unlines
+  [ "Native assets must use the full on-chain name such as:"
+  , "10 c0f8644a01a6bf5db02f4afe30d604975e63dd274f1098a1738e561d.4f7468657254"
+  , ""
+  , mconcat $ intersperse " "
+      [ "You can go to another page and copy the asset name; then return here to paste it in."
+      , "Your place will be saved."
+      ]
+  ]

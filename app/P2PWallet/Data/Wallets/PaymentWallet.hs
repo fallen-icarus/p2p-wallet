@@ -76,24 +76,6 @@ toPersonalUTxO AddressUTxO{..} = PersonalUTxO
   , showDetails = False
   }
 
--- | A lens to toggle the `showDetails` field of the `PersonalUTxO`.
-toggleDetails :: TxOutRef -> Lens' [PersonalUTxO] Bool
-toggleDetails ref = lens (getToggleDetails ref) (setToggleDetails ref)
-  where
-    getToggleDetails :: TxOutRef -> [PersonalUTxO] -> Bool
-    getToggleDetails _ [] = False
-    getToggleDetails targetRef (u:us) =
-      if u ^. #utxoRef == targetRef 
-      then u ^. #showDetails
-      else getToggleDetails targetRef us
-
-    setToggleDetails :: TxOutRef -> [PersonalUTxO] -> Bool -> [PersonalUTxO]
-    setToggleDetails _ [] _ = []
-    setToggleDetails targetRef (u:us) b =
-      if u ^. #utxoRef == targetRef 
-      then (u & #showDetails .~ b) : us
-      else u : setToggleDetails targetRef us b
-
 -------------------------------------------------
 -- Payment Wallet
 -------------------------------------------------

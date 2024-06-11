@@ -35,7 +35,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   PairPaymentWallet modal -> case modal of
     -- A paired payment wallet is an address using a hardware wallet payment key and 
     -- possibly a hardware wallet stake key. Scripts are not part of payment wallets.
-    StartAdding -> 
+    StartAdding _ -> 
       -- Set `pairing` to `True` to display the widget for getting the new payment wallet info.
       -- Also reset the `newPaymentWallet` field so that the last information is cleared.
       [ Model $ model & #homeModel % #addingWallet .~ True -- Show widget.
@@ -109,7 +109,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   WatchPaymentWallet modal -> case modal of
     -- A watched payment wallet can be any kind of payment wallet. However, it cannot be used
     -- to sign since only signing with hardware wallets is supported.
-    StartAdding -> 
+    StartAdding _ -> 
       -- Set `addingWallet` to `True` to display the widget for getting the new payment wallet info.
       -- Also reset the `newPaymentWallet` field so that the last information is cleared.
       [ Model $ model & #homeModel % #addingWallet .~ True -- Show widget.
@@ -189,7 +189,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   ChangePaymentWalletName modal -> case modal of
     -- Show the edit widget and set the extraTextField to the current alias.
-    StartAdding -> 
+    StartAdding _ -> 
       [ Model $ model & #homeModel % #editingWallet .~ True
                       & #homeModel % #showMorePopup .~ False
                       & #extraTextField .~ (homeModel ^. #selectedWallet % #alias)
@@ -245,7 +245,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   DeletePaymentWallet modal -> case modal of
     -- Show the confirmation widget.
-    GetDeleteConfirmation -> 
+    GetDeleteConfirmation _ -> 
       [ Model $ model & #homeModel % #deletingWallet .~ True
                       & #homeModel % #showMorePopup .~ False
       ]
@@ -302,3 +302,32 @@ handleHomeEvent model@AppModel{..} evt = case evt of
     [ Model $ model & #homeModel % #inspectedTransaction .~ Just tx ]
   CloseInspectedHomeTransaction -> 
     [ Model $ model & #homeModel % #inspectedTransaction .~ Nothing ]
+
+  -----------------------------------------------
+  -- Add Personal UTxO to Builder
+  -----------------------------------------------
+  AddSelectedUserInput personalUTxO ->
+    let PaymentWallet{alias,paymentAddress,paymentKeyPath} = homeModel ^. #selectedWallet
+        newInput = fromPersonalUTxO alias paymentAddress paymentKeyPath personalUTxO
+    in  case processNewUserInput newInput txBuilderModel of
+          Left err -> [ Task $ return $ Alert err ]
+          Right newTxModel ->
+            [ Model $ model & #txBuilderModel .~ newTxModel
+            , Task $ return $ Alert "Successfully added to builder!"
+            ]
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | Validate the new user input and add it to the builder.
+processNewUserInput :: UserInput -> TxBuilderModel -> Either Text TxBuilderModel
+processNewUserInput u@UserInput{utxoRef} model@TxBuilderModel{userInputs} = do
+  -- Verify that the new utxo is not already being spent.
+  maybeToLeft () $ fmap (const "This input is already being spent.") $ 
+    find (\i -> i ^. _2 % #utxoRef == utxoRef) userInputs
+
+  -- Get the input's new index.
+  let newIdx = length userInputs
+
+  -- Add the new input to the end of the list of user inputs.
+  return $ model & #userInputs %~ flip snoc (newIdx,u)

@@ -125,9 +125,9 @@ pairPaymentWidget model = do
     , spacer
     , hstack 
         [ filler
-        , mainButton "Pair" $ HomeEvent $ PairPaymentWallet ConfirmAdding
-        , spacer
         , button "Cancel" $ HomeEvent $ PairPaymentWallet CancelAdding
+        , spacer
+        , mainButton "Pair" $ HomeEvent $ PairPaymentWallet ConfirmAdding
         ]
     ] `styleBasic` [bgColor transparent, padding 20]
 
@@ -169,8 +169,8 @@ watchPaymentWidget _ = do
     , spacer
     , hstack 
         [ filler
-        , mainButton "Watch" $ HomeEvent $ WatchPaymentWallet ConfirmAdding
-        , spacer
         , button "Cancel" $ HomeEvent $ WatchPaymentWallet CancelAdding
+        , spacer
+        , mainButton "Watch" $ HomeEvent $ WatchPaymentWallet ConfirmAdding
         ]
     ] `styleBasic` [bgColor transparent, padding 20]

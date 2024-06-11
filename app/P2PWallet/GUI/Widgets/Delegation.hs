@@ -68,7 +68,7 @@ delegationWidget model = do
             [ filler
             -- The widget is initialized using PairStakeWallet. It is the same for all wallet 
             -- types.
-            , box (mainButton "Add Wallet" $ DelegationEvent $ PairStakeWallet StartAdding) 
+            , box (mainButton "Add Wallet" $ DelegationEvent $ PairStakeWallet $ StartAdding Nothing) 
                 `styleBasic` [padding 20]
             ]
         ] `nodeVisible` (not isAdding)
@@ -512,7 +512,7 @@ morePopup _ = do
           `styleHover` [bgColor customGray1, cursorIcon CursorHand]
     , customPopup (toLensVL $ #delegationModel % #showMorePopup) $
         vstack
-          [ button "Add Wallet" (DelegationEvent $ PairStakeWallet StartAdding)
+          [ button "Add Wallet" (DelegationEvent $ PairStakeWallet $ StartAdding Nothing)
               `styleBasic`
                 [ border 0 transparent
                 , textSize 12
@@ -521,7 +521,7 @@ morePopup _ = do
                 , textMiddle
                 ]
               `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-          , button "Edit Name" (DelegationEvent $ ChangeStakeWalletName StartAdding)
+          , button "Edit Name" (DelegationEvent $ ChangeStakeWalletName $ StartAdding Nothing)
               `styleBasic`
                 [ border 0 transparent
                 , textSize 12
@@ -531,7 +531,7 @@ morePopup _ = do
                 ]
               `styleHover` [bgColor customGray2, cursorIcon CursorHand]
           , separatorLine `styleBasic` [fgColor black, padding 5]
-          , button "Delete Wallet" (DelegationEvent $ DeleteStakeWallet GetDeleteConfirmation)
+          , button "Delete Wallet" (DelegationEvent $ DeleteStakeWallet $ GetDeleteConfirmation Nothing)
               `styleBasic`
                 [ border 0 transparent
                 , textSize 12
@@ -561,9 +561,9 @@ editStakeWalletWidget _ = do
     , spacer
     , hstack 
         [ filler
-        , mainButton "Confirm" $ DelegationEvent $ ChangeStakeWalletName ConfirmAdding
-        , spacer
         , button "Cancel" $ DelegationEvent $ ChangeStakeWalletName CancelAdding
+        , spacer
+        , mainButton "Confirm" $ DelegationEvent $ ChangeStakeWalletName ConfirmAdding
         ]
     ] `styleBasic` [bgColor customGray3, padding 20, width 700]
 
@@ -579,9 +579,9 @@ confirmDeleteWidget model = do
         ]
     , hstack 
         [ filler
-        , mainButton "Confirm" $ DelegationEvent $ DeleteStakeWallet ConfirmDeletion
-        , spacer
         , button "Cancel" $ DelegationEvent $ DeleteStakeWallet CancelDeletion
+        , spacer
+        , mainButton "Confirm" $ DelegationEvent $ DeleteStakeWallet ConfirmDeletion
         ]
     ] `styleBasic` [bgColor customGray3, padding 20, width 700]
 
