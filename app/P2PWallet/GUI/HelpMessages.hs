@@ -168,6 +168,7 @@ utxoSearchMsg = unlines
   , "2. policy_id"
   , "3. asset_name"
   , "4. fingerprint"
+  , "5. ticker"
   ]
 
 utxoSortMsg :: Text
@@ -212,6 +213,7 @@ txSearchMsg = unlines
   , "2. policy_id"
   , "3. asset_name"
   , "4. fingerprint"
+  , "5. ticker"
   , ""
   , "The search will try to match against any of:"
   , "1. Inputs"

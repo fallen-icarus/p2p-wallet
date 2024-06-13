@@ -181,7 +181,7 @@ instance Creatable Transaction where
     [ "CREATE TABLE " <> tableName @Transaction
     , "("
     , unwords $ intersperse ","
-        [ "tx_hash TEXT PRIMARY KEY"
+        [ "tx_hash TEXT NOT NULL"
         , "profile_id INTEGER REFERENCES profiles (profile_id)"
         , "payment_id INTEGER REFERENCES payment_wallets (payment_id)"
         , "block_time TEXT NOT NULL"
@@ -196,6 +196,7 @@ instance Creatable Transaction where
         , "reference_inputs BLOB"
         , "inputs BLOB"
         , "outputs BLOB"
+        , "PRIMARY KEY (tx_hash,payment_id)"
         ]
     , ");"
     ]

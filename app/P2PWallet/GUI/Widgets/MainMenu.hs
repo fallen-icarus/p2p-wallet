@@ -20,6 +20,7 @@ mainMenuWidget model = do
       -- , changeSceneButton "DEX" remixArrowLeftRightFill LimitOrders
       -- , changeSceneButton "Liquidity" remixWaterFlashLine MarketMakers
       , changeSceneButton "Contacts" contactsBookIcon AddressBookScene
+      , changeSceneButton "Tickers" tickersIcon TickerRegistryScene
       , changeSceneButton "Builder" txBuilderIcon TxBuilderScene
       , changeSceneButton "Settings" settingsIcon SettingsScene
       , filler

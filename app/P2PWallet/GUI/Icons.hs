@@ -112,7 +112,21 @@ largeAddIcon :: Text
 largeAddIcon = toGlyph 0XF4B2
 
 spendUTxOIcon :: Text
-spendUTxOIcon = remixMailSendFill
+spendUTxOIcon = remixSendPlane2Fill
+-- spendUTxOIcon = remixHandCoinLine
+-- spendUTxOIcon = remixMailSendFill
 
 contactsBookIcon :: Text
 contactsBookIcon = remixContactsBook2Line
+
+idCardIcon :: Text
+idCardIcon = toGlyph 0XF4E9
+
+tickersIcon :: Text
+tickersIcon = remixCurrencyLine
+
+downArrowIcon :: Text
+downArrowIcon = remixArrowDownLine
+
+upArrowIcon :: Text
+upArrowIcon = remixArrowUpLine

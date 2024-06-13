@@ -6,9 +6,11 @@ module P2PWallet.GUI.Widgets.Home.NativeAssets
   ) where
 
 import Monomer
+import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
+import P2PWallet.Data.TickerMap
 import P2PWallet.Data.Wallets
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
@@ -17,7 +19,7 @@ import P2PWallet.MonomerOptics()
 import P2PWallet.Prelude
 
 nativeAssetsWidget :: AppModel -> AppNode
-nativeAssetsWidget model =
+nativeAssetsWidget model@AppModel{reverseTickerMap} =
     zstack
       [ vstack 
           [ widgetIf (allAssets /= []) $ vstack
@@ -42,7 +44,7 @@ nativeAssetsWidget model =
                   , spacer_ [width 5]
                   , textField_ 
                       (toLensVL $ #homeModel % #assetFilterModel % #search) 
-                      [placeholder "one of: full name, policy id, asset name, fingerprint"] 
+                      [placeholder "one of: full name, policy id, asset name, fingerprint, ticker"] 
                       `styleBasic`
                         [ textSize 12
                         , width 500
@@ -117,11 +119,12 @@ nativeAssetsWidget model =
     searchFilter :: [NativeAsset] -> [NativeAsset]
     searchFilter
       | searchTarget == "" = filter (const True)
-      | otherwise = filter $ \NativeAsset{..} -> or
+      | otherwise = filter $ \a@NativeAsset{..} -> or
           [ policyId == searchTarget
           , tokenName == searchTarget
           , policyId <> "." <> tokenName == searchTarget
           , fingerprint == searchTarget
+          , fmap fst (Map.lookup (a ^. fullName) reverseTickerMap) == Just searchTarget
           ]
 
     assetRow :: NativeAsset -> AppNode
@@ -131,14 +134,15 @@ nativeAssetsWidget model =
                     $ wallet ^. #utxos
       vstack
         [ hstack 
-            [ copyableLabelMain (a ^. fullName)
+            [ copyableLabelMain (a ^. #fingerprint)
+                `styleBasic` [textSize 12]
             , filler
-            , label (show quantity)
+            , label (showAssetBalance reverseTickerMap a)
                 `styleBasic` [textSize 12]
             ]
         , spacer_ [width 2]
         , hstack 
-            [ label fingerprintIcon
+            [ label idCardIcon
                 `styleBasic` 
                   [ textSize 10
                   , textColor customBlue
@@ -146,8 +150,7 @@ nativeAssetsWidget model =
                   , paddingT 5
                   ]
             , spacer_ [width 3]
-            , copyableLabelSub (a ^. #fingerprint)
-                `styleBasic` [textSize 12]
+            , copyableLabelSub (a ^. fullName)
             , filler
             , label (show utxoCount <> " UTxO(s)")
                 `styleBasic`
@@ -185,6 +188,9 @@ assetFilterWidget _ = do
         , radius 10
         ]
 
+-------------------------------------------------
+-- Helper Widget
+-------------------------------------------------
 -- | A label button that will copy itself.
 copyableLabelMain :: Text -> WidgetNode s AppEvent
 copyableLabelMain caption = 

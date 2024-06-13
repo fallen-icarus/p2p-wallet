@@ -15,6 +15,7 @@ import P2PWallet.GUI.Widgets.MainMenu
 import P2PWallet.GUI.Widgets.Networks
 import P2PWallet.GUI.Widgets.Profiles
 import P2PWallet.GUI.Widgets.Settings
+import P2PWallet.GUI.Widgets.TickerRegistry
 import P2PWallet.GUI.Widgets.TxBuilder
 import P2PWallet.MonomerOptics()
 import P2PWallet.Prelude
@@ -46,6 +47,7 @@ buildUI _ model = do
             , delegationWidget model `nodeVisible` (DelegationScene == model ^. #scene)
             , txBuilderWidget model `nodeVisible` (TxBuilderScene == model ^. #scene)
             , addressBookWidget model `nodeVisible` (AddressBookScene == model ^. #scene)
+            , tickerRegistryWidget model `nodeVisible` (TickerRegistryScene == model ^. #scene)
             ]
         ] `nodeVisible` (isJust $ model ^. #selectedProfile)
     , alertOverlay `nodeVisible` (isJust $ model ^. #alertMessage)

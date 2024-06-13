@@ -24,6 +24,9 @@ module P2PWallet.Actions.Database
   , addNewAddressEntry
   , loadAddressBook
   , deleteAddressEntry
+  , addNewTickerInfo
+  , loadTickerInfo
+  , deleteTickerInfo
   ) where
 
 import System.Directory qualified as Dir
@@ -34,6 +37,7 @@ import P2PWallet.Data.AddressBook
 import P2PWallet.Data.Core
 import P2PWallet.Data.Database
 import P2PWallet.Data.Profile
+import P2PWallet.Data.TickerMap
 import P2PWallet.Data.Transaction
 import P2PWallet.Data.StakeReward
 import P2PWallet.Data.Wallets
@@ -57,6 +61,7 @@ initializeDatabase dbFile = do
       create @StakeWallet dbFile
       create @Transaction dbFile
       create @AddressEntry dbFile
+      create @TickerInfo dbFile
       return $ Right ()
 
 -------------------------------------------------
@@ -175,7 +180,7 @@ addNewPaymentWallet dbFile paymentWallet = do
 -- | Load the payment wallets for the specified profile
 loadPaymentWallets :: FilePath -> ProfileId -> IO (Either Text [PaymentWallet])
 loadPaymentWallets dbFile (ProfileId profileId) = do
-    handle @SomeException (return . Left . ("Could not load payment wallets : " <>) . show) $ do
+    handle @SomeException (return . Left . ("Could not load payment wallets : " <>) . show) $
       Right <$> query dbFile queryStmt
   where
     queryStmt :: Query
@@ -211,12 +216,12 @@ deletePaymentWallet dbFile (PaymentId paymentId) =
 addNewTransactions :: FilePath -> [Transaction] -> IO (Either Text ())
 addNewTransactions dbFile txs = do
   handle @SomeException (return . Left . ("Failed to insert transactions: " <>) . show) $
-    fmap sequence_ $ mapM (fmap Right . insert @Transaction dbFile) txs
+    Right <$> insertMany @Transaction dbFile txs
 
 -- | Load the transactions for the specified payment wallet.
 loadTransactions :: FilePath -> PaymentId -> IO (Either Text [Transaction])
 loadTransactions dbFile (PaymentId paymentId) = do
-    handle @SomeException (return . Left . ("Could not load transactions: " <>) . show) $ do
+    handle @SomeException (return . Left . ("Could not load transactions: " <>) . show) $
       Right <$> query dbFile queryStmt
   where
     queryStmt :: Query
@@ -288,7 +293,7 @@ deleteStakeWallet dbFile (StakeId stakeId) =
 addNewRewards :: FilePath -> [StakeReward] -> IO (Either Text ())
 addNewRewards dbFile rs = do
   handle @SomeException (return . Left . ("Failed to insert rewards: " <>) . show) $
-    fmap sequence_ $ mapM (fmap Right . insert @StakeReward dbFile) rs
+    Right <$> insertMany @StakeReward dbFile rs
 
 -- | Load the rewards for the specified stake wallet.
 loadRewards :: FilePath -> StakeId -> IO (Either Text [StakeReward])
@@ -349,4 +354,36 @@ deleteAddressEntry dbFile (AddressEntryId entryId) =
     deleteSmt = Query $ unwords
       [ "DELETE FROM " <> tableName @AddressEntry
       , "WHERE address_entry_id = " <> show entryId
+      ]
+
+-------------------------------------------------
+-- Ticker Map
+-------------------------------------------------
+-- | Add a new ticker to the database.
+addNewTickerInfo :: FilePath -> TickerInfo -> IO (Either Text ())
+addNewTickerInfo dbFile newTicker = do
+  handle @SomeException (return . Left . ("Failed to insert ticker info: " <>) . show) $
+    fmap Right $ insert @TickerInfo dbFile newTicker
+
+-- | Load the ticker map. The ticker map is the same for all networks and profiles.
+loadTickerInfo :: FilePath -> IO (Either Text [TickerInfo])
+loadTickerInfo dbFile = do
+    handle @SomeException (return . Left . ("Could not load ticker map: " <>) . show) $ do
+      Right <$> query dbFile queryStmt
+  where
+    queryStmt :: Query
+    queryStmt = Query $ unwords
+      [ "SELECT * FROM " <> tableName @TickerInfo
+      ]
+
+deleteTickerInfo :: FilePath -> Text -> IO (Either Text ())
+deleteTickerInfo dbFile ticker = 
+  handle @SomeException (return . Left . ("Failed to delete ticker info: " <>) . show) $ do
+    delete dbFile deleteSmt
+    return $ Right ()
+  where
+    deleteSmt :: Query
+    deleteSmt = Query $ unwords
+      [ "DELETE FROM " <> tableName @TickerInfo
+      , "WHERE ticker = " <> show ticker -- must wrap in quotes
       ]

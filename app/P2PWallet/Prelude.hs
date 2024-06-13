@@ -30,6 +30,7 @@ module P2PWallet.Prelude
     -- * Miscelleneous Functions
   , showValue
   , maybeHead
+  , groupInto
 
     -- * Lens Helpers
   , boolLens
@@ -85,6 +86,12 @@ getTemporaryDirectory = do
   tmpDir <- (<> "/p2p-wallet") <$> Dir.getTemporaryDirectory
   Dir.createDirectoryIfMissing True tmpDir -- Create the subfolder if it doesn't exist yet.
   return tmpDir
+
+-- Break a list into sublists of the specified length.
+groupInto :: Int -> [a] -> [[a]]
+groupInto _ [] = []
+groupInto n xs = 
+  take n xs : groupInto n (drop n xs)
 
 -------------------------------------------------
 -- Time

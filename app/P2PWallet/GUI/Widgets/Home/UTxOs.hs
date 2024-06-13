@@ -8,9 +8,11 @@ import Monomer
 
 import Prettyprinter (align, pretty, vsep)
 import Data.Text qualified as Text
+import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
+import P2PWallet.Data.TickerMap
 import P2PWallet.Data.Wallets
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
@@ -21,7 +23,7 @@ import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 utxosWidget :: AppModel -> AppNode
-utxosWidget model@AppModel{homeModel=HomeModel{..}} =
+utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap} =
     zstack
       [ cushionWidgetH $ vstack
           [ hstack 
@@ -97,9 +99,10 @@ utxosWidget model@AppModel{homeModel=HomeModel{..}} =
     targetQuantity p =
       flip (maybe Nothing) (maybeHead searchTargets) $ \target ->
         fmap (view #quantity) $
-          flip find (p ^. #nativeAssets) $ \NativeAsset{..} -> or
+          flip find (p ^. #nativeAssets) $ \a@NativeAsset{..} -> or
             [ policyId <> "." <> tokenName == target
             , fingerprint == target
+            , fmap fst (Map.lookup (a ^. fullName) reverseTickerMap) == Just target
             ]
 
     applySearchFilter :: [Text] -> [PersonalUTxO] -> [PersonalUTxO]
@@ -113,11 +116,12 @@ utxosWidget model@AppModel{homeModel=HomeModel{..}} =
           [ p ^. #referenceScriptHash == Just searchTarget
           , p ^. #datumHash == Just searchTarget
           , Text.isPrefixOf searchTarget $ showTxOutRef $ p ^. #utxoRef
-          , flip any (p ^. #nativeAssets) $ \NativeAsset{..} -> or
+          , flip any (p ^. #nativeAssets) $ \a@NativeAsset{..} -> or
               [ policyId == searchTarget
               , tokenName == searchTarget
               , policyId <> "." <> tokenName == searchTarget
               , fingerprint == searchTarget
+              , fmap fst (Map.lookup (a ^. fullName) reverseTickerMap) == Just searchTarget
               ]
           ]
 
@@ -288,8 +292,9 @@ utxosWidget model@AppModel{homeModel=HomeModel{..}} =
                   [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , copyableTextArea (show $ align $ vsep $ map pretty nativeAssets)
-                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 700]
+                      , copyableTextArea 
+                          (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
+                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 300]
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`

@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module P2PWallet.Plutus
   ( -- * Plutus Addresses
@@ -16,6 +17,9 @@ module P2PWallet.Plutus
   , PV1.toPubKeyHash
   , PV1.TxOutRef(..)
 
+    -- * Asset Fingerprints
+  , mkAssetFingerprint
+
     -- * Parsing
   , readHex
   , readTxOutRef
@@ -29,6 +33,11 @@ module P2PWallet.Plutus
 
 import Data.Text qualified as T
 import Data.Aeson
+import qualified Codec.Binary.Bech32 as Bech32
+import Codec.Binary.Bech32.TH (humanReadablePart)
+import Crypto.Hash (hash)
+import Crypto.Hash.Algorithms (Blake2b_160)
+import Data.ByteArray (convert)
 
 import PlutusLedgerApi.V1 qualified as PV1
 import PlutusLedgerApi.V1.Address qualified as PV1
@@ -64,6 +73,22 @@ readTxOutRef s =
 -- | Parse PubKeyHash from user supplied Text.
 readPubKeyHash :: Text -> Maybe PV1.PubKeyHash
 readPubKeyHash = fmap PV1.PubKeyHash . readHex
+
+-------------------------------------------------
+-- Asset Fingerprints
+-------------------------------------------------
+mkAssetFingerprint :: Text -> Text -> Either Text Text
+mkAssetFingerprint policyAsText tokenAsText = do
+    BuiltinByteString policyAsByte <- maybeToRight "Not a valid policy id" $ readHex policyAsText
+    BuiltinByteString tokenAsByte <- maybeToRight "Not a valid token name" $ readHex tokenAsText
+
+    return $ Bech32.encodeLenient hrp 
+           $ Bech32.dataPartFromBytes 
+           $ convert 
+           $ hash @_ @Blake2b_160 
+           $ policyAsByte <> tokenAsByte
+  where
+    hrp = [humanReadablePart|asset|]
 
 -------------------------------------------------
 -- Miscellaneous
