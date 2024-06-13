@@ -25,6 +25,7 @@ module P2PWallet.Data.AppModel
   , module P2PWallet.Data.AppModel.Common
   , module P2PWallet.Data.AppModel.Delegation
   , module P2PWallet.Data.AppModel.Home
+  , module P2PWallet.Data.AppModel.TickerRegistry
   , module P2PWallet.Data.AppModel.TxBuilder
   ) where
 
@@ -34,11 +35,13 @@ import P2PWallet.Data.AppModel.AddressBook
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.Delegation
 import P2PWallet.Data.AppModel.Home
+import P2PWallet.Data.AppModel.TickerRegistry
 import P2PWallet.Data.AppModel.TxBuilder
 import P2PWallet.Data.AddressBook
 import P2PWallet.Data.Core
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Profile
+import P2PWallet.Data.TickerMap
 import P2PWallet.Data.Wallets
 import P2PWallet.Prelude
 
@@ -53,6 +56,7 @@ data MainScene
   | DelegationScene
   | TxBuilderScene
   | AddressBookScene
+  | TickerRegistryScene
   | SettingsScene
   deriving (Show,Eq)
 
@@ -81,6 +85,8 @@ data AppEvent
   | DelegationEvent DelegationEvent
   -- | An event for the AddressBook page.
   | AddressBookEvent AddressBookEvent 
+  -- | An event for the Token Registry page.
+  | TickerRegistryEvent TickerRegistryEvent 
   -- | An event for the Tx Builder page.
   | TxBuilderEvent TxBuilderEvent 
   -- | Sync the currently tracked wallets.
@@ -97,7 +103,7 @@ data ProfileEvent
   -- | Load selected profile.
   | LoadSelectedProfile Profile
   -- | Load known information for this profile.
-  | LoadProfileInfo (Wallets,[AddressEntry])
+  | LoadProfileInfo (Wallets, [AddressEntry], [TickerInfo])
   -- | Log out of current profile.
   | LogoutProfile
   -- | Add a new profile.
@@ -154,6 +160,14 @@ data AppModel = AppModel
   , extraTextField :: Text
   -- | This is useful for forcing the redraw of the UI when a text field is changed.
   , forceRedraw :: Bool
+  -- | A mapping from tickers to their on-chain name `policy_id.token_name` and their decimal
+  -- places.
+  , tickerMap :: TickerMap
+  -- | A mapping from on-chain names (`policy_id.token_name`) to tickers and their decimal
+  -- places.
+  , reverseTickerMap :: ReverseTickerMap
+  -- | The ticker registry model
+  , tickerRegistryModel :: TickerRegistryModel
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''AppModel
@@ -181,6 +195,9 @@ instance Default AppModel where
     , extraTextField = ""
     , forceRedraw = False
     , addressBook = []
+    , tickerMap = mempty
+    , reverseTickerMap = mempty
+    , tickerRegistryModel = def
     }
 
 -------------------------------------------------

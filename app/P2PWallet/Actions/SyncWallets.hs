@@ -20,8 +20,8 @@ import P2PWallet.Prelude
 -- | This function gets the latest wallet states, and then backs up the states into the database.
 syncWallets :: FilePath -> Network -> Wallets -> IO Wallets
 syncWallets databaseFile network ws@Wallets{..} = do
-  updatedPaymentWallets <- 
-    pooledMapConcurrently (runQueryPaymentWalletInfo network) paymentWallets >>= 
+  updatedPaymentWallets <-
+    pooledMapConcurrently runQueryPaymentWalletInfo paymentWallets >>= 
       -- Throw an error if syncing failed.
       mapM fromRightOrAppError
   

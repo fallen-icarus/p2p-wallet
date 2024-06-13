@@ -16,6 +16,7 @@ import P2PWallet.GUI.EventHandler.AddressBookEvent
 import P2PWallet.GUI.EventHandler.DelegationEvent
 import P2PWallet.GUI.EventHandler.HomeEvent
 import P2PWallet.GUI.EventHandler.ProfileEvent
+import P2PWallet.GUI.EventHandler.TickerRegistryEvent
 import P2PWallet.GUI.EventHandler.TxBuilderEvent
 import P2PWallet.Prelude
 
@@ -104,6 +105,11 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   -- Address Book Events
   -----------------------------------------------
   AddressBookEvent modal -> handleAddressBookEvent model modal
+
+  -----------------------------------------------
+  -- Ticker Registry Events
+  -----------------------------------------------
+  TickerRegistryEvent modal -> handleTickerRegistryEvent model modal
 
   -----------------------------------------------
   -- TxBuilder Events

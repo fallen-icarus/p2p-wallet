@@ -14,6 +14,7 @@ import Prettyprinter (pretty, align, vsep, tupled)
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
+import P2PWallet.Data.TickerMap
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
@@ -111,7 +112,7 @@ txBuilderWidget model@AppModel{..} = do
         ] `styleBasic` [padding 0]
 
 userInputsList :: AppModel -> AppNode
-userInputsList model@AppModel{txBuilderModel=TxBuilderModel{userInputs}} = do
+userInputsList model@AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerMap} = do
   vstack
     [ label ("Personal UTxOs " <> show (tupled [pretty $ length userInputs]))
     , flip styleBasic [padding 5] $
@@ -207,7 +208,8 @@ userInputsList model@AppModel{txBuilderModel=TxBuilderModel{userInputs}} = do
                   [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , copyableTextArea (show $ align $ vsep $ map pretty nativeAssets)
+                      , copyableTextArea 
+                          (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
                           `styleBasic` [textSize 10, textColor lightGray, maxWidth 700]
                       ]
                   ] `styleBasic` [padding 2]

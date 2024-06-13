@@ -29,7 +29,7 @@ import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Data.Aeson 
 import Data.Text qualified as Text
-import UnliftIO.Async (mapConcurrently)
+import UnliftIO.Async (mapConcurrently,concurrently)
 
 import P2PWallet.Data.Core
 import P2PWallet.Data.Koios.AddressUTxO
@@ -96,25 +96,91 @@ runEvaluateTx network txFile = do
           Nothing -> return $ Left $ show e
         Left err -> return $ Left $ show err
 
-runQueryPaymentWalletInfo :: Network -> PaymentWallet -> IO (Either Text PaymentWallet)
-runQueryPaymentWalletInfo network wallet@PaymentWallet{paymentId,profileId} = do
-    manager <- newManager tlsManagerSettings
-    let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
-        lastBlock = fromMaybe 0 $ fmap (view #blockHeight) $ maybeHead $ wallet ^. #transactions
-    runClientM (queryPaymentWalletInfo (wallet ^. #paymentAddress) lastBlock) env >>= \case
-      Right (us,txs,as) -> do
+-- Sync the latest information for the payment wallet. Try to do as much concurrently as possible.
+runQueryPaymentWalletInfo :: PaymentWallet -> IO (Either Text PaymentWallet)
+runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
+    (utxoRes,(assetRes,txRes)) <- 
+      concurrently queryUTxOsWithRedundancies $
+        concurrently queryNativeAssetsWithRedundancies queryTxsConcurrently
+
+    case pure (,,) <*> utxoRes <*> assetRes <*> txRes of
+      Right (us,as,txs) -> do
         return $ Right $ 
           wallet & #utxos .~ map toPersonalUTxO us
                  & #lovelace .~ sum (map (view #lovelace) us)
                  & #transactions %~ mappend 
                      (sortOn (negate . view #blockTime) $ map (P2P.toTransaction profileId paymentId) txs)
                  & #nativeAssets .~ as
-      Left err -> do
-        let errText = show @Text err
-        if "ResponseTimeout)" == Text.takeEnd 16 errText then
-          return $ Left "Server timed out"
-        else
-          return $ Left errText
+      Left err -> return $ Left err
+  where
+    -- Add one to the blockHeight for the most recently recorded transaction for this wallet.
+    afterBlock :: Integer
+    afterBlock = (+1) $ fromMaybe 0 $ fmap (view #blockHeight) $ maybeHead transactions
+
+    -- Since Koios instances may occassionally return incorrect UTxOs if they are not
+    -- close enough to the chain tip, this would mess with the wallet's notifications.
+    -- To account for this, the UTxOs are queried three times and compared. At least
+    -- two responses must match to move on. The redundant queries occur concurrently.
+    queryUTxOsWithRedundancies :: IO (Either Text [AddressUTxO])
+    queryUTxOsWithRedundancies = do
+      (res1,(res2,res3)) <- concurrently fetchUTxOs (concurrently fetchUTxOs fetchUTxOs)
+      let path1 = pure (\a b c -> a == b || a == c) <*> res1 <*> res2 <*> res3
+          path2 = pure (\b c -> b == c) <*> res2 <*> res3
+      case (path1,path2) of
+        (Right True ,_) -> return $ first show res1
+        (_, Right True) -> return $ first show res2
+        (Left err, _) -> return $ Left $ show err
+        (_, Left err) -> return $ Left $ show err
+        _ -> return $ Left $ "There was an error syncing UTxOs. Wait a few seconds and try again."
+
+    -- Try to query the UTxOs. If a timeout error occurs, just try again.
+    fetchUTxOs :: IO (Either Text [AddressUTxO])
+    fetchUTxOs = do
+      manager <- newManager tlsManagerSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryAddressUTxOs [paymentAddress]) env)
+
+    -- Since Koios instances may occassionally return incorrect native assets if they are not close
+    -- enough to the chain tip, this would mess with the wallet's notifications. To account for
+    -- this, the native assets are queried three times and compared. At least two responses must
+    -- match to move on. The redundant queries occur concurrently.
+    queryNativeAssetsWithRedundancies :: IO (Either Text [NativeAsset])
+    queryNativeAssetsWithRedundancies = do
+      (res1,(res2,res3)) <- concurrently fetchAssets (concurrently fetchAssets fetchAssets)
+      if res1 == res2 || res1 == res2 then return res1
+      else if res2 == res3 then return res2
+      else return $ Left "There was an error syncing assets. Wait a few seconds and try again."
+
+    -- Try to query the Native Assets. If a timeout error occurs, just try again.
+    fetchAssets :: IO (Either Text [NativeAsset])
+    fetchAssets = do
+      manager <- newManager tlsManagerSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryAddressAssets [paymentAddress]) env)
+
+    -- Try to query the tx hashes since last time. If a timeout error occurs, just try again.
+    fetchTxHashes :: IO (Either Text [Text])
+    fetchTxHashes = do
+      manager <- newManager tlsManagerSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> 
+        handleTimeoutError (runClientM (queryAddressTxHashes [paymentAddress] afterBlock) env)
+
+    -- Try to query the transaction info concurrently. The transactions are grouped together,
+    -- 50 per response, since some transactions can be quite large.
+    queryTxsConcurrently :: IO (Either Text [Transaction])
+    queryTxsConcurrently = do
+      hashRes <- fetchTxHashes
+      case hashRes of
+        Left err -> return $ Left $ show err
+        Right hashes -> do
+          manager <- newManager tlsManagerSettings
+          let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+          bimap show concat . sequence <$> 
+            mapConcurrently 
+              (\hs -> handleTimeoutError (runClientM (queryAddressTransactions hs) env))
+              (groupInto 50 hashes)
+
 
 runQueryStakeWalletInfo :: Network -> StakeWallet -> IO (Either Text StakeWallet)
 runQueryStakeWalletInfo network' wallet@StakeWallet{stakeId,profileId} = do
@@ -122,14 +188,16 @@ runQueryStakeWalletInfo network' wallet@StakeWallet{stakeId,profileId} = do
   let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network') 443 "api/v1")
   res <- runClientM (queryStakeWalletInfo $ wallet ^. #stakeAddress) env
   case res of
-    Right ([StakeAccount{..}],rewards,pools,linkedAddresses) -> 
+    Right ([StakeAccount{..}],rewards,pools,linkedAddresses) -> do
+      let newRewardsHistory =
+            sortOn (negate . view #earnedEpoch) (map (P2P.toStakeReward profileId stakeId) rewards)
       return $ Right $
         wallet & #registrationStatus .~ registrationStatus
                & #totalDelegation .~ totalDelegation
                & #utxoBalance .~ utxoBalance
                & #availableRewards .~ availableRewards
                & #delegatedPool .~ maybeHead pools
-               & #rewardHistory .~ map (P2P.toStakeReward profileId stakeId) rewards
+               & #rewardHistory .~ newRewardsHistory
                & #linkedAddresses .~ linkedAddresses
     Right ([],_,_,_) -> 
       -- If a stake address has never been seen on chain before (ie, a UTxO has not been created 
@@ -174,6 +242,7 @@ type KoiosApi
      :> QueryParam' '[Required] "select" Text
      :> QueryParam' '[Required] "is_spent" Text
      :> QueryParam' '[Required] "offset" Int
+     :> QueryParam' '[Required] "order" Text
      :> QueryParam "asset_list" Text
      :> ReqBody '[JSON] ExtendedPaymentAddresses
      :> Post '[JSON] [AddressUTxO]
@@ -236,15 +305,6 @@ submitApi
   :<|> poolListApi
   = client (Proxy :: Proxy KoiosApi)
 
-queryPaymentWalletInfo 
-  :: PaymentAddress 
-  -> Integer 
-  -> ClientM ([AddressUTxO],[Transaction],[NativeAsset])
-queryPaymentWalletInfo addr lastBlock = 
-  (,,) <$> queryAddressUTxOs [addr]
-       <*> queryAddressTransactions [addr] lastBlock
-       <*> queryAddressAssets [addr]
-
 queryStakeWalletInfo :: StakeAddress -> ClientM ([StakeAccount],[StakeReward],[Pool],[PaymentAddress])
 queryStakeWalletInfo addr = do
   acc <- queryStakeAccounts [addr]
@@ -255,33 +315,19 @@ queryStakeWalletInfo addr = do
     <*> queryLinkedPaymentAddresses [addr] 
 
 queryAddressUTxOs :: [PaymentAddress] -> ClientM [AddressUTxO]
-queryAddressUTxOs addrs = do
-    -- Since koios may occassionally return incorrect UTxOs if the instance queried is not properly
-    -- synced, this would create a lot of problems for this program. To account for this, the
-    -- address UTxOs are queried up to three times; the results should match for at least two of
-    -- them. If they don't match, query another three and try again.
-    (r1,r2) <- 
-      (,) <$> queryUTxOs 0 []
-          <*> queryUTxOs 0 []
-
-    -- Only query a third time if necessary.
-    if r1 == r2 then 
-      -- Two results matched so return one of them.
-      return r1 
-    else do
-      -- Query a third time and compare against the previous two.
-      r3 <- queryUTxOs 0 []
-      if r3 == r1 || r3 == r2 then 
-        -- At least two matched.
-        return r3
-      else 
-        -- Query another three times since they did not match.
-        queryAddressUTxOs addrs
-
+queryAddressUTxOs addrs = queryUTxOs 0 []
   where
+    -- | This queries 1000 UTxOs at a time.
     queryUTxOs :: Int -> [AddressUTxO] -> ClientM [AddressUTxO]
     queryUTxOs offset !acc = do
-      !res <- addressUTxOsApi select "eq.false" offset Nothing (ExtendedPaymentAddresses addrs)
+      !res <- 
+        addressUTxOsApi 
+          select 
+          "eq.false" -- not spent
+          offset 
+          "block_height.asc"  -- ordering by block_height
+          Nothing -- no limit
+          (ExtendedPaymentAddresses addrs)
       if length res == 1000 then 
         -- Query again since there may be more.
         queryUTxOs (offset + 1000) $ acc <> res
@@ -307,29 +353,7 @@ queryAddressUTxOs addrs = do
         ]
 
 queryAddressAssets :: [PaymentAddress] -> ClientM [NativeAsset]
-queryAddressAssets addrs = do
-    -- Since koios may occassionally return incorrect results if the instance queried is not
-    -- properly synced, this would create a lot of problems for this program. To account for this,
-    -- the address UTxOs are queried three times; the results should match for at least two of them.
-    -- If they don't match, query another three and try again.
-    (r1,r2) <- 
-      (,) <$> queryAssets 0 []
-          <*> queryAssets 0 []
-
-    -- Only query a third time if necessary.
-    if r1 == r2 then 
-      -- Two results matched so return one of them.
-      return r1 
-    else do
-      -- Query a third time and compare against the previous two.
-      r3 <- queryAssets 0 []
-      if r3 == r1 || r3 == r2 then 
-        -- At least two matched.
-        return r3
-      else 
-        -- Query another three times since they did not match.
-        queryAddressAssets addrs
-
+queryAddressAssets addrs = queryAssets 0 []
   where
     queryAssets :: Int -> [NativeAsset] -> ClientM [NativeAsset]
     queryAssets offset !acc = do
@@ -350,23 +374,23 @@ queryAddressAssets addrs = do
         , "quantity"
         ]
 
-queryAddressTransactions :: [PaymentAddress] -> Integer -> ClientM [Transaction]
-queryAddressTransactions addrs lastBlock =
-    queryTxHashes 0 [] >>= 
-      -- Tx info can be quite large so only 50 transactions are queried at a time.
-      fmap concat . mapM (txInfoApi select . TxHashes) . groupInto 50
+queryAddressTxHashes :: [PaymentAddress] -> Integer -> ClientM [Text]
+queryAddressTxHashes addrs lastBlock = queryHashes 0 []
   where
-    queryTxHashes :: Int -> [Text] -> ClientM [Text]
-    queryTxHashes offset !acc = do
+    queryHashes :: Int -> [Text] -> ClientM [Text]
+    queryHashes offset !acc = do
       (TxHashes hashes) <- 
         addressTxsApi "tx_hash" offset (PaymentAddressesAfterBlock addrs lastBlock)
       if length hashes == 1000 then 
         -- Query again since there may be more.
-        queryTxHashes (offset + 1000) $ acc <> hashes
+        queryHashes (offset + 1000) $ acc <> hashes
       else
         -- That should be the last of the results.
         return $ acc <> hashes
 
+queryAddressTransactions :: [Text] -> ClientM [Transaction]
+queryAddressTransactions = txInfoApi select . TxHashes
+  where
     select :: Text
     select = 
       mconcat $ intersperse ","
@@ -456,11 +480,3 @@ queryPoolIds offset !acc = do
     -- That should be the last of the results.
     return $ acc <> poolIds
 
--------------------------------------------------
--- Helper Functions
--------------------------------------------------
--- Break a list into sublists of the specified length.
-groupInto :: Int -> [a] -> [[a]]
-groupInto _ [] = []
-groupInto n xs = 
-  take n xs : groupInto n (drop n xs)

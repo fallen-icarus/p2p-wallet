@@ -64,6 +64,7 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.Common
       P2PWallet.Data.AppModel.Delegation
       P2PWallet.Data.AppModel.Home
+      P2PWallet.Data.AppModel.TickerRegistry
       P2PWallet.Data.AppModel.TxBuilder
       P2PWallet.Data.AppModel.TxBuilder.ChangeOutput
       P2PWallet.Data.AppModel.TxBuilder.UserInput
@@ -100,6 +101,7 @@ executable p2p-wallet
       -- P2PWallet.Data.FilterLang
       P2PWallet.Data.Profile
       P2PWallet.Data.StakeReward
+      P2PWallet.Data.TickerMap
       P2PWallet.Data.Transaction
       P2PWallet.Data.Wallets
       P2PWallet.Data.Wallets.PaymentWallet
@@ -110,6 +112,7 @@ executable p2p-wallet
       P2PWallet.GUI.EventHandler.DelegationEvent
       P2PWallet.GUI.EventHandler.HomeEvent
       P2PWallet.GUI.EventHandler.ProfileEvent
+      P2PWallet.GUI.EventHandler.TickerRegistryEvent
       P2PWallet.GUI.EventHandler.TxBuilderEvent
       P2PWallet.GUI.HelpMessages
       P2PWallet.GUI.Icons
@@ -130,6 +133,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Networks
       P2PWallet.GUI.Widgets.Profiles
       P2PWallet.GUI.Widgets.Settings
+      P2PWallet.GUI.Widgets.TickerRegistry
       P2PWallet.GUI.Widgets.TxBuilder
       -- P2PWallet.GUI.Widgets.TxBuilder.AddCertificate
       -- P2PWallet.GUI.Widgets.TxBuilder.AddChangeOutput
@@ -177,6 +181,10 @@ executable p2p-wallet
       , vector
       , aeson-pretty
       , sqlite-simple
+      , bech32
+      , bech32-th
+      , cryptonite
+      , memory
 
     -- Directories containing source files.
     hs-source-dirs:   app

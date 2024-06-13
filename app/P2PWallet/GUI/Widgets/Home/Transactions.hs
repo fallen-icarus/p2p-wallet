@@ -9,9 +9,11 @@ module P2PWallet.GUI.Widgets.Home.Transactions
 import Monomer
 import Prettyprinter (align, pretty, vsep)
 import Data.Text qualified as Text
+import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core
+import P2PWallet.Data.TickerMap
 import P2PWallet.Data.Transaction
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
@@ -21,16 +23,32 @@ import P2PWallet.MonomerOptics()
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
--- | Calculate the net ADA flux from this address in the transaction.
-txValueFromWallet :: PaymentAddress -> Transaction -> Ada
-txValueFromWallet addr tx = 
+-- | Calculate the net asset flux from this address in the transaction.
+txValueFromWallet :: PaymentAddress -> Transaction -> (Ada,[NativeAsset])
+txValueFromWallet addr Transaction{inputs,outputs} = 
   let isFromAddress x = x ^. #paymentAddress == addr
-      spent = sum $ map (view #lovelace) $ filter isFromAddress $ tx ^. #inputs
-      received = sum $ map (view #lovelace) $ filter isFromAddress $ tx ^. #outputs
-  in toAda $ received - spent
+      addressInputs = filter isFromAddress inputs
+      addressOutputs = filter isFromAddress outputs
+      (spentLoves,spentAssets) = 
+        ( sum $ map (view #lovelace) addressInputs
+        , concatMap (view #nativeAssets) addressInputs
+        )
+      (receivedLoves,receivedAssets) = 
+        ( sum $ map (view #lovelace) addressOutputs
+        , concatMap (view #nativeAssets) addressOutputs
+        )
+      spentMap = 
+        Map.fromList $ map (\a -> (a ^. fullName, negate $ a ^. #quantity)) spentAssets
+      receivedMap = 
+        Map.fromList $ map (\a -> (a ^. fullName, a ^. #quantity)) receivedAssets
+      bal = map (fromMaybe def . readNativeAsset . \(name,q) -> show q <> " " <> name) 
+          $ filter (\(_,q) -> q /= 0)
+          $ Map.toList 
+          $ Map.unionWith (+) spentMap receivedMap
+  in (toAda $ receivedLoves - spentLoves, bal)
 
 transactionsWidget :: AppModel -> AppNode
-transactionsWidget model@AppModel{homeModel=HomeModel{..},config} =
+transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMap} =
     zstack
       [ cushionWidgetH $ vstack
           [ centerWidgetH $ hstack
@@ -122,11 +140,12 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config} =
       , referenceScriptHash == Just searchTarget
       , datumHash == Just searchTarget
       , Text.isPrefixOf searchTarget $ showTxOutRef utxoRef
-      , flip any nativeAssets $ \NativeAsset{..} -> or
+      , flip any nativeAssets $ \a@NativeAsset{..} -> or
           [ policyId == searchTarget
           , tokenName == searchTarget
           , policyId <> "." <> tokenName == searchTarget
           , fingerprint == searchTarget
+          , fmap fst (Map.lookup (a ^. fullName) reverseTickerMap) == Just searchTarget
           ]
       ]
 
@@ -144,15 +163,40 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config} =
            $ filter withinDateRange 
            $ selectedWallet ^. #transactions
 
+    txAssetFluxWidget :: NativeAsset -> AppNode
+    txAssetFluxWidget a@NativeAsset{..} = do
+      let mTickerInfo = Map.lookup (a ^. fullName) reverseTickerMap
+          (fluxIcon,color)
+            | quantity < 0 = (upArrowIcon, customRed)
+            | otherwise = (downArrowIcon, customBlue)
+          (name,formattedQuantity) = case mTickerInfo of
+            Nothing -> (fingerprint,show quantity)
+            Just (tckr,decimal) -> (tckr, show $ formatQuantity decimal quantity)
+      hstack_ [childSpacing_ 3]
+        [ label fluxIcon 
+            `styleBasic` 
+              [ textFont "Remix"
+              , textSize 8
+              , bgColor color
+              , padding 1
+              , radius 20
+              , textMiddle
+              ]
+        , copyableLabelSelf name 8 lightGray
+        , label formattedQuantity
+            `styleBasic` 
+              [ textSize 8, padding 3, radius 3, bgColor customGray3, textColor color]
+        ] `styleBasic` [bgColor customGray4, padding 3]
+
     txRow :: Transaction -> AppNode
     txRow tx@Transaction{..} = do
-      let txValueFlux = txValueFromWallet (selectedWallet ^. #paymentAddress) tx
-          valueColor
-            | txValueFlux >= 0 = customBlue
+      let (adaFlux,assetFlux) = txValueFromWallet (selectedWallet ^. #paymentAddress) tx
+          adaValueColor
+            | adaFlux >= 0 = customBlue
             | otherwise = customRed
       vstack
         [ hstack 
-            [ copyableLabelSelf txHash
+            [ copyableLabelSelf txHash 12 white
             , spacer_ [width 2]
             , tooltip_ "Inspect" [tooltipDelay 0] $
                 button inspectIcon (HomeEvent $ InspectHomeTransaction tx)
@@ -169,10 +213,10 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config} =
                     ]
                   `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             , filler
-            , label (fromString $ printf "%D ADA" txValueFlux)
+            , label (fromString $ printf "%D ADA" adaFlux)
                 `styleBasic` 
                   [ textSize 12
-                  , textColor valueColor
+                  , textColor adaValueColor
                   ]
             ]
         , hstack
@@ -210,6 +254,9 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config} =
                   , textColor lightGray
                   ]
            ] 
+        , widgetIf (not $ null assetFlux) $ vstack_ [childSpacing_ 3] $ 
+            flip map (groupInto 3 assetFlux) $ \assetRow -> 
+              hstack_ [childSpacing_ 3] $ [filler] <> map txAssetFluxWidget assetRow
         ] `styleBasic` 
             [ padding 10
             , bgColor customGray2
@@ -218,7 +265,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config} =
             ]
 
 inspectionWidget :: Transaction -> AppModel -> AppNode
-inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config} = do
+inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,reverseTickerMap} = do
     vstack
       [ vstack
           [ centerWidgetH $ label "Transaction Summary" 
@@ -350,7 +397,7 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config} 
                 , bgColor transparent
                 ]
           , spacer
-          , label "none" `styleBasic` [textColor lightGray, textSize 12]
+          , label "none" `styleBasic` [textColor lightGray, textSize 10]
           ]
       else
         vstack
@@ -394,8 +441,7 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config} 
       vstack
         [ vstack
             [ hstack 
-                [ copyableLabelSelf (showTxOutRef utxoRef)
-                    `styleBasic` [textSize 12]
+                [ copyableLabelSelf (showTxOutRef utxoRef) 12 white
                 , filler
                 , label (fromString $ printf "%D ADA" $ toAda lovelace) 
                     `styleBasic` [textSize 12]
@@ -509,8 +555,9 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config} 
                   [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , copyableTextArea (show $ align $ vsep $ map pretty nativeAssets)
-                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 700]
+                      , copyableTextArea 
+                          (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
+                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 300]
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`
@@ -661,16 +708,16 @@ txFilterWidget model = do
 -- Helper Widgets
 -------------------------------------------------
 -- | A label button that will copy itself.
-copyableLabelSelf :: Text -> WidgetNode s AppEvent
-copyableLabelSelf caption = 
+copyableLabelSelf :: Text -> Double -> Color -> WidgetNode s AppEvent
+copyableLabelSelf caption fontSize color = 
   tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
     `styleBasic`
       [ padding 0
       , radius 5
       , textMiddle
-      , textSize 12
+      , textSize fontSize
       , border 0 transparent
-      , textColor white
+      , textColor color
       , bgColor transparent
       ]
     `styleHover` [textColor customBlue, cursorIcon CursorHand]

@@ -11,6 +11,7 @@ import P2PWallet.Actions.Database
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Profile
+import P2PWallet.Data.TickerMap
 import P2PWallet.Data.Wallets
 import P2PWallet.Prelude
 
@@ -28,18 +29,21 @@ handleProfileEvent model@AppModel{..} evt = case evt of
     [ Model $ model & #selectedProfile .~ Just profile 
                     & #loadingProfile .~ True
     , Task $ runActionOrAlert (ProfileEvent . LoadProfileInfo) $
-        (,) <$> (loadWallets databaseFile profile >>= fromRightOrAppError)
-            <*> (loadAddressBook databaseFile profile >>= fromRightOrAppError)
+        (,,) <$> (loadWallets databaseFile profile >>= fromRightOrAppError)
+             <*> (loadAddressBook databaseFile profile >>= fromRightOrAppError)
+             <*> (loadTickerInfo databaseFile >>= fromRightOrAppError)
     ]
 
   -- After loading the profile info from the database, update the model.
-  LoadProfileInfo (wallets@Wallets{..},contacts) -> 
+  LoadProfileInfo (wallets@Wallets{..}, contacts, tickers) -> 
     [ Model $ model & #knownWallets .~ wallets
                     & #scene .~ HomeScene
                     & #loadingProfile .~ False
                     & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead paymentWallets)
                     & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead stakeWallets)
                     & #addressBook .~ contacts
+                    & #tickerMap .~ toTickerMap tickers
+                    & #reverseTickerMap .~ toReverseTickerMap tickers
     -- , Task $ return $ SyncWallets StartSync
     ]
 

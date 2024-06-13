@@ -9,7 +9,7 @@
 module P2PWallet.Data.Core.Asset where
 
 import Data.Aeson
-import Prettyprinter (hsep,tupled,Pretty(..))
+import Prettyprinter (Pretty(..))
 import Text.Printf qualified as Printf
 import Database.SQLite.Simple.ToField (ToField(..))
 import Database.SQLite.Simple.FromField (FromField(..))
@@ -95,14 +95,13 @@ data NativeAsset = NativeAsset
 
 makeFieldLabelsNoPrefix ''NativeAsset
 
-instance Pretty NativeAsset where
-  pretty NativeAsset{..} =
-    hsep 
-      [ pretty quantity
-      , pretty (policyId <> "." <> tokenName) 
-      , "  " 
-      , tupled [pretty fingerprint]
-      ]
+instance Default NativeAsset where
+  def = NativeAsset
+    { policyId = ""
+    , tokenName = ""
+    , fingerprint = ""
+    , quantity = 0
+    }
 
 instance ToJSON NativeAsset where
   toJSON NativeAsset{..} = 
@@ -125,14 +124,12 @@ instance FromJSON NativeAsset where
 readNativeAsset :: Text -> Maybe NativeAsset
 readNativeAsset t = case words $ replace "." " " t of
   [policy,name] -> do
-    void $ readHex policy
-    void $ readHex name
-    return $ NativeAsset policy name "" 0
+    fingerprint <- rightToMaybe $ mkAssetFingerprint policy name
+    return $ NativeAsset policy name fingerprint 0
   [num,policy,name] -> do
     n <- readMaybe @Integer $ toString num
-    void $ readHex policy
-    void $ readHex name
-    return $ NativeAsset policy name "" n
+    fingerprint <- rightToMaybe $ mkAssetFingerprint policy name
+    return $ NativeAsset policy name fingerprint n
   _ -> Nothing
 
 fullName :: Getter NativeAsset Text
