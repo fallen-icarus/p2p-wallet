@@ -82,7 +82,6 @@ tickerRegistryWidget AppModel{..} = do
           [ bgColor customGray3
           , padding 20
           , radius 20
-          , width 700
           ]
   where
     isAdding :: Bool
@@ -271,7 +270,7 @@ tickerRegistryWidget AppModel{..} = do
             , spacer
             , mainButton "Confirm" $ TickerRegistryEvent $ DeleteTickerInfo ConfirmDeletion
             ]
-        ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+        ] `styleBasic` [bgColor customGray3, padding 20]
 
 -------------------------------------------------
 -- Helper Widgets

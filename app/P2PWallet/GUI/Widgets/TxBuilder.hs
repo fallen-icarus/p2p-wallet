@@ -39,20 +39,27 @@ txBuilderWidget model@AppModel{..} = do
               ]
           , filler
           , hstack
-              [ filler
-              , addPopup
+              [ changeDetailsWidget model `nodeVisible` (not isEmpty)
+              , filler
+              , box_ [alignBottom] addPopup
               ]
           ] `nodeVisible` and
               [ isNothing targetUserOutput
+              , not isAddingChangeOutput
               ]
       , editUserOutputWidget (maybe "" (view (_2 % #alias)) targetUserOutput)
           `nodeVisible` isJust targetUserOutput
+      , addChangeOutputWidget model
+          `nodeVisible` isAddingChangeOutput
       ] `styleBasic`
           [ padding 20
           ]
   where
     isEmpty :: Bool
     isEmpty = isEmptyBuilder txBuilderModel
+
+    isAddingChangeOutput :: Bool
+    isAddingChangeOutput = txBuilderModel ^. #addingChangeOutput
 
     targetUserOutput :: Maybe (Int,NewUserOutput)
     targetUserOutput = txBuilderModel ^. #targetUserOutput
@@ -83,19 +90,9 @@ txBuilderWidget model@AppModel{..} = do
               `styleHover` [bgColor customGray2, cursorIcon CursorHand]
       vstack
         [ customPopup_ (toLensVL $ #txBuilderModel % #showAddPopup) 
-            [popupAnchor anchor, alignTop, popupAlignToOuterV] $
+            [popupAnchor anchor, alignTop, alignLeft, popupAlignToOuterV] $
             vstack
-              [ button "Input" AppInit
-                  `styleBasic`
-                    [ border 0 transparent
-                    , textSize 12
-                    , bgColor transparent
-                    , textColor customBlue
-                    , textMiddle
-                    ]
-                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-              , separatorLine `styleBasic` [fgColor black]
-              , button "Output" AppInit
+              [ button "Change Address" (TxBuilderEvent $ AddNewChangeOutput $ StartAdding Nothing)
                   `styleBasic`
                     [ border 0 transparent
                     , textSize 12
@@ -210,7 +207,7 @@ userInputsList model@AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseT
                       [ spacer_ [width 10]
                       , copyableTextArea 
                           (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
-                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 700]
+                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 300]
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`
@@ -221,15 +218,15 @@ userInputsList model@AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseT
         ]
 
 actionsList :: AppModel -> AppNode
-actionsList model@AppModel{txBuilderModel=TxBuilderModel{..}} = do
+actionsList model@AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
   let numActions = length userOutputs
   vstack
     [ label ("Actions " <> show (tupled [pretty numActions]))
-    , userOutputsList userOutputs
+    , userOutputsList reverseTickerMap userOutputs
     ] `styleBasic` [padding 5]
 
-userOutputsList :: [(Int,UserOutput)] -> AppNode
-userOutputsList userOutputs = do
+userOutputsList :: ReverseTickerMap -> [(Int,UserOutput)] -> AppNode
+userOutputsList reverseTickerMap userOutputs = do
     flip styleBasic [padding 5] $
       vstack_ [childSpacing] (map utxoRow userOutputs)
         `styleBasic` [padding 10]
@@ -251,7 +248,9 @@ userOutputsList userOutputs = do
     utxoRow :: (Int,UserOutput) -> AppNode
     utxoRow o@(idx,u@UserOutput{..}) =
       hstack
-        [ vstack
+        [ countWidget idx count
+        , spacer
+        , vstack
             [ vstack
                 [ hstack 
                     [ label ("Pay " <> if alias == "" then "external address" else alias)
@@ -326,8 +325,6 @@ userOutputsList userOutputs = do
                     ]
             , widgetIf showDetails $ utxoDetails u
             ]
-        , spacer
-        , countWidget idx count
         ]
 
     countWidget :: Int -> Int -> AppNode
@@ -377,9 +374,8 @@ userOutputsList userOutputs = do
                   , hstack
                       [ spacer_ [width 10]
                       , copyableTextArea 
-                            (show $ align $ vsep $ 
-                               map (pretty . view fullNameAndQuantity) nativeAssets)
-                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 700]
+                          (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
+                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 300]
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`
@@ -388,6 +384,19 @@ userOutputsList userOutputs = do
                 , border 1 black
                 ]
         ]
+
+changeDetailsWidget :: AppModel -> AppNode
+changeDetailsWidget AppModel{txBuilderModel=TxBuilderModel{..}} = do
+  vstack
+    [ hstack 
+        [ label "Change Address:"
+            `styleBasic` [textSize 8]
+        , spacer
+        , label (maybe "not set" toText $ changeOutput ^? _Just % #paymentAddress)
+            `styleBasic` [textSize 8, styleIf (isNothing changeOutput) $ textColor customRed]
+        ]
+    ] `styleBasic` [padding 20, radius 20, bgColor customGray3]
+
 
 editUserOutputWidget :: Text -> AppNode
 editUserOutputWidget recipient = do
@@ -425,7 +434,24 @@ editUserOutputWidget recipient = do
         , spacer
         , mainButton "Confirm" $ TxBuilderEvent $ EditSelectedUserOutput ConfirmAdding
         ]
-    ] `styleBasic` [radius 20, bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [radius 20, bgColor customGray3, padding 20]
+
+addChangeOutputWidget :: AppModel -> AppNode
+addChangeOutputWidget _ = do
+  centerWidget $ vstack 
+    [ hstack 
+        [ label "Change Address:"
+        , spacer
+        , textField (toLensVL $ #txBuilderModel % #newChangeOutput % #paymentAddress)
+        ]
+    , spacer
+    , hstack 
+        [ filler
+        , button "Cancel" $ TxBuilderEvent $ AddNewChangeOutput CancelAdding
+        , spacer
+        , mainButton "Confirm" $ TxBuilderEvent $ AddNewChangeOutput ConfirmAdding
+        ]
+    ] `styleBasic` [bgColor customGray3, padding 20]
 
 -------------------------------------------------
 -- Helper Widgets

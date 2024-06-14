@@ -47,7 +47,6 @@ addPaymentWalletWidget model = do
             , paddingR 20
             , paddingB 20
             , radius 0
-            , width 700
             ]
     ]
 
@@ -76,7 +75,7 @@ pairPaymentWidget model = do
               [ label "Payment Wallet Name:"
               , spacer
               , textField_ (toLensVL $ #homeModel % #newPaymentWallet % #alias) [placeholder "Personal"] 
-                  `styleBasic` [width 400]
+                  `styleBasic` [width 300]
               ]
           , hstack 
               [ label "Payment Key Address Index:"
@@ -155,7 +154,7 @@ watchPaymentWidget _ = do
               , textField_ 
                   (toLensVL $ #homeModel % #newPaymentWallet % #alias) 
                   [placeholder "Personal Watched"] 
-                  `styleBasic` [width 400]
+                  `styleBasic` [width 300]
               ]
           , hstack 
               [ label "Payment Address:"

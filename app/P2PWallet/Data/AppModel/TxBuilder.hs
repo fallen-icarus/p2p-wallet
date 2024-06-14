@@ -58,6 +58,8 @@ data TxBuilderEvent
   | ChangeUserOutputCount Int Int
   -- | Edit selected user output.
   | EditSelectedUserOutput (AddEvent (Int,UserOutput) (Int,UserOutput))
+  -- | Add the new change output.
+  | AddNewChangeOutput (AddEvent NewChangeOutput ChangeOutput)
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -75,6 +77,10 @@ data TxBuilderModel = TxBuilderModel
   , targetUserOutput :: Maybe (Int,NewUserOutput)
   -- | The change output.
   , changeOutput :: Maybe ChangeOutput
+  -- | The new change output information.
+  , newChangeOutput :: NewChangeOutput
+  -- | Whether the add change output widget should be open.
+  , addingChangeOutput :: Bool
   -- | The transaction fee for the built transaction.
   , fee :: Lovelace
   -- | Whether the model is the correct mirror for the tx.body file located in the tmp directory.
@@ -93,6 +99,8 @@ instance Default TxBuilderModel where
     , userOutputs = []
     , targetUserOutput = Nothing
     , changeOutput = Nothing
+    , newChangeOutput = def
+    , addingChangeOutput = False
     , fee = 0
     , isBuilt = False
     , showAddPopup = False

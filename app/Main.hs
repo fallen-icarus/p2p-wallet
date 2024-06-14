@@ -61,4 +61,6 @@ main = do
       -- This is needed to change the background color of alerts.
       darkTheme & mergeThemeStyle L.dialogFrameStyle [bgColor customGray3]
                 & mergeThemeStyle L.emptyOverlayStyle [bgColor $ black & #a .~ 0.4]
+                & setThemeValue L.scrollBarWidth 8
+                & setThemeValue L.scrollThumbWidth 5
                 -- & mergeThemeStyle L.emptyOverlayStyle [bgColor $ customGray1 & #a .~ 0.8]

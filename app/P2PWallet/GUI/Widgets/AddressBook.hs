@@ -184,14 +184,14 @@ addContactWidget = do
             , spacer
             , textField_ (toLensVL $ #addressBookModel % #newAddressEntry % #alias) 
                   [placeholder "Alice"]
-                `styleBasic` [width 500]
+                `styleBasic` [width 300]
             ]
         , hstack 
             [ label "Payment Address:"
             , spacer
             , textField_ (toLensVL $ #addressBookModel % #newAddressEntry % #paymentAddress) 
                   [placeholder "bech32 address"]
-                `styleBasic` [width 500, textSize 10]
+                `styleBasic` [textSize 10]
             ]
         ]
     , spacer
@@ -201,7 +201,7 @@ addContactWidget = do
         , spacer
         , mainButton "Confirm" $ AddressBookEvent $ AddNewAddressEntry ConfirmAdding
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [bgColor customGray3, padding 20]
 
 editContactWidget :: AppNode
 editContactWidget = do
@@ -212,14 +212,14 @@ editContactWidget = do
             , spacer
             , textField_ (toLensVL $ #addressBookModel % #newAddressEntry % #alias) 
                   [placeholder "Alice"]
-                `styleBasic` [width 500]
+                `styleBasic` [width 300]
             ]
         , hstack 
             [ label "Payment Address:"
             , spacer
             , textField_ (toLensVL $ #addressBookModel % #newAddressEntry % #paymentAddress) 
                   [placeholder "bech32 address"]
-                `styleBasic` [width 500, textSize 10]
+                `styleBasic` [textSize 10]
             ]
         ]
     , spacer
@@ -229,7 +229,7 @@ editContactWidget = do
         , spacer
         , mainButton "Confirm" $ AddressBookEvent $ ChangeAddressEntry ConfirmAdding
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [bgColor customGray3, padding 20]
 
 confirmDeleteWidget :: Text -> AppNode
 confirmDeleteWidget alias = do
@@ -246,7 +246,7 @@ confirmDeleteWidget alias = do
         , spacer
         , mainButton "Confirm" $ AddressBookEvent $ DeleteAddressEntry ConfirmDeletion
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [bgColor customGray3, padding 20]
 
 
 addNewUserOutputWidget :: Text -> AppNode
@@ -284,7 +284,7 @@ addNewUserOutputWidget recipient = do
         , spacer
         , mainButton "Confirm" $ AddressBookEvent $ AddNewUserOutputToContact ConfirmAdding
         ]
-    ] `styleBasic` [radius 20, bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [radius 20, bgColor customGray3, padding 20]
 
 -------------------------------------------------
 -- Helper Widgets

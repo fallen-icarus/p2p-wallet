@@ -47,7 +47,6 @@ addStakeWalletWidget model = do
             , paddingR 20
             , paddingB 20
             , radius 0
-            , width 700
             ]
     ]
 
@@ -74,7 +73,7 @@ pairStakeWidget _ = do
               , spacer
               , textField_ (toLensVL $ #delegationModel % #newStakeWallet % #alias) 
                   [placeholder "Personal Stake"]
-                  `styleBasic` [width 400]
+                  `styleBasic` [width 300]
               ]
           , hstack 
               [ label "Stake Key Address Index:"
@@ -129,7 +128,7 @@ watchStakeWidget _ = do
               , textField_ 
                   (toLensVL $ #delegationModel % #newStakeWallet % #alias) 
                   [placeholder "Personal Stake Watched"] 
-                  `styleBasic` [width 400]
+                  `styleBasic` [width 300]
               ]
           , hstack 
               [ label "Stake Address:"

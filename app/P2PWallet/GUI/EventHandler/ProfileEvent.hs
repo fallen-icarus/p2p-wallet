@@ -10,6 +10,7 @@ import Monomer
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Asset
 import P2PWallet.Data.Profile
 import P2PWallet.Data.TickerMap
 import P2PWallet.Data.Wallets
@@ -44,6 +45,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
                     & #addressBook .~ contacts
                     & #tickerMap .~ toTickerMap tickers
                     & #reverseTickerMap .~ toReverseTickerMap tickers
+                    & #fingerprintMap .~ genFingerprintMap wallets
     -- , Task $ return $ SyncWallets StartSync
     ]
 
@@ -165,3 +167,12 @@ handleProfileEvent model@AppModel{..} evt = case evt of
                       & #selectedProfile .~ Nothing
       , Task $ return $ SetNetwork $ config ^. #network
       ]
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | Create the fingerprint map.
+genFingerprintMap :: Wallets -> Map Text (Text,Text)
+genFingerprintMap Wallets{paymentWallets} =
+  let nativeAssets = concatMap (view #nativeAssets) paymentWallets
+  in fromList $ map (\NativeAsset{..} -> (fingerprint,(policyId,tokenName))) nativeAssets

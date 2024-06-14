@@ -11,6 +11,7 @@ module P2PWallet.Data.AppModel.TxBuilder.UserOutput where
 import Prettyprinter (pretty)
 
 import P2PWallet.Data.Core
+import P2PWallet.Data.TickerMap
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -66,8 +67,13 @@ instance Default NewUserOutput where
 -- NewUserOutput <--> UserOutput
 -------------------------------------------------
 -- | Verify the user info for the new output.
-processNewUserOutput :: Network -> NewUserOutput -> Either Text UserOutput
-processNewUserOutput network NewUserOutput{..} = do
+processNewUserOutput 
+  :: Network 
+  -> TickerMap 
+  -> FingerprintMap 
+  -> NewUserOutput 
+  -> Either Text UserOutput
+processNewUserOutput network tickerMap fingerprintMap NewUserOutput{..} = do
   -- Verify the address is a valid address.
   addr <- readPaymentAddress network paymentAddress
 
@@ -75,7 +81,7 @@ processNewUserOutput network NewUserOutput{..} = do
   adaQuantity <- readAda ada
 
   -- Check that the assets are valid. Returns the first error, if any.
-  assets <- sequence $ map parseNativeAsset $ lines nativeAssets
+  assets <- sequence $ map (parseNativeAsset tickerMap fingerprintMap) $ lines nativeAssets
 
   -- Create the new output.
   return $ UserOutput
@@ -87,11 +93,11 @@ processNewUserOutput network NewUserOutput{..} = do
     , count = count
     }
 
-toNewUserOutput :: UserOutput -> NewUserOutput
-toNewUserOutput UserOutput{..} = NewUserOutput
+toNewUserOutput :: ReverseTickerMap -> UserOutput -> NewUserOutput
+toNewUserOutput reverseTickerMap UserOutput{..} = NewUserOutput
   { alias = alias
   , paymentAddress = toText paymentAddress
   , ada = show $ pretty $ toAda lovelace
-  , nativeAssets = unlines $ map (view fullNameAndQuantity) nativeAssets
+  , nativeAssets = unlines $ map (showAssetInList reverseTickerMap) nativeAssets
   , count = count
   }

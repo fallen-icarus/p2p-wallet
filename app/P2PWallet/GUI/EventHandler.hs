@@ -12,6 +12,8 @@ import P2PWallet.Actions.LookupPools
 import P2PWallet.Actions.SyncWallets
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Asset
+import P2PWallet.Data.Wallets
 import P2PWallet.GUI.EventHandler.AddressBookEvent
 import P2PWallet.GUI.EventHandler.DelegationEvent
 import P2PWallet.GUI.EventHandler.HomeEvent
@@ -144,6 +146,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
                   & #knownWallets .~ resp
                   & #homeModel % #selectedWallet .~ updatedPaymentTarget
                   & #delegationModel % #selectedWallet .~ updatedStakeTarget
+                  & #fingerprintMap .~ genFingerprintMap resp
         , Task $
             runActionOrAlert UpdateCurrentDate $ getCurrentDay (config ^. #timeZone)
         ]
@@ -172,3 +175,11 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   UpdateCurrentDate day -> 
     [ Model $ model & #config % #currentDay .~ day ]
 
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | Create the fingerprint map.
+genFingerprintMap :: Wallets -> Map Text (Text,Text)
+genFingerprintMap Wallets{paymentWallets} =
+  let nativeAssets = concatMap (view #nativeAssets) paymentWallets
+  in fromList $ map (\NativeAsset{..} -> (fingerprint,(policyId,tokenName))) nativeAssets

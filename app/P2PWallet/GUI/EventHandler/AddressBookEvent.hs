@@ -153,7 +153,11 @@ handleAddressBookEvent model@AppModel{..} evt = case evt of
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (AddressBookEvent . AddNewUserOutputToContact . AddResult) $
           fromRightOrAppError $ 
-            processNewUserOutput (config ^. #network) (addressBookModel ^. #newUserOutput)
+            processNewUserOutput 
+              (config ^. #network) 
+              tickerMap
+              fingerprintMap
+              (addressBookModel ^. #newUserOutput)
       ]
     AddResult verifiedOutput ->
       -- Get the index for the new output.
