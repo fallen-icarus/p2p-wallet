@@ -186,7 +186,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
         , label formattedQuantity
             `styleBasic` 
               [ textSize 8, padding 3, radius 3, bgColor customGray3, textColor color]
-        ] `styleBasic` [bgColor customGray4, padding 3]
+        ] `styleBasic` [bgColor customGray4, paddingT 2, paddingB 2, paddingL 2, paddingR 0]
 
     txRow :: Transaction -> AppNode
     txRow tx@Transaction{..} = do
@@ -196,7 +196,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
             | otherwise = customRed
       vstack
         [ hstack 
-            [ copyableLabelSelf txHash 12 white
+            [ copyableLabelSelf txHash 11 white
             , spacer_ [width 2]
             , tooltip_ "Inspect" [tooltipDelay 0] $
                 button inspectIcon (HomeEvent $ InspectHomeTransaction tx)
@@ -255,7 +255,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
                   ]
            ] 
         , widgetIf (not $ null assetFlux) $ vstack_ [childSpacing_ 3] $ 
-            flip map (groupInto 3 assetFlux) $ \assetRow -> 
+            flip map (groupInto 2 assetFlux) $ \assetRow -> 
               hstack_ [childSpacing_ 3] $ [filler] <> map txAssetFluxWidget assetRow
         ] `styleBasic` 
             [ padding 10
@@ -274,12 +274,12 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                 , paddingB 10
                 ]
           , cushionWidget $ vscroll_ [wheelRate 100] $ vstack_ [childSpacing_ 5]
-              [ copyableLabelFor 12 "Tx Hash:" txHash
-              , copyableLabelFor 12 "Block Time:" $ show blockTime
-              , copyableLabelFor 12 "Block Height:" $ show blockHeight
-              , copyableLabelFor 12 "Fee:" $ fromString $ printf "%D ADA" $ toAda fee
+              [ copyableLabelFor 10 "Tx Hash:" txHash
+              , copyableLabelFor 10 "Block Time:" $ show blockTime
+              , copyableLabelFor 10 "Block Height:" $ show blockHeight
+              , copyableLabelFor 10 "Fee:" $ fromString $ printf "%D ADA" $ toAda fee
               , hstack
-                  [ copyableLabelFor 12 "Deposit:" $ fromString $ printf "%D ADA" $ toAda deposit
+                  [ copyableLabelFor 10 "Deposit:" $ fromString $ printf "%D ADA" $ toAda deposit
                   , mainButton helpIcon (Alert depositSignMsg)
                       `styleBasic`
                         [ border 0 transparent
@@ -290,12 +290,13 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                         , textColor customBlue
                         , textMiddle
                         , textFont "Remix"
+                        , textSize 10
                         ]
                       `styleHover` [bgColor customGray2, cursorIcon CursorHand]
                   ]
-              , copyableLabelFor 12 "Invalid Before:" $ 
+              , copyableLabelFor 10 "Invalid Before:" $ 
                   maybe "none" (fromString . printf "slot %s") invalidBefore
-              , copyableLabelFor 12 "Invalid After:" $ 
+              , copyableLabelFor 10 "Invalid After:" $ 
                   maybe "none" (fromString . printf "slot %s") invalidAfter
               , utxoField "Reference Inputs:" 
                   Nothing
@@ -391,7 +392,7 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                 [ padding 0
                 , radius 5
                 , textMiddle
-                , textSize 12
+                , textSize 10
                 , border 0 transparent
                 , textColor customBlue
                 , bgColor transparent
@@ -407,7 +408,7 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                     [ padding 0
                     , radius 5
                     , textMiddle
-                    , textSize 12
+                    , textSize 10
                     , border 0 transparent
                     , textColor customBlue
                     , bgColor transparent
@@ -441,15 +442,15 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
       vstack
         [ vstack
             [ hstack 
-                [ copyableLabelSelf (showTxOutRef utxoRef) 12 white
+                [ copyableLabelSelf (showTxOutRef utxoRef) 9 white
                 , filler
                 , label (fromString $ printf "%D ADA" $ toAda lovelace) 
-                    `styleBasic` [textSize 12]
+                    `styleBasic` [textSize 9]
                 ]
             , hstack
                 [ label calendarIcon
                     `styleBasic` 
-                      [ textSize 10
+                      [ textSize 9
                       , textColor customBlue
                       , textFont "Remix"
                       , paddingT 5
@@ -457,13 +458,13 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                 , spacer_ [width 3]
                 , label (showLocalDate (config ^. #timeZone) blockTime)
                     `styleBasic` 
-                      [ textSize 10
+                      [ textSize 9
                       , textColor lightGray
                       ]
                 , spacer
                 , label clockIcon
                     `styleBasic` 
-                      [ textSize 10
+                      [ textSize 9
                       , textColor customBlue
                       , textFont "Remix"
                       , paddingT 5
@@ -471,14 +472,14 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                 , spacer_ [width 3]
                 , label (showLocalTime (config ^. #timeZone) blockTime)
                     `styleBasic` 
-                      [ textSize 10
+                      [ textSize 9
                       , textColor lightGray
                       ]
                 , spacer
                 , widgetIf (not $ null nativeAssets) $ 
                     tooltip_ "Native Assets" [tooltipDelay 0] $ label coinsIcon
                       `styleBasic` 
-                        [ textSize 10
+                        [ textSize 9
                         , textColor customBlue
                         , textFont "Remix"
                         , textMiddle
@@ -487,7 +488,7 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                 , widgetIf (isJust datumHash) $ 
                     tooltip_ "Datum" [tooltipDelay 0] $ label datumIcon
                       `styleBasic` 
-                        [ textSize 10
+                        [ textSize 9
                         , textColor customBlue
                         , textFont "Remix"
                         , textMiddle
@@ -496,7 +497,7 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                 , widgetIf (isJust referenceScriptHash) $ 
                     tooltip_ "Reference Script" [tooltipDelay 0] $ label scriptIcon
                       `styleBasic` 
-                        [ textSize 10
+                        [ textSize 9
                         , textColor customBlue
                         , textFont "Remix"
                         , textMiddle
@@ -513,7 +514,7 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                                 % toggleShow (finalLens % toggleDetails utxoRef))
                       [toggleButtonOffStyle specificUtxoMoreOffStyle]
                       `styleBasic` 
-                        [ textSize 10
+                        [ textSize 9
                         , textColor customBlue
                         , textFont "Remix"
                         , textMiddle
@@ -537,27 +538,27 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
       hstack
         [ filler
         , vstack
-            [ copyableLabelFor 10 "Payment Address:" (toText paymentAddress)
+            [ copyableLabelFor 8 "Payment Address:" (toText paymentAddress)
                 `styleBasic` [padding 2]
-            , copyableLabelFor 10 "Stake Address:" (maybe "none" toText stakeAddress)
+            , copyableLabelFor 8 "Stake Address:" (maybe "none" toText stakeAddress)
                 `styleBasic` [padding 2]
             , widgetMaybe referenceScriptHash $ \hash ->
-                copyableLabelFor 10 "Reference Script Hash:" hash
+                copyableLabelFor 8 "Reference Script Hash:" hash
                   `styleBasic` [padding 2]
             , widgetMaybe datumHash $ \hash ->
-                copyableLabelFor 10 "Datum Hash:" hash
+                copyableLabelFor 8 "Datum Hash:" hash
                   `styleBasic` [padding 2]
             , widgetMaybe inlineDatum $ \x ->
-                copyableLabelFor 10 "Inline Datum:" (showValue x)
+                copyableLabelFor 8 "Inline Datum:" (showValue x)
                   `styleBasic` [padding 2]
             , widgetIf (not $ null nativeAssets) $
                 vstack
-                  [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
+                  [ label "Native Assets:" `styleBasic` [textSize 8, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
                       , copyableTextArea 
                           (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
-                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 300]
+                          `styleBasic` [textSize 8, textColor lightGray, maxWidth 300]
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`
@@ -710,11 +711,12 @@ txFilterWidget model = do
 -- | A label button that will copy itself.
 copyableLabelSelf :: Text -> Double -> Color -> WidgetNode s AppEvent
 copyableLabelSelf caption fontSize color = 
-  tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
+  tooltip_ "Copy" [tooltipDelay 0] $ button_ caption (CopyText caption) [resizeFactor 2]
     `styleBasic`
       [ padding 0
       , radius 5
       , textMiddle
+      , textLeft
       , textSize fontSize
       , border 0 transparent
       , textColor color
@@ -726,7 +728,7 @@ copyableLabelSelf caption fontSize color =
 copyableLabelFor :: Double -> Text -> Text -> WidgetNode s AppEvent
 copyableLabelFor fontSize caption info = 
   hstack
-    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
+    [ tooltip_ "Copy" [tooltipDelay 0] $ button_ caption (CopyText info) [resizeFactor 0]
         `styleBasic`
           [ padding 0
           , radius 5
@@ -738,7 +740,7 @@ copyableLabelFor fontSize caption info =
           ]
         `styleHover` [textColor lightGray, cursorIcon CursorHand]
     , spacer
-    , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize 10]
+    , label_ info [ellipsis,resizeFactor 2] `styleBasic` [padding 0, textColor lightGray, textSize fontSize]
     ]
 
 -------------------------------------------------

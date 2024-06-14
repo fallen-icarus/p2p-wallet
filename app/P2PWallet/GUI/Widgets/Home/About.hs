@@ -124,10 +124,11 @@ copyableLabelFor caption info =
           , border 0 transparent
           , textColor customBlue
           , bgColor transparent
+          , textSize 12
           ]
         `styleHover` [textColor lightGray, cursorIcon CursorHand]
     , spacer
-    , label info `styleBasic` [textColor lightGray]
+    , label_ info [ellipsis,resizeFactor 2] `styleBasic` [textSize 12, textColor lightGray]
     ]
 
 copyableLabelWith :: (ToText a) => Text -> (a -> Text) -> a -> WidgetNode s AppEvent
@@ -142,8 +143,9 @@ copyableLabelWith caption modifier fullInfo = do
           , border 0 transparent
           , textColor customBlue
           , bgColor transparent
+          , textSize 12
           ]
         `styleHover` [textColor lightGray, cursorIcon CursorHand]
     , spacer
-    , label formattedInfo `styleBasic` [textColor lightGray]
+    , label_ formattedInfo [resizeFactor 2] `styleBasic` [textSize 12, textColor lightGray]
     ]

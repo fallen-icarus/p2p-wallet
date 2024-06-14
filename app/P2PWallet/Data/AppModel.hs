@@ -168,6 +168,8 @@ data AppModel = AppModel
   , reverseTickerMap :: ReverseTickerMap
   -- | The ticker registry model
   , tickerRegistryModel :: TickerRegistryModel
+  -- | A mapping from fingerprints to their associated on-chain name.
+  , fingerprintMap :: Map Text (Text,Text)
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''AppModel
@@ -198,6 +200,7 @@ instance Default AppModel where
     , tickerMap = mempty
     , reverseTickerMap = mempty
     , tickerRegistryModel = def
+    , fingerprintMap = mempty
     }
 
 -------------------------------------------------

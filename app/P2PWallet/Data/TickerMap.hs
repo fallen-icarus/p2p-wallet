@@ -12,13 +12,13 @@ import Database.SQLite.Simple (ToRow(..),FromRow(..))
 import Data.Map (foldrWithKey')
 import Data.Text qualified as Text
 import Data.Map qualified as Map
-import Relude.Unsafe qualified as Unsafe
 
 import P2PWallet.Data.Core.Asset hiding (fullName)
 import P2PWallet.Data.Database
 import P2PWallet.Prelude
 
 type TickerMap = Map Text (Text,Text,Word8)
+type FingerprintMap = Map Text (Text,Text)
 type ReverseTickerMap = Map Text (Text,Word8)
 
 -------------------------------------------------
@@ -109,14 +109,6 @@ instance Default NewTickerInfo where
 -------------------------------------------------
 -- Showing native assets
 -------------------------------------------------
-mkScaleFactor :: Word8 -> Rational
-mkScaleFactor decimal = Unsafe.read @Rational
-                      $ "1" <> replicate (fromIntegral decimal) '0' <> " % 1"
-
-formatQuantity :: Word8 -> Integer -> Decimal
-formatQuantity decimal quantity = realFracToDecimal decimal 
-                                $ toRational quantity / mkScaleFactor decimal
-
 showAssetBalance :: ReverseTickerMap -> NativeAsset -> Text
 showAssetBalance reverseMap NativeAsset{..} =
   let mInfo = Map.lookup (policyId <> "." <> tokenName) reverseMap in 

@@ -13,5 +13,6 @@ import Optics.TH
 
 makeFieldLabels ''Color
 makeFieldLabels ''WidgetEnv
+makeFieldLabels ''WidgetNode
 makeFieldLabels ''Theme
 makeFieldLabels ''ThemeState

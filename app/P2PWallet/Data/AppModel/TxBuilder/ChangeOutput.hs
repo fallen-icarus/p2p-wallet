@@ -10,6 +10,7 @@ module P2PWallet.Data.AppModel.TxBuilder.ChangeOutput where
 
 import P2PWallet.Data.Core.Asset
 import P2PWallet.Data.Core.Bech32Address
+import P2PWallet.Data.Core.Network
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -23,9 +24,35 @@ data ChangeOutput = ChangeOutput
   , lovelace :: Lovelace
   -- | The native assets quantities to be returned as change.
   , nativeAssets :: [NativeAsset]
-  -- | Whether the widget expands the info for this output.
-  , showDetails :: Bool
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''ChangeOutput
 
+-------------------------------------------------
+-- New Change Output
+-------------------------------------------------
+-- | Information for the change output. The fee will be deducted from this output.
+data NewChangeOutput = NewChangeOutput
+  -- | The address where the change will go.
+  { paymentAddress :: Text
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''NewChangeOutput
+
+instance Default NewChangeOutput where
+  def = NewChangeOutput
+    { paymentAddress = ""
+    }
+
+-------------------------------------------------
+-- NewChangeOutput <--> ChangeOutput
+-------------------------------------------------
+processNewChangeOutput :: Network -> NewChangeOutput -> Either Text ChangeOutput
+processNewChangeOutput network NewChangeOutput{..} = do
+  addr <- readPaymentAddress network paymentAddress
+
+  return $ ChangeOutput
+    { paymentAddress = addr
+    , lovelace = 0
+    , nativeAssets = []
+    }

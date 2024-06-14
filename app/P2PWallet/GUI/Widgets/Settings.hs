@@ -83,7 +83,7 @@ confirmDeleteWidget model = do
         , spacer
         , mainButton "Confirm" $ ProfileEvent $ DeleteProfile ConfirmDeletion
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [bgColor customGray3, padding 20]
 
 editProfileWidget :: AppModel -> AppNode
 editProfileWidget _ = do
@@ -93,7 +93,7 @@ editProfileWidget _ = do
             [ label "Profile Name:"
             , spacer
             , textField (toLensVL $ #extraTextField)
-                `styleBasic` [width 500]
+                `styleBasic` [width 300]
             ]
         ]
     , spacer
@@ -103,4 +103,4 @@ editProfileWidget _ = do
         , spacer
         , mainButton "Confirm" $ ProfileEvent $ ChangeProfileName ConfirmAdding
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [bgColor customGray3, padding 20]

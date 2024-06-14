@@ -172,11 +172,10 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap} =
       vstack
         [ vstack
             [ hstack 
-                [ copyableLabelSelf (showTxOutRef utxoRef)
-                    `styleBasic` [textSize 12]
+                [ copyableLabelSelf 10 (showTxOutRef utxoRef)
                 , filler
                 , label (fromString $ printf "%D ADA" $ toAda lovelace) 
-                    `styleBasic` [textSize 12]
+                    `styleBasic` [textSize 10]
                 ]
             , hstack
                 [ label calendarIcon
@@ -543,14 +542,14 @@ utxoFilterWidget AppModel{homeModel=HomeModel{..}} = do
 -- Helper Widgets
 -------------------------------------------------
 -- | A label button that will copy itself.
-copyableLabelSelf :: Text -> WidgetNode s AppEvent
-copyableLabelSelf caption = 
+copyableLabelSelf :: Double -> Text -> WidgetNode s AppEvent
+copyableLabelSelf fontSize caption = 
   tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
     `styleBasic`
       [ padding 0
       , radius 5
       , textMiddle
-      , textSize 12
+      , textSize fontSize
       , border 0 transparent
       , textColor white
       , bgColor transparent

@@ -64,7 +64,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   EditSelectedUserOutput modal -> case modal of
     StartAdding mTarget ->
       [ Model $ model & #txBuilderModel % #targetUserOutput .~ 
-          (mTarget & _Just % _2 %~ toNewUserOutput)
+          (mTarget & _Just % _2 %~ toNewUserOutput reverseTickerMap)
       ]
     CancelAdding ->
       [ Model $ model & #txBuilderModel % #targetUserOutput .~ Nothing ]
@@ -72,10 +72,34 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
       [ Task $ runActionOrAlert (TxBuilderEvent . EditSelectedUserOutput . AddResult) $ do
           let (idx,newOutput) = fromMaybe (0,def) $ txBuilderModel ^. #targetUserOutput
           fromRightOrAppError $ fmap (idx,) $
-            processNewUserOutput (config ^. #network) newOutput
+            processNewUserOutput (config ^. #network) tickerMap fingerprintMap newOutput
       ]
     AddResult newInfo@(idx,_) ->
       [ Model $
           model & #txBuilderModel % #userOutputs % ix idx .~ newInfo
                 & #txBuilderModel % #targetUserOutput .~ Nothing
+      ]
+
+  -----------------------------------------------
+  -- Add the new change output
+  -----------------------------------------------
+  AddNewChangeOutput modal -> case modal of
+    StartAdding _ ->
+      [ Model $ model & #txBuilderModel % #newChangeOutput .~ def
+                      & #txBuilderModel % #addingChangeOutput .~ True
+      ]
+    CancelAdding ->
+      [ Model $ model & #txBuilderModel % #newChangeOutput .~ def 
+                      & #txBuilderModel % #addingChangeOutput .~ False
+      ]
+    ConfirmAdding -> 
+      [ Task $ runActionOrAlert (TxBuilderEvent . AddNewChangeOutput . AddResult) $ do
+          fromRightOrAppError $
+            processNewChangeOutput (config ^. #network) (txBuilderModel ^. #newChangeOutput)
+      ]
+    AddResult verifiedChangeOutput ->
+      [ Model $
+          model & #txBuilderModel % #changeOutput .~ Just verifiedChangeOutput
+                & #txBuilderModel % #newChangeOutput .~ def
+                & #txBuilderModel % #addingChangeOutput .~ False
       ]

@@ -244,7 +244,7 @@ editPaymentWalletWidget _ = do
             [ label "Wallet Name:"
             , spacer
             , textField (toLensVL $ #extraTextField) 
-                `styleBasic` [width 500]
+                `styleBasic` [width 400]
             ]
         ]
     , spacer
@@ -254,7 +254,7 @@ editPaymentWalletWidget _ = do
         , spacer
         , mainButton "Confirm" $ HomeEvent $ ChangePaymentWalletName ConfirmAdding
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [bgColor customGray3, padding 20]
 
 confirmDeleteWidget :: AppModel -> AppNode
 confirmDeleteWidget model = do
@@ -271,4 +271,4 @@ confirmDeleteWidget model = do
         , spacer
         , mainButton "Confirm" $ HomeEvent $ DeletePaymentWallet ConfirmDeletion
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [bgColor customGray3, padding 20]

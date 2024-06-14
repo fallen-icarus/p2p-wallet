@@ -302,11 +302,25 @@ spendableEpochMsg = unlines
 
 nativeAssetAreaEntryMsg :: Text
 nativeAssetAreaEntryMsg = unlines
-  [ "Native assets must use the full on-chain name such as:"
-  , "10 c0f8644a01a6bf5db02f4afe30d604975e63dd274f1098a1738e561d.4f7468657254"
+  [ "Native assets must in one of the following formats:"
+  , "1. '# policy_id.asset_name'"
+  , "2. '# fingerprint'"
+  , "3. '# ticker'"
   , ""
   , mconcat $ intersperse " "
-      [ "You can go to another page and copy the asset name; then return here to paste it in."
+      [ "You can go to another page and copy the name; then return here to paste it in."
       , "Your place will be saved."
+      ]
+  , ""
+  , mconcat $ intersperse " "
+      [ "The first two formats must always be paired with a whole number (the fingerprint is just"
+      , "an alias for 'policy_id.asset_name'), but the third format can be paired with a decimal."
+      ]
+  , ""
+  , mconcat $ intersperse " "
+      [ "If you use the ticker, be sure to account for the decimal places! For example, if the"
+      , "fingerprint is 'abc123', the ticker is `ABC`, and the asset uses 6 decimal places, then"
+      , "'1 abc123' is NOT the same as '1 ABC'! Instead, '1 ABC' would be '1000000 abc123'! Pay"
+      , "attention to the conversions!"
       ]
   ]

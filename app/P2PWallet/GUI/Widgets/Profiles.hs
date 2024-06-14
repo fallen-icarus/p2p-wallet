@@ -89,7 +89,7 @@ addProfileWidget _ = do
               [ label "Profile Name:"
               , spacer
               , textField_ (toLensVL $ #newProfile % #alias) [placeholder "Personal"] 
-                  `styleBasic` [width 500]
+                  `styleBasic` [width 300]
               ]
         , hstack
             [ label "Hardware Wallet:"
@@ -124,4 +124,4 @@ addProfileWidget _ = do
         , spacer
         , mainButton "Confirm" $ ProfileEvent $ AddNewProfile ConfirmAdding
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [bgColor customGray3, padding 20]

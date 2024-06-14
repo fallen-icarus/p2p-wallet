@@ -122,14 +122,15 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
                 , centerWidgetH $ 
                     label (fromString $ printf "%D%%" $ fromMaybe 0 liveSaturation)
                       `styleBasic` [textMiddle, textSize 8]
-                , centerWidgetH $ hstack
+                , centerWidgetH $ box_ [alignMiddle] $ vstack
                     [ label (fromString $ printf "%D ADA" $ toAda $ fromMaybe 0 pledge)
-                        `styleBasic` [textMiddle, textSize 8]
+                        `styleBasic` [textCenter, textSize 8]
                     , spacer_ [width 3]
                     , tooltip_ ("Actual: " <> actualPledge) [tooltipDelay 0] $ 
                         label pledgeIcon
                           `styleBasic` 
                             [ textMiddle
+                            , textCenter
                             , textSize 8
                             , textFont "Remix"
                             , textColor pledgeColor

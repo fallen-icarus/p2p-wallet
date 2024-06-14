@@ -47,7 +47,7 @@ nativeAssetsWidget model@AppModel{reverseTickerMap} =
                       [placeholder "one of: full name, policy id, asset name, fingerprint, ticker"] 
                       `styleBasic`
                         [ textSize 12
-                        , width 500
+                        , width 400
                         ]
                   , spacer_ [width 5]
                   , toggleButton_ "Search" (toLensVL $ #forceRedraw)

@@ -21,6 +21,7 @@ import P2PWallet.GUI.Widgets.Delegation.AddStakeWallet
 import P2PWallet.GUI.Widgets.Delegation.PoolPicker
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
+import P2PWallet.MonomerOptics
 import P2PWallet.Prelude
 
 delegationWidget :: AppModel -> AppNode
@@ -85,9 +86,9 @@ mainWidget model =
           [ vstack
               [ centerWidgetH $ hstack
                   [ registrationStatusWidget
-                  , spacer
+                  , spacer_ [width 5]
                   , totalDelegatedWidget
-                  , spacer
+                  , spacer_ [width 5]
                   , rewardsBalanceWidget
                   ]
               , spacer
@@ -98,7 +99,7 @@ mainWidget model =
               [ vstack 
                   [ centerWidgetH $ label "Reward History"
                       `styleBasic` [textFont "Italics", textSize 14, paddingT 10]
-                  , separatorLine `styleBasic` [paddingL 100, paddingR 100, fgColor darkGray]
+                  , separatorLine `styleBasic` [paddingL 70, paddingR 70, fgColor darkGray]
                   , widgetIf (rewardHistory /= []) historyTableWidget
                   , widgetIf (rewardHistory == []) $ centerWidget $ 
                       flip styleBasic [padding 10, bgColor customGray4, radius 10] $ box $ 
@@ -106,7 +107,7 @@ mainWidget model =
                           `styleBasic` [textSize 12]
                   ] `styleBasic` 
                       [ bgColor customGray2, radius 15
-                      , height 360
+                      , height 353
                       ]
               ] `styleBasic` [padding 10]
           ]
@@ -127,7 +128,7 @@ mainWidget model =
                     ]
                   `styleHover` [bgColor customGray1, cursorIcon CursorHand]
               ]
-          , separatorLine `styleBasic` [paddingL 175, paddingR 175, fgColor darkGray]
+          , separatorLine `styleBasic` [paddingL 125, paddingR 125, fgColor darkGray]
           , spacer
           , widgetIf(linkedAddresses == []) $ centerWidget $ 
               flip styleBasic [padding 10, bgColor customGray4, radius 10] $ box $ 
@@ -137,8 +138,8 @@ mainWidget model =
               vscroll_ [scrollOverlay, wheelRate 50, barWidth 3, thumbWidth 3] $ 
                 vstack_ [childSpacing_ 1] $ 
                   flip map linkedAddresses $ \addr ->
-                    centerWidgetH $ copyableLabelSelf 12 lightGray (toText addr)
-                      `styleBasic` [radius 20, padding 5, bgColor customGray4]
+                    centerWidgetH $ copyableLabelSelf 12 lightGray (fitAddress $ toText addr)
+                      `styleBasic` [textCenter,radius 20, padding 5, bgColor customGray4]
           ] `styleBasic` [radius 15, bgColor customGray2, padding 10]
       ] `styleBasic` [padding 10]
   where
@@ -151,17 +152,17 @@ mainWidget model =
     walletTypeLabel
       | isNothing (wallet ^. #stakeKeyPath) = 
           tooltip_ "Watched" [tooltipDelay 0] $ label watchedIcon
-            `styleBasic` [textColor customBlue, textMiddle, textFont "Remix"]
+            `styleBasic` [textSize 12, textColor customBlue, textMiddle, textFont "Remix"]
       | otherwise = 
           tooltip_ "Paired" [tooltipDelay 0] $ label pairedIcon
-            `styleBasic` [textColor customBlue, textMiddle, textFont "Remix"]
+            `styleBasic` [textSize 12, textColor customBlue, textMiddle, textFont "Remix"]
 
     historyTableWidget :: AppNode
     historyTableWidget = do
       vstack
-        [ hgrid_ [childSpacing]
+        [ hgrid_ [childSpacing_ 3]
             [ centerWidgetH $ hstack
-                [ label "Epoch" `styleBasic` [textSize 12]
+                [ label "Epoch" `styleBasic` [textSize 10]
                 , mainButton helpIcon (Alert spendableEpochMsg)
                     `styleBasic`
                       [ border 0 transparent
@@ -170,23 +171,23 @@ mainWidget model =
                       , textColor customBlue
                       , textMiddle
                       , padding 2
-                      , textSize 10
+                      , textSize 8
                       , textFont "Remix"
                       ]
                     `styleHover` [bgColor customGray2, cursorIcon CursorHand]
                 ]
-            , centerWidgetH $ label "Rewards" `styleBasic` [textSize 12]
-            , centerWidgetH $ label "Pool ID" `styleBasic` [textSize 12]
+            , centerWidgetH $ label "Rewards" `styleBasic` [textSize 10]
+            , centerWidgetH $ label "Pool ID" `styleBasic` [textSize 10]
             ] `styleBasic` [padding 5, bgColor customGray4, radiusTL 5, radiusTR 5]
         , spacer_ [width 1]
         , vscroll_ [scrollOverlay, wheelRate 50, thumbWidth 3] $ vstack_ [childSpacing_ 1] $ 
             flip map (take 50 rewardHistory) $ \StakeReward{..} ->
-              hgrid_ [childSpacing]
+              hgrid_ [childSpacing_ 3]
                 [ centerWidgetH $ label (show spendableEpoch) 
-                    `styleBasic` [textSize 12, textColor lightGray]
+                    `styleBasic` [padding 0, textSize 9, textColor lightGray]
                 , centerWidgetH $ label (fromString $ printf "%D ADA" $ toAda amount) 
-                    `styleBasic` [textSize 12, textColor lightGray]
-                , centerWidgetH $ copyableTruncatedPoolId 12 lightGray poolId
+                    `styleBasic` [padding 0, textSize 9, textColor lightGray]
+                , centerWidgetH $ copyableTruncatedPoolId 9 lightGray poolId
                 ] `styleBasic` [padding 5, bgColor customGray4]
         ] `styleBasic` [ padding 10 ]
 
@@ -214,14 +215,14 @@ mainWidget model =
           nameAndTicker = show $ pretty name <+> tupled [pretty ticker]
       vstack
         [ hstack
-            [ label nameAndTicker `styleBasic` [textSize 14]
+            [ label nameAndTicker `styleBasic` [textSize 12]
             , filler
             , changeDelegationButton
             ]
         , spacer_ [width 5]
-        , copyableLabelSelf 10 lightGray (toText poolId)
+        , copyableLabelSelf 9 lightGray (fitPoolId $ toText poolId)
         , spacer_ [width 3]
-        , copyableLabelSelf 10 lightGray homepage
+        , copyableLabelSelf 9 lightGray homepage
         , spacer
         , widgetMaybe retiringEpoch $ \epoch ->
             vstack
@@ -377,7 +378,7 @@ mainWidget model =
         [ hstack
             [ label "Status"
                 `styleBasic`
-                  [ textSize 10
+                  [ textSize 8
                   , textColor lightGray
                   ]
             , registrationButton
@@ -385,7 +386,7 @@ mainWidget model =
         , spacer_ [width 3]
         , label (displayRegistrationStatus registrationStatus)
             `styleBasic`
-              [ textSize 11
+              [ textSize 9
               , if registrationStatus == NotRegistered then 
                   textColor customRed 
                 else 
@@ -393,8 +394,8 @@ mainWidget model =
               ]
         ] `styleBasic`
             [ bgColor customGray2
-            , padding 10
-            , radius 10
+            , padding 8
+            , radius 8
             ]
 
     totalDelegatedWidget :: AppNode
@@ -403,7 +404,7 @@ mainWidget model =
         [ hstack
             [ label "Total Delegated"
                 `styleBasic`
-                  [ textSize 10
+                  [ textSize 8
                   , textColor lightGray
                   ]
             , mainTipButton totalDelegatedMsg
@@ -411,12 +412,12 @@ mainWidget model =
         , spacer_ [width 3]
         , label (fromString $ printf "%D ADA" $ toAda $ wallet ^. #totalDelegation)
             `styleBasic`
-              [ textSize 11
+              [ textSize 9
               ]
         ] `styleBasic`
             [ bgColor customGray2
-            , padding 10
-            , radius 10
+            , padding 8
+            , radius 8
             ]
 
     rewardsBalanceWidget :: AppNode
@@ -425,41 +426,42 @@ mainWidget model =
         [ hstack
             [ label "Rewards Balance"
                 `styleBasic`
-                  [ textSize 10
+                  [ textSize 8
                   , textColor lightGray
                   ]
             , withdrawButton
             ]
         , spacer_ [width 3]
+        -- , label "9999999.999999 ADA"
         , label (fromString $ printf "%D ADA" $ toAda $ wallet ^. #availableRewards)
             `styleBasic`
-              [ textSize 11
+              [ textSize 9
               ]
         ] `styleBasic`
             [ bgColor customGray2
-            , padding 10
-            , radius 10
+            , padding 8
+            , radius 8
             ]
 
     headerWidget :: AppNode
     headerWidget = do
       let innerDormantStyle = 
-            def `styleBasic` [bgColor customGray3, border 1 black]
-                `styleHover` [bgColor customGray2, border 1 black]
+            def `styleBasic` [textSize 10, bgColor customGray3, border 1 black]
+                `styleHover` [textSize 10, bgColor customGray2, border 1 black]
           innerFocusedStyle = 
-            def `styleFocus` [bgColor customGray3, border 1 customBlue]
-                `styleFocusHover` [bgColor customGray2, border 1 customBlue]
+            def `styleFocus` [textSize 10, bgColor customGray3, border 1 customBlue]
+                `styleFocusHover` [textSize 10, bgColor customGray2, border 1 customBlue]
       hstack
         [ hstack
             [ walletTypeLabel
             , spacer_ [width 5]
             , widgetMaybe (wallet ^. #stakeKeyPath) $ \path ->
                 vstack
-                  [ copyableLabelSelf 12 white (toText $ wallet ^. #stakeAddress)
-                  , copyableLabelSelf 10 lightGray $ showDerivationPath path
+                  [ copyableLabelSelf 10 white (toText $ wallet ^. #stakeAddress)
+                  , copyableLabelSelf 8 lightGray $ showDerivationPath path
                   ]
             , widgetIf (isNothing $ wallet ^. #stakeKeyPath) $
-                copyableLabelSelf 12 white (toText $ wallet ^. #stakeAddress)
+                copyableLabelSelf 10 white (toText $ wallet ^. #stakeAddress)
             , spacer_ [width 1]
             , morePopup model `styleBasic` [styleIf (isJust $ wallet ^. #stakeKeyPath) $ paddingT 2]
             ] `styleBasic`
@@ -476,9 +478,10 @@ mainWidget model =
               [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
             `styleBasic` 
               [ bgColor customGray3
-              , width 150
+              , width 120
               , paddingR 10
               , border 1 black
+              , textSize 10
               ]
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         , spacer
@@ -492,6 +495,7 @@ mainWidget model =
               , textColor customBlue
               , textMiddle
               , textFont "Remix"
+              , textSize 12
               ]
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         ]
@@ -508,6 +512,7 @@ morePopup _ = do
             , textColor customBlue
             , textMiddle
             , textFont "Remix"
+            , textSize 12
             ]
           `styleHover` [bgColor customGray1, cursorIcon CursorHand]
     , customPopup (toLensVL $ #delegationModel % #showMorePopup) $
@@ -555,7 +560,7 @@ editStakeWalletWidget _ = do
             [ label "Wallet Name:"
             , spacer
             , textField (toLensVL $ #extraTextField) 
-                `styleBasic` [width 500]
+                `styleBasic` [width 300]
             ]
         ]
     , spacer
@@ -565,7 +570,7 @@ editStakeWalletWidget _ = do
         , spacer
         , mainButton "Confirm" $ DelegationEvent $ ChangeStakeWalletName ConfirmAdding
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [bgColor customGray3, padding 20]
 
 
 confirmDeleteWidget :: AppModel -> AppNode
@@ -583,7 +588,7 @@ confirmDeleteWidget model = do
         , spacer
         , mainButton "Confirm" $ DelegationEvent $ DeleteStakeWallet ConfirmDeletion
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20, width 700]
+    ] `styleBasic` [bgColor customGray3, padding 20]
 
 -------------------------------------------------
 -- Helper Widgets
@@ -617,3 +622,29 @@ copyableTruncatedPoolId fontSize mainColor (PoolID text) =
       , bgColor transparent
       ]
     `styleHover` [textColor customBlue, cursorIcon CursorHand]
+
+-- -- | A label button that will copy itself and show ellipsis if too long.
+-- copyableLabelSelfWithEllipsis :: Double -> Color -> Text -> WidgetNode s AppEvent
+-- copyableLabelSelfWithEllipsis fontSize mainColor caption = do
+--   let formattedCaption
+--         | Text.length caption > 80 = Text.take 40 caption <> "..." <> Text.drop 80 caption
+--         | otherwise = caption
+--   tooltip_ "Copy" [tooltipDelay 0] $ button formattedCaption (CopyText caption)
+--     `styleBasic`
+--       [ padding 0
+--       , textCenter
+--       , textMiddle
+--       , textSize fontSize
+--       , border 0 transparent
+--       , textColor mainColor
+--       , bgColor transparent
+--       ]
+--     `styleHover` [textColor customBlue, cursorIcon CursorHand]
+
+fitPoolId :: Text -> Text
+fitPoolId poolId = Text.take 20 poolId <> "..." <> Text.drop 40 poolId
+
+fitAddress :: Text -> Text
+fitAddress address
+  | Text.length address > 80 = Text.take 40 address <> "..." <> Text.drop 80 address
+  | otherwise = address

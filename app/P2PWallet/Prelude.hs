@@ -31,6 +31,9 @@ module P2PWallet.Prelude
   , showValue
   , maybeHead
   , groupInto
+  , mkScaleFactor
+  , formatQuantity
+  , unFormatQuantity
 
     -- * Lens Helpers
   , boolLens
@@ -92,6 +95,17 @@ groupInto :: Int -> [a] -> [[a]]
 groupInto _ [] = []
 groupInto n xs = 
   take n xs : groupInto n (drop n xs)
+
+mkScaleFactor :: Word8 -> Rational
+mkScaleFactor decimal = Unsafe.read @Rational
+                      $ "1" <> replicate (fromIntegral decimal) '0' <> " % 1"
+
+formatQuantity :: Word8 -> Integer -> Decimal
+formatQuantity decimal quantity = realFracToDecimal decimal 
+                                $ toRational quantity / mkScaleFactor decimal
+
+unFormatQuantity :: Word8 -> Decimal -> Integer
+unFormatQuantity decimal quantity = round $ (toRational quantity) * mkScaleFactor decimal
 
 -------------------------------------------------
 -- Time

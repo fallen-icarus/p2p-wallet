@@ -14,6 +14,7 @@ import Text.Printf qualified as Printf
 import Database.SQLite.Simple.ToField (ToField(..))
 import Database.SQLite.Simple.FromField (FromField(..))
 import Data.Decimal (decimalPlaces)
+import Data.Map qualified as Map
 
 import P2PWallet.Prelude
 import P2PWallet.Plutus
@@ -61,7 +62,7 @@ makeFieldLabelsNoPrefix ''Ada
 readAda :: Text -> Either Text Ada
 readAda text = do
   -- It must be a number.
-  decimal <- maybeToRight "Not a valid number" $ readMaybe @Decimal $ toString text
+  decimal <- maybeToRight "Not a valid ada quantity" $ readMaybe @Decimal $ toString text
 
   -- The number can have no more than 6 decimal places.
   when (decimalPlaces decimal > 6) $ Left "Ada only has up to 6 decimal places."
@@ -145,23 +146,58 @@ fullNameAndQuantity = to get'
     get' NativeAsset{quantity,policyId,tokenName} = 
       show quantity <> " " <> policyId <> "." <> tokenName
 
--- | Native assets are supposed to be of the form '# policy_id.asset_name' and separated
--- by newlines. All quantities must be greater than or equal to 0. This is meant to be used
--- on one line at a time like: `sequence . map parseNativeAsset . lines`.
-parseNativeAsset :: Text -> Either Text NativeAsset
-parseNativeAsset assetLine = do
-  asset@NativeAsset{quantity} <- flip maybeToRight (readNativeAsset assetLine) $
-    unlines
-      [ "Invalid native asset entry. Must be of the form '# policy_id.asset_name'."
-      , "Native assets must be separated by newlines."
+-- | Native assets can be one of:
+-- '# policy_id.asset_name'
+-- '# fingerprint'
+-- '# ticker'
+-- The assets must be separated by newlines and all quantities must be greater than or equal to 0.
+parseNativeAsset 
+  :: Map Text (Text,Text,Word8) 
+  -> Map Text (Text,Text) 
+  -> Text 
+  -> Either Text NativeAsset
+parseNativeAsset tickerMap fingerprintMap assetLine =
+    case words assetLine of
+      [num,name] -> do
+        asset <- maybeToRight parseErrorMsg $ asum
+          [ parseTickerEntry num name
+          , parseOnChainEntry assetLine
+          , parseFingerprintEntry num name
+          ]
+        if asset ^. #quantity < 0 then Left $ "Quantities must be >= 0: " <> assetLine
+        else return asset
+      _ -> Left $ toText parseErrorMsg
+  where
+    parseErrorMsg :: Text
+    parseErrorMsg = unlines
+      [ "Invalid native asset entry. Entries must be separated by newlines, and be one of:"
+      , "'# policy_id.asset_name'"
+      , "'# fingerprint'"
+      , "'# ticker'"
       , ""
       , "Could not parse: '" <> assetLine <> "'"
       ]
 
-  if quantity >= 0 then Right asset else 
-    Left $
-      unlines 
-        [ "Native asset quantities must be greater than or equal to 0."
-        , ""
-        , "Invalid quantity: '" <> assetLine <> "'"
-        ]
+    parseTickerEntry :: Text -> Text -> Maybe NativeAsset
+    parseTickerEntry num name =
+      case Map.lookup name tickerMap of
+        Nothing -> Nothing
+        Just (policy,assetName,decimal) -> do
+          rawQuantity <- readMaybe @Decimal $ toString num
+          readNativeAsset $ unwords
+            [ show (unFormatQuantity decimal rawQuantity)
+            , policy <> "." <> assetName
+            ]
+
+    parseOnChainEntry :: Text -> Maybe NativeAsset
+    parseOnChainEntry asset = readNativeAsset asset
+
+    parseFingerprintEntry :: Text -> Text -> Maybe NativeAsset
+    parseFingerprintEntry num name =
+      case Map.lookup name fingerprintMap of
+        Nothing -> Nothing
+        Just (policy,assetName) -> do
+          readNativeAsset $ unwords
+            [ num
+            , policy <> "." <> assetName
+            ]
