@@ -130,3 +130,15 @@ downArrowIcon = remixArrowDownLine
 
 upArrowIcon :: Text
 upArrowIcon = remixArrowUpLine
+
+indeterminateCheckboxIcon :: Text
+indeterminateCheckboxIcon = remixCheckboxIndeterminateLine
+
+checkedBoxIcon :: Text
+checkedBoxIcon = remixCheckboxLine
+
+uncheckedBoxIcon :: Text
+uncheckedBoxIcon = remixCheckboxBlankLine
+
+notificationCircleIcon :: Text
+notificationCircleIcon = toGlyph 0XF3C1

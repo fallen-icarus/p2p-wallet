@@ -48,15 +48,15 @@ executable p2p-wallet
     -- Modules included in this executable, other than Main.
     other-modules:
       P2PWallet.Actions.AddWallet
-      -- P2PWallet.Actions.BuildTxBody
+      P2PWallet.Actions.BuildTxBody
       P2PWallet.Actions.Database
       -- P2PWallet.Actions.ExportTxBody
       P2PWallet.Actions.ExportHwKey
       P2PWallet.Actions.LookupPools
       P2PWallet.Actions.Query.Koios
       P2PWallet.Actions.Utils
-      -- P2PWallet.Actions.SignTx
-      -- P2PWallet.Actions.SubmitTx
+      P2PWallet.Actions.SignTxBody
+      P2PWallet.Actions.SubmitTx
       P2PWallet.Actions.SyncWallets
       P2PWallet.Data.AddressBook
       P2PWallet.Data.AppModel
@@ -83,7 +83,7 @@ executable p2p-wallet
       P2PWallet.Data.Core.RegistrationStatus
       P2PWallet.Data.Core.StakeId
       P2PWallet.Data.Core.TxCBOR
-      -- P2PWallet.Data.Core.Witness
+      P2PWallet.Data.Core.Witness
       P2PWallet.Data.Database
       P2PWallet.Data.Database.Create
       P2PWallet.Data.Database.Delete
@@ -97,8 +97,7 @@ executable p2p-wallet
       P2PWallet.Data.Koios.StakeAccount
       P2PWallet.Data.Koios.StakeReward
       P2PWallet.Data.Koios.Transaction
-      -- P2PWallet.Data.Koios.TxSubmissionResponse
-      -- P2PWallet.Data.FilterLang
+      P2PWallet.Data.Koios.TxSubmissionResponse
       P2PWallet.Data.Profile
       P2PWallet.Data.StakeReward
       P2PWallet.Data.TickerMap
@@ -135,13 +134,6 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Settings
       P2PWallet.GUI.Widgets.TickerRegistry
       P2PWallet.GUI.Widgets.TxBuilder
-      -- P2PWallet.GUI.Widgets.TxBuilder.AddCertificate
-      -- P2PWallet.GUI.Widgets.TxBuilder.AddChangeOutput
-      -- P2PWallet.GUI.Widgets.TxBuilder.AddInput
-      -- P2PWallet.GUI.Widgets.TxBuilder.AddOutput
-      -- P2PWallet.GUI.Widgets.TxBuilder.AddWithdrawal
-      -- P2PWallet.GUI.Widgets.TxBuilder.ExportTxBody
-      -- P2PWallet.GUI.Widgets.TxBuilder.Summary
       P2PWallet.MonomerOptics
       P2PWallet.Plutus
       P2PWallet.Prelude

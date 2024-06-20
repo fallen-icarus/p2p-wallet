@@ -21,7 +21,6 @@ import P2PWallet.GUI.Widgets.Delegation.AddStakeWallet
 import P2PWallet.GUI.Widgets.Delegation.PoolPicker
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
-import P2PWallet.MonomerOptics
 import P2PWallet.Prelude
 
 delegationWidget :: AppModel -> AppNode

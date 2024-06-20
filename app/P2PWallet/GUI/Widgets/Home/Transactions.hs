@@ -255,7 +255,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
                   ]
            ] 
         , widgetIf (not $ null assetFlux) $ vstack_ [childSpacing_ 3] $ 
-            flip map (groupInto 2 assetFlux) $ \assetRow -> 
+            flip map (groupInto 3 assetFlux) $ \assetRow -> 
               hstack_ [childSpacing_ 3] $ [filler] <> map txAssetFluxWidget assetRow
         ] `styleBasic` 
             [ padding 10

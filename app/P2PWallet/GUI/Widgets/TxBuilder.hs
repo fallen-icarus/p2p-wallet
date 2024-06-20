@@ -9,6 +9,7 @@ import Monomer hiding
   ( popupAnchor
   , alignTop
   , popupAlignToOuterV
+  , popupAlignToOuterH
   )
 import Prettyprinter (pretty, align, vsep, tupled)
 
@@ -39,9 +40,23 @@ txBuilderWidget model@AppModel{..} = do
               ]
           , filler
           , hstack
-              [ changeDetailsWidget model `nodeVisible` (not isEmpty)
+              [ filler
+              , box_ [alignMiddle] $ hstack
+                  [ spacer_ [width 50]
+                  , mainButton "Build" (TxBuilderEvent BuildTx)
+                      `nodeVisible` canBeBuilt
+                  , button "Build" AppInit
+                      `nodeEnabled` canBeBuilt
+                      `nodeVisible` not canBeBuilt
+                  , spacer_ [width 3]
+                  , mainButton "Sign & Submit" (TxBuilderEvent SignAndSubmitTx)
+                      `nodeVisible` txBuilderModel ^. #isBuilt
+                  , button "Sign & Submit" AppInit
+                      `nodeEnabled` txBuilderModel ^. #isBuilt
+                      `nodeVisible` (not $ txBuilderModel ^. #isBuilt)
+                  ] `nodeVisible` not isEmpty
               , filler
-              , box_ [alignBottom] addPopup
+              , box_ [alignBottom,alignRight] addPopup
               ]
           ] `nodeVisible` and
               [ isNothing targetUserOutput
@@ -58,6 +73,17 @@ txBuilderWidget model@AppModel{..} = do
     isEmpty :: Bool
     isEmpty = isEmptyBuilder txBuilderModel
 
+    canBeBuilt :: Bool
+    canBeBuilt = and
+      [ isJust $ txBuilderModel ^. #changeOutput
+      , Just "" /= txBuilderModel ^? #changeOutput % _Just % #paymentAddress
+      , txBuilderModel ^. #isBalanced
+      , if txBuilderModel ^. #requiresCollateral then 
+          isJust $ txBuilderModel ^. #collateralInput
+        else
+          True
+      ]
+
     isAddingChangeOutput :: Bool
     isAddingChangeOutput = txBuilderModel ^. #addingChangeOutput
 
@@ -69,6 +95,11 @@ txBuilderWidget model@AppModel{..} = do
       vstack
         [ centerWidgetH $ label "Tx Builder"
             `styleBasic` [paddingT 10, paddingB 10, textFont "Italics", textColor white, textSize 18]
+        , box_ [alignMiddle] $ hstack
+            [ changeInfoPopup model
+            , spacer_ [width 2]
+            , statusBar model
+            ]
         , actionsList model
         , widgetIf (txBuilderModel ^. #userInputs /= []) $ userInputsList model
         ]
@@ -76,7 +107,7 @@ txBuilderWidget model@AppModel{..} = do
     addPopup :: AppNode
     addPopup = do
       let anchor = 
-            button addIcon (TxBuilderEvent ShowTxAddPopup)
+            button remixCommandLine (TxBuilderEvent ShowTxAddPopup)
               `styleBasic`
                 [ border 0 transparent
                 , radius 20
@@ -92,12 +123,22 @@ txBuilderWidget model@AppModel{..} = do
         [ customPopup_ (toLensVL $ #txBuilderModel % #showAddPopup) 
             [popupAnchor anchor, alignTop, alignLeft, popupAlignToOuterV] $
             vstack
-              [ button "Change Address" (TxBuilderEvent $ AddNewChangeOutput $ StartAdding Nothing)
+              [ button "Change Output" (TxBuilderEvent $ AddNewChangeOutput $ StartAdding Nothing)
                   `styleBasic`
                     [ border 0 transparent
                     , textSize 12
                     , bgColor transparent
                     , textColor customBlue
+                    , textMiddle
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              , separatorLine `styleBasic` [fgColor black, padding 5]
+              , button "Reset" (TxBuilderEvent ResetBuilder)
+                  `styleBasic`
+                    [ border 0 transparent
+                    , textSize 12
+                    , bgColor transparent
+                    , textColor customRed
                     , textMiddle
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
@@ -108,12 +149,135 @@ txBuilderWidget model@AppModel{..} = do
                   ]
         ] `styleBasic` [padding 0]
 
+statusBar :: AppModel -> AppNode
+statusBar AppModel{txBuilderModel=TxBuilderModel{..}} = do
+  let checkboxIcon b
+        | b == Nothing = indeterminateCheckboxIcon
+        | b == Just True = checkedBoxIcon
+        | otherwise = uncheckedBoxIcon
+      checkboxColor b
+        | b == Nothing = gray
+        | b == Just True = customBlue
+        | otherwise = customRed
+      collateralState
+        | requiresCollateral = Just $ isJust collateralInput
+        | otherwise = Nothing
+      changeAddressSet = and
+        [ isJust changeOutput
+        , Just "" /= changeOutput ^? _Just % #paymentAddress
+        ]
+  hstack_ [childSpacing]
+    [ hstack
+        [ label "Change Address"
+            `styleBasic`
+              [ textSize 12 ]
+        , spacer_ [width 3]
+        , label (checkboxIcon $ Just changeAddressSet)
+            `styleBasic`
+              [ textFont "Remix"
+              , textColor $ checkboxColor $ Just changeAddressSet
+              , textMiddle
+              , textSize 12
+              ]
+        ]
+    , separatorLine
+    , hstack
+        [ label "Balanced"
+            `styleBasic`
+              [ textSize 12 ]
+        , spacer_ [width 3]
+        , label (checkboxIcon $ Just isBalanced)
+            `styleBasic`
+              [ textFont "Remix"
+              , textColor $ checkboxColor $ Just isBalanced
+              , textMiddle
+              , textSize 12
+              ]
+        ]
+    , separatorLine
+    , hstack
+        [ label "Collateral"
+            `styleBasic`
+              [ textSize 12 ]
+        , spacer_ [width 3]
+        , label (checkboxIcon collateralState)
+            `styleBasic`
+              [ textFont "Remix"
+              , textColor $ checkboxColor collateralState
+              , textMiddle
+              , textSize 12
+              ]
+        ]
+    ] `styleBasic`
+        [ bgColor customGray2
+        , border 1 black
+        , padding 10
+        , radius 15
+        ]
+
+changeInfoPopup :: AppModel -> AppNode
+changeInfoPopup AppModel{txBuilderModel,reverseTickerMap} = do
+  let ChangeOutput{..} = fromMaybe def $ txBuilderModel ^. #changeOutput
+      anchor = 
+        box_ [alignMiddle] $ tooltip_ "Change Info" [tooltipDelay 0] $
+          button remixExchangeDollarLine (TxBuilderEvent ShowTxChangePopup)
+            `styleBasic`
+              [ border 0 transparent
+              , radius 20
+              , padding 2
+              , bgColor transparent
+              , textColor customBlue
+              , textMiddle
+              , textFont "Remix"
+              ]
+            `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+  customPopup_ (toLensVL $ #txBuilderModel % #showChangePopup) 
+    [popupAnchor anchor, alignBottom, popupAlignToOuterV] $
+    vstack
+      [ hstack 
+          [ label "Change Address:"
+              `styleBasic` [textSize 8]
+          , spacer
+          , if paymentAddress == "" then 
+              label "not set"
+               `styleBasic` [textColor customRed, textSize 8]
+            else
+              label (toText paymentAddress)
+               `styleBasic` [textSize 8]
+          ]
+      , spacer_ [width 5]
+      , hstack 
+          [ label "Value:"
+              `styleBasic` [textSize 8]
+          , spacer
+          , label (fromString $ printf "%D ADA" $ toAda lovelace)
+              `styleBasic` [textSize 8]
+          ]
+      , widgetIf (not $ null nativeAssets) $
+          vstack
+            [ spacer_ [width 5]
+            , label "Native Assets:" `styleBasic` [textSize 8]
+            , hstack
+                [ spacer_ [width 10]
+                , copyableTextArea 
+                    (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
+                    `styleBasic` [textSize 8, maxWidth 300]
+                ]
+            ]
+      ] `styleBasic`
+          [ bgColor customGray3
+          , border 1 black
+          , padding 10
+          , maxWidth 600
+          ]
+
 userInputsList :: AppModel -> AppNode
-userInputsList model@AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerMap} = do
+userInputsList AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerMap} = do
   vstack
     [ label ("Personal UTxOs " <> show (tupled [pretty $ length userInputs]))
+        `styleBasic` [textSize 12]
     , flip styleBasic [padding 5] $
-        vstack_ [childSpacing] (map utxoRow userInputs)
+        vscroll_ [wheelRate 50] $ vstack_ [childSpacing] (map utxoRow userInputs)
           `styleBasic` [padding 10]
     ] `styleBasic` [padding 5]
   where
@@ -218,11 +382,12 @@ userInputsList model@AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseT
         ]
 
 actionsList :: AppModel -> AppNode
-actionsList model@AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
+actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
   let numActions = length userOutputs
   vstack
     [ label ("Actions " <> show (tupled [pretty numActions]))
-    , userOutputsList reverseTickerMap userOutputs
+        `styleBasic` [textSize 12]
+    , vscroll_ [wheelRate 50] $ userOutputsList reverseTickerMap userOutputs
     ] `styleBasic` [padding 5]
 
 userOutputsList :: ReverseTickerMap -> [(Int,UserOutput)] -> AppNode
@@ -248,8 +413,45 @@ userOutputsList reverseTickerMap userOutputs = do
     utxoRow :: (Int,UserOutput) -> AppNode
     utxoRow o@(idx,u@UserOutput{..}) =
       hstack
-        [ countWidget idx count
-        , spacer
+        [ hstack
+            [ vstack
+                [ spacer_ [width 15]
+                , box_ [alignCenter,alignTop] $ tooltip_ "Edit Output" [tooltipDelay 0] $
+                    button editIcon 
+                        (TxBuilderEvent $ EditSelectedUserOutput $ StartAdding $ Just o)
+                      `styleBasic` 
+                        [ textSize 10
+                        , textColor customBlue
+                        , textFont "Remix"
+                        , textMiddle
+                        , padding 3
+                        , radius 3
+                        , bgColor transparent
+                        , border 0 transparent
+                        ]
+                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                ]
+            , spacer_ [width 2]
+            , countWidget idx count
+            , spacer_ [width 2]
+            , vstack
+                [ spacer_ [width 15]
+                , box_ [alignCenter,alignTop] $ tooltip_ "Remove Output" [tooltipDelay 0] $
+                    button closeCircleIcon (TxBuilderEvent $ RemoveSelectedUserOutput idx)
+                      `styleBasic` 
+                        [ textSize 10
+                        , textColor customRed
+                        , textFont "Remix"
+                        , textMiddle
+                        , padding 3
+                        , radius 3
+                        , bgColor transparent
+                        , border 0 transparent
+                        ]
+                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                ]
+            ]
+        , spacer_ [width 3]
         , vstack
             [ vstack
                 [ hstack 
@@ -271,32 +473,6 @@ userOutputsList reverseTickerMap userOutputs = do
                 , hstack
                     [ copyableLabelSelf (toText paymentAddress) lightGray 10
                     , filler
-                    , tooltip_ "Remove Output" [tooltipDelay 0] $
-                        button closeCircleIcon (TxBuilderEvent $ RemoveSelectedUserOutput idx)
-                          `styleBasic` 
-                            [ textSize 10
-                            , textColor customRed
-                            , textFont "Remix"
-                            , textMiddle
-                            , padding 0
-                            , bgColor transparent
-                            , border 0 transparent
-                            ]
-                          `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-                    , spacer_ [width 3]
-                    , tooltip_ "Edit Output" [tooltipDelay 0] $
-                        button editIcon 
-                            (TxBuilderEvent $ EditSelectedUserOutput $ StartAdding $ Just o)
-                          `styleBasic` 
-                            [ textSize 10
-                            , textColor customBlue
-                            , textFont "Remix"
-                            , textMiddle
-                            , padding 0
-                            , bgColor transparent
-                            , border 0 transparent
-                            ]
-                          `styleHover` [bgColor customGray1, cursorIcon CursorHand]
                     , widgetIf (nativeAssets /= []) $ hstack
                         [ spacer_ [width 5]
                         , tooltip_ (moreTip showDetails) [tooltipDelay 0] $
@@ -385,19 +561,6 @@ userOutputsList reverseTickerMap userOutputs = do
                 ]
         ]
 
-changeDetailsWidget :: AppModel -> AppNode
-changeDetailsWidget AppModel{txBuilderModel=TxBuilderModel{..}} = do
-  vstack
-    [ hstack 
-        [ label "Change Address:"
-            `styleBasic` [textSize 8]
-        , spacer
-        , label (maybe "not set" toText $ changeOutput ^? _Just % #paymentAddress)
-            `styleBasic` [textSize 8, styleIf (isNothing changeOutput) $ textColor customRed]
-        ]
-    ] `styleBasic` [padding 20, radius 20, bgColor customGray3]
-
-
 editUserOutputWidget :: Text -> AppNode
 editUserOutputWidget recipient = do
   let maybeLens' = maybeLens (0,def) (#txBuilderModel % #targetUserOutput)
@@ -443,6 +606,8 @@ addChangeOutputWidget _ = do
         [ label "Change Address:"
         , spacer
         , textField (toLensVL $ #txBuilderModel % #newChangeOutput % #paymentAddress)
+            `styleBasic`
+              [textSize 10]
         ]
     , spacer
     , hstack 

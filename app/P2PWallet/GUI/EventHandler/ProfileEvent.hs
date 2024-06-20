@@ -46,7 +46,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
                     & #tickerMap .~ toTickerMap tickers
                     & #reverseTickerMap .~ toReverseTickerMap tickers
                     & #fingerprintMap .~ genFingerprintMap wallets
-    -- , Task $ return $ SyncWallets StartSync
+    , Task $ return $ SyncWallets StartSync
     ]
 
   LogoutProfile -> 

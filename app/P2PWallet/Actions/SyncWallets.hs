@@ -1,7 +1,4 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
-{-# LANGUAGE TypeOperators #-}
 
 module P2PWallet.Actions.SyncWallets
   (

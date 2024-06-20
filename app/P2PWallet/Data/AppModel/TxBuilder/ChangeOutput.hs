@@ -28,6 +28,13 @@ data ChangeOutput = ChangeOutput
 
 makeFieldLabelsNoPrefix ''ChangeOutput
 
+instance Default ChangeOutput where
+  def = ChangeOutput
+    { paymentAddress = ""
+    , lovelace = 0
+    , nativeAssets = []
+    }
+
 -------------------------------------------------
 -- New Change Output
 -------------------------------------------------
@@ -35,6 +42,8 @@ makeFieldLabelsNoPrefix ''ChangeOutput
 data NewChangeOutput = NewChangeOutput
   -- | The address where the change will go.
   { paymentAddress :: Text
+  , lovelace :: Lovelace
+  , nativeAssets :: [NativeAsset]
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''NewChangeOutput
@@ -42,6 +51,8 @@ makeFieldLabelsNoPrefix ''NewChangeOutput
 instance Default NewChangeOutput where
   def = NewChangeOutput
     { paymentAddress = ""
+    , lovelace = 0
+    , nativeAssets = []
     }
 
 -------------------------------------------------

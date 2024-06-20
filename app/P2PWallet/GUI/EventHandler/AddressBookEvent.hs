@@ -167,6 +167,7 @@ handleAddressBookEvent model@AppModel{..} evt = case evt of
                   & #addressBookModel % #selectedContact .~ Nothing
                   & #addressBookModel % #newUserOutput .~ def
                   & #txBuilderModel % #userOutputs %~ flip snoc (newIdx,verifiedOutput)
+                  & #txBuilderModel %~ balanceTx
         , Task $ return $ Alert "Successfully added to builder!"
         ]
 

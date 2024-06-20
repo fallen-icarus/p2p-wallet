@@ -13,7 +13,7 @@ import P2PWallet.Prelude
 
 -- | A side bar for switching between the main app scenes.
 mainMenuWidget :: AppModel -> AppNode
-mainMenuWidget model = do
+mainMenuWidget model@AppModel{txBuilderModel} = do
     vstack 
       [ changeSceneButton "Home" homeIcon HomeScene
       , changeSceneButton "Staking" delegationCenterIcon DelegationScene
@@ -21,7 +21,8 @@ mainMenuWidget model = do
       -- , changeSceneButton "Liquidity" remixWaterFlashLine MarketMakers
       , changeSceneButton "Contacts" contactsBookIcon AddressBookScene
       , changeSceneButton "Tickers" tickersIcon TickerRegistryScene
-      , changeSceneButton "Builder" txBuilderIcon TxBuilderScene
+      , txBuilderButton
+      -- , changeSceneButton "Builder" txBuilderIcon TxBuilderScene
       , changeSceneButton "Settings" settingsIcon SettingsScene
       , filler
       , logOutButton
@@ -60,6 +61,45 @@ mainMenuWidget model = do
                       ]
               ]
       box_ [onClick $ ChangeMainScene newScene] btn
+        `styleBasic` [bgColor transparent , paddingB 5 , radius 5]
+        `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+
+    -- | A button with an icon, a label, and a transparent background.
+    txBuilderButton :: AppNode
+    txBuilderButton = do
+      let dormantColor
+            | model ^. #scene == TxBuilderScene = customBlue
+            | otherwise = white
+          btn = 
+            zstack
+              [ vstack 
+                  [ centerWidgetH $ label txBuilderIcon
+                      `styleBasic`
+                          [ textFont "Remix"
+                          , paddingT 8
+                          , paddingL 10
+                          , paddingR 10
+                          , paddingB 0
+                          , textMiddle
+                          , textSize 12
+                          , textColor dormantColor
+                          , border 0 transparent
+                          ]
+                  , centerWidgetH $ label "Builder"
+                      `styleBasic` 
+                          [ paddingT 0
+                          , paddingL 0
+                          , paddingR 0
+                          , paddingB 2
+                          , textSize 8
+                          , textColor dormantColor
+                          ]
+                  ]
+              , flip nodeVisible (not $ isEmptyBuilder txBuilderModel) $ box_ [alignTop,alignRight] $ 
+                  label notificationCircleIcon 
+                    `styleBasic` [textFont "Remix", padding 5, textSize 8, textColor customRed]
+              ]
+      box_ [onClick $ ChangeMainScene TxBuilderScene] btn
         `styleBasic` [bgColor transparent , paddingB 5 , radius 5]
         `styleHover` [bgColor customGray2, cursorIcon CursorHand]
 
