@@ -13,6 +13,7 @@ module P2PWallet.Data.Core
   , module P2PWallet.Data.Core.RegistrationStatus
   , module P2PWallet.Data.Core.StakeId
   , module P2PWallet.Data.Core.TxCBOR
+  , module P2PWallet.Data.Core.Witness
   ) where
 
 import P2PWallet.Data.Core.AddressEntryId
@@ -28,3 +29,4 @@ import P2PWallet.Data.Core.ProfileId
 import P2PWallet.Data.Core.RegistrationStatus
 import P2PWallet.Data.Core.StakeId
 import P2PWallet.Data.Core.TxCBOR
+import P2PWallet.Data.Core.Witness

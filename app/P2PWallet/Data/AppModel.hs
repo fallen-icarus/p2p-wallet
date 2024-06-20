@@ -39,6 +39,7 @@ import P2PWallet.Data.AppModel.TickerRegistry
 import P2PWallet.Data.AppModel.TxBuilder
 import P2PWallet.Data.AddressBook
 import P2PWallet.Data.Core
+import P2PWallet.Data.Files
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Profile
 import P2PWallet.Data.TickerMap
@@ -95,6 +96,8 @@ data AppEvent
   | SyncRegisteredPools (SyncEvent [Pool])
   -- | Update the current date.
   | UpdateCurrentDate Day
+  -- | Submit a signed transaction. The transaction can be loaded from an external file.
+  | SubmitTx SignedTxFile 
 
 
 data ProfileEvent
@@ -150,12 +153,16 @@ data AppModel = AppModel
   , syncingWallets :: Bool
   -- | The app is syncing the pools.
   , syncingPools :: Bool
+  -- | The app is building the transaction.
+  , building :: Bool
   -- | The app is loading the profile.
   , loadingProfile :: Bool
   -- | The address book for this profile.
   , addressBook :: [AddressEntry]
   -- | The address book model
   , addressBookModel :: AddressBookModel
+  -- | The app is submitting a transaction.
+  , submitting :: Bool
   -- | Useful when the user must specify a one-time use input such as a filepath or new alias.
   , extraTextField :: Text
   -- | This is useful for forcing the redraw of the UI when a text field is changed.
@@ -194,6 +201,8 @@ instance Default AppModel where
     , syncingWallets = False
     , syncingPools = False
     , loadingProfile = False
+    , submitting = False
+    , building = False
     , extraTextField = ""
     , forceRedraw = False
     , addressBook = []

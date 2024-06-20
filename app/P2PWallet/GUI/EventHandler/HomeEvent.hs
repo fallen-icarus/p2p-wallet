@@ -319,7 +319,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
--- | Validate the new user input and add it to the builder.
+-- | Validate the new user input and add it to the builder. Balance the transaction after.
 processNewUserInput :: UserInput -> TxBuilderModel -> Either Text TxBuilderModel
 processNewUserInput u@UserInput{utxoRef} model@TxBuilderModel{userInputs} = do
   -- Verify that the new utxo is not already being spent.
@@ -330,4 +330,4 @@ processNewUserInput u@UserInput{utxoRef} model@TxBuilderModel{userInputs} = do
   let newIdx = length userInputs
 
   -- Add the new input to the end of the list of user inputs.
-  return $ model & #userInputs %~ flip snoc (newIdx,u)
+  return $ balanceTx $ model & #userInputs %~ flip snoc (newIdx,u)

@@ -49,6 +49,8 @@ data TxBuilderEvent
   | ResetBuilder
   -- | Open the add popup widget
   | ShowTxAddPopup
+  -- | Open the change popup widget
+  | ShowTxChangePopup
   -- | Remove the selected user input from the tx builder.
   | RemoveSelectedUserInput Int
   -- | Remove the selected user output from the tx builder.
@@ -60,6 +62,12 @@ data TxBuilderEvent
   | EditSelectedUserOutput (AddEvent (Int,UserOutput) (Int,UserOutput))
   -- | Add the new change output.
   | AddNewChangeOutput (AddEvent NewChangeOutput ChangeOutput)
+  -- | Build the transaction while also estimating the execution budgets and tx fee.
+  | BuildTx
+  -- | The updated transaction model with the new transaction fee.
+  | BuildResult TxBuilderModel
+  -- | Sign a transaction that was built using the TxBuilder, and then immediately submit it.
+  | SignAndSubmitTx
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -86,8 +94,16 @@ data TxBuilderModel = TxBuilderModel
   -- | Whether the model is the correct mirror for the tx.body file located in the tmp directory.
   -- This is helpful for knowing whether it is okay to sign, or export.
   , isBuilt :: Bool
+  -- | Whether the transaction's assets are balanced.
+  , isBalanced :: Bool
+  -- | Whether the transaction requires collateral.
+  , requiresCollateral :: Bool
+  -- | The chosen collateral input.
+  , collateralInput :: Maybe UserInput
   -- | Whether to show the add popup widget.
   , showAddPopup :: Bool
+  -- | Whether to show the change popup widget.
+  , showChangePopup :: Bool
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''TxBuilderModel
@@ -103,7 +119,11 @@ instance Default TxBuilderModel where
     , addingChangeOutput = False
     , fee = 0
     , isBuilt = False
+    , isBalanced = False
+    , requiresCollateral = False
+    , collateralInput = Nothing
     , showAddPopup = False
+    , showChangePopup = False
     }
 
 -- | Check whether the builder has anything yet. Not all fields correspond to the actual

@@ -9,6 +9,7 @@ import Monomer
 
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.LookupPools
+import P2PWallet.Actions.SubmitTx
 import P2PWallet.Actions.SyncWallets
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
@@ -63,6 +64,8 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
                     & #syncingWallets .~ False
                     & #syncingPools .~ False
                     & #loadingProfile .~ False
+                    & #building .~ False
+                    & #submitting .~ False
     ]
   CloseAlertMessage -> 
     -- Close the alert widget and reset the alert message.
@@ -174,6 +177,19 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   -----------------------------------------------
   UpdateCurrentDate day -> 
     [ Model $ model & #config % #currentDay .~ day ]
+
+
+  -----------------------------------------------
+  -- Submit Transaction
+  -----------------------------------------------
+  SubmitTx signedFile ->
+    [ Model $ model & #submitting .~ True
+                    & #waitingOnDevice .~ False -- Disable this since it can be called from `SignTx`.
+    , Task $
+        if not $ txBuilderModel ^. #isBuilt
+        then return $ Alert "You must first build the transaction."
+        else runActionOrAlert Alert $ submitTx (config ^. #network) signedFile
+    ]
 
 -------------------------------------------------
 -- Helper Functions

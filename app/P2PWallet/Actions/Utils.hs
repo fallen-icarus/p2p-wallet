@@ -4,8 +4,11 @@ module P2PWallet.Actions.Utils where
 
 import System.Exit (ExitCode(ExitSuccess))
 import System.Process (readCreateProcessWithExitCode, shell)
+import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -- | Run an action. If successfull, do something with the results. If unsuccessfull, do something
@@ -43,7 +46,7 @@ runCmd cmd =
 
 -- | Re-index the lists while preserving ordering.
 reIndex :: [(Int,a)] -> [(Int,a)]
-reIndex xs = go xs 1
+reIndex xs = go xs 0
   where
     go [] _ = []
     go ((_,y):ys) i = (i,y) : go ys (i+1)
@@ -52,3 +55,65 @@ reIndex xs = go xs 1
 removeAction :: Int -> [(Int,a)] -> [(Int,a)]
 removeAction idx xs = reIndex $ filter ((/=idx) . fst) xs
 
+-- | Balance the inputs with the outputs by updating the changeOutput and subtracting off the
+-- fee.
+balanceTx :: TxBuilderModel -> TxBuilderModel
+balanceTx tx@TxBuilderModel{..} =
+    tx & #changeOutput .~ (if newChange == def then Nothing else Just newChange)
+       & #isBalanced .~ balanced
+       & #isBuilt .~ False
+  where
+    newChange :: ChangeOutput
+    newChange = ChangeOutput
+      { paymentAddress = fromMaybe "" $ changeOutput ^? _Just % #paymentAddress
+      , lovelace = loves - fee
+      , nativeAssets = assets
+      }
+
+    -- The amount of ADA and native assets available as change.
+    (loves :: Lovelace, assets :: [NativeAsset]) =
+      let (inLoves,inAssets) = 
+            ( sum $ map (view #lovelace . snd) userInputs
+            , concatMap (view #nativeAssets . snd) userInputs
+            )
+          (outLoves,outAssets) = 
+            ( sum $ map (view #lovelace . snd) userOutputs
+            , concatMap (view #nativeAssets . snd) userOutputs
+            )
+          inMap = Map.fromList $ map (\a -> (a ^. fullName, a ^. #quantity)) inAssets
+          outMap = Map.fromList $ map (\a -> (a ^. fullName, negate $ a ^. #quantity)) outAssets
+          bal = map (fromMaybe def . readNativeAsset . \(name',q) -> show q <> " " <> name') 
+              $ filter (\(_,q) -> q /= 0)
+              $ Map.toList 
+              $ Map.unionWith (+) inMap outMap
+      in (inLoves - outLoves,bal)
+
+    -- Whether all assets are balanced.
+    balanced = all ((>= 0) . view #quantity) assets && loves - fee >= 0
+
+-- | A list of unique pub keys that must sign the transaction as well as their `DerivationPath`
+-- if known. 
+getRequiredWitnesses :: TxBuilderModel -> Either Text [Witness]
+getRequiredWitnesses TxBuilderModel{..} = do
+    -- | Get the required pubkeys among the inputs. Returns the first error, if any.
+    inputWitnesses <- catMaybes <$> sequence (map checkInput userInputs)
+
+    -- | Remove repeat keys before returning. You cannot have the same `PubKeyHash` with different
+    -- `DerivationPath`s so it is enough to just check the key hashes. Filter out registration
+    -- certificate keys if they are also normal witnesses.
+    return $ ordNubOn (fst . view #witness) inputWitnesses
+  where
+    -- Get the pubkeyhash from the plutus address. Returns nothing if the input is a script input.
+    checkInput :: (Int,UserInput) -> Either Text (Maybe Witness)
+    checkInput (index,i) = do
+      plutusAddr <- 
+        first (const $ "Input " <> show index <> " has an invalid bech32 shelley address.") $
+          paymentAddressToPlutusAddress $ i ^. #paymentAddress
+      return $ case toPubKeyHash plutusAddr of
+        Nothing -> Nothing
+        Just pkHash -> Just $ Witness (pkHash, i ^. #paymentKeyPath)
+
+-- | Convert `Network` to the required flag for cardano-cli.
+toNetworkFlag :: Network -> Text
+toNetworkFlag Mainnet = "--mainnet"
+toNetworkFlag Testnet = "--testnet-magic 1"

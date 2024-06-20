@@ -23,18 +23,9 @@ import P2PWallet.Prelude
 buildUI :: AppWenv -> AppModel -> AppNode
 buildUI _ model = do
   let alertOverlay = customAlertMsg (fromMaybe "" $ model ^. #alertMessage) CloseAlertMessage
-      waitingOnDeviceOverlay =
-        box (label "Waiting on Device..." `styleBasic` [textSize 20, textColor black])
-          `styleBasic` [bgColor $ darkGray & #a .~ 0.9]
-      syncingWalletsOverlay = 
-        box (label "Syncing Wallets..." `styleBasic` [textSize 20, textColor black])
-          `styleBasic` [bgColor (darkGray & #a .~ 0.8)]
-      loadingProfileOverlay = 
-        box (label "Loading Profile..." `styleBasic` [textSize 20, textColor black])
-          `styleBasic` [bgColor (darkGray & #a .~ 0.8)]
-      syncingPoolsOverlay = 
-        box (label "Syncing Pools..." `styleBasic` [textSize 20, textColor black])
-          `styleBasic` [bgColor (darkGray & #a .~ 0.8)]
+      waitingOverlay caption =
+        box (label caption `styleBasic` [textSize 20, textColor black])
+          `styleBasic` [bgColor $ darkGray & #a .~ 0.8]
 
   zstack 
     [ networksWidget model `nodeVisible` (NetworksScene == model ^. #scene)
@@ -51,8 +42,10 @@ buildUI _ model = do
             ]
         ] `nodeVisible` (isJust $ model ^. #selectedProfile)
     , alertOverlay `nodeVisible` (isJust $ model ^. #alertMessage)
-    , waitingOnDeviceOverlay `nodeVisible` (model ^. #waitingOnDevice)
-    , syncingWalletsOverlay `nodeVisible` (model ^. #syncingWallets)
-    , syncingPoolsOverlay `nodeVisible` (model ^. #syncingPools)
-    , loadingProfileOverlay `nodeVisible` (model ^. #loadingProfile)
+    , waitingOverlay "Waiting on Device..." `nodeVisible` (model ^. #waitingOnDevice)
+    , waitingOverlay "Syncing Wallets..." `nodeVisible` (model ^. #syncingWallets)
+    , waitingOverlay "Loading Profile..." `nodeVisible` (model ^. #loadingProfile)
+    , waitingOverlay "Syncing Pools..." `nodeVisible` (model ^. #syncingPools)
+    , waitingOverlay "Building..." `nodeVisible` (model ^. #building)
+    , waitingOverlay "Submitting Transaction..." `nodeVisible` (model ^. #submitting)
     ] `styleBasic` [bgColor customGray4]

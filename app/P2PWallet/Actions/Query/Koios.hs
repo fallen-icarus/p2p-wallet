@@ -13,6 +13,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryPaymentWalletInfo
   , runQueryStakeWalletInfo
   , runQueryAllRegisteredPools
+  , runGetParams
   ) where
 
 import Servant.Client 
@@ -27,7 +28,8 @@ import Servant.Client qualified as Client
 import Servant.API ((:<|>)(..), JSON, Post, Get, (:>), ReqBody, Required, QueryParam', QueryParam)
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
-import Data.Aeson 
+import Data.Aeson.Encoding qualified as Aeson
+import Data.Aeson as Aeson
 import Data.Text qualified as Text
 import UnliftIO.Async (mapConcurrently,concurrently)
 
@@ -228,6 +230,12 @@ runQueryAllRegisteredPools network = do
       Right rs -> return $ Right $ concat rs
       Left err -> return $ Left $ show err
 
+runGetParams :: Network -> IO (Either Text ByteString)
+runGetParams network = do
+  manager' <- newManager tlsManagerSettings
+  let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+  bimap show (toStrict . Aeson.encodingToLazyByteString . Aeson.value) <$> runClientM paramsApi env
+
 -------------------------------------------------
 -- Low-Level API
 -------------------------------------------------
@@ -292,6 +300,9 @@ type KoiosApi
      :> QueryParam' '[Required] "pool_status" Text
      :> Get '[JSON] Pools
 
+  :<|>  "cli_protocol_params"
+       :> Get '[JSON] Value
+
 submitApi
   :<|> evaluateApi 
   :<|> addressUTxOsApi 
@@ -303,6 +314,7 @@ submitApi
   :<|> poolInfoApi
   :<|> linkedPaymentAddressesApi
   :<|> poolListApi
+  :<|> paramsApi
   = client (Proxy :: Proxy KoiosApi)
 
 queryStakeWalletInfo :: StakeAddress -> ClientM ([StakeAccount],[StakeReward],[Pool],[PaymentAddress])
