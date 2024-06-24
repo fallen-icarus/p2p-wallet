@@ -1,6 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -16,7 +14,7 @@ module P2PWallet.Data.Koios.AddressUTxO where
 
 import Data.Aeson
 
-import P2PWallet.Data.Core
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
@@ -43,7 +41,7 @@ instance FromJSON AddressUTxO where
           <$> o .: "address"
           <*> o .: "stake_address"
           <*> ( (concatRef <$> o .: "tx_hash" <*> o .: "tx_index") >>= 
-                  maybe mzero return . readTxOutRef)
+                  maybe mzero return . parseTxOutRef)
           <*> o .: "value"
           <*> o .: "datum_hash"
           <*> (o .: "inline_datum" >>= 

@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.Widgets.Home.NativeAssets
   ( 
     nativeAssetsWidget
@@ -9,22 +7,24 @@ import Monomer
 import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
-import P2PWallet.Data.TickerMap
-import P2PWallet.Data.Wallets
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
+import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
-import P2PWallet.MonomerOptics()
 import P2PWallet.Prelude
 
 nativeAssetsWidget :: AppModel -> AppNode
-nativeAssetsWidget model@AppModel{reverseTickerMap} =
+nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
     zstack
       [ vstack 
-          [ widgetIf (allAssets /= []) $ vstack
-              [ centerWidgetH $ hstack
-                  [ tooltip_ "Sort/Filter/Search" [tooltipDelay 0] $
+          [ widgetIf (not $ null allAssets) $ vstack
+              [ -- A header with a filter button and search bar.
+                centerWidgetH $ hstack
+                  [ -- A buttom to open the filter settings.
+                    tooltip_ "Sort/Filter/Search" [tooltipDelay 0] $
                       toggleButton_ menuSearchIcon
                         (toLensVL $ #homeModel % #showAssetFilter)
                         [toggleButtonOffStyle menuOffStyle]
@@ -42,6 +42,7 @@ nativeAssetsWidget model@AppModel{reverseTickerMap} =
                           ]
                         `styleHover` [bgColor customGray2, cursorIcon CursorHand]
                   , spacer_ [width 5]
+                    -- A search bar.
                   , textField_ 
                       (toLensVL $ #homeModel % #assetFilterModel % #search) 
                       [placeholder "one of: full name, policy id, asset name, fingerprint, ticker"] 
@@ -50,7 +51,9 @@ nativeAssetsWidget model@AppModel{reverseTickerMap} =
                         , width 400
                         ]
                   , spacer_ [width 5]
-                  , toggleButton_ "Search" (toLensVL $ #forceRedraw)
+                    -- The confirm search button. The redrawing is delayed until this button is
+                    -- pressed.
+                  , toggleButton_ "Search" (toLensVL #forceRedraw)
                       [toggleButtonOffStyle searchOffStyle]
                       `styleBasic`
                         [ bgColor customBlue
@@ -62,25 +65,31 @@ nativeAssetsWidget model@AppModel{reverseTickerMap} =
                       `styleHover`
                         [ bgColor lightGray ]
                   ]
-              , widgetIf (sample /= []) $ cushionWidget $ vscroll_ [wheelRate 50] $ 
+                -- The native assets that match those filters and search criteria.
+              , widgetIf (not $ null sample) $ cushionWidget $ vscroll_ [wheelRate 50] $ 
                   vstack_ [childSpacing] (map assetRow sample)
                     `styleBasic` 
                       [ padding 10
                       , paddingT 0
                       ]
-              , widgetIf (sample == []) $ 
+                -- What to display when no assets match the filter and search criteria.
+              , widgetIf (null sample) $ 
                   centerWidget $
                     label "No assets match that search."
                      `styleBasic` [textFont "Italics"]
               ]
-          , widgetIf (allAssets == []) $
+            -- What to display when the wallet does not have any native assets.
+          , widgetIf (null allAssets) $
               centerWidget $
                 label "This address does not have any native assets."
                  `styleBasic` [textFont "Italics"]
           ]
-      , assetFilterWidget model `nodeVisible` (model ^. #homeModel % #showAssetFilter)
+      , assetFilterWidget model `nodeVisible` (homeModel ^. #showAssetFilter)
       ]
   where
+    wallet :: PaymentWallet
+    wallet = homeModel ^. #selectedWallet
+
     allAssets :: [NativeAsset]
     allAssets = wallet ^. #nativeAssets
 
@@ -104,41 +113,37 @@ nativeAssetsWidget model@AppModel{reverseTickerMap} =
           `styleHover`
             [ bgColor lightGray ]
 
-    wallet :: PaymentWallet
-    wallet = model ^. #homeModel % #selectedWallet
+    AssetFilterModel{search=searchTarget} = homeModel ^. #assetFilterModel
+
+    searchFilter :: [NativeAsset] -> [NativeAsset]
+    searchFilter xs
+      | searchTarget == "" = xs
+      | otherwise = flip filter xs $ \NativeAsset{..} -> or
+          [ display policyId == searchTarget
+          , display tokenName == searchTarget
+          , display policyId <> "." <> display tokenName == searchTarget
+          , fingerprint == Fingerprint searchTarget
+          , fmap fst (Map.lookup (policyId,tokenName) reverseTickerMap) == Just (Ticker searchTarget)
+          ]
 
     sample :: [NativeAsset]
     sample = searchFilter allAssets
 
-    filterModel :: AssetFilterModel
-    filterModel = model ^. #homeModel % #assetFilterModel
-
-    searchTarget :: Text
-    searchTarget = filterModel ^. #search
-
-    searchFilter :: [NativeAsset] -> [NativeAsset]
-    searchFilter
-      | searchTarget == "" = filter (const True)
-      | otherwise = filter $ \a@NativeAsset{..} -> or
-          [ policyId == searchTarget
-          , tokenName == searchTarget
-          , policyId <> "." <> tokenName == searchTarget
-          , fingerprint == searchTarget
-          , fmap fst (Map.lookup (a ^. fullName) reverseTickerMap) == Just searchTarget
-          ]
-
+    -- This is the actual asset information.
     assetRow :: NativeAsset -> AppNode
     assetRow a@NativeAsset{..} = do
-      let utxoCount = length 
+      let -- How many utxos contain this asset.
+          utxoCount = length 
                     $ filter (elem fingerprint . map (view #fingerprint) . view #nativeAssets) 
                     $ wallet ^. #utxos
       vstack
         [ hstack 
-            [ copyableLabelMain (a ^. #fingerprint)
-                `styleBasic` [textSize 12]
+            [ copyableLabelMain (display fingerprint)
+                `styleBasic` [textSize 10]
             , filler
-            , label (showAssetBalance reverseTickerMap a)
-                `styleBasic` [textSize 12]
+              -- Show the asset name with the ticker if set. Do not use the fingerprint otherwise.
+            , label (showAssetBalance False reverseTickerMap a)
+                `styleBasic` [textSize 10]
             ]
         , spacer_ [width 2]
         , hstack 
@@ -150,7 +155,7 @@ nativeAssetsWidget model@AppModel{reverseTickerMap} =
                   , paddingT 5
                   ]
             , spacer_ [width 3]
-            , copyableLabelSub (a ^. fullName)
+            , copyableLabelSub $ display policyId <> "." <> display tokenName
             , filler
             , label (show utxoCount <> " UTxO(s)")
                 `styleBasic`

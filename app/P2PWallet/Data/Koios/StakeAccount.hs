@@ -1,6 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -16,10 +14,7 @@ module P2PWallet.Data.Koios.StakeAccount where
 
 import Data.Aeson
 
-import P2PWallet.Data.Core.Asset
-import P2PWallet.Data.Core.Bech32Address
-import P2PWallet.Data.Core.PoolID
-import P2PWallet.Data.Core.RegistrationStatus
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Prelude
 
 data StakeAccount = StakeAccount

@@ -13,8 +13,8 @@ import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
 addStakeWalletWidget :: AppModel -> AppNode
-addStakeWalletWidget model = do
-  let isPairing = model ^. #delegationModel % #newStakeWallet % #pairing
+addStakeWalletWidget AppModel{..} = do
+  let isPairing = delegationModel ^. #newStakeWallet % #pairing
       offStyle = def 
         `styleBasic` [ bgColor customGray1 , textColor white ]
         `styleHover` [ textColor lightGray ]
@@ -38,8 +38,8 @@ addStakeWalletWidget model = do
               ]
         ]
     , zstack 
-        [ widgetIf isPairing $ centerWidgetH $ pairStakeWidget model
-        , widgetIf (not isPairing) $ centerWidgetH $ watchStakeWidget model
+        [ widgetIf isPairing $ centerWidgetH pairStakeWidget
+        , widgetIf (not isPairing) $ centerWidgetH watchStakeWidget
         ] `styleBasic` 
             [ bgColor customGray3
             , paddingT 0
@@ -50,8 +50,8 @@ addStakeWalletWidget model = do
             ]
     ]
 
-pairStakeWidget :: AppModel -> AppNode
-pairStakeWidget _ = do
+pairStakeWidget :: AppNode
+pairStakeWidget = do
   let editFields = 
         vstack_ [childSpacing]
           [ hstack
@@ -104,8 +104,8 @@ pairStakeWidget _ = do
         ]
     ] `styleBasic` [bgColor transparent, padding 20]
 
-watchStakeWidget :: AppModel -> AppNode
-watchStakeWidget _ = do
+watchStakeWidget :: AppNode
+watchStakeWidget = do
   let editFields = 
         vstack_ [childSpacing]
           [ hstack

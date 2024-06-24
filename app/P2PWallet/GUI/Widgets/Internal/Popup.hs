@@ -249,7 +249,7 @@ customPopup
   => ALens' s Bool   -- ^ The lens into the model.
   -> WidgetNode s e  -- ^ The child node.
   -> WidgetNode s e  -- ^ The created popup.
-customPopup field content = customPopup_ field def content
+customPopup field = customPopup_ field def
 
 {-|
 Creates a popup with the given lens to determine its visibility. Accepts config.
@@ -273,7 +273,7 @@ popupD_
   -> [PopupCfg s e]     -- ^ The config options.
   -> WidgetNode s e     -- ^ The child node.
   -> WidgetNode s e     -- ^ The created popup.
-popupD_ wdata configs content = makeNode widget anchor content where
+popupD_ wdata configs = makeNode widget anchor where
   config = mconcat configs
   state = PopupState def (-1)
   widget = makePopup wdata config state

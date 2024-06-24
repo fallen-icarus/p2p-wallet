@@ -1,6 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -17,33 +15,34 @@ module P2PWallet.Data.AppModel
     -- * Main App Types
   , MainScene(..)
   , AppEvent(..)
-  , ProfileEvent(..)
   , AppModel(..)
 
     -- * Re-exports
-  , module P2PWallet.Data.AppModel.AddressBook
+  , module P2PWallet.Data.AppModel.AddressBookModel
   , module P2PWallet.Data.AppModel.Common
-  , module P2PWallet.Data.AppModel.Delegation
-  , module P2PWallet.Data.AppModel.Home
-  , module P2PWallet.Data.AppModel.TickerRegistry
-  , module P2PWallet.Data.AppModel.TxBuilder
+  , module P2PWallet.Data.AppModel.DelegationModel
+  , module P2PWallet.Data.AppModel.HomeModel
+  , module P2PWallet.Data.AppModel.ProfileModel
+  , module P2PWallet.Data.AppModel.TickerRegistryModel
+  , module P2PWallet.Data.AppModel.TxBuilderModel
   ) where
 
-import Monomer qualified as Monomer
+import Monomer qualified
 
-import P2PWallet.Data.AppModel.AddressBook
+import P2PWallet.Data.AppModel.AddressBookModel
 import P2PWallet.Data.AppModel.Common
-import P2PWallet.Data.AppModel.Delegation
-import P2PWallet.Data.AppModel.Home
-import P2PWallet.Data.AppModel.TickerRegistry
-import P2PWallet.Data.AppModel.TxBuilder
-import P2PWallet.Data.AddressBook
-import P2PWallet.Data.Core
-import P2PWallet.Data.Files
-import P2PWallet.Data.Koios.Pool
-import P2PWallet.Data.Profile
-import P2PWallet.Data.TickerMap
-import P2PWallet.Data.Wallets
+import P2PWallet.Data.AppModel.DelegationModel
+import P2PWallet.Data.AppModel.HomeModel
+import P2PWallet.Data.AppModel.ProfileModel
+import P2PWallet.Data.AppModel.TickerRegistryModel
+import P2PWallet.Data.AppModel.TxBuilderModel
+import P2PWallet.Data.Core.AddressBook
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal.Config
+import P2PWallet.Data.Core.Internal.Files
+import P2PWallet.Data.Core.Internal.Network
+import P2PWallet.Data.Core.Profile
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -60,6 +59,38 @@ data MainScene
   | TickerRegistryScene
   | SettingsScene
   deriving (Show,Eq)
+
+-------------------------------------------------
+-- Waiting Status
+-------------------------------------------------
+-- | Whether the app should block user actions and why. This is useful when the app is waiting for
+-- something external.
+data WaitingStatus = WaitingStatus
+  -- | The app is waiting for the hardware wallet.
+  { waitingOnDevice :: Bool
+  -- | The app is syncing the wallets.
+  , syncingWallets :: Bool
+  -- | The app is syncing the pools.
+  , syncingPools :: Bool
+  -- | The app is building the transaction.
+  , building :: Bool
+  -- | The app is loading the profile.
+  , loadingProfile :: Bool
+  -- | The app is submitting a transaction.
+  , submitting :: Bool
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''WaitingStatus
+
+instance Default WaitingStatus where
+  def = WaitingStatus
+    { waitingOnDevice = False
+    , syncingWallets = False
+    , syncingPools = False
+    , building = False
+    , loadingProfile = False
+    , submitting = False
+    }
 
 -------------------------------------------------
 -- App Events
@@ -80,6 +111,11 @@ data AppEvent
   | SetNetwork Network
   -- | An event updating the current profile.
   | ProfileEvent ProfileEvent
+  -- | Sync the currently tracked wallets. This can be called from most scenes which is why it
+  -- is a main event.
+  | SyncWallets (ProcessEvent Wallets)
+  -- | Update the current date.
+  | UpdateCurrentDate (ProcessEvent Day)
   -- | An event for the Home page.
   | HomeEvent HomeEvent 
   -- | An event for the Delegation page.
@@ -90,34 +126,11 @@ data AppEvent
   | TickerRegistryEvent TickerRegistryEvent 
   -- | An event for the Tx Builder page.
   | TxBuilderEvent TxBuilderEvent 
-  -- | Sync the currently tracked wallets.
-  | SyncWallets (SyncEvent Wallets)
-  -- | Sync all registered pools.
-  | SyncRegisteredPools (SyncEvent [Pool])
-  -- | Update the current date.
-  | UpdateCurrentDate Day
-  -- | Submit a signed transaction. The transaction can be loaded from an external file.
+  -- | Submit a signed transaction.
   | SubmitTx SignedTxFile 
 
-
-data ProfileEvent
-  -- | Load the profiles for that network, and then prompt the user to pick one.
-  = LoadKnownProfiles [Profile]
-  -- | Load selected profile.
-  | LoadSelectedProfile Profile
-  -- | Load known information for this profile.
-  | LoadProfileInfo (Wallets, [AddressEntry], [TickerInfo])
-  -- | Log out of current profile.
-  | LogoutProfile
-  -- | Add a new profile.
-  | AddNewProfile (AddEvent Profile Profile)
-  -- | Change a profile name.
-  | ChangeProfileName (AddEvent Text Text)
-  -- | Delete a profile.
-  | DeleteProfile (DeleteWithConfirmationEvent Profile)
-
 -------------------------------------------------
--- Main App State
+-- App State
 -------------------------------------------------
 -- | The main state for the app.
 data AppModel = AppModel
@@ -129,54 +142,38 @@ data AppModel = AppModel
   , scene :: MainScene
   -- | Used for both error messages and notices.
   , alertMessage :: Maybe Text
-  -- | A list of all known profiles for this network.
-  , knownProfiles :: [Profile]
+  -- | The profile model.
+  , profileModel :: ProfileModel
   -- | The currently loaded profile. `Nothing` if one has not been loaded yet.
   , selectedProfile :: Maybe Profile
-  -- | The new `Profile` information.
-  , newProfile :: NewProfile
-  -- | Whether the new profile widget should be open.
-  , addingProfile :: Bool
-  -- | Whether the delete profile widget should be open.
-  , deletingProfile :: Bool
-  -- | The model for the home scene.
-  , homeModel :: HomeModel
-  -- | The model for the delegation scene.
-  , delegationModel :: DelegationModel
-  -- | The model for the tx builder scene.
-  , txBuilderModel :: TxBuilderModel
   -- | The known wallets for the selected profile.
   , knownWallets :: Wallets
-  -- | The app is waiting for the hardware wallet.
-  , waitingOnDevice :: Bool
-  -- | The app is syncing the wallets.
-  , syncingWallets :: Bool
-  -- | The app is syncing the pools.
-  , syncingPools :: Bool
-  -- | The app is building the transaction.
-  , building :: Bool
-  -- | The app is loading the profile.
-  , loadingProfile :: Bool
+  -- | The waiting status for the app.
+  , waitingStatus :: WaitingStatus
+  -- | The home model.
+  , homeModel :: HomeModel
+  -- | The delegation model.
+  , delegationModel :: DelegationModel
+  -- | The address book model.
+  , addressBookModel :: AddressBookModel
+  -- | The ticker registry model.
+  , tickerRegistryModel :: TickerRegistryModel
+  -- | The model for the tx builder scene.
+  , txBuilderModel :: TxBuilderModel
   -- | The address book for this profile.
   , addressBook :: [AddressEntry]
-  -- | The address book model
-  , addressBookModel :: AddressBookModel
-  -- | The app is submitting a transaction.
-  , submitting :: Bool
-  -- | Useful when the user must specify a one-time use input such as a filepath or new alias.
-  , extraTextField :: Text
-  -- | This is useful for forcing the redraw of the UI when a text field is changed.
-  , forceRedraw :: Bool
   -- | A mapping from tickers to their on-chain name `policy_id.token_name` and their decimal
   -- places.
   , tickerMap :: TickerMap
   -- | A mapping from on-chain names (`policy_id.token_name`) to tickers and their decimal
   -- places.
   , reverseTickerMap :: ReverseTickerMap
-  -- | The ticker registry model
-  , tickerRegistryModel :: TickerRegistryModel
   -- | A mapping from fingerprints to their associated on-chain name.
-  , fingerprintMap :: Map Text (Text,Text)
+  , fingerprintMap :: FingerprintMap
+  -- | Useful when the user must specify a one-time use input such as a filepath or new alias.
+  , extraTextField :: Text
+  -- | This is useful for forcing the redraw of the UI when a text field is changed.
+  , forceRedraw :: Bool
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''AppModel
@@ -187,29 +184,21 @@ instance Default AppModel where
     , config = def
     , scene = NetworksScene
     , alertMessage = Nothing
-    , knownProfiles = []
+    , profileModel = def
     , selectedProfile = Nothing
-    , newProfile = def
-    , addingProfile = False
-    , deletingProfile = False
+    , knownWallets = def
+    , waitingStatus = def
     , homeModel = def
     , delegationModel = def
     , addressBookModel = def
+    , tickerRegistryModel = def
     , txBuilderModel = def
-    , knownWallets = def
-    , waitingOnDevice = False
-    , syncingWallets = False
-    , syncingPools = False
-    , loadingProfile = False
-    , submitting = False
-    , building = False
-    , extraTextField = ""
-    , forceRedraw = False
     , addressBook = []
     , tickerMap = mempty
     , reverseTickerMap = mempty
-    , tickerRegistryModel = def
     , fingerprintMap = mempty
+    , extraTextField = ""
+    , forceRedraw = False
     }
 
 -------------------------------------------------

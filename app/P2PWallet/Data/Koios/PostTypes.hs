@@ -1,12 +1,15 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 
+{-
+
+This module contains the types for POST information for the Koios apis.
+
+-}
 module P2PWallet.Data.Koios.PostTypes where
 
 import Data.Aeson
 
-import P2PWallet.Data.Core
-import P2PWallet.Plutus
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -51,11 +54,11 @@ instance ToJSON PaymentAddresses where
            ]
 
 -- | A newtype for submitting a list of payment addresses with the "_extended" flag.
-newtype ExtendedPaymentAddresses = ExtendedPaymentAddresses [PaymentAddress] 
+newtype PaymentAddressesExtended = PaymentAddressesExtended [PaymentAddress] 
   deriving (Show)
 
-instance ToJSON ExtendedPaymentAddresses where
-  toJSON (ExtendedPaymentAddresses as) = 
+instance ToJSON PaymentAddressesExtended where
+  toJSON (PaymentAddressesExtended as) = 
     object [ "_addresses" .= map unPaymentAddress as 
            , "_extended" .= True
            ]
@@ -68,28 +71,6 @@ instance ToJSON PaymentAddressesAfterBlock where
   toJSON (PaymentAddressesAfterBlock as lastBlock) = 
     object [ "_addresses" .= map unPaymentAddress as 
            , "_after_block_height" .= lastBlock
-           ]
-
--------------------------------------------------
--- Stake Addresses
--------------------------------------------------
--- | A newtype for submitting a list of stake addresses.
-newtype StakeAddresses = StakeAddresses [StakeAddress] 
-  deriving (Show)
-
-instance ToJSON StakeAddresses where
-  toJSON (StakeAddresses as) = 
-    object [ "_stake_addresses" .= map unStakeAddress as 
-           ]
-
--- | A newtype for submitting a list of stake addresses to get the linked payment addresses.
-newtype NonEmptyStakeAddresses = NonEmptyStakeAddresses [StakeAddress] 
-  deriving (Show)
-
-instance ToJSON NonEmptyStakeAddresses where
-  toJSON (NonEmptyStakeAddresses as) = 
-    object [ "_stake_addresses" .= map unStakeAddress as 
-           , "_empty" .= False
            ]
 
 -------------------------------------------------
@@ -107,14 +88,26 @@ instance FromJSON TxHashes where
     withArray "TxHashes" $ fmap (TxHashes . toList) . mapM (withObject "TxHash" (.: "tx_hash"))
 
 -------------------------------------------------
--- Unknown UTxOs
+-- Stake Addresses
 -------------------------------------------------
--- | A newtype for submitting a list of unknown UTxOs to lookup.
-newtype UnknownUTxOs = UnknownUTxOs [TxOutRef]
+-- | A newtype for submitting a list of stake addresses.
+newtype StakeAddresses = StakeAddresses [StakeAddress] 
   deriving (Show)
 
-instance ToJSON UnknownUTxOs where
-  toJSON (UnknownUTxOs refs) = object [ "_utxo_refs" .= map (showTxOutRef @Text) refs ]
+instance ToJSON StakeAddresses where
+  toJSON (StakeAddresses as) = 
+    object [ "_stake_addresses" .= map unStakeAddress as 
+           ]
+
+-- | A newtype for submitting a list of stake addresses to get the active linked payment addresses.
+newtype StakeAddressesNonEmpty = StakeAddressesNonEmpty [StakeAddress] 
+  deriving (Show)
+
+instance ToJSON StakeAddressesNonEmpty where
+  toJSON (StakeAddressesNonEmpty as) = 
+    object [ "_stake_addresses" .= map unStakeAddress as 
+           , "_empty" .= False
+           ]
 
 -------------------------------------------------
 -- Pools

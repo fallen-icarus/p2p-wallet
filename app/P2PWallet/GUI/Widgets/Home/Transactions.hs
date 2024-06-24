@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.Widgets.Home.Transactions 
   ( 
     transactionsWidget
@@ -10,42 +8,20 @@ import Monomer
 import Prettyprinter (align, pretty, vsep)
 import Data.Text qualified as Text
 import Data.Map qualified as Map
+import Data.Time.Format qualified as Time
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
-import P2PWallet.Data.TickerMap
-import P2PWallet.Data.Transaction
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.Wallets.PaymentWallet
+import P2PWallet.Data.Core.Transaction
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
+import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
-import P2PWallet.MonomerOptics()
 import P2PWallet.Plutus
 import P2PWallet.Prelude
-
--- | Calculate the net asset flux from this address in the transaction.
-txValueFromWallet :: PaymentAddress -> Transaction -> (Ada,[NativeAsset])
-txValueFromWallet addr Transaction{inputs,outputs} = 
-  let isFromAddress x = x ^. #paymentAddress == addr
-      addressInputs = filter isFromAddress inputs
-      addressOutputs = filter isFromAddress outputs
-      (spentLoves,spentAssets) = 
-        ( sum $ map (view #lovelace) addressInputs
-        , concatMap (view #nativeAssets) addressInputs
-        )
-      (receivedLoves,receivedAssets) = 
-        ( sum $ map (view #lovelace) addressOutputs
-        , concatMap (view #nativeAssets) addressOutputs
-        )
-      spentMap = 
-        Map.fromList $ map (\a -> (a ^. fullName, negate $ a ^. #quantity)) spentAssets
-      receivedMap = 
-        Map.fromList $ map (\a -> (a ^. fullName, a ^. #quantity)) receivedAssets
-      bal = map (fromMaybe def . readNativeAsset . \(name,q) -> show q <> " " <> name) 
-          $ filter (\(_,q) -> q /= 0)
-          $ Map.toList 
-          $ Map.unionWith (+) spentMap receivedMap
-  in (toAda $ receivedLoves - spentLoves, bal)
 
 transactionsWidget :: AppModel -> AppNode
 transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMap} =
@@ -56,7 +32,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
                   `styleBasic` 
                     [ padding 0
                     , textMiddle
-                    , textFont "Bold"
+                    , textFont "Italics"
                     ]
               , spacer_ [width 5]
               , tooltip_ "Filter/Search" [tooltipDelay 0] $
@@ -80,7 +56,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
           , widgetIf (sample /= []) $ flip styleBasic [padding 5] $ box $ vscroll_ [wheelRate 50] $ 
               vstack_ [childSpacing] (map txRow sample)
                 `styleBasic` [padding 10]
-          , widgetIf (sample == []) $ 
+          , widgetIf (null sample) $ 
               centerWidget $
                 label "No transactions found."
                  `styleBasic` [textFont "Italics"]
@@ -125,53 +101,19 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
     searchTargets :: [Text]
     searchTargets = words $ replace "," " " $ txFilterModel ^. #search
 
-    applySearchFilter :: [Text] -> [Transaction] -> [Transaction]
-    applySearchFilter [] xs = xs
-    applySearchFilter (target:ts) xs = applySearchFilter ts $ searchFilter target xs
-
-    matchesUTxO :: Text -> TransactionUTxO -> Bool
-    matchesUTxO searchTarget TransactionUTxO{..} = or
-      [ -- Only match the payment address if it is not the selected wallet's address.
-        paymentAddress /= selectedWallet ^. #paymentAddress && 
-          paymentAddress == PaymentAddress searchTarget
-        -- Only match the stake address if it is not the selected wallet's stake address.
-      , stakeAddress /= selectedWallet ^. #stakeAddress && 
-          stakeAddress == Just (StakeAddress searchTarget)
-      , referenceScriptHash == Just searchTarget
-      , datumHash == Just searchTarget
-      , Text.isPrefixOf searchTarget $ showTxOutRef utxoRef
-      , flip any nativeAssets $ \a@NativeAsset{..} -> or
-          [ policyId == searchTarget
-          , tokenName == searchTarget
-          , policyId <> "." <> tokenName == searchTarget
-          , fingerprint == searchTarget
-          , fmap fst (Map.lookup (a ^. fullName) reverseTickerMap) == Just searchTarget
-          ]
-      ]
-
-    searchFilter :: Text -> [Transaction] -> [Transaction]
-    searchFilter searchTarget
-      | searchTarget == "" = filter (const True)
-      | otherwise = filter $ \Transaction{..} -> or
-          [ any (matchesUTxO searchTarget) inputs
-          , any (matchesUTxO searchTarget) outputs
-          , any (matchesUTxO searchTarget) referenceInputs
-          ]
-
     sample :: [Transaction]
-    sample = applySearchFilter searchTargets 
-           $ filter withinDateRange 
+    sample = applySearchFilter selectedWallet reverseTickerMap searchTargets 
+           . filter withinDateRange 
            $ selectedWallet ^. #transactions
 
     txAssetFluxWidget :: NativeAsset -> AppNode
-    txAssetFluxWidget a@NativeAsset{..} = do
-      let mTickerInfo = Map.lookup (a ^. fullName) reverseTickerMap
-          (fluxIcon,color)
+    txAssetFluxWidget NativeAsset{..} = do
+      let (fluxIcon,color)
             | quantity < 0 = (upArrowIcon, customRed)
             | otherwise = (downArrowIcon, customBlue)
-          (name,formattedQuantity) = case mTickerInfo of
-            Nothing -> (fingerprint,show quantity)
-            Just (tckr,decimal) -> (tckr, show $ formatQuantity decimal quantity)
+          (name,formattedQuantity) = case Map.lookup (policyId,tokenName) reverseTickerMap of
+            Nothing -> (display fingerprint, show quantity)
+            Just (tckr,decimal) -> (display tckr, show $ formatQuantity decimal quantity)
       hstack_ [childSpacing_ 3]
         [ label fluxIcon 
             `styleBasic` 
@@ -196,7 +138,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
             | otherwise = customRed
       vstack
         [ hstack 
-            [ copyableLabelSelf txHash 11 white
+            [ copyableLabelSelf txHash 10 white
             , spacer_ [width 2]
             , tooltip_ "Inspect" [tooltipDelay 0] $
                 button inspectIcon (HomeEvent $ InspectHomeTransaction tx)
@@ -213,9 +155,9 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
                     ]
                   `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             , filler
-            , label (fromString $ printf "%D ADA" adaFlux)
+            , label (display adaFlux)
                 `styleBasic` 
-                  [ textSize 12
+                  [ textSize 10
                   , textColor adaValueColor
                   ]
             ]
@@ -248,14 +190,14 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
                   , textColor lightGray
                   ]
             , filler
-            , label (unwords ["Fee:", fromString $ printf "%D ADA" $ toAda fee])
+            , label (unwords ["Fee:", display fee])
                 `styleBasic` 
-                  [ textSize 10
+                  [ textSize 8
                   , textColor lightGray
                   ]
            ] 
         , widgetIf (not $ null assetFlux) $ vstack_ [childSpacing_ 3] $ 
-            flip map (groupInto 3 assetFlux) $ \assetRow -> 
+            for (groupInto 3 assetFlux) $ \assetRow -> 
               hstack_ [childSpacing_ 3] $ [filler] <> map txAssetFluxWidget assetRow
         ] `styleBasic` 
             [ padding 10
@@ -265,7 +207,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
             ]
 
 inspectionWidget :: Transaction -> AppModel -> AppNode
-inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,reverseTickerMap} = do
+inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverseTickerMap} = do
     vstack
       [ vstack
           [ centerWidgetH $ label "Transaction Summary" 
@@ -431,7 +373,7 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                     ]
                   `styleHover` [bgColor customGray1, cursorIcon CursorHand]
               ]
-          , widgetIf (model ^. showRoot % toggleShow finalLens) $
+          , widgetIf (inspectedTransaction ^. toggleShow finalLens) $
               flip styleBasic [padding 5] $
                 vstack_ [childSpacing] (map (utxoRow userSymbol utxoLens) utxos)
                   `styleBasic` [padding 10]
@@ -442,7 +384,7 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
       vstack
         [ vstack
             [ hstack 
-                [ copyableLabelSelf (showTxOutRef utxoRef) 9 white
+                [ copyableLabelSelf (display utxoRef) 9 white
                 , filler
                 , label (fromString $ printf "%D ADA" $ toAda lovelace) 
                     `styleBasic` [textSize 9]
@@ -530,43 +472,43 @@ inspectionWidget Transaction{..} model@AppModel{homeModel=HomeModel{..},config,r
                 , radius 5
                 , border 1 black
                 ]
-        , widgetIf showDetails $ utxoDetails u
+        , widgetIf showDetails $ utxoDetails reverseTickerMap u
         ]
 
-    utxoDetails :: TransactionUTxO -> AppNode
-    utxoDetails TransactionUTxO{..} = 
-      hstack
-        [ filler
-        , vstack
-            [ copyableLabelFor 8 "Payment Address:" (toText paymentAddress)
-                `styleBasic` [padding 2]
-            , copyableLabelFor 8 "Stake Address:" (maybe "none" toText stakeAddress)
-                `styleBasic` [padding 2]
-            , widgetMaybe referenceScriptHash $ \hash ->
-                copyableLabelFor 8 "Reference Script Hash:" hash
-                  `styleBasic` [padding 2]
-            , widgetMaybe datumHash $ \hash ->
-                copyableLabelFor 8 "Datum Hash:" hash
-                  `styleBasic` [padding 2]
-            , widgetMaybe inlineDatum $ \x ->
-                copyableLabelFor 8 "Inline Datum:" (showValue x)
-                  `styleBasic` [padding 2]
-            , widgetIf (not $ null nativeAssets) $
-                vstack
-                  [ label "Native Assets:" `styleBasic` [textSize 8, textColor customBlue]
-                  , hstack
-                      [ spacer_ [width 10]
-                      , copyableTextArea 
-                          (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
-                          `styleBasic` [textSize 8, textColor lightGray, maxWidth 300]
-                      ]
-                  ] `styleBasic` [padding 2]
-            ] `styleBasic`
-                [ bgColor black
-                , padding 10
-                , border 1 black
-                ]
-        ]
+utxoDetails :: ReverseTickerMap -> TransactionUTxO -> AppNode
+utxoDetails reverseTickerMap TransactionUTxO{..} = 
+  hstack
+    [ filler
+    , vstack
+        [ copyableLabelFor 8 "Payment Address:" (toText paymentAddress)
+            `styleBasic` [padding 2]
+        , copyableLabelFor 8 "Stake Address:" (maybe "none" toText stakeAddress)
+            `styleBasic` [padding 2]
+        , widgetMaybe referenceScriptHash $ \hash ->
+            copyableLabelFor 8 "Reference Script Hash:" hash
+              `styleBasic` [padding 2]
+        , widgetMaybe datumHash $ \hash ->
+            copyableLabelFor 8 "Datum Hash:" hash
+              `styleBasic` [padding 2]
+        , widgetMaybe inlineDatum $ \x ->
+            copyableLabelFor 8 "Inline Datum:" (showValue x)
+              `styleBasic` [padding 2]
+        , widgetIf (not $ null nativeAssets) $
+            vstack
+              [ label "Native Assets:" `styleBasic` [textSize 8, textColor customBlue]
+              , hstack
+                  [ spacer_ [width 10]
+                  , flip styleBasic [textSize 8, textColor lightGray, maxWidth 300] $
+                      copyableTextArea $ show $ align $ vsep $ 
+                        map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
+                  ]
+              ] `styleBasic` [padding 2]
+        ] `styleBasic`
+            [ bgColor black
+            , padding 10
+            , border 1 black
+            ]
+    ]
 
 txFilterWidget :: AppModel -> AppNode
 txFilterWidget model = do
@@ -773,3 +715,88 @@ toggleShow finalLens = lens getToggleShow setToggleShow
 
     setToggleShow :: Maybe Transaction -> Bool -> Maybe Transaction
     setToggleShow maybeTx b = fmap (set finalLens b) maybeTx
+
+lowerBoundText :: Lens' TxFilterModel Text
+lowerBoundText = lens getLowerBoundText setLowerBoundText
+  where
+    getLowerBoundText :: TxFilterModel -> Text
+    getLowerBoundText tx = 
+      maybe "" (toText . Time.formatTime Time.defaultTimeLocale "%m-%d-%Y") $ tx ^. #dateRange % _1
+
+    setLowerBoundText :: TxFilterModel -> Text -> TxFilterModel
+    setLowerBoundText tx date = 
+      tx & #dateRange % _1 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
+
+upperBoundText :: Lens' TxFilterModel Text
+upperBoundText = lens getLowerBoundText setLowerBoundText
+  where
+    getLowerBoundText :: TxFilterModel -> Text
+    getLowerBoundText tx = 
+      maybe "" (toText . Time.formatTime Time.defaultTimeLocale "%m-%d-%Y") $ tx ^. #dateRange % _2
+
+    setLowerBoundText :: TxFilterModel -> Text -> TxFilterModel
+    setLowerBoundText tx date = 
+      tx & #dateRange % _2 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | Calculate the net asset flux from this address in the transaction.
+txValueFromWallet :: PaymentAddress -> Transaction -> (Ada,[NativeAsset])
+txValueFromWallet addr Transaction{inputs,outputs} = 
+  let isFromAddress x = x ^. #paymentAddress == addr
+      addressInputs = filter isFromAddress inputs
+      addressOutputs = filter isFromAddress outputs
+      (spentLoves,spentAssets) = 
+        ( sum $ map (view #lovelace) addressInputs
+        , concatMap (view #nativeAssets) addressInputs
+        )
+      (receivedLoves,receivedAssets) = 
+        ( sum $ map (view #lovelace) addressOutputs
+        , concatMap (view #nativeAssets) addressOutputs
+        )
+      spentMap = 
+        Map.fromList $ map (\a -> (a ^. onChainName, negate $ a ^. #quantity)) spentAssets
+      receivedMap = 
+        Map.fromList $ map (\a -> (a ^. onChainName, a ^. #quantity)) receivedAssets
+      bal = map (fromMaybe def . parseNativeAsset . \(name,q) -> show q <> " " <> name) 
+          $ filter (\(_,q) -> q /= 0)
+          $ Map.toList 
+          $ Map.unionWith (+) spentMap receivedMap
+  in (toAda $ receivedLoves - spentLoves, bal)
+
+applySearchFilter :: PaymentWallet -> ReverseTickerMap -> [Text] -> [Transaction] -> [Transaction]
+applySearchFilter _ _ [] xs = xs
+applySearchFilter selectedWallet reverseTickerMap (target:ts) xs = 
+  applySearchFilter selectedWallet reverseTickerMap ts $ 
+    searchFilter selectedWallet reverseTickerMap target xs
+
+matchesUTxO :: PaymentWallet -> ReverseTickerMap -> Text -> TransactionUTxO -> Bool
+matchesUTxO wallet reverseTickerMap searchTarget TransactionUTxO{..} = or
+    -- Only match the payment address if it is not the selected wallet's address.
+    [ paymentAddress /= wallet ^. #paymentAddress && paymentAddress == PaymentAddress searchTarget
+    -- Only match the stake address if it is not the selected wallet's stake address.
+    , stakeAddress /= wallet ^. #stakeAddress && stakeAddress == Just (StakeAddress searchTarget)
+    , maybe False (Text.isPrefixOf searchTarget) referenceScriptHash
+    , maybe False (Text.isPrefixOf searchTarget) datumHash
+    , Text.isPrefixOf searchTarget (display utxoRef)
+    , any matchesAsset nativeAssets
+    ]
+  where
+    matchesAsset :: NativeAsset -> Bool
+    matchesAsset NativeAsset{..} = or
+      [ display policyId == searchTarget
+      , display tokenName == searchTarget
+      , display policyId <> "." <> display tokenName == searchTarget
+      , display fingerprint == searchTarget
+      , Just searchTarget == fmap (display . fst) (Map.lookup (policyId,tokenName) reverseTickerMap)
+      ]
+
+searchFilter :: PaymentWallet -> ReverseTickerMap -> Text -> [Transaction] -> [Transaction]
+searchFilter selectedWallet reverseTickerMap searchTarget xs
+  | searchTarget == "" = xs
+  | otherwise = flip filter xs $ \Transaction{..} -> or
+      [ any (matchesUTxO selectedWallet reverseTickerMap searchTarget) inputs
+      , any (matchesUTxO selectedWallet reverseTickerMap searchTarget) outputs
+      , any (matchesUTxO selectedWallet reverseTickerMap searchTarget) referenceInputs
+      ]

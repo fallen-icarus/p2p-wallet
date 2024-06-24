@@ -17,9 +17,9 @@ data AddEvent a b
   = StartAdding (Maybe a)
   -- | Close the widget and reset the new information in the form.
   | CancelAdding
-  -- | Keep the widget open, validate the information, and (if pairing) try to get the required 
-  -- information from the hardware wallet. If anything fails, display an error message to the 
-  -- user. The widget is kept open to allow the user to quickly try again.
+  -- | Keep the widget open, validate the information, and try to get any information from the real
+  -- world. If anything fails, display an error message to the user. The widget is kept open to
+  -- allow the user to quickly try again. This is meant to be the IO step.
   | ConfirmAdding
   -- | Process the new information and update the database.
   | AddResult b
@@ -36,19 +36,20 @@ data DeleteWithConfirmationEvent a
   = GetDeleteConfirmation (Maybe a)
   -- | Close the widget without deleting the item.
   | CancelDeletion
-  -- | Delete the item.
+  -- | Delete the item. This is meant to be the IO step.
   | ConfirmDeletion
   -- | Update UI to post deletion.
   | PostDeletionAction
   deriving (Show,Eq)
 
 -------------------------------------------------
--- Syncing information of type `a`
+-- Process Event
 -------------------------------------------------
--- | The UI steps for syncing. These steps are automated.
-data SyncEvent a
-  = StartSync
-  | SyncResults a
+-- | Most interactions with the real world require two steps: get/edit/delete the data, and process the result.
+-- This tries to separate the pure part from the IO part.
+data ProcessEvent a
+  = StartProcess -- IO step.
+  | ProcessResults a -- Pure step.
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -60,9 +61,9 @@ data SortDirection
   | SortDescending
   deriving (Show,Eq,Enum)
 
-displaySortDirection :: SortDirection -> Text
-displaySortDirection SortAscending = "Ascending"
-displaySortDirection SortDescending = "Descending"
+instance Display SortDirection where
+  display SortAscending = "Ascending"
+  display SortDescending = "Descending"
 
 -- | A list of possible sorting directions. This is useful for dropdown menus.
 sortingDirections :: [SortDirection]

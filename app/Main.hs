@@ -1,8 +1,4 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
-
 
 module Main where
 
@@ -39,7 +35,7 @@ main = do
           def & #databaseFile .~ dbFilePath -- Use the full filepath for to the database.
               & #config % #timeZone .~ timeZone
               & #config % #currentDay .~ currentDate
-              & #homeModel % #txFilterModel % #dateRange % _1 .~ Just thirtyDaysAgo
+              & #homeModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
     startApp initModel handleEvent buildUI $ appCfg AppInit
 
   where

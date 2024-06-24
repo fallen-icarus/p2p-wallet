@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.Actions.Utils where
 
 import System.Exit (ExitCode(ExitSuccess))
@@ -7,8 +5,8 @@ import System.Process (readCreateProcessWithExitCode, shell)
 import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
-import P2PWallet.Plutus
+import P2PWallet.Data.Core.Internal
+-- import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -- | Run an action. If successfull, do something with the results. If unsuccessfull, do something
@@ -19,9 +17,10 @@ runAction onAppErr onSuccess action =
   handle (\(AppError err) -> return $ onAppErr err) $ fmap onSuccess action
 
 -- | Run an action. If successfull, do something with the results. If unsuccessfull, pass
--- the error message to `Alert`. 
+-- the error message to `Alert`. This is usefull for immediately displaying the error to the
+-- user through the frontend.
 runActionOrAlert :: (c -> AppEvent) -> IO c -> IO AppEvent
-runActionOrAlert onSuccess action = runAction Alert onSuccess action
+runActionOrAlert = runAction Alert
 
 -- | Gets the `Just` value or throws an `AppError` with the supplied error message.
 fromJustOrAppError :: Text -> Maybe a -> IO a
@@ -44,16 +43,34 @@ runCmd cmd =
         ('\n':xs) -> reverse xs
         _ -> s
 
+-- | Run the command without returning anything except an error message if an error occurs. The trailing newline is
+-- dropped for the error message.
+runCmd_ :: String -> IO ()
+runCmd_ cmd =
+    readCreateProcessWithExitCode (shell cmd) [] >>= \case
+      (ExitSuccess,_,_) -> return ()
+      (_,_,errMsg) -> throwIO $ AppError $ toText $ dropTrailingNewline errMsg
+  where
+    dropTrailingNewline s = 
+      case reverse s of
+        ('\n':xs) -> reverse xs
+        _ -> s
+
 -- | Re-index the lists while preserving ordering.
 reIndex :: [(Int,a)] -> [(Int,a)]
 reIndex xs = go xs 0
   where
     go [] _ = []
-    go ((_,y):ys) i = (i,y) : go ys (i+1)
+    go ((_,y):ys) !i = (i,y) : go ys (i+1)
 
--- | Remove the item from the list and re-index after.
+-- | Remove the item from the list, and then re-index.
 removeAction :: Int -> [(Int,a)] -> [(Int,a)]
 removeAction idx xs = reIndex $ filter ((/=idx) . fst) xs
+
+-- | Convert `Network` to the required flag for cardano-cli.
+toNetworkFlag :: Network -> Text
+toNetworkFlag Mainnet = "--mainnet"
+toNetworkFlag Testnet = "--testnet-magic 1"
 
 -- | Balance the inputs with the outputs by updating the changeOutput and subtracting off the
 -- fee.
@@ -77,12 +94,15 @@ balanceTx tx@TxBuilderModel{..} =
             , concatMap (view #nativeAssets . snd) userInputs
             )
           (outLoves,outAssets) = 
-            ( sum $ map (view #lovelace . snd) userOutputs
-            , concatMap (view #nativeAssets . snd) userOutputs
+            -- Increase the quantity of lovelace for each output by the count.
+            ( sum $ map (\(_,UserOutput{count,lovelace}) -> fromIntegral count * lovelace) userOutputs
+            -- Increase the quantity of each native asset by the count.
+            , flip concatMap userOutputs $ \(_,UserOutput{count,nativeAssets}) -> 
+                for nativeAssets $ \asset -> asset & #quantity %~ (fromIntegral count *)
             )
-          inMap = Map.fromList $ map (\a -> (a ^. fullName, a ^. #quantity)) inAssets
-          outMap = Map.fromList $ map (\a -> (a ^. fullName, negate $ a ^. #quantity)) outAssets
-          bal = map (fromMaybe def . readNativeAsset . \(name',q) -> show q <> " " <> name') 
+          inMap = Map.fromList $ map (\a -> (a ^. onChainName, a ^. #quantity)) inAssets
+          outMap = Map.fromList $ map (\a -> (a ^. onChainName, negate $ a ^. #quantity)) outAssets
+          bal = map (fromMaybe def . parseNativeAsset . \(name',q) -> show q <> " " <> name') 
               $ filter (\(_,q) -> q /= 0)
               $ Map.toList 
               $ Map.unionWith (+) inMap outMap
@@ -90,30 +110,3 @@ balanceTx tx@TxBuilderModel{..} =
 
     -- Whether all assets are balanced.
     balanced = all ((>= 0) . view #quantity) assets && loves - fee >= 0
-
--- | A list of unique pub keys that must sign the transaction as well as their `DerivationPath`
--- if known. 
-getRequiredWitnesses :: TxBuilderModel -> Either Text [Witness]
-getRequiredWitnesses TxBuilderModel{..} = do
-    -- | Get the required pubkeys among the inputs. Returns the first error, if any.
-    inputWitnesses <- catMaybes <$> sequence (map checkInput userInputs)
-
-    -- | Remove repeat keys before returning. You cannot have the same `PubKeyHash` with different
-    -- `DerivationPath`s so it is enough to just check the key hashes. Filter out registration
-    -- certificate keys if they are also normal witnesses.
-    return $ ordNubOn (fst . view #witness) inputWitnesses
-  where
-    -- Get the pubkeyhash from the plutus address. Returns nothing if the input is a script input.
-    checkInput :: (Int,UserInput) -> Either Text (Maybe Witness)
-    checkInput (index,i) = do
-      plutusAddr <- 
-        first (const $ "Input " <> show index <> " has an invalid bech32 shelley address.") $
-          paymentAddressToPlutusAddress $ i ^. #paymentAddress
-      return $ case toPubKeyHash plutusAddr of
-        Nothing -> Nothing
-        Just pkHash -> Just $ Witness (pkHash, i ^. #paymentKeyPath)
-
--- | Convert `Network` to the required flag for cardano-cli.
-toNetworkFlag :: Network -> Text
-toNetworkFlag Mainnet = "--mainnet"
-toNetworkFlag Testnet = "--testnet-magic 1"

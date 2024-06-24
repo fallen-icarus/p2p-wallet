@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.Actions.AddWallet
   ( 
     pairPaymentWallet
@@ -11,9 +9,9 @@ module P2PWallet.Actions.AddWallet
 import P2PWallet.Actions.ExportHwKey
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
-import P2PWallet.Data.Profile
-import P2PWallet.Data.Wallets
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.Profile
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
@@ -27,7 +25,7 @@ pairPaymentWallet network Profile{profileId,accountIndex} paymentId NewPaymentWa
 
     pKeyPath <- 
       fromJustOrAppError "Invalid payment address index." $ 
-        fmap (PaymentKeyPath accountIndex) $ toAddressIndex paymentAddressIndex
+        PaymentKeyPath accountIndex <$> toAddressIndex paymentAddressIndex
 
     msKeyPath <- case fmap toAddressIndex stakeAddressIndex of
       Nothing -> return Nothing -- No stake key present.
@@ -74,7 +72,7 @@ pairStakeWallet network Profile{profileId,accountIndex} stakeId NewStakeWallet{.
 
     sKeyPath <- 
       fromJustOrAppError "Invalid stake address index." $ 
-        fmap (StakeKeyPath accountIndex) $ toAddressIndex stakeAddressIndex
+        StakeKeyPath accountIndex <$> toAddressIndex stakeAddressIndex
 
     stakeAddr <- genStakeAddress sKeyPath
 
@@ -140,7 +138,7 @@ watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} = d
   where
     genAddresses :: Text -> Either Text (PaymentAddress, Maybe StakeAddress)
     genAddresses = 
-      readPaymentAddress network >=> paymentAddressToPlutusAddress >=> plutusToBech32 network
+      parsePaymentAddress network >=> paymentAddressToPlutusAddress >=> plutusToBech32 network
 
 -- | Validate and then watch the new wallet.
 watchStakeWallet :: Network -> Profile -> StakeId -> NewStakeWallet -> IO StakeWallet
@@ -148,7 +146,7 @@ watchStakeWallet network Profile {profileId} stakeId NewStakeWallet{..} = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
 
     -- Check if the stakeAddress is a valid bech32 stake address. 
-    stakeAddr <- fromRightOrAppError $ readStakeAddress network stakeAddress
+    stakeAddr <- fromRightOrAppError $ parseStakeAddress network stakeAddress
 
     return $ StakeWallet 
       { network = network

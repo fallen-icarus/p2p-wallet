@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.Widgets.AddressBook
   ( 
     addressBookWidget
@@ -8,8 +6,8 @@ module P2PWallet.GUI.Widgets.AddressBook
 import Monomer
 import Data.Text qualified as Text
 
-import P2PWallet.Data.AddressBook
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.AddressBook
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
@@ -54,11 +52,11 @@ addressBookWidget AppModel{..} = do
                   [ padding 10
                   , paddingT 0
                   ]
-          , widgetIf (sample == [] && addressBook /= []) $ 
+          , widgetIf (null sample && addressBook /= []) $ 
               centerWidget $
                 label "No contacts match that search."
                  `styleBasic` [textFont "Italics"]
-          , widgetIf (addressBook == []) $
+          , widgetIf (null addressBook) $
               centerWidget $
                 label "This profile does not have any saved contacts."
                  `styleBasic` [textFont "Italics"]
@@ -103,11 +101,11 @@ addressBookWidget AppModel{..} = do
     searchTarget = addressBookModel ^. #search
 
     searchFilter :: [AddressEntry] -> [AddressEntry]
-    searchFilter
-      | searchTarget == "" = filter (const True)
-      | otherwise = filter $ \AddressEntry{..} -> or
+    searchFilter xs
+      | searchTarget == "" = xs
+      | otherwise = flip filter xs $ \AddressEntry{..} -> or
           [ searchTarget `Text.isPrefixOf` alias
-          , searchTarget `Text.isPrefixOf` (toText paymentAddress)
+          , searchTarget `Text.isPrefixOf` toText paymentAddress
           ]
 
     sample :: [AddressEntry]
@@ -252,7 +250,7 @@ confirmDeleteWidget alias = do
 addNewUserOutputWidget :: Text -> AppNode
 addNewUserOutputWidget recipient = do
   centerWidget $ vstack
-    [ centerWidgetH $ label ("How much would you like to pay " <> recipient <> "?")
+    [ centerWidgetH $ label ("How much would you like to send to " <> recipient <> "?")
     , spacer_ [width 20]
     , hstack
         [ label "ADA:"

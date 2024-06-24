@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.Widgets.Home.UTxOs 
   ( utxosWidget
   ) where
@@ -11,22 +9,25 @@ import Data.Text qualified as Text
 import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
-import P2PWallet.Data.TickerMap
-import P2PWallet.Data.Wallets
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
+import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
-import P2PWallet.MonomerOptics()
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 utxosWidget :: AppModel -> AppNode
-utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap} =
+utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap,config} =
     zstack
       [ cushionWidgetH $ vstack
-          [ hstack 
+          [ -- A header widget saying how many UTxOs match that search out of the total as well
+            -- as a filter button for opening the filter menu. On the far right, there are expand
+            -- and collapse all buttons for showing/hiding the details for all UTxOs.
+            hstack 
               [ label ("UTxOs (" <> fractionShown <> ")")
                   `styleBasic` [textFont "Italics", textSize 14]
               , spacer_ [width 5]
@@ -73,6 +74,7 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap} =
                       ]
                     `styleHover` [bgColor customGray2, cursorIcon CursorHand]
               ]
+            -- These are the UTxOs that match those filter/search settings.
           , flip styleBasic [padding 5] $ box $ vscroll_ [wheelRate 50] $ 
               vstack_ [childSpacing] (map utxoRow sample)
                 `styleBasic` [padding 10]
@@ -81,11 +83,6 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap} =
       , utxoFilterWidget model `nodeVisible` showUTxOFilter
       ]
   where
-    fractionShown :: Text
-    fractionShown = show (length sample) 
-                 <> "/" 
-                 <> show (length $ selectedWallet ^. #utxos)
-
     sortMethodSetting :: UTxOSortMethod
     sortMethodSetting = utxoFilterModel ^. #sortingMethod
 
@@ -95,60 +92,16 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap} =
     searchTargets :: [Text]
     searchTargets = words $ replace "," " " $ utxoFilterModel ^. #search
 
-    targetQuantity :: PersonalUTxO -> Maybe Integer
-    targetQuantity p =
-      flip (maybe Nothing) (maybeHead searchTargets) $ \target ->
-        fmap (view #quantity) $
-          flip find (p ^. #nativeAssets) $ \a@NativeAsset{..} -> or
-            [ policyId <> "." <> tokenName == target
-            , fingerprint == target
-            , fmap fst (Map.lookup (a ^. fullName) reverseTickerMap) == Just target
-            ]
-
-    applySearchFilter :: [Text] -> [PersonalUTxO] -> [PersonalUTxO]
-    applySearchFilter [] xs = xs
-    applySearchFilter (target:ts) xs = applySearchFilter ts $ searchFilter target xs
-
-    searchFilter :: Text -> [PersonalUTxO] -> [PersonalUTxO]
-    searchFilter searchTarget
-      | searchTarget == "" = filter (const True)
-      | otherwise = filter $ \p -> or
-          [ p ^. #referenceScriptHash == Just searchTarget
-          , p ^. #datumHash == Just searchTarget
-          , Text.isPrefixOf searchTarget $ showTxOutRef $ p ^. #utxoRef
-          , flip any (p ^. #nativeAssets) $ \a@NativeAsset{..} -> or
-              [ policyId == searchTarget
-              , tokenName == searchTarget
-              , policyId <> "." <> tokenName == searchTarget
-              , fingerprint == searchTarget
-              , fmap fst (Map.lookup (a ^. fullName) reverseTickerMap) == Just searchTarget
-              ]
-          ]
-
-    sorter = case sortMethodSetting of
-      UTxOLexicographical -> sortOn (view #utxoRef)
-      UTxOAdaBalance -> sortOn (view #lovelace)
-      UTxOTime -> sortOn (view #blockTime)
-      UTxOSearchTokenBalance -> sortOn targetQuantity -- Only used with search
-
-    orderer
-      | sortOrderSetting == SortAscending = id
-      | otherwise = reverse
-
-    filterer :: [PersonalUTxO] -> [PersonalUTxO]
-    filterer us = do
-      u@PersonalUTxO{..} <- us
-      guard $ maybe True (isJust referenceScriptHash ==) (utxoFilterModel ^. #hasReferenceScript)
-      guard $ maybe True (isJust datumHash ==) (utxoFilterModel ^. #hasDatum)
-      guard $ maybe True (not (null nativeAssets) ==) (utxoFilterModel ^. #hasNativeAssets)
-      return u
-
     sample :: [PersonalUTxO]
-    sample = orderer 
-           $ sorter 
-           $ applySearchFilter searchTargets
-           $ filterer 
+    sample = orderer sortOrderSetting
+           . sorter reverseTickerMap (maybeHead searchTargets) sortMethodSetting 
+           . applySearchFilter reverseTickerMap searchTargets 
+           . filterer utxoFilterModel
            $ selectedWallet ^. #utxos
+
+    fractionShown :: Text
+    fractionShown = 
+      show (length sample) <> "/" <> show (length $ selectedWallet ^. #utxos)
 
     -- This is used for all toggleButton off styles.
     toggleOffStyle :: Style
@@ -172,9 +125,9 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap} =
       vstack
         [ vstack
             [ hstack 
-                [ copyableLabelSelf 10 (showTxOutRef utxoRef)
+                [ copyableLabelSelf 10 (display utxoRef)
                 , filler
-                , label (fromString $ printf "%D ADA" $ toAda lovelace) 
+                , label (display lovelace) 
                     `styleBasic` [textSize 10]
                 ]
             , hstack
@@ -186,7 +139,7 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap} =
                       , paddingT 5
                       ]
                 , spacer_ [width 3]
-                , label (showLocalDate (model ^. #config % #timeZone) blockTime)
+                , label (showLocalDate (config ^. #timeZone) blockTime)
                     `styleBasic` 
                       [ textSize 10
                       , textColor lightGray
@@ -200,30 +153,34 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap} =
                       , paddingT 5
                       ]
                 , spacer_ [width 3]
-                , label (showLocalTime (model ^. #config % #timeZone) blockTime)
+                , label (showLocalTime (config ^. #timeZone) blockTime)
                     `styleBasic` 
                       [ textSize 10
                       , textColor lightGray
                       ]
                 , spacer
                 , widgetIf (not $ null nativeAssets) $ 
-                    tooltip_ "Native Assets" [tooltipDelay 500] $ label coinsIcon
-                      `styleBasic` 
-                        [ textSize 10
-                        , textColor customBlue
-                        , textFont "Remix"
-                        , textMiddle
-                        ]
-                , widgetIf (not $ null nativeAssets) $ spacer_ [width 3]
+                    hstack
+                      [ tooltip_ "Native Assets" [tooltipDelay 500] $ label coinsIcon
+                          `styleBasic` 
+                            [ textSize 10
+                            , textColor customBlue
+                            , textFont "Remix"
+                            , textMiddle
+                            ]
+                      , spacer_ [width 3]
+                      ]
                 , widgetIf (isJust datumHash) $ 
-                    tooltip_ "Datum" [tooltipDelay 500] $ label datumIcon
-                      `styleBasic` 
-                        [ textSize 10
-                        , textColor customBlue
-                        , textFont "Remix"
-                        , textMiddle
-                        ]
-                , widgetIf (isJust datumHash) $ spacer_ [width 3]
+                    hstack
+                      [ tooltip_ "Datum" [tooltipDelay 500] $ label datumIcon
+                          `styleBasic` 
+                            [ textSize 10
+                            , textColor customBlue
+                            , textFont "Remix"
+                            , textMiddle
+                            ]
+                      , spacer_ [width 3]
+                      ]
                 , widgetIf (isJust referenceScriptHash) $ 
                     tooltip_ "Reference Script" [tooltipDelay 500] $ label scriptIcon
                       `styleBasic` 
@@ -291,9 +248,9 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap} =
                   [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , copyableTextArea 
-                          (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
-                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 300]
+                      , flip styleBasic [textSize 10, textColor lightGray, maxWidth 300] $
+                          copyableTextArea $ show $ align $ vsep $ 
+                            map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`
@@ -476,7 +433,7 @@ utxoFilterWidget AppModel{homeModel=HomeModel{..}} = do
             , textDropdown_
                   (toLensVL $ #homeModel % #utxoFilterModel % #sortingMethod) 
                   possibleSortingMethods
-                  displayUTxOSortMethod 
+                  display 
                   [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
                 `styleBasic` 
                   [ bgColor customGray2
@@ -502,7 +459,7 @@ utxoFilterWidget AppModel{homeModel=HomeModel{..}} = do
             , textDropdown_
                   (toLensVL $ #homeModel % #utxoFilterModel % #sortingDirection) 
                   sortingDirections
-                  displaySortDirection 
+                  display 
                   [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
                 `styleBasic` 
                   [ bgColor customGray2
@@ -595,3 +552,62 @@ toggleDetails ref = lens (getToggleDetails ref) (setToggleDetails ref)
       if u ^. #utxoRef == targetRef 
       then (u & #showDetails .~ b) : us
       else u : setToggleDetails targetRef us b
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- Sort the list based of the first search criteria. The first criteria is expected to 
+-- be a native asset.
+targetQuantity :: ReverseTickerMap -> Maybe Text -> PersonalUTxO -> Maybe Integer
+targetQuantity reverseTickerMap mTarget p =
+  flip (maybe Nothing) mTarget $ \target ->
+    fmap (view #quantity) $
+      flip find (p ^. #nativeAssets) $ \NativeAsset{..} -> or
+        [ display policyId <> "." <> display tokenName == target
+        , display fingerprint == target
+        , Just target == fmap (display . fst) (Map.lookup (policyId,tokenName) reverseTickerMap)
+        ]
+
+sorter :: ReverseTickerMap -> Maybe Text -> UTxOSortMethod -> [PersonalUTxO] -> [PersonalUTxO]
+sorter reverseTickerMap mTarget sortMethod = case sortMethod of
+  UTxOLexicographical -> sortOn (view #utxoRef)
+  UTxOAdaBalance -> sortOn (view #lovelace)
+  UTxOTime -> sortOn (view #blockTime)
+  UTxOSearchTokenBalance -> sortOn (targetQuantity reverseTickerMap mTarget) -- Only used with search
+
+orderer :: SortDirection -> [PersonalUTxO] -> [PersonalUTxO]
+orderer = \case
+  SortAscending -> id
+  SortDescending -> reverse
+
+filterer :: UTxOFilterModel -> [PersonalUTxO] -> [PersonalUTxO]
+filterer UTxOFilterModel{..} us = do
+  u@PersonalUTxO{..} <- us
+  guard $ maybe True (isJust referenceScriptHash ==) hasReferenceScript
+  guard $ maybe True (isJust datumHash ==) hasDatum
+  guard $ maybe True (not (null nativeAssets) ==) hasNativeAssets
+  return u
+
+-- Apply the search filter recursively since users can search for multiple criteria
+-- and the UTxOs must match all set criteria.
+applySearchFilter :: ReverseTickerMap -> [Text] -> [PersonalUTxO] -> [PersonalUTxO]
+applySearchFilter _ [] !xs = xs
+applySearchFilter reverseTickerMap (target:ts) !xs = 
+  applySearchFilter reverseTickerMap ts $ searchFilter reverseTickerMap target xs
+
+searchFilter :: ReverseTickerMap -> Text -> [PersonalUTxO] -> [PersonalUTxO]
+searchFilter reverseTickerMap searchTarget !xs
+  | searchTarget == "" = xs
+  | otherwise = flip filter xs $ \p -> or
+      [ p ^. #referenceScriptHash == Just searchTarget
+      , p ^. #datumHash == Just searchTarget
+      , Text.isPrefixOf searchTarget $ display $ p ^. #utxoRef
+      , flip any (p ^. #nativeAssets) $ \NativeAsset{..} -> or
+          [ display policyId == searchTarget
+          , display tokenName == searchTarget
+          , display policyId <> "." <> display tokenName == searchTarget
+          , display fingerprint == searchTarget
+          , Just searchTarget ==
+              fmap (display . fst) (Map.lookup (policyId,tokenName) reverseTickerMap) 
+          ]
+      ]

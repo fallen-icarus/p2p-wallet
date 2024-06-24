@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.Widgets.TickerRegistry
   (
     tickerRegistryWidget
@@ -9,7 +7,8 @@ import Monomer
 import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.TickerMap
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal.Assets
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
@@ -40,7 +39,7 @@ tickerRegistryWidget AppModel{..} = do
                 , not isDeleting
                 ]
           , spacer_ [width 5]
-          , toggleButton_ "Search" (toLensVL $ #forceRedraw)
+          , toggleButton_ "Search" (toLensVL #forceRedraw)
               [toggleButtonOffStyle searchOffStyle]
               `styleBasic`
                 [ bgColor customGray4
@@ -60,8 +59,8 @@ tickerRegistryWidget AppModel{..} = do
       , box_ [mergeRequired reqUpdate] $ zstack
           [ widgetMaybe result resultWidget
               `nodeVisible` and
-                [ not isAdding
-                , not isEditing
+                [ not isAdding 
+                , not isEditing 
                 , not isDeleting
                 ]
           , unknownTickerWidget
@@ -112,13 +111,13 @@ tickerRegistryWidget AppModel{..} = do
     searchTarget :: Text
     searchTarget = tickerRegistryModel ^. #search
 
-    result :: Maybe (Text,Text,Word8)
-    result = Map.lookup searchTarget tickerMap
+    result :: Maybe (CurrencySymbol,TokenName,Word8)
+    result = Map.lookup (Ticker searchTarget) tickerMap
 
-    resultWidget :: (Text,Text,Word8) -> AppNode
+    resultWidget :: (CurrencySymbol,TokenName,Word8) -> AppNode
     resultWidget (policyId,assetName,decimal) = do
-      let fingerprint = fromRight "" $ mkAssetFingerprint policyId assetName
-          newInfo = NewTickerInfo searchTarget policyId assetName decimal
+      let fingerprint = mkAssetFingerprint policyId assetName
+          newInfo = NewTickerInfo searchTarget (display policyId) (display assetName) decimal
       vstack
         [ centerWidgetH $ hstack
             [ tooltip_ "Edit" [tooltipDelay 0] $
@@ -156,11 +155,11 @@ tickerRegistryWidget AppModel{..} = do
                 ]
         , spacer
         , centerWidgetH $ vstack
-            [ copyableLabelFor "Policy Id:" policyId
+            [ copyableLabelFor "Policy Id:" $ display policyId
             , spacer
-            , copyableLabelFor "Asset Name:" assetName
+            , copyableLabelFor "Asset Name:" $ display assetName
             , spacer
-            , copyableLabelFor "Fingerprint:" fingerprint
+            , copyableLabelFor "Fingerprint:" $ display fingerprint
             , spacer
             , copyableLabelFor "Decimals:" $ show decimal
             ]

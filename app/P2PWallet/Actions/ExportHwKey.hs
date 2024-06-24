@@ -9,8 +9,7 @@ import Data.String qualified as String
 
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
-import P2PWallet.Data.Files
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
@@ -23,7 +22,7 @@ exportHwKeyFiles prefix key = do
       hwsKeyFile = 
         HwSigningFile $ tmpDir </> fromMaybe "new_key_export" prefix <.> ".hwsfile"
 
-  void $ runCmd $ exportPubKeyCmd key pubKeyFile hwsKeyFile
+  runCmd_ $ exportPubKeyCmd key pubKeyFile hwsKeyFile
   return (pubKeyFile,hwsKeyFile)
 
 exportHwPubKeyHash :: DerivationPath -> IO PubKeyHash
@@ -33,7 +32,7 @@ exportHwPubKeyHash key = do
     hash <- toText <$> runCmd (printf hashPubKeyFileCmd $ toString pubKeyFile)
     
     either (throwIO . AppError) return $
-      maybeToRight "Could not parse pubkey hash" $ readPubKeyHash hash
+      maybeToRight "Could not parse pubkey hash" $ parsePubKeyHash hash
 
   where
     hashPubKeyFileCmd = case key of
@@ -44,7 +43,7 @@ exportPubKeyCmd :: DerivationPath -> PubKeyFile -> HwSigningFile -> String
 exportPubKeyCmd key pubKeyFile hwsKeyFile =
   String.unwords
     [ "cardano-hw-cli address key-gen"
-    , printf "--path %s" $ showDerivationPath key
+    , printf "--path %s" $ display key
     , printf "--verification-key-file %s" $ toString pubKeyFile
     , printf "--hw-signing-file %s" $ toString hwsKeyFile
     ]

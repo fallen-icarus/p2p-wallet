@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.Widgets.Delegation.PoolPicker 
   (
     poolPickerWidget
@@ -9,15 +7,16 @@ module P2PWallet.GUI.Widgets.Delegation.PoolPicker
 import Monomer hiding (icon)
 import Data.Text qualified as Text
 import Prettyprinter ((<+>), pretty)
+import Data.Ord qualified as Ord
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
+import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
-import P2PWallet.MonomerOptics()
 import P2PWallet.Prelude
 
 poolPickerWidget :: AppModel -> AppNode
@@ -62,48 +61,49 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
           ]
       , spacer
       , hgrid_ [childSpacing]
-          [ centerWidgetH $ label "Pool Description"
+          [ box_ [alignMiddle] $ label "Pool Description"
               `styleBasic` [textMiddle, textSize 8]
-          , centerWidgetH $ vstack
+          , box_ [alignMiddle] $ vstack
               [ sortButton ascendingSortIcon (PoolLiveSaturation SortAscending)
               , headerField "Live Saturation" liveSaturationMsg
               , sortButton descendingSortIcon (PoolLiveSaturation SortDescending)
               ]
-          , centerWidgetH $ vstack
+          , box_ [alignMiddle] $ vstack
               [ sortButton ascendingSortIcon (PoolActivePledge SortAscending)
               , headerField "Pledge" pledgeMsg
               , sortButton descendingSortIcon (PoolActivePledge SortDescending)
               ]
-          , centerWidgetH $ vstack
+          , box_ [alignMiddle] $ vstack
               [ sortButton ascendingSortIcon (PoolCost SortAscending)
               , headerField "Cost" fixedCostMsg
               , sortButton descendingSortIcon (PoolCost SortDescending)
               ]
-          , centerWidgetH $ vstack
+          , box_ [alignMiddle] $ vstack
               [ sortButton ascendingSortIcon (PoolMargin SortAscending)
               , headerField "Margin" marginMsg
               , sortButton descendingSortIcon (PoolMargin SortDescending)
               ]
-          , box_ [onClick $ SyncRegisteredPools StartSync] $ tooltip_ "Refresh" [tooltipDelay 0] $ 
-              label refreshIcon
-                `styleBasic`
-                  [ textSize 10
-                  , bgColor transparent
-                  , padding 3
-                  , textMiddle
-                  , radius 10
-                  , textColor customBlue
-                  , textFont "Remix"
-                  ]
-                `styleHover`
-                  [ bgColor customGray1 
-                  , cursorIcon CursorHand
-                  ]
+          , box_ [alignMiddle, onClick $ DelegationEvent $ SyncRegisteredPools StartProcess] $ 
+              tooltip_ "Refresh" [tooltipDelay 0] $ 
+                label refreshIcon
+                  `styleBasic`
+                    [ textSize 10
+                    , bgColor transparent
+                    , padding 3
+                    , textMiddle
+                    , radius 10
+                    , textColor customBlue
+                    , textFont "Remix"
+                    ]
+                  `styleHover`
+                    [ bgColor customGray1 
+                    , cursorIcon CursorHand
+                    ]
           ] `styleBasic` [padding 5, bgColor customGray4, radiusTL 5, radiusTR 5]
       , spacer_ [width 1]
       , vscroll_ [scrollOverlay, wheelRate 50, barWidth 3, thumbWidth 3] $ 
           vstack_ [childSpacing_ 1] $
-            flip map sample $ \Pool{..} -> do
+            for sample $ \Pool{..} -> do
               let PoolInfo{..} = fromMaybe def info
                   displayName = if Text.length name <= 10 then name else Text.take 10 name <> "..."
                   nameAndTicker = show $ 
@@ -111,7 +111,7 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
                   (pledgeIcon,pledgeColor)
                     | pledge > livePledge = (closeCircleIcon, customRed)
                     | otherwise = (circleCheckboxFillIcon, customBlue)
-                  actualPledge = fromString $ printf "%D ADA" $ toAda $ fromMaybe 0 livePledge
+                  actualPledge = display $ fromMaybe 0 livePledge
               hgrid_ [childSpacing]
                 [ vstack 
                     [ tooltip_ name [tooltipDelay 0] $ label nameAndTicker
@@ -119,11 +119,11 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
                     , copyableTruncatedPoolId 8 lightGray poolId
                     , copyableLabelSelf 8 lightGray homepage
                     ]
-                , centerWidgetH $ 
+                , box_ [alignMiddle] $ 
                     label (fromString $ printf "%D%%" $ fromMaybe 0 liveSaturation)
                       `styleBasic` [textMiddle, textSize 8]
-                , centerWidgetH $ box_ [alignMiddle] $ vstack
-                    [ label (fromString $ printf "%D ADA" $ toAda $ fromMaybe 0 pledge)
+                , box_ [alignMiddle] $ box_ [alignMiddle] $ vstack
+                    [ label (display $ fromMaybe 0 pledge)
                         `styleBasic` [textCenter, textSize 8]
                     , spacer_ [width 3]
                     , tooltip_ ("Actual: " <> actualPledge) [tooltipDelay 0] $ 
@@ -136,13 +136,13 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
                             , textColor pledgeColor
                             ]
                     ]
-                , centerWidgetH $ 
-                    label (fromString $ printf "%D ADA" $ toAda $ fromMaybe 0 fixedCost)
+                , box_ [alignMiddle] $ 
+                    label (display $ fromMaybe 0 fixedCost)
                       `styleBasic` [textMiddle, textSize 8]
-                , centerWidgetH $ 
+                , box_ [alignMiddle] $ 
                     label (fromString $ printf "%D%%" $ (*100) $ fromMaybe 0 margin)
                       `styleBasic` [textMiddle, textSize 8]
-                , box_ [onClick AppInit] $
+                , box_ [ignoreEmptyArea, alignMiddle, onClick AppInit] $
                     label "Delegate" 
                       `styleBasic`
                         [ textSize 10
@@ -158,13 +158,12 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
                         ]
                 ] `styleBasic` [padding 5, bgColor customGray4]
       , spacer
-      , hstack
-          [ filler
-          , let shouldBeEnabled = previousPage /= -1 in 
+      , box_ [alignRight] $ hstack
+          [ let shouldBeEnabled = previousPage /= -1 in 
               pageButton "Previous" previousPage (not shouldBeEnabled)
                 `nodeEnabled` shouldBeEnabled
           , spacer_ [width 3]
-          , let shouldBeEnabled = actualSampleSize == poolFilterModel ^. #sampleSize in
+          , let shouldBeEnabled = actualSampleSize == sampleSize in
               pageButton "Next" nextPage (not shouldBeEnabled)
                 `nodeEnabled` shouldBeEnabled
           ]
@@ -173,53 +172,20 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
           , radius 20
           , padding 20
           ]
-
   where
-    sortMethod :: PoolSortMethod
-    sortMethod = poolFilterModel ^. #sortMethod
+    PoolFilterModel{..} = poolFilterModel
+
+    -- sortMethod :: PoolSortMethod
+    -- sortMethod = poolFilterModel ^. #sortMethod
 
     previousPage :: Int
-    previousPage = (poolFilterModel ^. #currentPage) - 1
+    previousPage = currentPage - 1
 
     nextPage :: Int
-    nextPage = (poolFilterModel ^. #currentPage) + 1
+    nextPage = currentPage + 1
 
-    pageButton :: Text -> Int -> Bool -> AppNode
-    pageButton caption pageNum isDisabled = do
-      let targetColor
-            | isDisabled = darkGray
-            | otherwise = customBlue
-          offStyle = def 
-            `styleBasic`
-              [ bgColor customGray4
-              , border 1 targetColor
-              , textColor targetColor
-              , padding 3
-              , textSize 10
-              ]
-            `styleHover` [ bgColor customGray1 ]
-      optionButton_ caption pageNum (toLensVL $ #delegationModel % #poolFilterModel % #currentPage)
-          [optionButtonOffStyle offStyle]
-        `styleBasic`
-          [ bgColor customGray4
-          , border 1 targetColor
-          , textColor targetColor
-          , padding 3
-          , textSize 10
-          ]
-        `styleHover` [bgColor customGray1]
-      
     searchTarget :: Text
-    searchTarget = poolFilterModel ^. #search
-
-    searchFilter :: [Pool] -> [Pool]
-    searchFilter
-      | searchTarget == "" = filter (const True)
-      | otherwise = filter $ \Pool{..} -> or
-          [ toText poolId == searchTarget
-          , searchTarget `Text.isPrefixOf` fromMaybe "" (info ^? _Just % #ticker)
-          , searchTarget `Text.isPrefixOf` fromMaybe "" (info ^? _Just % #name)
-          ]
+    searchTarget = search
 
     menuOffStyle :: Style
     menuOffStyle = 
@@ -231,38 +197,13 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
           `styleHover`
             [ bgColor customGray1]
 
-    sorter = case sortMethod of
-      PoolLiveSaturation SortAscending -> sortOn (view #liveSaturation)
-      PoolLiveSaturation SortDescending -> reverse . sortOn (view #liveSaturation)
-      PoolActivePledge SortAscending -> sortOn (view #livePledge)
-      PoolActivePledge SortDescending -> reverse . sortOn (view #livePledge)
-      PoolCost SortAscending -> sortOn (view #fixedCost)
-      PoolCost SortDescending -> reverse . sortOn (view #fixedCost)
-      PoolMargin SortAscending -> sortOn (view #margin)
-      PoolMargin SortDescending -> reverse . sortOn (view #margin)
-
-    filterer :: [Pool] -> [Pool]
-    filterer = filter $ \Pool{..} -> and
-      [ fmap (*100) margin >= Just (poolFilterModel ^. #marginRange % _1)
-      , fmap (*100) margin <= Just (poolFilterModel ^. #marginRange % _2)
-      , liveSaturation >= Just (poolFilterModel ^. #liveSaturationRange % _1)
-      , liveSaturation <= Just (poolFilterModel ^. #liveSaturationRange % _2)
-      , flip (maybe True) (poolFilterModel ^. #fixedCostRange % _1) $ \lowerBound ->
-          fmap (unAda . toAda) fixedCost >= Just lowerBound
-      , flip (maybe True) (poolFilterModel ^. #fixedCostRange % _2) $ \upperBound ->
-          fmap (unAda . toAda) fixedCost <= Just upperBound
-      , flip (maybe True) (poolFilterModel ^. #pledgeRange % _1) $ \lowerBound ->
-          fmap (unAda . toAda) pledge >= Just lowerBound
-      , flip (maybe True) (poolFilterModel ^. #pledgeRange % _2) $ \upperBound ->
-          fmap (unAda . toAda) pledge <= Just upperBound
-      ]
-      
     sample :: [Pool]
-    sample = take (poolFilterModel ^. #sampleSize) 
-           $ drop (poolFilterModel ^. #currentPage * poolFilterModel ^. #sampleSize)
-           $ sorter 
-           $ filterer 
-           $ searchFilter registeredPools
+    sample = take sampleSize
+           . drop (currentPage * sampleSize)
+           . sorter sortMethod
+           . filterer poolFilterModel
+           . searchFilter searchTarget 
+           $ registeredPools
 
     actualSampleSize :: Int
     actualSampleSize = length sample
@@ -286,33 +227,8 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
             , cursorIcon CursorHand
             ]
 
-    headerField :: Text -> Text -> AppNode
-    headerField caption helpMsg =
-      hstack
-        [ label caption
-            `styleBasic`
-              [ textSize 8
-              , textMiddle
-              ]
-        , spacer_ [width 2]
-        , box_ [onClick $ Alert helpMsg] $ 
-            label helpIcon
-              `styleBasic`
-                [ textColor customBlue 
-                , textSize 10
-                , textFont "Remix"
-                , bgColor transparent
-                , textMiddle
-                , radius 10
-                ]
-              `styleHover`
-                [ bgColor customGray2 
-                , cursorIcon CursorHand
-                ]
-        ]
-
-poolFilterWidget :: AppModel -> AppNode
-poolFilterWidget _ = do
+poolFilterWidget :: AppNode
+poolFilterWidget = do
   vstack
     [ centerWidget $ vstack
         [ hstack
@@ -417,9 +333,9 @@ poolFilterWidget _ = do
                     `styleBasic` [width 100, textSize 10, height 30]
                 ]
             ] 
-        , hstack
-            [ filler
-            , button "Reset" $ DelegationEvent ResetPoolFilters
+        , spacer
+        , box_ [alignRight] $ hstack
+            [ button "Reset" $ DelegationEvent ResetPoolFilters
             , spacer
             , toggleButton "Confirm" (toLensVL $ #delegationModel % #showPoolFilter)
             ] `styleBasic` [padding 10]
@@ -441,6 +357,56 @@ poolFilterWidget _ = do
 -------------------------------------------------
 -- Helper Widgets
 -------------------------------------------------
+headerField :: Text -> Text -> AppNode
+headerField caption helpMsg =
+  hstack
+    [ label caption
+        `styleBasic`
+          [ textSize 8
+          , textMiddle
+          ]
+    , spacer_ [width 2]
+    , box_ [onClick $ Alert helpMsg] $ 
+        label helpIcon
+          `styleBasic`
+            [ textColor customBlue 
+            , textSize 10
+            , textFont "Remix"
+            , bgColor transparent
+            , textMiddle
+            , radius 10
+            ]
+          `styleHover`
+            [ bgColor customGray2 
+            , cursorIcon CursorHand
+            ]
+    ]
+
+pageButton :: Text -> Int -> Bool -> AppNode
+pageButton caption pageNum isDisabled = do
+  let targetColor
+        | isDisabled = darkGray
+        | otherwise = customBlue
+      offStyle = def 
+        `styleBasic`
+          [ bgColor customGray4
+          , border 1 targetColor
+          , textColor targetColor
+          , padding 3
+          , textSize 10
+          ]
+        `styleHover` [ bgColor customGray1 ]
+  optionButton_ caption pageNum (toLensVL $ #delegationModel % #poolFilterModel % #currentPage)
+      [optionButtonOffStyle offStyle]
+    `styleBasic`
+      [ bgColor customGray4
+      , border 1 targetColor
+      , textColor targetColor
+      , padding 3
+      , textSize 10
+      ]
+    `styleHover` [bgColor customGray1]
+      
 -- | A label button that will copy itself but display a truncated version.
 copyableTruncatedPoolId :: Double -> Color -> PoolID -> WidgetNode s AppEvent
 copyableTruncatedPoolId fontSize mainColor (PoolID text) = 
@@ -469,3 +435,80 @@ copyableLabelSelf fontSize mainColor caption =
       ]
     `styleHover` [textColor customBlue, cursorIcon CursorHand]
 
+-------------------------------------------------
+-- Helper Lens
+-------------------------------------------------
+fixedCostMinimum :: Lens' PoolFilterModel Text
+fixedCostMinimum = lens getLowerBoundText setLowerBoundText
+  where
+    getLowerBoundText :: PoolFilterModel -> Text
+    getLowerBoundText model = maybe "" show $ model ^. #fixedCostRange % _1
+
+    setLowerBoundText :: PoolFilterModel -> Text -> PoolFilterModel
+    setLowerBoundText model decimal = model & #fixedCostRange % _1 .~ readMaybe (toString decimal)
+
+fixedCostMaximum :: Lens' PoolFilterModel Text
+fixedCostMaximum = lens getLowerBoundText setLowerBoundText
+  where
+    getLowerBoundText :: PoolFilterModel -> Text
+    getLowerBoundText model = maybe "" show $ model ^. #fixedCostRange % _2
+
+    setLowerBoundText :: PoolFilterModel -> Text -> PoolFilterModel
+    setLowerBoundText model decimal = model & #fixedCostRange % _2 .~ readMaybe (toString decimal)
+
+pledgeMinimum :: Lens' PoolFilterModel Text
+pledgeMinimum = lens getLowerBoundText setLowerBoundText
+  where
+    getLowerBoundText :: PoolFilterModel -> Text
+    getLowerBoundText model = maybe "" show $ model ^. #pledgeRange % _1
+
+    setLowerBoundText :: PoolFilterModel -> Text -> PoolFilterModel
+    setLowerBoundText model decimal = model & #pledgeRange % _1 .~ readMaybe (toString decimal)
+
+pledgeMaximum :: Lens' PoolFilterModel Text
+pledgeMaximum = lens getLowerBoundText setLowerBoundText
+  where
+    getLowerBoundText :: PoolFilterModel -> Text
+    getLowerBoundText model = maybe "" show $ model ^. #pledgeRange % _2
+
+    setLowerBoundText :: PoolFilterModel -> Text -> PoolFilterModel
+    setLowerBoundText model decimal = model & #pledgeRange % _2 .~ readMaybe (toString decimal)
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+searchFilter :: Text -> [Pool] -> [Pool]
+searchFilter searchTarget xs
+  | searchTarget == "" = xs
+  | otherwise = flip filter xs $ \Pool{..} -> or
+      [ display poolId == searchTarget
+      , maybe False (Text.isPrefixOf searchTarget) (info ^? _Just % #ticker)
+      , maybe False (Text.isPrefixOf searchTarget) (info ^? _Just % #name)
+      ]
+
+sorter :: PoolSortMethod -> [Pool] -> [Pool]
+sorter sortMethod = case sortMethod of
+  PoolLiveSaturation SortAscending -> sortOn (view #liveSaturation)
+  PoolLiveSaturation SortDescending -> sortOn (Ord.Down . view #liveSaturation)
+  PoolActivePledge SortAscending -> sortOn (view #livePledge)
+  PoolActivePledge SortDescending -> sortOn (Ord.Down . view #livePledge)
+  PoolCost SortAscending -> sortOn (view #fixedCost)
+  PoolCost SortDescending -> sortOn (Ord.Down . view #fixedCost)
+  PoolMargin SortAscending -> sortOn (view #margin)
+  PoolMargin SortDescending -> sortOn (Ord.Down . view #margin)
+
+filterer :: PoolFilterModel -> [Pool] -> [Pool]
+filterer poolFilterModel = filter $ \Pool{..} -> and
+  [ fmap (*100) margin >= Just (poolFilterModel ^. #marginRange % _1)
+  , fmap (*100) margin <= Just (poolFilterModel ^. #marginRange % _2)
+  , liveSaturation >= Just (poolFilterModel ^. #liveSaturationRange % _1)
+  , liveSaturation <= Just (poolFilterModel ^. #liveSaturationRange % _2)
+  , flip (maybe True) (poolFilterModel ^. #fixedCostRange % _1) $ \lowerBound ->
+      fmap (unAda . toAda) fixedCost >= Just lowerBound
+  , flip (maybe True) (poolFilterModel ^. #fixedCostRange % _2) $ \upperBound ->
+      fmap (unAda . toAda) fixedCost <= Just upperBound
+  , flip (maybe True) (poolFilterModel ^. #pledgeRange % _1) $ \lowerBound ->
+      fmap (unAda . toAda) pledge >= Just lowerBound
+  , flip (maybe True) (poolFilterModel ^. #pledgeRange % _2) $ \upperBound ->
+      fmap (unAda . toAda) pledge <= Just upperBound
+  ]

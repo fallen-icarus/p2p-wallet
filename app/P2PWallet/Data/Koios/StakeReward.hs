@@ -1,6 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -16,8 +14,7 @@ module P2PWallet.Data.Koios.StakeReward where
 
 import Data.Aeson
 
-import P2PWallet.Data.Core.Asset
-import P2PWallet.Data.Core.PoolID
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Prelude
 
 data StakeReward = StakeReward
@@ -37,6 +34,7 @@ instance FromJSON StakeReward where
         <*> o .: "amount"
         <*> o .: "pool_id"
 
+-- | This type is used to unwrap the koios response.
 newtype StakeRewards = StakeRewards { unStakeRewards :: [StakeReward] }
 
 instance FromJSON StakeRewards where

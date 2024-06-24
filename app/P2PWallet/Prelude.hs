@@ -29,11 +29,13 @@ module P2PWallet.Prelude
 
     -- * Miscelleneous Functions
   , showValue
+  , valueAsByteString
   , maybeHead
   , groupInto
   , mkScaleFactor
   , formatQuantity
   , unFormatQuantity
+  , for
 
     -- * Lens Helpers
   , boolLens
@@ -44,8 +46,10 @@ module P2PWallet.Prelude
   , catch
   , handle
 
+  -- Display Class
+  , Display(..)
+
     -- * Other useful re-exports
-  , Sqlite.Query(..)
   , module Relude
   , module Optics
   , Printf.printf
@@ -66,17 +70,16 @@ import Monomer.Core.FromFractional(FromFractional(..))
 import Control.Exception (throwIO,catch,handle)
 import Optics
 import Database.SQLite.Simple (SQLData(SQLText))
-import Database.SQLite.Simple qualified as Sqlite
 import Database.SQLite.Simple.FromField (FromField(..), returnError, ResultError(ConversionFailed))
 import Database.SQLite.Simple.ToField (ToField(..))
 import Database.SQLite.Simple.Ok (Ok(Ok))
 import Database.SQLite.Simple.Internal (Field(..))
 
 showValue :: Aeson.Value -> Text
-showValue = decodeUtf8 
-          . toStrict 
-          . Aeson.encodingToLazyByteString 
-          . Aeson.value
+showValue = decodeUtf8 . valueAsByteString
+
+valueAsByteString :: Aeson.Value -> ByteString
+valueAsByteString = toStrict . Aeson.encodingToLazyByteString . Aeson.value
 
 maybeHead :: [a] -> Maybe a
 maybeHead [] = Nothing
@@ -90,26 +93,35 @@ getTemporaryDirectory = do
   Dir.createDirectoryIfMissing True tmpDir -- Create the subfolder if it doesn't exist yet.
   return tmpDir
 
--- Break a list into sublists of the specified length.
+-- | Break a list into sublists of the specified length.
 groupInto :: Int -> [a] -> [[a]]
 groupInto _ [] = []
 groupInto n xs = 
   take n xs : groupInto n (drop n xs)
 
+-- | The factor to use when accounting for the specified decimal places.
 mkScaleFactor :: Word8 -> Rational
-mkScaleFactor decimal = Unsafe.read @Rational
-                      $ "1" <> replicate (fromIntegral decimal) '0' <> " % 1"
+mkScaleFactor decimal = 
+  Unsafe.read @Rational $ "1" <> replicate (fromIntegral decimal) '0' <> " % 1"
 
+-- | Format an integer to the specified decimal places by using the scale factor. This is useful
+-- for showing asset values using the desired number of decimal places.
 formatQuantity :: Word8 -> Integer -> Decimal
-formatQuantity decimal quantity = realFracToDecimal decimal 
-                                $ toRational quantity / mkScaleFactor decimal
+formatQuantity decimal quantity = 
+  realFracToDecimal decimal $ toRational quantity / mkScaleFactor decimal
 
+-- | Convert a `Decimal` back to the specified `Integer` by using the scale factor.
 unFormatQuantity :: Word8 -> Decimal -> Integer
-unFormatQuantity decimal quantity = round $ (toRational quantity) * mkScaleFactor decimal
+unFormatQuantity decimal quantity = round $ toRational quantity * mkScaleFactor decimal
+
+-- | A custom `for` function since the one in `Data.Traversable` does not work for some reason.
+for :: [a] -> (a -> b) -> [b]
+for = flip map
 
 -------------------------------------------------
 -- Time
 -------------------------------------------------
+-- | Convert `Time.POSIXTime` to the user's local date. Formatting: "Feb 13, 2024"
 showLocalDate :: Time.TimeZone -> Time.POSIXTime -> Text
 showLocalDate zone t = 
     toText $ Time.formatTime Time.defaultTimeLocale formatter localTime
@@ -118,6 +130,7 @@ showLocalDate zone t =
     localTime = Time.utcToLocalTime zone utcTime
     formatter = "%b %d, %0Y"
 
+-- | Convert `Time.POSIXTime` to the user's local time. Formatting: "1:13 pm"
 showLocalTime :: Time.TimeZone -> Time.POSIXTime -> Text
 showLocalTime zone t = 
     toText $ Time.formatTime Time.defaultTimeLocale formatter localTime
@@ -144,16 +157,18 @@ getCurrentDay timeZone =
 -- Lens Helpers
 -------------------------------------------------
 -- | A lens that interprets a `Maybe a` as True or False. This is usefull for widgets
--- that depend on a `Bool`.
+-- that depend on a `Bool`, but the internal state of the App uses Maybe.
 boolLens :: a -> Lens' s (Maybe a) -> Lens' s Bool
 boolLens def' targetLens = 
   lens (\m -> isJust $ m ^. targetLens)
        (\m b -> m & targetLens .~ if b then Just def' else Nothing)
 
+-- | A lens that can handle a type inside a Maybe. In the case of `Nothing`, a default value for
+-- `a` will be used.
 maybeLens :: a -> Lens' s (Maybe a) -> Lens' s a
 maybeLens def' targetLens = 
   lens (\m -> fromMaybe def' $ m ^. targetLens)
-       (\m t -> m & targetLens .~ Just t)
+       (\m t -> m & targetLens ?~ t)
 
 -- -- | A lens into a sum type `a` with a default choice of type `b`. The unWrapper `(a -> b)`
 -- -- must cover the cases where the other data constructors are present. This is useful for
@@ -164,10 +179,21 @@ maybeLens def' targetLens =
 --        (\m t -> m & targetLens #~ wrapper t)
 
 -------------------------------------------------
+-- Display Class
+-------------------------------------------------
+-- | An alternative `Show` class that can be customized without breaking:
+-- `show . read = read . show`
+class Display a where
+  display :: a -> Text
+
+-------------------------------------------------
 -- Orphans
 -------------------------------------------------
 instance FromFractional Decimal where
   fromFractional = realToFrac
+
+instance ToText Decimal where
+  toText = show
 
 instance Printf.PrintfArg Decimal where
   formatArg x fmt | Printf.fmtChar (Printf.vFmt 'D' fmt) == 'D' =

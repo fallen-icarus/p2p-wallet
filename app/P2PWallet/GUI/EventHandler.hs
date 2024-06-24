@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.EventHandler
   ( 
     handleEvent
@@ -7,14 +5,12 @@ module P2PWallet.GUI.EventHandler
 
 import Monomer
 
-import P2PWallet.Actions.Database
-import P2PWallet.Actions.LookupPools
 import P2PWallet.Actions.SubmitTx
 import P2PWallet.Actions.SyncWallets
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core.Asset
-import P2PWallet.Data.Wallets
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.GUI.EventHandler.AddressBookEvent
 import P2PWallet.GUI.EventHandler.DelegationEvent
 import P2PWallet.GUI.EventHandler.HomeEvent
@@ -53,19 +49,14 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   --
   -- Note on errors: Even though Monomer allows disabling widgets if certain criteria is not
   -- satisfied, when several criteria must be met, it is not always clear what is not satisfied.
-  -- To improve the user experience, the "submit" widgets will always be enabled and an alert
+  -- To improve the user experience, the "submit" widgets will usually be enabled and an alert
   -- message will shown when the input is invalid. The alert message will explain to the user
   -- what is wrong. IMO this is a much better UX.
   Alert msg -> 
     -- Disable all overlays and display the message. The scene is not changed so users can 
     -- quickly try again if desired. 
-    [ Model $ model & #alertMessage .~ Just msg 
-                    & #waitingOnDevice .~ False
-                    & #syncingWallets .~ False
-                    & #syncingPools .~ False
-                    & #loadingProfile .~ False
-                    & #building .~ False
-                    & #submitting .~ False
+    [ Model $ model & #alertMessage ?~ msg 
+                    & #waitingStatus .~ def
     ]
   CloseAlertMessage -> 
     -- Close the alert widget and reset the alert message.
@@ -74,7 +65,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- Changing Scenes
   -----------------------------------------------
-  -- Change the main scene while trying to leave the `AppModel` alone. This way, users can switch
+  -- Change the main scene while leaving the `AppModel` alone. This way, users can switch
   -- between scenes without losing their place when building transactions.
   ChangeMainScene newScene -> 
     [ Model $ model & #scene .~ newScene ]
@@ -83,12 +74,9 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   -- Set Network
   -----------------------------------------------
   -- Set the app config to that network and load the profiles associated with that network.
-  SetNetwork network' -> 
-    [ Model $ model & #config % #network .~ network'
-    , Task $ runActionOrAlert (ProfileEvent . LoadKnownProfiles) $
-        -- Try to load the profiles from the sqlite database. Show the user any error that appears.
-        -- The resulting profiles are passed to `LoadKnownProfiles`.
-        loadProfiles databaseFile network' >>= fromRightOrAppError
+  SetNetwork targetNetwork -> 
+    [ Model $ model & #config % #network .~ targetNetwork
+    , Task $ return $ ProfileEvent $ LoadKnownProfiles StartProcess
     ]
 
   -----------------------------------------------
@@ -107,14 +95,14 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   DelegationEvent modal -> handleDelegationEvent model modal
 
   -----------------------------------------------
-  -- Address Book Events
-  -----------------------------------------------
-  AddressBookEvent modal -> handleAddressBookEvent model modal
-
-  -----------------------------------------------
   -- Ticker Registry Events
   -----------------------------------------------
   TickerRegistryEvent modal -> handleTickerRegistryEvent model modal
+
+  -----------------------------------------------
+  -- Address Book Events
+  -----------------------------------------------
+  AddressBookEvent modal -> handleAddressBookEvent model modal
 
   -----------------------------------------------
   -- TxBuilder Events
@@ -122,80 +110,51 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   TxBuilderEvent modal -> handleTxBuilderEvent model modal
 
   -----------------------------------------------
+  -- Updating the current date
+  -----------------------------------------------
+  UpdateCurrentDate modal -> case modal of
+    StartProcess -> 
+      [ Task $ runActionOrAlert (UpdateCurrentDate . ProcessResults) $ 
+          getCurrentDay (config ^. #timeZone)
+      ]
+    ProcessResults day ->
+      [ Model $ model & #config % #currentDay .~ day ]
+
+  -----------------------------------------------
   -- Syncing Wallets
   -----------------------------------------------
   SyncWallets modal -> case modal of
-    StartSync -> 
+    StartProcess -> 
       -- Set `syncing` to True to let users know syncing is happening.
-      [ Model $ model & #syncingWallets .~ True 
+      [ Model $ model & #waitingStatus % #syncingWallets .~ True 
       , Task $ do
-          let network = config ^. #network
-              wallets = model ^. #knownWallets
-          runActionOrAlert (SyncWallets . SyncResults) $ 
-            syncWallets (model ^. #databaseFile) network wallets
+          runActionOrAlert (SyncWallets . ProcessResults) $ 
+            syncWallets databaseFile knownWallets
       ]
-    SyncResults resp ->
+    ProcessResults resp@Wallets{..} ->
       -- Disable `syncing` and update the list of wallets. Also update the information for
       -- the `selectedWallet`.
-      let paymentTarget = model ^. #homeModel % #selectedWallet % #alias
+      let paymentTarget = model ^. #homeModel % #selectedWallet % #paymentId
           updatedPaymentTarget = 
-            fromMaybe def $ find (\w -> w ^. #alias == paymentTarget) $ resp ^. #paymentWallets
-          stakeTarget = model ^. #delegationModel % #selectedWallet % #alias
+            fromMaybe def $ find (\w -> w ^. #paymentId == paymentTarget) paymentWallets
+          stakeTarget = model ^. #delegationModel % #selectedWallet % #stakeId
           updatedStakeTarget = 
-            fromMaybe def $ find (\w -> w ^. #alias == stakeTarget) $ resp ^. #stakeWallets
+            fromMaybe def $ find (\w -> w ^. #stakeId == stakeTarget) stakeWallets
       in
         [ Model $ 
-            model & #syncingWallets .~ False
+            model & #waitingStatus % #syncingWallets .~ False
                   & #knownWallets .~ resp
                   & #homeModel % #selectedWallet .~ updatedPaymentTarget
                   & #delegationModel % #selectedWallet .~ updatedStakeTarget
-                  & #fingerprintMap .~ genFingerprintMap resp
-        , Task $
-            runActionOrAlert UpdateCurrentDate $ getCurrentDay (config ^. #timeZone)
+                  & #fingerprintMap .~ 
+                      toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
+        , Task $ return $ UpdateCurrentDate StartProcess
         ]
-
-  -----------------------------------------------
-  -- Syncing Registered Pools
-  -----------------------------------------------
-  SyncRegisteredPools modal -> case modal of
-    StartSync -> 
-      -- Set `syncing` to True to let users know syncing is happening.
-      [ Model $ model & #syncingPools .~ True 
-      , Task $ do
-          let network = config ^. #network
-          runActionOrAlert (SyncRegisteredPools . SyncResults) $ lookupRegisteredPools network
-      ]
-    SyncResults resp -> 
-      -- Disable `syncing` and update the list of pools. 
-      [ Model $ 
-          model & #syncingPools .~ False
-                & #delegationModel % #registeredPools .~ resp
-      ]
-
-  -----------------------------------------------
-  -- Updating the current date
-  -----------------------------------------------
-  UpdateCurrentDate day -> 
-    [ Model $ model & #config % #currentDay .~ day ]
-
 
   -----------------------------------------------
   -- Submit Transaction
   -----------------------------------------------
   SubmitTx signedFile ->
-    [ Model $ model & #submitting .~ True
-                    & #waitingOnDevice .~ False -- Disable this since it can be called from `SignTx`.
-    , Task $
-        if not $ txBuilderModel ^. #isBuilt
-        then return $ Alert "You must first build the transaction."
-        else runActionOrAlert Alert $ submitTx (config ^. #network) signedFile
+    [ Model $ model & #waitingStatus % #submitting .~ True
+    , Task $ runActionOrAlert Alert $ submitTx (config ^. #network) signedFile
     ]
-
--------------------------------------------------
--- Helper Functions
--------------------------------------------------
--- | Create the fingerprint map.
-genFingerprintMap :: Wallets -> Map Text (Text,Text)
-genFingerprintMap Wallets{paymentWallets} =
-  let nativeAssets = concatMap (view #nativeAssets) paymentWallets
-  in fromList $ map (\NativeAsset{..} -> (fingerprint,(policyId,tokenName))) nativeAssets

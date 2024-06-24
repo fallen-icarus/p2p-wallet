@@ -1,0 +1,9 @@
+# HLint configuration file
+# https://github.com/ndmitchell/hlint
+##########################
+
+# I find using `and` with a list of criteria easier to read/write than a long series of `&&`. The
+# same applies to `or` vs `||`. The scoping also seems to be easier since the commas separate entire
+# sections.
+- ignore: {name: Use &&} 
+- ignore: {name: Use ||}

@@ -2,7 +2,6 @@
 
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedLists #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -10,30 +9,22 @@ module P2PWallet.Actions.Query.Koios
   (
     runSubmitTx
   , runEvaluateTx
+  , runGetParams
   , runQueryPaymentWalletInfo
   , runQueryStakeWalletInfo
   , runQueryAllRegisteredPools
-  , runGetParams
   ) where
 
-import Servant.Client 
-  ( client
-  , ClientM
-  , runClientM
-  , Scheme(Https)
-  , BaseUrl(..)
-  , mkClientEnv
-  )
+import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
 import Servant.Client qualified as Client
 import Servant.API ((:<|>)(..), JSON, Post, Get, (:>), ReqBody, Required, QueryParam', QueryParam)
 import Network.HTTP.Client (newManager)
 import Network.HTTP.Client.TLS (tlsManagerSettings)
-import Data.Aeson.Encoding qualified as Aeson
-import Data.Aeson as Aeson
+import Data.Aeson
 import Data.Text qualified as Text
 import UnliftIO.Async (mapConcurrently,concurrently)
 
-import P2PWallet.Data.Core
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Koios.AddressUTxO
 import P2PWallet.Data.Koios.LinkedPaymentAddresses
 import P2PWallet.Data.Koios.Pool
@@ -41,13 +32,13 @@ import P2PWallet.Data.Koios.PostTypes
 import P2PWallet.Data.Koios.StakeAccount
 import P2PWallet.Data.Koios.StakeReward
 import P2PWallet.Data.Koios.Transaction
-import P2PWallet.Data.Transaction qualified as P2P
-import P2PWallet.Data.StakeReward qualified as P2P
-import P2PWallet.Data.Wallets
+import P2PWallet.Data.Core.Transaction qualified as P2P
+import P2PWallet.Data.Core.StakeReward qualified as P2P
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
 
 -------------------------------------------------
--- High-Level API
+-- Helper Functions
 -------------------------------------------------
 toNetworkURL :: Network -> String
 toNetworkURL Mainnet = "api.koios.rest"
@@ -64,6 +55,10 @@ handleTimeoutError query = query >>= \case
     isTimeoutError err =
       "ResponseTimeout)" == Text.takeEnd 16 (show err)
 
+-------------------------------------------------
+-- High-Level API
+-------------------------------------------------
+-- | Submit a transaction through Koios.
 runSubmitTx :: Network -> FilePath -> IO (Either Text Value)
 runSubmitTx network txFile = do
   tx' <- decode @TxCBOR <$> readFileLBS txFile
@@ -81,6 +76,7 @@ runSubmitTx network txFile = do
           Nothing -> return $ Left $ show e
         Left err -> return $ Left $ show err
 
+-- | Estimate the execution budgets for the transaction using Koios.
 runEvaluateTx :: Network -> FilePath -> IO (Either Text Value)
 runEvaluateTx network txFile = do
   tx' <- decode @TxCBOR <$> readFileLBS txFile
@@ -98,26 +94,35 @@ runEvaluateTx network txFile = do
           Nothing -> return $ Left $ show e
         Left err -> return $ Left $ show err
 
--- Sync the latest information for the payment wallet. Try to do as much concurrently as possible.
+-- | Get the current parameters for use with cardano-cli.
+runGetParams :: Network -> IO (Either Text ByteString)
+runGetParams network = do
+  manager' <- newManager tlsManagerSettings
+  let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+  bimap show valueAsByteString <$> runClientM paramsApi env
+
+-- | Sync the latest information for the payment wallet. Try to do as much concurrently as possible.
+-- There are redundant queries built-in since Koios can occassionally return incorrect information
+-- if a particular instance is not properly synced/configured.
 runQueryPaymentWalletInfo :: PaymentWallet -> IO (Either Text PaymentWallet)
 runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
     (utxoRes,(assetRes,txRes)) <- 
       concurrently queryUTxOsWithRedundancies $
         concurrently queryNativeAssetsWithRedundancies queryTxsConcurrently
 
-    case pure (,,) <*> utxoRes <*> assetRes <*> txRes of
+    case (,,) <$> utxoRes <*> assetRes <*> txRes of
       Right (us,as,txs) -> do
         return $ Right $ 
           wallet & #utxos .~ map toPersonalUTxO us
                  & #lovelace .~ sum (map (view #lovelace) us)
-                 & #transactions %~ mappend 
-                     (sortOn (negate . view #blockTime) $ map (P2P.toTransaction profileId paymentId) txs)
+                 & #transactions %~ mappend (map (P2P.toTransaction profileId paymentId) txs)
                  & #nativeAssets .~ as
       Left err -> return $ Left err
   where
     -- Add one to the blockHeight for the most recently recorded transaction for this wallet.
+    -- Koios will return any transactions for that block or later.
     afterBlock :: Integer
-    afterBlock = (+1) $ fromMaybe 0 $ fmap (view #blockHeight) $ maybeHead transactions
+    afterBlock = (+1) $ maybe 0 (view #blockHeight) $ maybeHead transactions
 
     -- Since Koios instances may occassionally return incorrect UTxOs if they are not
     -- close enough to the chain tip, this would mess with the wallet's notifications.
@@ -126,14 +131,14 @@ runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
     queryUTxOsWithRedundancies :: IO (Either Text [AddressUTxO])
     queryUTxOsWithRedundancies = do
       (res1,(res2,res3)) <- concurrently fetchUTxOs (concurrently fetchUTxOs fetchUTxOs)
-      let path1 = pure (\a b c -> a == b || a == c) <*> res1 <*> res2 <*> res3
-          path2 = pure (\b c -> b == c) <*> res2 <*> res3
+      let path1 = liftA3 (\a b c -> a == b || a == c) res1 res2 res3
+          path2 = liftA2 (==) res2 res3
       case (path1,path2) of
         (Right True ,_) -> return $ first show res1
         (_, Right True) -> return $ first show res2
         (Left err, _) -> return $ Left $ show err
         (_, Left err) -> return $ Left $ show err
-        _ -> return $ Left $ "There was an error syncing UTxOs. Wait a few seconds and try again."
+        _ -> return $ Left "There was an error syncing UTxOs. Wait a few seconds and try again."
 
     -- Try to query the UTxOs. If a timeout error occurs, just try again.
     fetchUTxOs :: IO (Either Text [AddressUTxO])
@@ -172,44 +177,75 @@ runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
     -- 50 per response, since some transactions can be quite large.
     queryTxsConcurrently :: IO (Either Text [Transaction])
     queryTxsConcurrently = do
-      hashRes <- fetchTxHashes
-      case hashRes of
+      fetchTxHashes >>= \case
         Left err -> return $ Left $ show err
         Right hashes -> do
           manager <- newManager tlsManagerSettings
           let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
           bimap show concat . sequence <$> 
             mapConcurrently 
-              (\hs -> handleTimeoutError (runClientM (queryAddressTransactions hs) env))
+              (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
               (groupInto 50 hashes)
 
+-- | Sync the latest information for the stake wallet. Try to do as much concurrently as possible.
+runQueryStakeWalletInfo :: StakeWallet -> IO (Either Text StakeWallet)
+runQueryStakeWalletInfo wallet@StakeWallet{network,profileId,stakeId,stakeAddress} = do
+    (res1,(res2,res3)) <- 
+      concurrently fetchAccountStatus $ concurrently fetchRewards fetchLinkedAddresses
+    case (,,) <$> res1 <*> res2 <*> res3 of
+      Right ([StakeAccount{stakeAddress=_,..}],rewards,linkedAddresses) ->
+        -- This query relies on the response from the `fetchAccountStatus` query.
+        fetchDelegatedPoolInfo delegatedPool >>= \case
+          Left err -> return $ Left $ show err
+          Right pools -> do
+            return $ Right $
+              wallet & #registrationStatus .~ registrationStatus
+                     & #totalDelegation .~ totalDelegation
+                     & #utxoBalance .~ utxoBalance
+                     & #availableRewards .~ availableRewards
+                     & #delegatedPool .~ maybeHead pools
+                     & #rewardHistory .~ reverse (map (P2P.toStakeReward profileId stakeId) rewards)
+                     & #linkedAddresses .~ linkedAddresses
+      Right ([],_,_) -> 
+        -- If a stake address has never been seen on chain before (ie, a UTxO has not been created 
+        -- at a payment address using the staking credential), the query will return the empty list.
+        -- The preset fields for the account are accurate in this scenario.
+        return $ Right wallet
+      Right _ -> do
+        return $ Left "Stake account query returned an unexpected number of arguments."
+      Left err -> return $ Left $ show err
+  where
+    -- Try to query the stake address' status.
+    fetchAccountStatus :: IO (Either Text [StakeAccount])
+    fetchAccountStatus = do
+      manager <- newManager tlsManagerSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryStakeAccounts [stakeAddress]) env)
 
-runQueryStakeWalletInfo :: Network -> StakeWallet -> IO (Either Text StakeWallet)
-runQueryStakeWalletInfo network' wallet@StakeWallet{stakeId,profileId} = do
-  manager' <- newManager tlsManagerSettings
-  let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network') 443 "api/v1")
-  res <- runClientM (queryStakeWalletInfo $ wallet ^. #stakeAddress) env
-  case res of
-    Right ([StakeAccount{..}],rewards,pools,linkedAddresses) -> do
-      let newRewardsHistory =
-            sortOn (negate . view #earnedEpoch) (map (P2P.toStakeReward profileId stakeId) rewards)
-      return $ Right $
-        wallet & #registrationStatus .~ registrationStatus
-               & #totalDelegation .~ totalDelegation
-               & #utxoBalance .~ utxoBalance
-               & #availableRewards .~ availableRewards
-               & #delegatedPool .~ maybeHead pools
-               & #rewardHistory .~ newRewardsHistory
-               & #linkedAddresses .~ linkedAddresses
-    Right ([],_,_,_) -> 
-      -- If a stake address has never been seen on chain before (ie, a UTxO has not been created 
-      -- at a payment address using the staking credential), the query will return the empty list.
-      -- The preset fields for the account are accurate in this scenario.
-      return $ Right wallet
-    Right _ -> do
-      return $ Left "Stake wallet query returned an unexpected number of arguments."
-    Left err -> return $ Left $ show err
-
+    -- Try to query the stake address' rewards.
+    fetchRewards :: IO (Either Text [StakeReward])
+    fetchRewards = do
+      manager <- newManager tlsManagerSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryStakeRewards [stakeAddress]) env)
+    
+    -- Try to query the information for the pool this stake address is delegated to.
+    fetchDelegatedPoolInfo :: Maybe PoolID -> IO (Either Text [Pool])
+    fetchDelegatedPoolInfo mDelegatedPool = do
+      manager <- newManager tlsManagerSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+          query = queryPoolInfo Nothing Nothing $ Pools $ catMaybes [mDelegatedPool]
+      first show <$> handleTimeoutError (runClientM query env)
+    
+    -- Try to query the stake address' rewards.
+    fetchLinkedAddresses :: IO (Either Text [PaymentAddress])
+    fetchLinkedAddresses = do
+      manager <- newManager tlsManagerSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryLinkedPaymentAddresses [stakeAddress]) env)
+    
+-- | Get all registered pools for the given network. This tries to do as much concurrently as
+-- possible.
 runQueryAllRegisteredPools :: Network -> IO (Either Text [Pool])
 runQueryAllRegisteredPools network = do
     manager' <- newManager tlsManagerSettings
@@ -230,12 +266,6 @@ runQueryAllRegisteredPools network = do
       Right rs -> return $ Right $ concat rs
       Left err -> return $ Left $ show err
 
-runGetParams :: Network -> IO (Either Text ByteString)
-runGetParams network = do
-  manager' <- newManager tlsManagerSettings
-  let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network) 443 "api/v1")
-  bimap show (toStrict . Aeson.encodingToLazyByteString . Aeson.value) <$> runClientM paramsApi env
-
 -------------------------------------------------
 -- Low-Level API
 -------------------------------------------------
@@ -246,13 +276,16 @@ type KoiosApi
   :<|>  ReqBody '[JSON] EvaluateTxCBOR
      :> Post '[JSON] Value
 
+  :<|>  "cli_protocol_params"
+     :> Get '[JSON] Value
+
   :<|>  "address_utxos"
      :> QueryParam' '[Required] "select" Text
      :> QueryParam' '[Required] "is_spent" Text
      :> QueryParam' '[Required] "offset" Int
      :> QueryParam' '[Required] "order" Text
      :> QueryParam "asset_list" Text
-     :> ReqBody '[JSON] ExtendedPaymentAddresses
+     :> ReqBody '[JSON] PaymentAddressesExtended
      :> Post '[JSON] [AddressUTxO]
 
   :<|> "address_txs"
@@ -269,6 +302,7 @@ type KoiosApi
 
   :<|> "tx_info"
      :> QueryParam' '[Required] "select" Text
+     :> QueryParam' '[Required] "order" Text
      :> ReqBody '[JSON] TxHashes
      :> Post '[JSON] [Transaction]
 
@@ -291,7 +325,7 @@ type KoiosApi
 
   :<|>  "account_addresses"
      :> QueryParam' '[Required] "select" Text
-     :> ReqBody '[JSON] NonEmptyStakeAddresses
+     :> ReqBody '[JSON] StakeAddressesNonEmpty
      :> Post '[JSON] LinkedPaymentAddresses
 
   :<|> "pool_list"
@@ -300,11 +334,9 @@ type KoiosApi
      :> QueryParam' '[Required] "pool_status" Text
      :> Get '[JSON] Pools
 
-  :<|>  "cli_protocol_params"
-       :> Get '[JSON] Value
-
 submitApi
   :<|> evaluateApi 
+  :<|> paramsApi
   :<|> addressUTxOsApi 
   :<|> addressTxsApi
   :<|> addressAssetsApi 
@@ -314,18 +346,9 @@ submitApi
   :<|> poolInfoApi
   :<|> linkedPaymentAddressesApi
   :<|> poolListApi
-  :<|> paramsApi
   = client (Proxy :: Proxy KoiosApi)
 
-queryStakeWalletInfo :: StakeAddress -> ClientM ([StakeAccount],[StakeReward],[Pool],[PaymentAddress])
-queryStakeWalletInfo addr = do
-  acc <- queryStakeAccounts [addr]
-
-  (acc,,,) 
-    <$> queryStakeRewards [addr] 
-    <*> (queryPoolInfo Nothing Nothing $ Pools $ catMaybes $ map (view #delegatedPool) acc)
-    <*> queryLinkedPaymentAddresses [addr] 
-
+-- Query all UTxOs for a list of payment addresses.
 queryAddressUTxOs :: [PaymentAddress] -> ClientM [AddressUTxO]
 queryAddressUTxOs addrs = queryUTxOs 0 []
   where
@@ -339,7 +362,7 @@ queryAddressUTxOs addrs = queryUTxOs 0 []
           offset 
           "block_height.asc"  -- ordering by block_height
           Nothing -- no limit
-          (ExtendedPaymentAddresses addrs)
+          (PaymentAddressesExtended addrs)
       if length res == 1000 then 
         -- Query again since there may be more.
         queryUTxOs (offset + 1000) $ acc <> res
@@ -364,6 +387,7 @@ queryAddressUTxOs addrs = queryUTxOs 0 []
         , "block_height"
         ]
 
+-- Query all native assets owned by a list of payment addresses.
 queryAddressAssets :: [PaymentAddress] -> ClientM [NativeAsset]
 queryAddressAssets addrs = queryAssets 0 []
   where
@@ -386,12 +410,15 @@ queryAddressAssets addrs = queryAssets 0 []
         , "quantity"
         ]
 
+-- Query all transactions for a list of addresses but only transactions at or after the specified
+-- block.
 queryAddressTxHashes :: [PaymentAddress] -> Integer -> ClientM [Text]
 queryAddressTxHashes addrs lastBlock = queryHashes 0 []
   where
     queryHashes :: Int -> [Text] -> ClientM [Text]
     queryHashes offset !acc = do
       (TxHashes hashes) <- 
+        -- Only fetch the "tx_hash" column.
         addressTxsApi "tx_hash" offset (PaymentAddressesAfterBlock addrs lastBlock)
       if length hashes == 1000 then 
         -- Query again since there may be more.
@@ -400,8 +427,10 @@ queryAddressTxHashes addrs lastBlock = queryHashes 0 []
         -- That should be the last of the results.
         return $ acc <> hashes
 
+-- Query the information for a list of transaction hashes. The transactions are returned latest
+-- first.
 queryAddressTransactions :: [Text] -> ClientM [Transaction]
-queryAddressTransactions = txInfoApi select . TxHashes
+queryAddressTransactions = txInfoApi select "block_height.desc" . TxHashes
   where
     select :: Text
     select = 
@@ -441,12 +470,7 @@ queryStakeAccounts addrs = stakeAccountApi select $ StakeAddresses addrs
 
 queryStakeRewards :: [StakeAddress] -> ClientM [StakeReward]
 queryStakeRewards addrs = 
-    concatMap unStakeRewards <$> 
-      stakeRewardsApi select (StakeAddresses addrs)
-  where
-    select =
-      toText $ intercalate ","
-        [ "rewards" ]
+    concatMap unStakeRewards <$> stakeRewardsApi "rewards" (StakeAddresses addrs)
 
 -- Some pools will have `Nothing` for a lot of correlated fields. The sigma filter
 -- can be used to filter out these pools. Another possible filter is whethere a pool
@@ -475,12 +499,7 @@ queryPoolInfo sigmaFilter metaFilter pools = poolInfoApi select sigmaFilter meta
 
 queryLinkedPaymentAddresses :: [StakeAddress] -> ClientM [PaymentAddress]
 queryLinkedPaymentAddresses addrs = 
-    unLinkedPaymentAddresses <$> linkedPaymentAddressesApi select (NonEmptyStakeAddresses addrs)
-  where
-    select =
-      toText $ intercalate ","
-        [ "addresses"
-        ]
+  unLinkedPaymentAddresses <$> linkedPaymentAddressesApi "addresses" (StakeAddressesNonEmpty addrs)
 
 queryPoolIds :: Int -> [PoolID] -> ClientM [PoolID]
 queryPoolIds offset !acc = do
@@ -491,4 +510,3 @@ queryPoolIds offset !acc = do
   else
     -- That should be the last of the results.
     return $ acc <> poolIds
-

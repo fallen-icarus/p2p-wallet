@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.Widgets.TxBuilder
   ( 
     txBuilderWidget
@@ -14,14 +12,12 @@ import Monomer hiding
 import Prettyprinter (pretty, align, vsep, tupled)
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
-import P2PWallet.Data.TickerMap
+import P2PWallet.Data.Core.AssetMaps
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
-import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 txBuilderWidget :: AppModel -> AppNode
@@ -43,17 +39,17 @@ txBuilderWidget model@AppModel{..} = do
               [ filler
               , box_ [alignMiddle] $ hstack
                   [ spacer_ [width 50]
-                  , mainButton "Build" (TxBuilderEvent BuildTx)
+                  , mainButton "Build" (TxBuilderEvent $ BuildTx StartProcess)
                       `nodeVisible` canBeBuilt
                   , button "Build" AppInit
-                      `nodeEnabled` canBeBuilt
+                      `nodeEnabled` False -- This button is just for show.
                       `nodeVisible` not canBeBuilt
                   , spacer_ [width 3]
-                  , mainButton "Sign & Submit" (TxBuilderEvent SignAndSubmitTx)
+                  , mainButton "Sign & Submit" (TxBuilderEvent $ WitnessTx StartProcess)
                       `nodeVisible` txBuilderModel ^. #isBuilt
                   , button "Sign & Submit" AppInit
-                      `nodeEnabled` txBuilderModel ^. #isBuilt
-                      `nodeVisible` (not $ txBuilderModel ^. #isBuilt)
+                      `nodeEnabled` False -- This button is just for show.
+                      `nodeVisible` not (txBuilderModel ^. #isBuilt)
                   ] `nodeVisible` not isEmpty
               , filler
               , box_ [alignBottom,alignRight] addPopup
@@ -61,11 +57,14 @@ txBuilderWidget model@AppModel{..} = do
           ] `nodeVisible` and
               [ isNothing targetUserOutput
               , not isAddingChangeOutput
+              , not isImporting
               ]
       , editUserOutputWidget (maybe "" (view (_2 % #alias)) targetUserOutput)
           `nodeVisible` isJust targetUserOutput
-      , addChangeOutputWidget model
+      , addChangeOutputWidget
           `nodeVisible` isAddingChangeOutput
+      , importSignedTxWidget
+          `nodeVisible` isImporting
       ] `styleBasic`
           [ padding 20
           ]
@@ -75,17 +74,20 @@ txBuilderWidget model@AppModel{..} = do
 
     canBeBuilt :: Bool
     canBeBuilt = and
-      [ isJust $ txBuilderModel ^. #changeOutput
-      , Just "" /= txBuilderModel ^? #changeOutput % _Just % #paymentAddress
+      -- A change output must be set with a valid payment address.
+      [ maybe False (("" /=) . view #paymentAddress) $ txBuilderModel ^. #changeOutput
+      -- The transaction must be balanced.
       , txBuilderModel ^. #isBalanced
-      , if txBuilderModel ^. #requiresCollateral then 
-          isJust $ txBuilderModel ^. #collateralInput
-        else
-          True
+      -- If it requires collateral, than a colalteral input must be set.
+      , bool True (isJust $ txBuilderModel ^. #collateralInput) $ 
+          txBuilderModel ^. #requiresCollateral
       ]
 
     isAddingChangeOutput :: Bool
     isAddingChangeOutput = txBuilderModel ^. #addingChangeOutput
+
+    isImporting :: Bool
+    isImporting = txBuilderModel ^. #importing
 
     targetUserOutput :: Maybe (Int,NewUserOutput)
     targetUserOutput = txBuilderModel ^. #targetUserOutput
@@ -133,7 +135,16 @@ txBuilderWidget model@AppModel{..} = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
               , separatorLine `styleBasic` [fgColor black, padding 5]
-              , button "Reset" (TxBuilderEvent ResetBuilder)
+              , button "Submit External Tx" (TxBuilderEvent $ ImportSignedTxFile $ StartAdding Nothing)
+                  `styleBasic`
+                    [ border 0 transparent
+                    , textSize 12
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              , button "Reset Builder" (TxBuilderEvent ResetBuilder)
                   `styleBasic`
                     [ border 0 transparent
                     , textSize 12
@@ -152,20 +163,17 @@ txBuilderWidget model@AppModel{..} = do
 statusBar :: AppModel -> AppNode
 statusBar AppModel{txBuilderModel=TxBuilderModel{..}} = do
   let checkboxIcon b
-        | b == Nothing = indeterminateCheckboxIcon
+        | isNothing b = indeterminateCheckboxIcon
         | b == Just True = checkedBoxIcon
         | otherwise = uncheckedBoxIcon
       checkboxColor b
-        | b == Nothing = gray
+        | isNothing b = gray
         | b == Just True = customBlue
         | otherwise = customRed
       collateralState
         | requiresCollateral = Just $ isJust collateralInput
         | otherwise = Nothing
-      changeAddressSet = and
-        [ isJust changeOutput
-        , Just "" /= changeOutput ^? _Just % #paymentAddress
-        ]
+      changeAddressSet = maybe False (("" /=) . view #paymentAddress) changeOutput
   hstack_ [childSpacing]
     [ hstack
         [ label "Change Address"
@@ -250,7 +258,7 @@ changeInfoPopup AppModel{txBuilderModel,reverseTickerMap} = do
           [ label "Value:"
               `styleBasic` [textSize 8]
           , spacer
-          , label (fromString $ printf "%D ADA" $ toAda lovelace)
+          , label (display lovelace)
               `styleBasic` [textSize 8]
           ]
       , widgetIf (not $ null nativeAssets) $
@@ -259,9 +267,9 @@ changeInfoPopup AppModel{txBuilderModel,reverseTickerMap} = do
             , label "Native Assets:" `styleBasic` [textSize 8]
             , hstack
                 [ spacer_ [width 10]
-                , copyableTextArea 
-                    (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
-                    `styleBasic` [textSize 8, maxWidth 300]
+                , flip styleBasic [textSize 8, maxWidth 300] $
+                    copyableTextArea $ show $ align $ vsep $ 
+                      map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
                 ]
             ]
       ] `styleBasic`
@@ -300,9 +308,9 @@ userInputsList AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerM
       vstack
         [ vstack
             [ hstack 
-                [ copyableLabelSelf (showTxOutRef utxoRef) white 12
+                [ copyableLabelSelf (display utxoRef) white 12
                 , filler
-                , label (fromString $ printf "%D ADA" $ toAda lovelace) 
+                , label (display lovelace) 
                     `styleBasic` [textSize 12, textColor white]
                 ]
             , hstack
@@ -369,9 +377,9 @@ userInputsList AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerM
                   [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , copyableTextArea 
-                          (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
-                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 300]
+                      , flip styleBasic [textSize 10, textColor lightGray, maxWidth 300] $
+                          copyableTextArea $ show $ align $ vsep $ 
+                            map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`
@@ -467,7 +475,7 @@ userOutputsList reverseTickerMap userOutputs = do
                             , textMiddle
                             ]
                     , filler
-                    , label (fromString $ printf "%D ADA" $ toAda lovelace) 
+                    , label (display lovelace) 
                         `styleBasic` [textSize 12, textColor white]
                     ]
                 , hstack
@@ -549,9 +557,9 @@ userOutputsList reverseTickerMap userOutputs = do
                   [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , copyableTextArea 
-                          (show $ align $ vsep $ map (pretty . showAssetInList reverseTickerMap) nativeAssets)
-                          `styleBasic` [textSize 10, textColor lightGray, maxWidth 300]
+                      , flip styleBasic [textSize 10,textColor lightGray, maxWidth 300] $ 
+                          copyableTextArea $ show $ align $ vsep $ 
+                            map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`
@@ -565,7 +573,7 @@ editUserOutputWidget :: Text -> AppNode
 editUserOutputWidget recipient = do
   let maybeLens' = maybeLens (0,def) (#txBuilderModel % #targetUserOutput)
   centerWidget $ vstack
-    [ centerWidgetH $ label ("How much would you like to pay " <> recipient <> "?")
+    [ centerWidgetH $ label ("How much would you like to send to " <> recipient <> "?")
     , spacer_ [width 20]
     , hstack
         [ label "ADA:"
@@ -599,8 +607,8 @@ editUserOutputWidget recipient = do
         ]
     ] `styleBasic` [radius 20, bgColor customGray3, padding 20]
 
-addChangeOutputWidget :: AppModel -> AppNode
-addChangeOutputWidget _ = do
+addChangeOutputWidget :: AppNode
+addChangeOutputWidget = do
   centerWidget $ vstack 
     [ hstack 
         [ label "Change Address:"
@@ -615,6 +623,25 @@ addChangeOutputWidget _ = do
         , button "Cancel" $ TxBuilderEvent $ AddNewChangeOutput CancelAdding
         , spacer
         , mainButton "Confirm" $ TxBuilderEvent $ AddNewChangeOutput ConfirmAdding
+        ]
+    ] `styleBasic` [bgColor customGray3, padding 20]
+
+importSignedTxWidget :: AppNode
+importSignedTxWidget = do
+  centerWidget $ vstack 
+    [ hstack 
+        [ label "Absolute FilePath:"
+        , spacer
+        , textField (toLensVL $ #txBuilderModel % #importedSignedTxFile)
+            `styleBasic`
+              [textSize 10]
+        ]
+    , spacer
+    , hstack 
+        [ filler
+        , button "Cancel" $ TxBuilderEvent $ ImportSignedTxFile CancelAdding
+        , spacer
+        , mainButton "Confirm" $ TxBuilderEvent $ ImportSignedTxFile ConfirmAdding
         ]
     ] `styleBasic` [bgColor customGray3, padding 20]
 
@@ -672,7 +699,7 @@ toggleUserInputDetails idx = lens getToggleDetails setToggleDetails
     setToggleDetails [] _ = []
     setToggleDetails ((i,u):us) b =
       if i == idx
-      then (i,(u & #showDetails .~ b)) : us
+      then (i,u & #showDetails .~ b) : us
       else (i,u) : setToggleDetails us b
 
 toggleUserOutputDetails :: Int -> Lens' [(Int,UserOutput)] Bool
@@ -689,5 +716,5 @@ toggleUserOutputDetails idx = lens getToggleDetails setToggleDetails
     setToggleDetails [] _ = []
     setToggleDetails ((i,u):us) b =
       if i == idx
-      then (i,(u & #showDetails .~ b)) : us
+      then (i,u & #showDetails .~ b) : us
       else (i,u) : setToggleDetails us b

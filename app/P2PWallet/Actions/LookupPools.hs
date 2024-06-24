@@ -5,7 +5,7 @@ module P2PWallet.Actions.LookupPools
 
 import P2PWallet.Actions.Query.Koios
 import P2PWallet.Actions.Utils
-import P2PWallet.Data.Core.Network
+import P2PWallet.Data.Core.Internal.Network
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Prelude
 
