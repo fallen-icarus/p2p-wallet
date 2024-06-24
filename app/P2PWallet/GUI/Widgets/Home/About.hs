@@ -5,10 +5,11 @@ module P2PWallet.GUI.Widgets.Home.About
 
 import Monomer
 import Prettyprinter (pretty,tupled)
+import Data.Text qualified as Text
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
-import P2PWallet.Data.Wallets
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Plutus
@@ -26,23 +27,25 @@ aboutWidget model = do
           , box (mainButton "Add Wallet" $ HomeEvent $ PairPaymentWallet $ StartAdding Nothing) 
               `styleBasic` [padding 20]
           ]
-      ] `nodeVisible` (not isAdding)
+      ] `nodeVisible` not isAdding
   where
     isAdding :: Bool
     isAdding = model ^. #homeModel % #addingWallet
 
--- | Show key information about the address.
+-- Show key information about the address.
 addressInfoWidget :: AppModel -> AppNode
-addressInfoWidget model = do
-  let wallet = model ^. #homeModel % #selectedWallet
-      mStakeAddress = wallet ^. #stakeAddress
-      knownStakeWallets = model ^. #knownWallets % #stakeWallets
-      hasStaking = isJust mStakeAddress
-      addrInfo = inspectBech32Address $ wallet ^. #paymentAddress % #unPaymentAddress
+addressInfoWidget AppModel{homeModel=HomeModel{selectedWallet},..} = do
+  let -- Payment info
+      PaymentWallet{paymentAddress,paymentKeyPath,stakeAddress,stakeKeyPath} = selectedWallet
+      addrInfo = inspectBech32Address $ unPaymentAddress paymentAddress
       spendingKeyHash = fromMaybe "" $ either (const Nothing) infoSpendingKeyHash addrInfo
+
+      -- Stake info
+      hasStaking = isJust stakeAddress
       stakeKeyHash = either (const Nothing) infoStakeKeyHash addrInfo
-      mTrackedStakeWallet = flip (maybe Nothing) mStakeAddress $ 
-        \addr -> find (\StakeWallet{stakeAddress} -> addr == stakeAddress) knownStakeWallets
+      knownStakeWallets = knownWallets ^. #stakeWallets
+      mTrackedStakeWallet = flip (maybe Nothing) stakeAddress $ 
+        \addr -> find (\stake -> addr == stake ^. #stakeAddress) knownStakeWallets
 
   vstack 
     [ centerWidgetH $ label "Address Info" 
@@ -50,11 +53,12 @@ addressInfoWidget model = do
     , vstack
         [ hstack
             [ spacer_ [width 10]
-            , label "Payment Credential" `styleBasic` [textColor lightGray, textFont "Italics"]
+            , label "Payment Credential" 
+                `styleBasic` [textSize 14, textColor lightGray, textFont "Italics"]
             ] `styleBasic` [padding 5]
         , hstack
             [ spacer_ [width 20]
-            , copyableLabelWith "Address:" showAddressFormatted $ wallet ^. #paymentAddress
+            , copyableLabelWith "Address:" formatAddress paymentAddress
             ] `styleBasic` [padding 5]
         , hstack 
             [ spacer_ [width 20]
@@ -62,10 +66,9 @@ addressInfoWidget model = do
             ] `styleBasic` [padding 5]
         , hstack
             [ spacer_ [width 20]
-            , copyableLabelFor "Derivation Path:" $ fromMaybe "none" $
-                show . pretty . showDerivationPath <$> wallet ^. #paymentKeyPath
+            , copyableLabelFor "Derivation Path:" $ maybe "none" display paymentKeyPath
             ] `styleBasic` [padding 5]
-              `nodeVisible` (isJust $ wallet ^. #paymentKeyPath)
+              `nodeVisible` isJust paymentKeyPath
         ]
     , spacer
     , separatorLine `styleBasic` [paddingL 20, paddingR 20]
@@ -73,7 +76,8 @@ addressInfoWidget model = do
     , vstack
         [ hstack
             [ spacer_ [width 10]
-            , label "Stake Credential" `styleBasic` [textColor lightGray, textFont "Italics"]
+            , label "Stake Credential" 
+                `styleBasic` [textSize 14, textColor lightGray, textFont "Italics"]
             , spacer
             , widgetMaybe mTrackedStakeWallet $ \StakeWallet{alias} ->
                 label (show $ tupled [pretty alias])
@@ -84,22 +88,22 @@ addressInfoWidget model = do
                     , border 0 transparent
                     , textColor lightGray
                     , bgColor transparent
+                    , textSize 14
                     ]
             ] `styleBasic` [padding 5]
         , hstack
             [ spacer_ [width 20]
-            , copyableLabelFor "Address:" $ maybe "none" toText $ wallet ^. #stakeAddress
+            , copyableLabelFor "Address:" $ maybe "none" toText stakeAddress
             ] `styleBasic` [padding 5]
         , hstack 
             [ spacer_ [width 20]
             , copyableLabelFor "Key Hash:" $ 
-                fromMaybe "" $ show . PubKeyHash . BuiltinByteString <$> stakeKeyHash
+                maybe "" (show . PubKeyHash . BuiltinByteString) stakeKeyHash
             ] `styleBasic` [padding 5]
               `nodeVisible` hasStaking
-        , widgetMaybe (wallet ^. #stakeKeyPath) $ \keyPath -> hstack
+        , widgetMaybe stakeKeyPath $ \keyPath -> hstack
             [ spacer_ [width 20]
-            , copyableLabelFor "Derivation Path:" $
-                show $ pretty $ showDerivationPath keyPath
+            , copyableLabelFor "Derivation Path:" $ display keyPath
             ] `styleBasic` [padding 5]
               `nodeVisible` hasStaking
         ]
@@ -108,6 +112,18 @@ addressInfoWidget model = do
         , radius 20
         , bgColor customGray3
         ]
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | An address with delegation can be very long and exceed the length of the window. This
+-- function will add an ellipsis in the middle if the address is likely to overflow.
+formatAddress :: PaymentAddress -> Text
+formatAddress (PaymentAddress text)
+    | Text.length text > 80 = newText
+    | otherwise = text
+  where
+    newText = Text.take 40 text <> "..." <> Text.drop 80 text
 
 -------------------------------------------------
 -- Helper Widgets

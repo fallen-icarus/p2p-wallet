@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.EventHandler.TickerRegistryEvent
   ( 
     handleTickerRegistryEvent
@@ -10,9 +8,9 @@ import Data.Map qualified as Map
 
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.Utils
-import P2PWallet.Data.TickerMap
 import P2PWallet.Data.AppModel
-import P2PWallet.Plutus
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Prelude
 
 handleTickerRegistryEvent 
@@ -44,7 +42,7 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
             processNewTickerInfo tickerInfo reverseTickerMap
 
           -- Add the new ticker to the database.
-          addNewTickerInfo databaseFile verifiedTickerInfo >>= fromRightOrAppError
+          insertTickerInfo databaseFile verifiedTickerInfo >>= fromRightOrAppError
 
           return verifiedTickerInfo
       ]
@@ -54,7 +52,7 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
                 & #tickerRegistryModel % #newTickerInfo .~ def -- Clear for next time.
                 & #tickerMap %~ Map.insert ticker (policyId,assetName,decimals)
                 & #reverseTickerMap %~ 
-                    Map.insert (policyId <> "." <> assetName) (ticker,decimals)
+                    Map.insert (policyId,assetName) (ticker,decimals)
       ]
 
   -----------------------------------------------
@@ -71,27 +69,23 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
       ]
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (TickerRegistryEvent . ChangeTickerInfo . AddResult) $ do
-          let tickerInfo@NewTickerInfo{policyId,assetName} = tickerRegistryModel ^. #newTickerInfo
-              -- Delete the on-chain entry in the reverse map.
-              restOfReverseMap = Map.delete (policyId <> "." <> assetName) reverseTickerMap
+          let tickerInfo = tickerRegistryModel ^. #newTickerInfo
 
           -- Validate the new ticker info.
           verifiedTickerInfo <- fromRightOrAppError $ 
-            processNewTickerInfo tickerInfo restOfReverseMap
+            processNewTickerInfo tickerInfo reverseTickerMap
 
           -- Add the new ticker to the database.
-          addNewTickerInfo databaseFile verifiedTickerInfo >>= fromRightOrAppError
+          insertTickerInfo databaseFile verifiedTickerInfo >>= fromRightOrAppError
 
-          -- The new reverse map is returned to ensure the old on-chain name is no longer present.
-          return (verifiedTickerInfo,restOfReverseMap)
+          return verifiedTickerInfo
       ]
-    AddResult (TickerInfo{..},restOfReverseMap) ->
+    AddResult TickerInfo{..} ->
       [ Model $
           model & #tickerRegistryModel % #editingTicker .~ False
                 & #tickerRegistryModel % #newTickerInfo .~ def -- Clear for next time.
                 & #tickerMap %~ Map.insert ticker (policyId,assetName,decimals)
-                & #reverseTickerMap .~ 
-                    Map.insert (policyId <> "." <> assetName) (ticker,decimals) restOfReverseMap
+                & #reverseTickerMap %~ Map.insert (policyId,assetName) (ticker,decimals)
       ]
 
   -----------------------------------------------
@@ -108,43 +102,18 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
       ]
     ConfirmDeletion ->
       [ Task $ runActionOrAlert (const $ TickerRegistryEvent $ DeleteTickerInfo PostDeletionAction) $ do
-          -- Get the entry id for the contact to delete.
           let NewTickerInfo{ticker} = tickerRegistryModel ^. #newTickerInfo
 
           -- Delete the entry.
-          deleteTickerInfo databaseFile ticker >>= fromRightOrAppError
+          deleteTickerInfo databaseFile (Ticker ticker) >>= fromRightOrAppError
       ]
     PostDeletionAction ->
       -- Get the entry id for the contact to delete.
-      let NewTickerInfo{..} = tickerRegistryModel ^. #newTickerInfo
+      let NewTickerInfo{ticker} = tickerRegistryModel ^. #newTickerInfo
+          (policy,name,_) = fromMaybe ("","",0) $ Map.lookup (Ticker ticker) tickerMap
       in  [ Model $ 
               model & #tickerRegistryModel % #deletingTicker .~ False
                     & #tickerRegistryModel % #newTickerInfo .~ def
-                    & #tickerMap %~ Map.delete ticker
-                    & #reverseTickerMap %~ Map.delete (policyId <> "." <> assetName)
+                    & #tickerMap %~ Map.delete (Ticker ticker)
+                    & #reverseTickerMap %~ Map.delete (policy,name)
           ]
-
--------------------------------------------------
--- Helper Functions
--------------------------------------------------
-processNewTickerInfo :: NewTickerInfo -> ReverseTickerMap -> Either Text TickerInfo
-processNewTickerInfo NewTickerInfo{..} reverseTickerMap = do
-  -- Check the policy id is valid.
-  void $ maybeToRight "Not a valid policy id" $ readHex policyId
-
-  -- Check the asset name is valid.
-  void $ maybeToRight "Not a valid asset name" $ readHex assetName
-
-  -- Check the on-chain name is not already linked to another ticker.
-  first (\(tckr,_) -> "This asset is already linked to another ticker: '" <> tckr <> "'") $
-    maybeToLeft () $ Map.lookup (policyId <> "." <> assetName) reverseTickerMap
-
-  -- Check the decimal places is valid.
-  when (decimals < 0) $ Left "Decimal places must be >= 0"
-
-  return $ TickerInfo
-    { ticker = ticker
-    , policyId = policyId
-    , assetName = assetName
-    , decimals = decimals
-    }

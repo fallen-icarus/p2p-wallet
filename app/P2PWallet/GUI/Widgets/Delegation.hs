@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.Widgets.Delegation
   ( 
     delegationWidget
@@ -10,10 +8,10 @@ import Prettyprinter ((<+>), pretty, tupled)
 import Data.Text qualified as Text
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.StakeReward
+import P2PWallet.Data.Core.Wallets.StakeWallet
 import P2PWallet.Data.Koios.Pool
-import P2PWallet.Data.StakeReward
-import P2PWallet.Data.Wallets
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
@@ -24,7 +22,7 @@ import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.Prelude
 
 delegationWidget :: AppModel -> AppNode
-delegationWidget model = do
+delegationWidget model@AppModel{..} = do
     zstack
       [ mainWidget model 
           `nodeVisible` and
@@ -34,25 +32,30 @@ delegationWidget model = do
             , not isDeleting
             ]
       , addFirstWalletWidget 
-          `nodeVisible` (not isAdding && not hasStakeWallets && not isEditing && not isDeleting)
+          `nodeVisible` and
+            [ not isAdding 
+            , not hasStakeWallets 
+            , not isEditing 
+            , not isDeleting
+            ]
       , widgetIf isAdding $ addStakeWalletWidget model
       , widgetIf isEditing $ editStakeWalletWidget model
       , widgetIf isDeleting $ confirmDeleteWidget model
-      , widgetIf (model ^. #delegationModel % #showPoolPicker) $ poolPickerWidget model
-      , widgetIf (model ^. #delegationModel % #showPoolFilter) $ poolFilterWidget model
+      , widgetIf (model ^. #delegationModel % #showPoolPicker) $ poolPickerWidget model -- picker
+      , widgetIf (model ^. #delegationModel % #showPoolFilter) poolFilterWidget -- filter
       ]
   where
     hasStakeWallets :: Bool
-    hasStakeWallets = model ^. #knownWallets % #stakeWallets /= []
+    hasStakeWallets = knownWallets ^. #stakeWallets /= []
 
     isAdding :: Bool
-    isAdding = model ^. #delegationModel % #addingWallet
+    isAdding = delegationModel ^. #addingWallet
 
     isEditing :: Bool
-    isEditing = model ^. #delegationModel % #editingWallet
+    isEditing = delegationModel ^. #editingWallet
 
     isDeleting :: Bool
-    isDeleting = model ^. #delegationModel % #deletingWallet
+    isDeleting = delegationModel ^. #deletingWallet
 
     -- A welcome message when there are currently no tracked stake wallets.
     addFirstWalletWidget :: AppNode
@@ -71,36 +74,37 @@ delegationWidget model = do
             , box (mainButton "Add Wallet" $ DelegationEvent $ PairStakeWallet $ StartAdding Nothing) 
                 `styleBasic` [padding 20]
             ]
-        ] `nodeVisible` (not isAdding)
+        ] `nodeVisible` not isAdding
 
 -- The main widget that should only be shown if there are currently tracked stake wallets
 -- AND no overlays need to be shown.
 mainWidget :: AppModel -> AppNode
-mainWidget model =
+mainWidget AppModel{..} =
     vstack
       [ spacer
       , centerWidgetH headerWidget
       , spacer
       , hgrid
           [ vstack
-              [ centerWidgetH $ hstack
-                  [ registrationStatusWidget
+              [ box_ [alignMiddle] $ hstack
+                  [ registrationStatusWidget registrationStatus
                   , spacer_ [width 5]
-                  , totalDelegatedWidget
+                  , totalDelegatedWidget totalDelegation
                   , spacer_ [width 5]
-                  , rewardsBalanceWidget
+                  , rewardsBalanceWidget registrationStatus availableRewards
                   ]
               , spacer
               , widgetMaybe (wallet ^. #delegatedPool) poolInfoWidget
-              , widgetIf (isNothing $ wallet ^. #delegatedPool) notDelegatedWidget
+              , widgetIf (isNothing $ wallet ^. #delegatedPool) $ 
+                  notDelegatedWidget registrationStatus
               ] `styleBasic` [padding 10]
           , vstack
               [ vstack 
-                  [ centerWidgetH $ label "Reward History"
+                  [ box_ [alignMiddle] $ label "Reward History"
                       `styleBasic` [textFont "Italics", textSize 14, paddingT 10]
                   , separatorLine `styleBasic` [paddingL 70, paddingR 70, fgColor darkGray]
-                  , widgetIf (rewardHistory /= []) historyTableWidget
-                  , widgetIf (rewardHistory == []) $ centerWidget $ 
+                  , widgetIf (rewardHistory /= []) $ historyTableWidget rewardHistory
+                  , widgetIf (null rewardHistory) $ centerWidget $ 
                       flip styleBasic [padding 10, bgColor customGray4, radius 10] $ box $ 
                         label "This staking address has not earned any rewards yet."
                           `styleBasic` [textSize 12]
@@ -129,318 +133,26 @@ mainWidget model =
               ]
           , separatorLine `styleBasic` [paddingL 125, paddingR 125, fgColor darkGray]
           , spacer
-          , widgetIf(linkedAddresses == []) $ centerWidget $ 
+          , widgetIf(null linkedAddresses) $ centerWidget $ 
               flip styleBasic [padding 10, bgColor customGray4, radius 10] $ box $ 
                 label "There are no active linked payment addresses."
                   `styleBasic` [textSize 12, textColor lightGray]
           , widgetIf(linkedAddresses /= []) $
               vscroll_ [scrollOverlay, wheelRate 50, barWidth 3, thumbWidth 3] $ 
                 vstack_ [childSpacing_ 1] $ 
-                  flip map linkedAddresses $ \addr ->
+                  for linkedAddresses $ \addr ->
                     centerWidgetH $ copyableLabelSelf 12 lightGray (fitAddress $ toText addr)
                       `styleBasic` [textCenter,radius 20, padding 5, bgColor customGray4]
           ] `styleBasic` [radius 15, bgColor customGray2, padding 10]
       ] `styleBasic` [padding 10]
   where
     wallet :: StakeWallet
-    wallet@StakeWallet{registrationStatus,rewardHistory,linkedAddresses} = 
-      model ^. #delegationModel % #selectedWallet
+    wallet@StakeWallet{..} = delegationModel ^. #selectedWallet
 
     -- Shows an icon representing where the address is paired or watched.
-    walletTypeLabel :: AppNode
-    walletTypeLabel
-      | isNothing (wallet ^. #stakeKeyPath) = 
-          tooltip_ "Watched" [tooltipDelay 0] $ label watchedIcon
-            `styleBasic` [textSize 12, textColor customBlue, textMiddle, textFont "Remix"]
-      | otherwise = 
-          tooltip_ "Paired" [tooltipDelay 0] $ label pairedIcon
-            `styleBasic` [textSize 12, textColor customBlue, textMiddle, textFont "Remix"]
-
-    historyTableWidget :: AppNode
-    historyTableWidget = do
-      vstack
-        [ hgrid_ [childSpacing_ 3]
-            [ centerWidgetH $ hstack
-                [ label "Epoch" `styleBasic` [textSize 10]
-                , mainButton helpIcon (Alert spendableEpochMsg)
-                    `styleBasic`
-                      [ border 0 transparent
-                      , radius 20
-                      , bgColor transparent
-                      , textColor customBlue
-                      , textMiddle
-                      , padding 2
-                      , textSize 8
-                      , textFont "Remix"
-                      ]
-                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-                ]
-            , centerWidgetH $ label "Rewards" `styleBasic` [textSize 10]
-            , centerWidgetH $ label "Pool ID" `styleBasic` [textSize 10]
-            ] `styleBasic` [padding 5, bgColor customGray4, radiusTL 5, radiusTR 5]
-        , spacer_ [width 1]
-        , vscroll_ [scrollOverlay, wheelRate 50, thumbWidth 3] $ vstack_ [childSpacing_ 1] $ 
-            flip map (take 50 rewardHistory) $ \StakeReward{..} ->
-              hgrid_ [childSpacing_ 3]
-                [ centerWidgetH $ label (show spendableEpoch) 
-                    `styleBasic` [padding 0, textSize 9, textColor lightGray]
-                , centerWidgetH $ label (fromString $ printf "%D ADA" $ toAda amount) 
-                    `styleBasic` [padding 0, textSize 9, textColor lightGray]
-                , centerWidgetH $ copyableTruncatedPoolId 9 lightGray poolId
-                ] `styleBasic` [padding 5, bgColor customGray4]
-        ] `styleBasic` [ padding 10 ]
-
-    changeDelegationButton :: AppNode
-    changeDelegationButton = do
-      tooltip_ "Change Delegation" [tooltipDelay 0] $ 
-        box_ [onClick $ DelegationEvent OpenPoolPicker] $ 
-          label "Change"
-            `styleBasic`
-              [ textSize 10
-              , bgColor customBlue
-              , padding 3
-              , textMiddle
-              , radius 10
-              , textColor lightGray
-              ]
-            `styleHover`
-              [ bgColor customGray1 
-              , cursorIcon CursorHand
-              ]
-
-    poolInfoWidget :: Pool -> AppNode
-    poolInfoWidget Pool{..} = do
-      let PoolInfo{..} = fromMaybe def info
-          nameAndTicker = show $ pretty name <+> tupled [pretty ticker]
-      vstack
-        [ hstack
-            [ label nameAndTicker `styleBasic` [textSize 12]
-            , filler
-            , changeDelegationButton
-            ]
-        , spacer_ [width 5]
-        , copyableLabelSelf 9 lightGray (fitPoolId $ toText poolId)
-        , spacer_ [width 3]
-        , copyableLabelSelf 9 lightGray homepage
-        , spacer
-        , widgetMaybe retiringEpoch $ \epoch ->
-            vstack
-              [ label ("WARNING: This pool is retiring on epoch " <> show epoch)
-                  `styleBasic`
-                      [textFont "Italics", textSize 12, textColor customRed]
-              , spacer
-              ]
-        , hgrid_ [childSpacing]
-            [ subField "Margin" marginMsg $ 
-                fromString $ printf "%D%%" $ (*100) $ fromMaybe 0 margin
-            , subField "Live Saturation" liveSaturationMsg $ 
-                fromString $ printf "%D%%" $ fromMaybe 0 liveSaturation
-            ]
-        , spacer
-        , subField "Pledge" pledgeMsg $
-            fromString $ printf "%D ADA" $ toAda $ fromMaybe 0 pledge
-        , spacer
-        , subField "Active Pledge" activePledgeMsg $
-            fromString $ printf "%D ADA" $ toAda $ fromMaybe 0 livePledge
-        , spacer
-        , subField "Cost" fixedCostMsg $
-            fromString $ printf "%D ADA" $ toAda $ fromMaybe 0 fixedCost
-        ] `styleBasic`
-            [ bgColor customGray2
-            , padding 10
-            , radius 10
-            , height 300
-            ]
-
-    notDelegatedWidget :: AppNode
-    notDelegatedWidget = do
-      flip styleBasic [height 300, bgColor customGray2, padding 10, radius 10] $ box $ 
-        centerWidget $ vstack
-          [ centerWidgetH $ label "Delegate to start earning rewards!"
-              `styleBasic` [ textFont "Italics" ]
-          , widgetIf (registrationStatus == NotRegistered) $
-              vstack
-                [ spacer_ [width 3]
-                , centerWidgetH $ label (show $ tupled ["Don't forget to also register!"])
-                    `styleBasic` [ textColor customRed, textSize 12 ]
-                ]
-          , spacer
-          , centerWidgetH $ mainButton "Delegate" $ DelegationEvent OpenPoolPicker
-          ]
-
-    withdrawButton :: AppNode
-    withdrawButton = do
-      let (tip,mainColor,highlightColor,event)
-            | registrationStatus == Registered = ("Withdraw",customBlue,customGray1,AppInit)
-            | otherwise = ("Register to enable withdrawals",customRed,transparent,AppInit)
-      tooltip_ tip [tooltipDelay 0] $ box_ [onClick event] $ 
-        label withdrawRewardsIcon
-          `styleBasic`
-            [ textColor mainColor 
-            , textSize 10
-            , textFont "Remix"
-            , bgColor customGray2
-            , padding 2
-            , textMiddle
-            , radius 10
-            ]
-          `styleHover`
-            [ bgColor highlightColor
-            , cursorIcon CursorHand
-            ]
-
-    subField :: Text -> Text -> Text -> AppNode
-    subField caption helpMsg field =
-      vstack
-        [ hstack
-            [ label caption
-                `styleBasic`
-                  [ textSize 10
-                  , textColor lightGray
-                  ]
-            , subTipButton helpMsg
-            ]
-        , spacer_ [width 3]
-        , label field
-            `styleBasic`
-              [ textSize 12
-              ]
-        ] `styleBasic`
-            [ bgColor customGray4
-            , padding 10
-            , radius 10
-            ]
-
-    mainTipButton :: Text -> AppNode
-    mainTipButton msg =
-      box_ [onClick $ Alert msg] $ 
-        label helpIcon
-          `styleBasic`
-            [ textColor customBlue 
-            , textSize 10
-            , textFont "Remix"
-            , bgColor customGray2
-            , padding 2
-            , textMiddle
-            , radius 10
-            ]
-          `styleHover`
-            [ bgColor customGray1 
-            , cursorIcon CursorHand
-            ]
-
-    subTipButton :: Text -> AppNode
-    subTipButton msg =
-      box_ [onClick $ Alert msg] $ 
-        label helpIcon
-          `styleBasic`
-            [ textColor customBlue 
-            , textSize 10
-            , textFont "Remix"
-            , bgColor customGray4
-            , padding 2
-            , textMiddle
-            , radius 10
-            ]
-          `styleHover`
-            [ bgColor customGray2 
-            , cursorIcon CursorHand
-            ]
-
-    registrationButton :: AppNode
-    registrationButton = do
-      let (tip,icon)
-            | registrationStatus == NotRegistered = ("Register",registerIcon)
-            | otherwise = ("Deregister",deregisterIcon)
-      tooltip_ tip [tooltipDelay 0] $ box_ [onClick AppInit] $ 
-        label icon
-          `styleBasic`
-            [ textSize 10
-            , textFont "Remix"
-            , bgColor customGray2
-            , padding 2
-            , textMiddle
-            , radius 10
-            , if registrationStatus == NotRegistered then 
-                textColor customBlue 
-              else 
-                textColor customRed
-            ]
-          `styleHover`
-            [ bgColor customGray1 
-            , cursorIcon CursorHand
-            ]
-
-    registrationStatusWidget :: AppNode
-    registrationStatusWidget = do
-      vstack
-        [ hstack
-            [ label "Status"
-                `styleBasic`
-                  [ textSize 8
-                  , textColor lightGray
-                  ]
-            , registrationButton
-            ]
-        , spacer_ [width 3]
-        , label (displayRegistrationStatus registrationStatus)
-            `styleBasic`
-              [ textSize 9
-              , if registrationStatus == NotRegistered then 
-                  textColor customRed 
-                else 
-                  textColor customBlue
-              ]
-        ] `styleBasic`
-            [ bgColor customGray2
-            , padding 8
-            , radius 8
-            ]
-
-    totalDelegatedWidget :: AppNode
-    totalDelegatedWidget = do
-      vstack
-        [ hstack
-            [ label "Total Delegated"
-                `styleBasic`
-                  [ textSize 8
-                  , textColor lightGray
-                  ]
-            , mainTipButton totalDelegatedMsg
-            ]
-        , spacer_ [width 3]
-        , label (fromString $ printf "%D ADA" $ toAda $ wallet ^. #totalDelegation)
-            `styleBasic`
-              [ textSize 9
-              ]
-        ] `styleBasic`
-            [ bgColor customGray2
-            , padding 8
-            , radius 8
-            ]
-
-    rewardsBalanceWidget :: AppNode
-    rewardsBalanceWidget = do
-      vstack
-        [ hstack
-            [ label "Rewards Balance"
-                `styleBasic`
-                  [ textSize 8
-                  , textColor lightGray
-                  ]
-            , withdrawButton
-            ]
-        , spacer_ [width 3]
-        -- , label "9999999.999999 ADA"
-        , label (fromString $ printf "%D ADA" $ toAda $ wallet ^. #availableRewards)
-            `styleBasic`
-              [ textSize 9
-              ]
-        ] `styleBasic`
-            [ bgColor customGray2
-            , padding 8
-            , radius 8
-            ]
+    (walletTypeIcon,walletTypeTip)
+      | isNothing stakeKeyPath = (watchedIcon,"Watched")
+      | otherwise = (pairedIcon,"Paired")
 
     headerWidget :: AppNode
     headerWidget = do
@@ -452,17 +164,18 @@ mainWidget model =
                 `styleFocusHover` [textSize 10, bgColor customGray2, border 1 customBlue]
       hstack
         [ hstack
-            [ walletTypeLabel
+            [ tooltip_ walletTypeTip [tooltipDelay 0] $ label walletTypeIcon
+                `styleBasic` [textSize 12, textColor white, textMiddle, textFont "Remix"]
             , spacer_ [width 5]
-            , widgetMaybe (wallet ^. #stakeKeyPath) $ \path ->
+            , widgetMaybe stakeKeyPath $ \path ->
                 vstack
-                  [ copyableLabelSelf 10 white (toText $ wallet ^. #stakeAddress)
-                  , copyableLabelSelf 8 lightGray $ showDerivationPath path
+                  [ copyableLabelSelf 10 white $ display stakeAddress
+                  , copyableLabelSelf 8 lightGray $ display path
                   ]
-            , widgetIf (isNothing $ wallet ^. #stakeKeyPath) $
-                copyableLabelSelf 10 white (toText $ wallet ^. #stakeAddress)
+            , widgetIf (isNothing stakeKeyPath) $
+                copyableLabelSelf 10 white $ display stakeAddress
             , spacer_ [width 1]
-            , morePopup model `styleBasic` [styleIf (isJust $ wallet ^. #stakeKeyPath) $ paddingT 2]
+            , morePopup `styleBasic` [styleIf (isJust stakeKeyPath) $ paddingT 2]
             ] `styleBasic`
                 [ bgColor customGray3
                 , padding 10
@@ -472,7 +185,7 @@ mainWidget model =
         , spacer
         , textDropdown_ 
               (toLensVL $ #delegationModel % #selectedWallet) 
-              (model ^. #knownWallets % #stakeWallets) 
+              (knownWallets ^. #stakeWallets) 
               (view #alias) 
               [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
             `styleBasic` 
@@ -485,7 +198,7 @@ mainWidget model =
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         , spacer
         , tooltip_ "Refresh" [tooltipDelay 0] $
-            button refreshIcon (SyncWallets StartSync)
+            button refreshIcon (SyncWallets StartProcess)
             `styleBasic`
               [ border 0 transparent
               , radius 20
@@ -499,8 +212,139 @@ mainWidget model =
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         ]
 
-morePopup :: AppModel -> AppNode
-morePopup _ = do
+notDelegatedWidget :: RegistrationStatus -> AppNode
+notDelegatedWidget registrationStatus = do
+  flip styleBasic [height 300, bgColor customGray2, padding 10, radius 10] $ box $ 
+    centerWidget $ vstack
+      [ centerWidgetH $ label "Delegate to start earning rewards!"
+          `styleBasic` [ textFont "Italics" ]
+      , widgetIf (registrationStatus == NotRegistered) $
+          vstack
+            [ spacer_ [width 3]
+            , centerWidgetH $ label (show $ tupled ["Don't forget to also register!"])
+                `styleBasic` [ textColor customRed, textSize 12 ]
+            ]
+      , spacer
+      , centerWidgetH $ mainButton "Delegate" $ DelegationEvent OpenPoolPicker
+      ]
+
+withdrawButton :: RegistrationStatus -> AppNode
+withdrawButton registrationStatus = do
+  let (tip,mainColor,highlightColor,event)
+        | registrationStatus == Registered = ("Withdraw",customBlue,customGray1,AppInit)
+        | otherwise = ("Register to enable withdrawals",customRed,transparent,AppInit)
+  tooltip_ tip [tooltipDelay 0] $ box_ [onClick event] $ 
+    label withdrawRewardsIcon
+      `styleBasic`
+        [ textColor mainColor 
+        , textSize 10
+        , textFont "Remix"
+        , bgColor customGray2
+        , padding 2
+        , textMiddle
+        , radius 10
+        ]
+      `styleHover`
+        [ bgColor highlightColor
+        , cursorIcon CursorHand
+        ]
+
+registrationButton :: RegistrationStatus -> AppNode
+registrationButton registrationStatus = do
+  let (tip,icon)
+        | registrationStatus == NotRegistered = ("Register",registerIcon)
+        | otherwise = ("Deregister",deregisterIcon)
+  tooltip_ tip [tooltipDelay 0] $ box_ [onClick AppInit] $ 
+    label icon
+      `styleBasic`
+        [ textSize 10
+        , textFont "Remix"
+        , bgColor customGray2
+        , padding 2
+        , textMiddle
+        , radius 10
+        , if registrationStatus == NotRegistered then 
+            textColor customBlue 
+          else 
+            textColor customRed
+        ]
+      `styleHover`
+        [ bgColor customGray1 
+        , cursorIcon CursorHand
+        ]
+
+registrationStatusWidget :: RegistrationStatus -> AppNode
+registrationStatusWidget registrationStatus = do
+  vstack
+    [ hstack
+        [ label "Status"
+            `styleBasic`
+              [ textSize 8
+              , textColor lightGray
+              ]
+        , registrationButton registrationStatus
+        ]
+    , spacer_ [width 3]
+    , label (display registrationStatus)
+        `styleBasic`
+          [ textSize 9
+          , if registrationStatus == NotRegistered then 
+              textColor customRed 
+            else 
+              textColor customBlue
+          ]
+    ] `styleBasic`
+        [ bgColor customGray2
+        , padding 8
+        , radius 8
+        ]
+
+totalDelegatedWidget :: Lovelace -> AppNode
+totalDelegatedWidget totalDelegation = do
+  vstack
+    [ hstack
+        [ label "Total Delegated"
+            `styleBasic`
+              [ textSize 8
+              , textColor lightGray
+              ]
+        , mainTipButton totalDelegatedMsg
+        ]
+    , spacer_ [width 3]
+    , label (display totalDelegation)
+        `styleBasic`
+          [ textSize 9
+          ]
+    ] `styleBasic`
+        [ bgColor customGray2
+        , padding 8
+        , radius 8
+        ]
+
+rewardsBalanceWidget :: RegistrationStatus -> Lovelace -> AppNode
+rewardsBalanceWidget registrationStatus availableRewards = do
+  vstack
+    [ hstack
+        [ label "Rewards Balance"
+            `styleBasic`
+              [ textSize 8
+              , textColor lightGray
+              ]
+        , withdrawButton registrationStatus
+        ]
+    , spacer_ [width 3]
+    , label (display availableRewards)
+        `styleBasic`
+          [ textSize 9
+          ]
+    ] `styleBasic`
+        [ bgColor customGray2
+        , padding 8
+        , radius 8
+        ]
+
+morePopup :: AppNode
+morePopup = do
   vstack
     [ tooltip_ "More" [tooltipDelay 0] $
         button verticalMoreIcon (DelegationEvent ShowDelegationMorePopup)
@@ -551,6 +395,99 @@ morePopup _ = do
               ]
     ] `styleBasic` [padding 0, height 5]
 
+historyTableWidget :: [StakeReward] -> AppNode
+historyTableWidget rewardHistory = do
+  vstack
+    [ hgrid_ [childSpacing_ 3]
+        [ box_ [alignMiddle] $ hstack
+            [ label "Epoch" `styleBasic` [textSize 10]
+            , mainButton helpIcon (Alert spendableEpochMsg)
+                `styleBasic`
+                  [ border 0 transparent
+                  , radius 20
+                  , bgColor transparent
+                  , textColor customBlue
+                  , textMiddle
+                  , padding 2
+                  , textSize 8
+                  , textFont "Remix"
+                  ]
+                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            ]
+        , box_ [alignMiddle] $ label "Rewards" `styleBasic` [textSize 10]
+        , box_ [alignMiddle] $ label "Pool ID" `styleBasic` [textSize 10]
+        ] `styleBasic` [padding 5, bgColor customGray4, radiusTL 5, radiusTR 5]
+    , spacer_ [width 1]
+    , vscroll_ [scrollOverlay, wheelRate 50, thumbWidth 3] $ vstack_ [childSpacing_ 1] $ 
+        for (take 50 rewardHistory) $ \StakeReward{profileId=_,stakeId=_,..} ->
+          hgrid_ [childSpacing_ 3]
+            [ box_ [alignMiddle] $ label (show spendableEpoch) 
+                `styleBasic` [padding 0, textSize 9, textColor lightGray]
+            , box_ [alignMiddle] $ label (display amount) 
+                `styleBasic` [padding 0, textSize 9, textColor lightGray]
+            , box_ [alignMiddle] $ copyableTruncatedPoolId 9 lightGray poolId
+            ] `styleBasic` [padding 5, bgColor customGray4]
+    ] `styleBasic` [ padding 10 ]
+
+poolInfoWidget :: Pool -> AppNode
+poolInfoWidget Pool{..} = do
+    let PoolInfo{..} = fromMaybe def info
+        nameAndTicker = show $ pretty name <+> tupled [pretty ticker]
+    vstack
+      [ hstack
+          [ label nameAndTicker `styleBasic` [textSize 12]
+          , filler
+          , changeDelegationButton
+          ]
+      , spacer_ [width 5]
+      , copyableLabelSelf 9 lightGray $ fitPoolId $ display poolId
+      , spacer_ [width 3]
+      , copyableLabelSelf 9 lightGray homepage
+      , spacer
+      , widgetMaybe retiringEpoch $ \epoch ->
+          vstack
+            [ label ("WARNING: This pool is retiring on epoch " <> show epoch)
+                `styleBasic`
+                    [textFont "Italics", textSize 12, textColor customRed]
+            , spacer
+            ]
+      , hgrid_ [childSpacing]
+          [ subField "Margin" marginMsg $ 
+              fromString $ printf "%D%%" $ (*100) $ fromMaybe 0 margin
+          , subField "Live Saturation" liveSaturationMsg $ 
+              fromString $ printf "%D%%" $ fromMaybe 0 liveSaturation
+          ]
+      , spacer
+      , subField "Pledge" pledgeMsg $ display $ fromMaybe 0 pledge
+      , spacer
+      , subField "Active Pledge" activePledgeMsg $ display $ fromMaybe 0 livePledge
+      , spacer
+      , subField "Cost" fixedCostMsg $ display $ fromMaybe 0 fixedCost
+      ] `styleBasic`
+          [ bgColor customGray2
+          , padding 10
+          , radius 10
+          , height 300
+          ]
+  where
+    changeDelegationButton :: AppNode
+    changeDelegationButton = do
+      tooltip_ "Change Delegation" [tooltipDelay 0] $ 
+        box_ [onClick $ DelegationEvent OpenPoolPicker] $ 
+          label "Change"
+            `styleBasic`
+              [ textSize 10
+              , bgColor customBlue
+              , padding 3
+              , textMiddle
+              , radius 10
+              , textColor lightGray
+              ]
+            `styleHover`
+              [ bgColor customGray1 
+              , cursorIcon CursorHand
+              ]
+
 editStakeWalletWidget :: AppModel -> AppNode
 editStakeWalletWidget _ = do
   centerWidget $ vstack 
@@ -558,7 +495,7 @@ editStakeWalletWidget _ = do
         [ hstack 
             [ label "Wallet Name:"
             , spacer
-            , textField (toLensVL $ #extraTextField) 
+            , textField (toLensVL #extraTextField) 
                 `styleBasic` [width 300]
             ]
         ]
@@ -592,6 +529,64 @@ confirmDeleteWidget model = do
 -------------------------------------------------
 -- Helper Widgets
 -------------------------------------------------
+mainTipButton :: Text -> AppNode
+mainTipButton msg =
+  box_ [onClick $ Alert msg] $ 
+    label helpIcon
+      `styleBasic`
+        [ textColor customBlue 
+        , textSize 10
+        , textFont "Remix"
+        , bgColor customGray2
+        , padding 2
+        , textMiddle
+        , radius 10
+        ]
+      `styleHover`
+        [ bgColor customGray1 
+        , cursorIcon CursorHand
+        ]
+
+subTipButton :: Text -> AppNode
+subTipButton msg =
+  box_ [onClick $ Alert msg] $ 
+    label helpIcon
+      `styleBasic`
+        [ textColor customBlue 
+        , textSize 10
+        , textFont "Remix"
+        , bgColor customGray4
+        , padding 2
+        , textMiddle
+        , radius 10
+        ]
+      `styleHover`
+        [ bgColor customGray2 
+        , cursorIcon CursorHand
+        ]
+
+subField :: Text -> Text -> Text -> AppNode
+subField caption helpMsg field =
+  vstack
+    [ hstack
+        [ label caption
+            `styleBasic`
+              [ textSize 10
+              , textColor lightGray
+              ]
+        , subTipButton helpMsg
+        ]
+    , spacer_ [width 3]
+    , label field
+        `styleBasic`
+          [ textSize 12
+          ]
+    ] `styleBasic`
+        [ bgColor customGray4
+        , padding 10
+        , radius 10
+        ]
+
 -- | A label button that will copy itself.
 copyableLabelSelf :: Double -> Color -> Text -> WidgetNode s AppEvent
 copyableLabelSelf fontSize mainColor caption = 
@@ -621,24 +616,6 @@ copyableTruncatedPoolId fontSize mainColor (PoolID text) =
       , bgColor transparent
       ]
     `styleHover` [textColor customBlue, cursorIcon CursorHand]
-
--- -- | A label button that will copy itself and show ellipsis if too long.
--- copyableLabelSelfWithEllipsis :: Double -> Color -> Text -> WidgetNode s AppEvent
--- copyableLabelSelfWithEllipsis fontSize mainColor caption = do
---   let formattedCaption
---         | Text.length caption > 80 = Text.take 40 caption <> "..." <> Text.drop 80 caption
---         | otherwise = caption
---   tooltip_ "Copy" [tooltipDelay 0] $ button formattedCaption (CopyText caption)
---     `styleBasic`
---       [ padding 0
---       , textCenter
---       , textMiddle
---       , textSize fontSize
---       , border 0 transparent
---       , textColor mainColor
---       , bgColor transparent
---       ]
---     `styleHover` [textColor customBlue, cursorIcon CursorHand]
 
 fitPoolId :: Text -> Text
 fitPoolId poolId = Text.take 20 poolId <> "..." <> Text.drop 40 poolId

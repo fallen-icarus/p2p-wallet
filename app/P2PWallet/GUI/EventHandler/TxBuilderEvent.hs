@@ -1,17 +1,18 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.EventHandler.TxBuilderEvent
   ( 
     handleTxBuilderEvent
   ) where
 
 import Monomer
+import System.Directory qualified as Dir
 
+import P2PWallet.Actions.AssembleWitnesses
 import P2PWallet.Actions.BuildTxBody
-import P2PWallet.Actions.SignTxBody
+import P2PWallet.Actions.ExportTxBody
+import P2PWallet.Actions.WitnessTxBody
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Prelude
 
 handleTxBuilderEvent :: AppModel -> TxBuilderEvent -> [AppEventResponse AppModel AppEvent]
@@ -79,7 +80,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (TxBuilderEvent . EditSelectedUserOutput . AddResult) $ do
           let (idx,newOutput) = fromMaybe (0,def) $ txBuilderModel ^. #targetUserOutput
-          fromRightOrAppError $ fmap (idx,) $
+          fromRightOrAppError $ (idx,) <$>
             processNewUserOutput (config ^. #network) tickerMap fingerprintMap newOutput
       ]
     AddResult newInfo@(idx,_) ->
@@ -108,7 +109,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
       ]
     AddResult verifiedChangeOutput ->
       [ Model $
-          model & #txBuilderModel % #changeOutput .~ Just verifiedChangeOutput
+          model & #txBuilderModel % #changeOutput ?~ verifiedChangeOutput
                 & #txBuilderModel % #newChangeOutput .~ def
                 & #txBuilderModel % #addingChangeOutput .~ False
                 & #txBuilderModel %~ balanceTx
@@ -117,38 +118,109 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- Building transactions
   -----------------------------------------------
-  BuildTx ->
-    -- Build the transaction using the current `txBuilderModel`. It will calculate the fee
-    -- and will return an updated `txBuilderModel`. The resulting tx.body file will be
-    -- located in the tmp directory. If an error is throw, it will be displayed in an alert
-    -- message. Otherwise, `BuildResult` will be called. This also ensures that the minUTxOValues
-    -- are satisfied.
-    [ Model $ model & #building .~ True 
-    , Task $ runActionOrAlert (TxBuilderEvent . BuildResult) $
-        buildTxBody (config ^. #network) txBuilderModel
-    ]
-  BuildResult newTx -> 
-    -- Replace the old `txBuilderModel` with the new one that has the proper fee and disable
-    -- the `building` flag. An `alertMessage` is used to tell the user the estimated transaction
-    -- fee. Finally, now that is built, the `isBuilt` flag can be set to True to allow acting
-    -- on the tx.body file currently in the tmp directory.
-    [ Model $ 
-        model & #txBuilderModel .~ newTx 
-              & #building .~ False
-              & #alertMessage .~ Just 
-                  (fromString $ printf "Estimated Fee: %D ADA" (toAda $ newTx ^. #fee))
-    ]
-
-  -----------------------------------------------
-  -- Sign Transaction
-  -----------------------------------------------
-  SignAndSubmitTx ->
-    if not $ txBuilderModel ^. #isBuilt
-    then [ Task $ return $ Alert "You must first build the transaction."]
-    else
-      [ Model $ model & #waitingOnDevice .~ True
-      , Task $
-          runActionOrAlert SubmitTx $ 
-            signTxBody (config ^. #network) (model ^. #txBuilderModel)
+  BuildTx modal -> case modal of
+    StartProcess ->
+      -- Build the transaction using the current `txBuilderModel`. It will calculate the fee
+      -- and will return an updated `txBuilderModel`. The resulting tx.body file will be
+      -- located in the tmp directory. If an error is throw, it will be displayed in an alert
+      -- message. Otherwise, `BuildResult` will be called. 
+      [ Model $ model & #waitingStatus % #building .~ True 
+      , Task $ runActionOrAlert (TxBuilderEvent . BuildTx . ProcessResults) $
+          buildTxBody (config ^. #network) txBuilderModel
+      ]
+    ProcessResults newTx -> 
+      -- Replace the old `txBuilderModel` with the new one that has the proper fee and disable the
+      -- `building` flag. An `alertMessage` is used to tell the user the estimated transaction fee.
+      -- Finally, now that is built, the `isBuilt` is set to True to allow acting on the tx.body
+      -- file currently in the tmp directory; this was already toggled by `buildTxBody`.
+      [ Model $ 
+          model & #txBuilderModel .~ newTx 
+                & #waitingStatus % #building .~ False
+                & #alertMessage ?~
+                    fromString (printf "Estimated Fee: %D ADA" (toAda $ newTx ^. #fee))
       ]
 
+  -----------------------------------------------
+  -- Witnessing transactions
+  -----------------------------------------------
+  WitnessTx modal -> case modal of
+    StartProcess ->
+      if not $ txBuilderModel ^. #isBuilt
+      then [ Task $ return $ Alert "The transaction must first be built." ]
+      else
+        [ Model $ model & #waitingStatus % #waitingOnDevice .~ True 
+        , Task $ runActionOrAlert (TxBuilderEvent . WitnessTx . ProcessResults) $
+            witnessTxBody (config ^. #network) txBuilderModel
+        ]
+    ProcessResults witnessFiles -> 
+      [ Model $ 
+          -- The waitingOnDevice flag is left active. It will be disabled by whatever gets called
+          -- next.
+          model & #txBuilderModel % #witnessFiles .~ witnessFiles
+      , Task $ 
+          if txBuilderModel ^. #allWitnessesKnown then
+            -- The witnesses can be assembled and then submitted to the blockchain.
+            return $ TxBuilderEvent $ AssembleWitnesses StartProcess
+          else
+            -- Export the tx.body file so it can be signed externally. The witnesses will also be
+            -- exported.
+            return $ TxBuilderEvent $ ExportTxBody StartProcess
+      ]
+
+  -----------------------------------------------
+  -- Assembling witnesses
+  -----------------------------------------------
+  AssembleWitnesses modal -> case modal of
+    StartProcess ->
+      [ Task $ runActionOrAlert (TxBuilderEvent . AssembleWitnesses . ProcessResults) $
+          assembleWitnesses (txBuilderModel ^. #witnessFiles)
+      ]
+    ProcessResults signedFile -> 
+      [ Model $ 
+          model & #waitingStatus % #waitingOnDevice .~ False
+      , Task $ return $ SubmitTx signedFile
+      ]
+
+  -----------------------------------------------
+  -- Exporting the tx.body file and witnesses
+  -----------------------------------------------
+  ExportTxBody modal -> case modal of
+    StartProcess ->
+      [ Task $ runActionOrAlert (TxBuilderEvent . ExportTxBody . ProcessResults) $
+          exportTxBody (txBuilderModel ^. #witnessFiles)
+      ]
+    ProcessResults exportDestination -> 
+      [ Model $ 
+          model & #waitingStatus % #waitingOnDevice .~ False -- This can be called from `WitnessTx`.
+      , Task $ return $ Alert $ unlines
+          [ "Transaction file(s) successfully exported to the following directory:"
+          , toText exportDestination
+          ]
+      ]
+
+  -----------------------------------------------
+  -- Import tx.signed
+  -----------------------------------------------
+  ImportSignedTxFile modal -> case modal of
+    StartAdding _ ->
+      [ Model $ model & #txBuilderModel % #importedSignedTxFile .~ ""
+                      & #txBuilderModel % #importing .~ True
+      ]
+    CancelAdding ->
+      [ Model $ model & #txBuilderModel % #importedSignedTxFile .~ ""
+                      & #txBuilderModel % #importing .~ False
+      ]
+    ConfirmAdding -> 
+      [ Task $ runActionOrAlert (TxBuilderEvent . ImportSignedTxFile . AddResult) $ do
+          let importedFile = toString $ txBuilderModel ^. #importedSignedTxFile
+
+          -- Verify the file exists and is not a directory.
+          unlessM (Dir.doesFileExist importedFile) $ throwIO $ AppError "File does not exist."
+
+          -- Return the filepath.
+          return importedFile
+      ]
+    AddResult importedFile ->
+      [ Model $ model & #txBuilderModel % #importedSignedTxFile .~ ""
+      , Task $ return $ SubmitTx $ SignedTxFile importedFile
+      ]

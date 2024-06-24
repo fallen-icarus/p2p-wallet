@@ -7,8 +7,8 @@ import Monomer
 import Prettyprinter (tupled)
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
-import P2PWallet.Data.Profile
+import P2PWallet.Data.Core.Internal.HardwareDevice
+import P2PWallet.Data.Core.Profile
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
@@ -16,15 +16,15 @@ import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
 profilesWidget :: AppModel -> AppNode
-profilesWidget model = do
+profilesWidget model@AppModel{..} = do
     zstack
-      [ profilePickerWidget `nodeVisible` (not isAdding)
+      [ profilePickerWidget `nodeVisible` not isAdding
       , addProfileWidget model `nodeVisible` isAdding
       ]
 
   where
     isAdding :: Bool
-    isAdding = model ^. #addingProfile
+    isAdding = profileModel ^. #addingProfile
 
     profileColumn :: Profile -> AppNode
     profileColumn p =
@@ -33,8 +33,8 @@ profilesWidget model = do
             vstack 
               [ centerWidgetH $ label (p ^. #alias) 
                   `styleBasic` [textFont "Medium", textSize 24, paddingT 10]
-              , centerWidgetH $ flip styleBasic [textSize 14] $ label $ 
-                  show $ tupled $ [accMsg]
+              , centerWidgetH $ label (show $ tupled [accMsg])
+                  `styleBasic` [textSize 14]
               ] `styleBasic` [width 200, padding 20, radius 5]
                 `styleHover` [bgColor customBlue, cursorIcon CursorHand]
       in box_ [expandContent, onClick $ ProfileEvent $ LoadSelectedProfile p] content 
@@ -64,11 +64,11 @@ profilesWidget model = do
             , flip styleBasic [height 150] $ hscroll $ centerWidget $ 
                 flip styleBasic [border 1 black, padding 10, radius 5] $ 
                   hstack_ [childSpacing] $ 
-                    map profileColumn (model ^. #knownProfiles) <> [ newProfileBox ]
+                    map profileColumn (profileModel ^. #knownProfiles) <> [ newProfileBox ]
             , spacer_ [width 50]
             ]
         , filler
-        , centerWidgetH $ (button "Switch Networks" $ ChangeMainScene NetworksScene)
+        , centerWidgetH $ button "Switch Networks" (ChangeMainScene NetworksScene)
             `styleBasic`
               [ bgColor customGray3
               , textColor customBlue
@@ -88,19 +88,19 @@ addProfileWidget _ = do
           [ hstack 
               [ label "Profile Name:"
               , spacer
-              , textField_ (toLensVL $ #newProfile % #alias) [placeholder "Personal"] 
+              , textField_ (toLensVL $ #profileModel % #newProfile % #alias) [placeholder "Personal"] 
                   `styleBasic` [width 300]
               ]
         , hstack
             [ label "Hardware Wallet:"
             , spacer
-            , textDropdown_ (toLensVL $ #newProfile % #device) supportedDevices showHwDevice []
+            , textDropdown_ (toLensVL $ #profileModel % #newProfile % #device) supportedDevices display []
                 `styleBasic` [width 200]
             ]
           , hstack 
               [ label "Account ID:"
               , spacer
-              , numericField_ (toLensVL $ #newProfile % #accountIndex) [decimals 0]
+              , numericField_ (toLensVL $ #profileModel % #newProfile % #accountIndex) [decimals 0]
                   `styleBasic` [width 100]
               , mainButton helpIcon (Alert accountIdInfoMsg)
                   `styleBasic`

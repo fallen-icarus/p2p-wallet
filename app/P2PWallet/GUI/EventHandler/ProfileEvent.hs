@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.GUI.EventHandler.ProfileEvent
   ( 
     handleProfileEvent
@@ -10,48 +8,59 @@ import Monomer
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core.Asset
-import P2PWallet.Data.Profile
-import P2PWallet.Data.TickerMap
-import P2PWallet.Data.Wallets
+import P2PWallet.Data.Core.Profile
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
 
 handleProfileEvent :: AppModel -> ProfileEvent -> [AppEventResponse AppModel AppEvent]
 handleProfileEvent model@AppModel{..} evt = case evt of
-  -- After loading the profiles from the database, update the model.
-  LoadKnownProfiles profiles -> 
-    -- When the profiles are loaded, move the user to the profile picker scene.
-    [ Model $ model & #scene .~ ProfilesScene 
-                    & #knownProfiles .~ profiles
-    ]
+  -- Load all tracked profiles for the specified network.
+  LoadKnownProfiles modal -> case modal of
+    StartProcess -> 
+      [ Task $ runActionOrAlert (ProfileEvent . LoadKnownProfiles . ProcessResults) $
+          -- Try to load the profiles from the sqlite database. Show the user any error that appears.
+          loadProfiles databaseFile (config ^. #network) >>= fromRightOrAppError
+      ]
+    ProcessResults profiles ->
+      -- When the profiles are loaded, move the user to the profile picker scene.
+      [ Model $ model & #scene .~ ProfilesScene 
+                      & #profileModel % #knownProfiles .~ profiles
+      ]
 
-  -- Set the desired profile to selected and get the associated wallets from the database.
+  -- Set the desired profile to selected.
   LoadSelectedProfile profile -> 
-    [ Model $ model & #selectedProfile .~ Just profile 
-                    & #loadingProfile .~ True
-    , Task $ runActionOrAlert (ProfileEvent . LoadProfileInfo) $
-        (,,) <$> (loadWallets databaseFile profile >>= fromRightOrAppError)
-             <*> (loadAddressBook databaseFile profile >>= fromRightOrAppError)
-             <*> (loadTickerInfo databaseFile >>= fromRightOrAppError)
+    [ Model $ model & #selectedProfile ?~ profile 
+                    & #waitingStatus % #loadingProfile .~ True
+    , Task $ return $ ProfileEvent $ LoadProfileInfo StartProcess
     ]
 
-  -- After loading the profile info from the database, update the model.
-  LoadProfileInfo (wallets@Wallets{..}, contacts, tickers) -> 
-    [ Model $ model & #knownWallets .~ wallets
-                    & #scene .~ HomeScene
-                    & #loadingProfile .~ False
-                    & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead paymentWallets)
-                    & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead stakeWallets)
-                    & #addressBook .~ contacts
-                    & #tickerMap .~ toTickerMap tickers
-                    & #reverseTickerMap .~ toReverseTickerMap tickers
-                    & #fingerprintMap .~ genFingerprintMap wallets
-    , Task $ return $ SyncWallets StartSync
-    ]
+  -- Load all info for the selected profile.
+  LoadProfileInfo modal -> case modal of
+    StartProcess ->
+      let profile = fromMaybe def selectedProfile in
+      [ Task $ runActionOrAlert (ProfileEvent . LoadProfileInfo . ProcessResults) $
+          (,,) <$> (loadWallets databaseFile profile >>= fromRightOrAppError)
+               <*> (loadAddressBook databaseFile profile >>= fromRightOrAppError)
+               <*> (loadTickerInfo databaseFile >>= fromRightOrAppError)
+      ]
+    ProcessResults (wallets@Wallets{..}, contacts, tickers) -> 
+      [ Model $ model & #knownWallets .~ wallets
+                      & #scene .~ HomeScene
+                      & #waitingStatus % #loadingProfile .~ False
+                      & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead paymentWallets)
+                      & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead stakeWallets)
+                      & #addressBook .~ contacts
+                      & #tickerMap .~ toTickerMap tickers
+                      & #reverseTickerMap .~ toReverseTickerMap tickers
+                      & #fingerprintMap .~ 
+                          toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
+      -- , Task $ return $ SyncWallets StartSync
+      ]
 
+  -- Log the user out of the currently selected profile, and return the user to the profile 
+  -- picker screen.
   LogoutProfile -> 
-    -- Log the user out of the currently selected profile, and return the user to the profile 
-    -- picker screen.
     [ Model $ model & #scene .~ ProfilesScene 
                     & #selectedProfile .~ Nothing
                     & #knownWallets .~ def
@@ -64,31 +73,31 @@ handleProfileEvent model@AppModel{..} evt = case evt of
   AddNewProfile modal -> case modal of
     -- Show the addNewProfile widget and clear the old information.
     StartAdding _ -> 
-      [ Model $ model & #newProfile .~ def
-                      & #addingProfile .~ True
+      [ Model $ model & #profileModel % #newProfile .~ def
+                      & #profileModel % #addingProfile .~ True
       ]
     CancelAdding -> 
       -- Close the widget for getting the new info.
-      [ Model $ model & #addingProfile .~ False ]
+      [ Model $ model & #profileModel % #addingProfile .~ False ]
     ConfirmAdding ->
+      let ProfileModel{..} = profileModel in
       [ Task $ runActionOrAlert (ProfileEvent . AddNewProfile . AddResult) $ do
           -- Get the next row id for the profiles table.
           newProfileId <- getNextProfileId databaseFile >>= fromRightOrAppError
 
           -- Verify the user supplied information.
           verifiedProfile <- fromRightOrAppError $
-            toProfile (config ^. #network) newProfileId newProfile knownProfiles
+            processNewProfile (config ^. #network) newProfileId newProfile knownProfiles
 
           -- Add the new profile.
-          addNewProfile databaseFile verifiedProfile >>= fromRightOrAppError
+          insertProfile databaseFile verifiedProfile >>= fromRightOrAppError
 
           return verifiedProfile
       ]
     AddResult verifiedProfile ->
-      -- Take the user to the home page. Also toggle the addingProfile flag.
       [ Model $ 
-          model & #knownProfiles %~ flip snoc verifiedProfile
-                & #addingProfile .~ False
+          model & #profileModel % #knownProfiles %~ flip snoc verifiedProfile
+                & #profileModel % #addingProfile .~ False
       , Task $ return $ ProfileEvent $ LoadSelectedProfile verifiedProfile
       ]
 
@@ -98,61 +107,50 @@ handleProfileEvent model@AppModel{..} evt = case evt of
   ChangeProfileName modal -> case modal of
     -- Show the edit widget and set the newProfile information to the current profile.
     StartAdding _ -> 
-      [ Model $ model & #extraTextField .~ fromMaybe "" (selectedProfile ^? _Just % #alias)
-                      & #addingProfile .~ True
+      [ Model $ model & #profileModel % #newProfile .~ maybe def toNewProfile selectedProfile
+                      & #profileModel % #addingProfile .~ True
       ]
     CancelAdding -> 
       -- Close the widget for getting the new info.
-      [ Model $ model & #addingProfile .~ False
-                      & #extraTextField .~ ""
+      [ Model $ model & #profileModel % #addingProfile .~ False
+                      & #profileModel % #newProfile .~ def
       ]
     ConfirmAdding ->
       [ Task $ runActionOrAlert (ProfileEvent . ChangeProfileName . AddResult) $ do
-          let currentProfile = fromMaybe def selectedProfile
-              -- Get the row id for the profile being updated.
-              currentId = currentProfile ^. #profileId
+          let Profile{network,profileId} = fromMaybe def selectedProfile
+              ProfileModel{newProfile,knownProfiles} = profileModel
               -- Filter out the selected profile from the list of known profiles.
-              otherProfiles = filter (\p -> currentId /= p ^. #profileId) knownProfiles
-              newAlias = model ^. #extraTextField
-              newProfile' = currentProfile & #alias .~ newAlias
+              otherProfiles = filter (\p -> profileId /= p ^. #profileId) knownProfiles
 
-          -- Check if the alias name is already being used.
-          when (newAlias == "") $ 
-            throwIO $ AppError "New name is empty."
-          when (any (\p -> p ^. #alias == newAlias) otherProfiles) $ 
-            throwIO $ AppError "Name is already being used."
+          -- Verify the user supplied information.
+          verifiedProfile <- fromRightOrAppError $
+            processNewProfile network profileId newProfile otherProfiles
 
-          -- Overwrite the current profile name.
-          addNewProfile databaseFile newProfile' >>= fromRightOrAppError
+          -- Overwrite the current profile info.
+          insertProfile databaseFile verifiedProfile >>= fromRightOrAppError
 
-          return newAlias
+          return verifiedProfile
       ] 
-    AddResult newAlias ->
-      let currentProfile = fromMaybe def selectedProfile
-          -- Get the row id for the profile being updated.
-          currentId = currentProfile ^. #profileId
-          -- Filter out the selected profile from the list of known profiles.
-          otherProfiles = filter (\p -> currentId /= p ^. #profileId) knownProfiles
-          newProfile' = currentProfile & #alias .~ newAlias
-          newProfiles = sortOn (view #profileId) $ newProfile' : otherProfiles
-      -- Toggle the addingProfile flag.
+    AddResult verifiedProfile@Profile{profileId} ->
+      let knownProfiles = profileModel ^. #knownProfiles
+          otherProfiles = filter (\p -> profileId /= p ^. #profileId) knownProfiles
+          newProfiles = sortOn (view #profileId) $ verifiedProfile : otherProfiles
       in [ Model $ 
-             model & #knownProfiles .~ newProfiles
-                   & #addingProfile .~ False
-                   & #selectedProfile .~ Just newProfile'
+             model & #profileModel % #knownProfiles .~ newProfiles
+                   & #profileModel % #addingProfile .~ False
+                   & #profileModel % #newProfile .~ def
+                   & #selectedProfile ?~ verifiedProfile
          ]
 
   -----------------------------------------------
   -- Delete Profile
   -----------------------------------------------
   DeleteProfile modal -> case modal of
-    -- Show the confirmation widget.
     GetDeleteConfirmation _ -> 
-      [ Model $ model & #deletingProfile .~ True
+      [ Model $ model & #profileModel % #deletingProfile .~ True
       ]
     CancelDeletion -> 
-      -- Close the widget for confirming deletion.
-      [ Model $ model & #deletingProfile .~ False ]
+      [ Model $ model & #profileModel % #deletingProfile .~ False ]
     ConfirmDeletion ->
       [ Task $ runActionOrAlert (const $ ProfileEvent $ DeleteProfile PostDeletionAction) $ do
           -- Get the row id for the profile to delete.
@@ -162,17 +160,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
           deleteProfile databaseFile currentId >>= fromRightOrAppError
       ]
     PostDeletionAction ->
-      -- Toggle the deletingProfile flag.
-      [ Model $ model & #deletingProfile .~ False
+      [ Model $ model & #profileModel % #deletingProfile .~ False
                       & #selectedProfile .~ Nothing
-      , Task $ return $ SetNetwork $ config ^. #network
+      , Task $ return $ ProfileEvent $ LoadKnownProfiles StartProcess
       ]
-
--------------------------------------------------
--- Helper Functions
--------------------------------------------------
--- | Create the fingerprint map.
-genFingerprintMap :: Wallets -> Map Text (Text,Text)
-genFingerprintMap Wallets{paymentWallets} =
-  let nativeAssets = concatMap (view #nativeAssets) paymentWallets
-  in fromList $ map (\NativeAsset{..} -> (fingerprint,(policyId,tokenName))) nativeAssets

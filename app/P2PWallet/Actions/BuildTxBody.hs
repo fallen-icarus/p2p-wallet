@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.Actions.BuildTxBody
   (
     buildTxBody
@@ -10,43 +8,19 @@ import System.FilePath ((</>), (<.>))
 import P2PWallet.Actions.Query.Koios
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core
-import P2PWallet.Data.Files
-import P2PWallet.Plutus
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.TxBody
 import P2PWallet.Prelude
 
-buildTxBody :: Network -> TxBuilderModel -> IO TxBuilderModel
-buildTxBody network tx = do
-  -- Check if the transaction can be built without errors. This will throw an AppError if it
-  -- cannot.
-  canBeBuilt tx
-
-  -- Get the file names since cardano-cli works with files.
-  tmpDir <- getTemporaryDirectory
-  let paramsFile = ParamsFile $ tmpDir </> "params" <.> "json"
-      txBodyFile = TxBodyFile $ tmpDir </> "tx" <.> "body"
-
-  -- Get the current parameters, and write them to a file for cardano-cli to use.
-  runGetParams network >>= fromRightOrAppError >>= writeFileBS (toString paramsFile)
-
-  -- Update the transaction fee. The changeOutput is already rebalanced to account for the fee.
-  newTx <- estimateTxFee network paramsFile txBodyFile tx
-
-  -- Build the transaction one more time so that the tx.body file has the finalized transaction.
-  void $ runCmd $ buildRawCmd paramsFile txBodyFile newTx
-
-  -- Return the final transaction after setting `isBuilt` to True.
-  return $ newTx & #isBuilt .~ True
-
--- Since cardano-cli transaction build-raw can throw confusing error messages if certain
--- pieces are missing from the transaction, this check validates those cases will not occur.
--- It will throw an `AppError` with a more user friendly error message if cardano-cli 
--- transaction build-raw is likely to throw an error. The UI should catch these errors sooner but
--- the redundant checks can't hurt and enable building to be tested without a UI.
+-- Since `cardano-cli transaction build-raw` can throw confusing error messages if certain pieces
+-- are missing from the transaction, this check validates those cases will not occur. It will throw
+-- an `AppError` with a more user friendly error message if cardano-cli is likely to throw an error.
+-- The UI should catch these errors sooner but the redundant checks can't hurt and enable building
+-- to be tested without a UI.
 canBeBuilt :: TxBuilderModel -> IO ()
 canBeBuilt TxBuilderModel{userInputs,changeOutput}
   -- The tx must have inputs.
-  | userInputs == [] = throwIO $ AppError "No inputs specified."
+  | null userInputs = throwIO $ AppError "No inputs specified."
   -- A change address must be specified.
   | change ^. #paymentAddress == "" = throwIO $ AppError "Change address missing."
   -- The value of ADA must be balanced.
@@ -61,38 +35,55 @@ canBeBuilt TxBuilderModel{userInputs,changeOutput}
     nativeAssetsNotBalanced :: Bool
     nativeAssetsNotBalanced = any ((<0) . view #quantity) $ change ^. #nativeAssets
 
--- | Calculate the fee twice. The first time is to get the initial estimate and the second
--- time is to account for adding the new fee to the transaction.
-estimateTxFee 
-  :: Network 
-  -> ParamsFile 
-  -> TxBodyFile 
-  -> TxBuilderModel 
-  -> IO TxBuilderModel
-estimateTxFee network paramsFile txBodyFile startTx = estimate startTx >>= estimate
+-- | Build the transaction and generate the tx.body file.
+buildTxBody :: Network -> TxBuilderModel -> IO TxBuilderModel
+buildTxBody network tx = do
+  -- Check if the transaction can be built without errors. 
+  canBeBuilt tx
+
+  -- Get the file names since cardano-cli works with files.
+  tmpDir <- getTemporaryDirectory
+  let paramsFile = ParamsFile $ tmpDir </> "params" <.> "json"
+      txBodyFile = TxBodyFile $ tmpDir </> "tx" <.> "body"
+
+  -- Get the current parameters, and write them to a file for cardano-cli to use.
+  runGetParams network >>= fromRightOrAppError >>= writeFileBS (toString paramsFile)
+
+  -- Convert the model to `TxBody` and extract out the required witnesses for returning
+  -- with the finalized `TxBuilderModel`.
+  let initialTxBody@TxBody{witnesses} = convertToTxBody tx
+
+  -- Calculate the fee. This calculation is done twice to account for adding the fee the second
+  -- time.
+  fee <- do
+    feeCalc1 <- estimateTxFee network paramsFile txBodyFile initialTxBody
+    estimateTxFee network paramsFile txBodyFile $
+      -- Add the fee to the transaction, rebalance, and calculate again.
+      convertToTxBody $ balanceTx $ tx & #fee .~ feeCalc1
+
+  -- Build the transaction one more time so that the tx.body file has the finalized transaction.
+  -- Also set the witnesses since the GUI will need them to determine what actions can be taken
+  -- on the tx.body file.
+  let finalizedTx = balanceTx $ tx & #fee .~ fee
+                                   & #witnesses .~ witnesses
+                                   & #allWitnessesKnown .~ all (isJust . snd . unWitness) witnesses
+  runCmd_ $ buildRawCmd paramsFile txBodyFile $ convertToTxBody finalizedTx
+
+  -- Return the updated `TxBuilderModel`. Mark the model as built.
+  return $ finalizedTx & #isBuilt .~ True
+
+-- | Calculate the fee.
+estimateTxFee :: Network -> ParamsFile -> TxBodyFile -> TxBody -> IO Lovelace
+estimateTxFee network paramsFile txBodyFile tx@TxBody{inputs,outputs,witnesses} = do
+    -- This builds the tx.body file and stores it in the tmp directory. 
+    runCmd_ $ buildRawCmd paramsFile txBodyFile tx
+
+    -- This uses the tx.body file to estimate the transaction fee. 
+    fromJustOrAppError "Could not parse min fee." . fmap Lovelace . readMaybe =<<
+      runCmd calcFeeCmd
   where
-    estimate :: TxBuilderModel -> IO TxBuilderModel
-    estimate tx@TxBuilderModel{userInputs,userOutputs} = do
-      -- Get all key witnesses that must sign this transaction.
-      witnesses <- fromRightOrAppError $ getRequiredWitnesses tx
-
-      -- This builds the tx.body file and stores it in the tmp directory. 
-      void $ runCmd $ buildRawCmd paramsFile txBodyFile tx
-
-      -- This uses the tx.body file to estimate the transaction fee. It will update
-      -- the fee inside the `TxBuilderModel`.
-      minFee <- fromJustOrAppError "Could not parse min fee." . fmap Lovelace . readMaybe =<<
-        runCmd (calcFeeCmd userInputs userOutputs witnesses)
-
-      -- Add the fee to the transaction and rebalance the change output.
-      return $ balanceTx $ tx & #fee .~ minFee
-
-    calcFeeCmd 
-      :: [(Int,UserInput)] 
-      -> [(Int,UserOutput)] 
-      -> [Witness]
-      -> String
-    calcFeeCmd inputs outputs wits =
+    calcFeeCmd :: String
+    calcFeeCmd =
       toString $ (<> " | cut -d' ' -f1") $ unwords
         [ "cardano-cli transaction calculate-min-fee"
         , "--tx-body-file " <> toText txBodyFile
@@ -100,49 +91,34 @@ estimateTxFee network paramsFile txBodyFile startTx = estimate startTx >>= estim
         , "--protocol-params-file " <> toText paramsFile
         , "--tx-in-count " <> show (length inputs)
         , "--tx-out-count " <> show (length outputs)
-        , "--witness-count " <> show 
-            (length $ ordNubOn fst $ map (view #witness) wits)
+        , "--witness-count " <> show (length witnesses)
         ]
 
-buildRawCmd :: ParamsFile -> TxBodyFile -> TxBuilderModel -> String
+-- | Create the actual `cardano-cli transaction build-raw` command.
+buildRawCmd :: ParamsFile -> TxBodyFile -> TxBody -> String
 buildRawCmd paramsFile outFile tx = toString $ unwords
     [ "cardano-cli transaction build-raw"
-    , unwords $ map inputField $ tx ^. #userInputs
-    , unwords $ map outputField $ tx ^. #userOutputs
-    , changeField $ fromMaybe def $ tx ^. #changeOutput
+    , unwords $ map inputField $ tx ^. #inputs
+    , unwords $ map outputField $ tx ^. #outputs
     , "--protocol-params-file " <> toText paramsFile
     , "--fee " <> show (unLovelace $ tx ^. #fee)
     , "--out-file " <> toText outFile
     ]
   where
-    inputField :: (Int,UserInput) -> Text
-    inputField (_,input) = unwords
-      [ "--tx-in " <> (showTxOutRef $ input ^. #utxoRef)
+    inputField :: TxBodyInput -> Text
+    inputField TxBodyInput{utxoRef} = unwords
+      [ "--tx-in " <> display utxoRef
       ]
 
-    outputField :: (Int,UserOutput) -> Text
-    outputField (_,output) = unwords
+    outputField :: TxBodyOutput -> Text
+    outputField TxBodyOutput{..} = unwords
       [ mconcat 
           [ "--tx-out "
           , show $ unwords
-              [ toText $ output ^. #paymentAddress
-              , show (unLovelace $ output ^. #lovelace) <> " lovelace"
-              , unwords $ flip map (output ^. #nativeAssets) $ \NativeAsset{..} ->
-                  "+ " <> show quantity <> " " <> policyId <> "." <> tokenName
-              ] 
-          ]
-      ]
-
-    -- The fee has already been subtracted from the change output.
-    changeField :: ChangeOutput -> Text
-    changeField output = unwords
-      [ mconcat 
-          [ "--tx-out "
-          , show $ unwords
-              [ toText $ output ^. #paymentAddress
-              , show (unLovelace $ output ^. #lovelace) <> " lovelace"
-              , unwords $ flip map (output ^. #nativeAssets) $ \NativeAsset{..} ->
-                  "+ " <> show quantity <> " " <> policyId <> "." <> tokenName
+              [ toText paymentAddress
+              , show (unLovelace lovelace) <> " lovelace"
+              , unwords $ for nativeAssets $ \NativeAsset{..} ->
+                  "+ " <> show quantity <> " " <> display policyId <> "." <> display tokenName
               ] 
           ]
       ]

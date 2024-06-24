@@ -12,7 +12,7 @@ import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
 settingsWidget :: AppModel -> AppNode
-settingsWidget model = do
+settingsWidget model@AppModel{..} = do
     zstack
       [ setttingsMenu `nodeVisible` (not isAdding && not isDeleting)
       , editProfileWidget model `nodeVisible` isAdding
@@ -20,10 +20,10 @@ settingsWidget model = do
       ]
   where
     isAdding :: Bool
-    isAdding = model ^. #addingProfile
+    isAdding = profileModel ^. #addingProfile
 
     isDeleting :: Bool
-    isDeleting = model ^. #deletingProfile
+    isDeleting = profileModel ^. #deletingProfile
 
     setttingsMenu :: AppNode
     setttingsMenu =
@@ -92,7 +92,7 @@ editProfileWidget _ = do
         [ hstack 
             [ label "Profile Name:"
             , spacer
-            , textField (toLensVL $ #extraTextField)
+            , textField (toLensVL $ #profileModel % #newProfile % #alias)
                 `styleBasic` [width 300]
             ]
         ]

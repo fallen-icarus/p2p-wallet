@@ -31,11 +31,13 @@ common extensions
     default-language: GHC2021
     default-extensions:
       DeriveAnyClass
+      DerivingStrategies
       DuplicateRecordFields
       OverloadedStrings
       OverloadedLabels
       LambdaCase
       NoImplicitPrelude
+      RecordWildCards
 
 executable p2p-wallet
     import:
@@ -48,48 +50,50 @@ executable p2p-wallet
     -- Modules included in this executable, other than Main.
     other-modules:
       P2PWallet.Actions.AddWallet
+      P2PWallet.Actions.AssembleWitnesses
       P2PWallet.Actions.BuildTxBody
       P2PWallet.Actions.Database
-      -- P2PWallet.Actions.ExportTxBody
       P2PWallet.Actions.ExportHwKey
+      P2PWallet.Actions.ExportTxBody
       P2PWallet.Actions.LookupPools
       P2PWallet.Actions.Query.Koios
       P2PWallet.Actions.Utils
-      P2PWallet.Actions.SignTxBody
       P2PWallet.Actions.SubmitTx
       P2PWallet.Actions.SyncWallets
-      P2PWallet.Data.AddressBook
+      P2PWallet.Actions.WitnessTxBody
       P2PWallet.Data.AppModel
-      P2PWallet.Data.AppModel.AddressBook
+      P2PWallet.Data.AppModel.AddressBookModel
       P2PWallet.Data.AppModel.Common
-      P2PWallet.Data.AppModel.Delegation
-      P2PWallet.Data.AppModel.Home
-      P2PWallet.Data.AppModel.TickerRegistry
-      P2PWallet.Data.AppModel.TxBuilder
-      P2PWallet.Data.AppModel.TxBuilder.ChangeOutput
-      P2PWallet.Data.AppModel.TxBuilder.UserInput
-      P2PWallet.Data.AppModel.TxBuilder.UserOutput
-      P2PWallet.Data.Core
-      P2PWallet.Data.Core.AddressEntryId
-      P2PWallet.Data.Core.Asset
-      P2PWallet.Data.Core.Bech32Address
-      P2PWallet.Data.Core.Config
-      P2PWallet.Data.Core.DerivationPath
-      P2PWallet.Data.Core.HardwareDevice
-      P2PWallet.Data.Core.Network
-      P2PWallet.Data.Core.PaymentId
-      P2PWallet.Data.Core.ProfileId
-      P2PWallet.Data.Core.PoolID
-      P2PWallet.Data.Core.RegistrationStatus
-      P2PWallet.Data.Core.StakeId
-      P2PWallet.Data.Core.TxCBOR
-      P2PWallet.Data.Core.Witness
-      P2PWallet.Data.Database
-      P2PWallet.Data.Database.Create
-      P2PWallet.Data.Database.Delete
-      P2PWallet.Data.Database.Insert
-      P2PWallet.Data.Database.Query
-      P2PWallet.Data.Files
+      P2PWallet.Data.AppModel.DelegationModel
+      P2PWallet.Data.AppModel.HomeModel
+      P2PWallet.Data.AppModel.ProfileModel
+      P2PWallet.Data.AppModel.TickerRegistryModel
+      P2PWallet.Data.AppModel.TxBuilderModel
+      P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
+      P2PWallet.Data.AppModel.TxBuilderModel.UserInput
+      P2PWallet.Data.AppModel.TxBuilderModel.UserOutput
+      P2PWallet.Data.Core.AddressBook
+      P2PWallet.Data.Core.AssetMaps
+      P2PWallet.Data.Core.Internal
+      P2PWallet.Data.Core.Internal.Assets
+      P2PWallet.Data.Core.Internal.Bech32Address
+      P2PWallet.Data.Core.Internal.Config
+      P2PWallet.Data.Core.Internal.DerivationPath
+      P2PWallet.Data.Core.Internal.Files
+      P2PWallet.Data.Core.Internal.HardwareDevice
+      P2PWallet.Data.Core.Internal.Network
+      P2PWallet.Data.Core.Internal.PrimaryKeys
+      P2PWallet.Data.Core.Internal.PoolID
+      P2PWallet.Data.Core.Internal.RegistrationStatus
+      P2PWallet.Data.Core.Internal.TxCBOR
+      P2PWallet.Data.Core.Internal.Witness
+      P2PWallet.Data.Core.Profile
+      P2PWallet.Data.Core.StakeReward
+      P2PWallet.Data.Core.Transaction
+      P2PWallet.Data.Core.TxBody
+      P2PWallet.Data.Core.Wallets
+      P2PWallet.Data.Core.Wallets.PaymentWallet
+      P2PWallet.Data.Core.Wallets.StakeWallet
       P2PWallet.Data.Koios.AddressUTxO
       P2PWallet.Data.Koios.LinkedPaymentAddresses
       P2PWallet.Data.Koios.Pool
@@ -98,13 +102,7 @@ executable p2p-wallet
       P2PWallet.Data.Koios.StakeReward
       P2PWallet.Data.Koios.Transaction
       P2PWallet.Data.Koios.TxSubmissionResponse
-      P2PWallet.Data.Profile
-      P2PWallet.Data.StakeReward
-      P2PWallet.Data.TickerMap
-      P2PWallet.Data.Transaction
-      P2PWallet.Data.Wallets
-      P2PWallet.Data.Wallets.PaymentWallet
-      P2PWallet.Data.Wallets.StakeWallet
+      P2PWallet.Database
       P2PWallet.GUI.Colors
       P2PWallet.GUI.EventHandler
       P2PWallet.GUI.EventHandler.AddressBookEvent
@@ -115,6 +113,7 @@ executable p2p-wallet
       P2PWallet.GUI.EventHandler.TxBuilderEvent
       P2PWallet.GUI.HelpMessages
       P2PWallet.GUI.Icons
+      P2PWallet.GUI.MonomerOptics
       P2PWallet.GUI.UIBuilder
       P2PWallet.GUI.Widgets.AddressBook
       P2PWallet.GUI.Widgets.Delegation
@@ -134,7 +133,6 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Settings
       P2PWallet.GUI.Widgets.TickerRegistry
       P2PWallet.GUI.Widgets.TxBuilder
-      P2PWallet.MonomerOptics
       P2PWallet.Plutus
       P2PWallet.Prelude
 

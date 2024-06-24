@@ -12,9 +12,10 @@ import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
+-- A widget for adding either a paired wallet or watched wallet.
 addPaymentWalletWidget :: AppModel -> AppNode
-addPaymentWalletWidget model = do
-  let isPairing = model ^. #homeModel % #newPaymentWallet % #pairing
+addPaymentWalletWidget model@AppModel{homeModel} = do
+  let isPairing = homeModel ^. #newPaymentWallet % #pairing
       offStyle = def 
         `styleBasic` [ bgColor customGray1 , textColor white ]
         `styleHover` [ textColor lightGray ]

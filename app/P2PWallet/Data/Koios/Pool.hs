@@ -1,6 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -16,10 +14,12 @@ module P2PWallet.Data.Koios.Pool where
 
 import Data.Aeson
 
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Prelude
-import P2PWallet.Data.Core.Asset
-import P2PWallet.Data.Core.PoolID
 
+-------------------------------------------------
+-- Pool Status
+-------------------------------------------------
 -- | Whether the pool is still active, retired, or in the process of retiring.
 data PoolStatus
   = RegisteredPool
@@ -28,22 +28,25 @@ data PoolStatus
   deriving (Show,Eq)
 
 instance ToJSON PoolStatus where
-  toJSON = toJSON . showPoolStatus
+  toJSON = toJSON . display
 
 instance FromJSON PoolStatus where
-  parseJSON = withText "PoolStatus" (maybe mzero return . readPoolStatus)
+  parseJSON = withText "PoolStatus" (maybe mzero return . parsePoolStatus)
 
-readPoolStatus :: Text -> Maybe PoolStatus
-readPoolStatus "retiring" = Just RetiringPool
-readPoolStatus "registered" = Just RegisteredPool
-readPoolStatus "retired" = Just RetiredPool
-readPoolStatus _ = Nothing
+instance Display PoolStatus where
+  display RetiringPool = "retiring"
+  display RegisteredPool = "registered"
+  display RetiredPool = "retired"
 
-showPoolStatus :: PoolStatus -> Text
-showPoolStatus RetiringPool = "retiring"
-showPoolStatus RegisteredPool = "registered"
-showPoolStatus RetiredPool = "retired"
+parsePoolStatus :: Text -> Maybe PoolStatus
+parsePoolStatus "retiring" = Just RetiringPool
+parsePoolStatus "registered" = Just RegisteredPool
+parsePoolStatus "retired" = Just RetiredPool
+parsePoolStatus _ = Nothing
 
+-------------------------------------------------
+-- Pool Info
+-------------------------------------------------
 -- | The information about the pool.
 data PoolInfo = PoolInfo
   { name :: Text
@@ -79,6 +82,9 @@ instance Default PoolInfo where
     , description = "none"
     }
 
+-------------------------------------------------
+-- Pool
+-------------------------------------------------
 -- | The stats for a specific pool.
 data Pool = Pool
   { poolId :: PoolID
