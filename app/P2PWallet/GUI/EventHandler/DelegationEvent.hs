@@ -10,6 +10,7 @@ import P2PWallet.Actions.Database
 import P2PWallet.Actions.LookupPools
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.TxBody
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
 
@@ -223,3 +224,70 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           model & #waitingStatus % #syncingPools .~ False
                 & #delegationModel % #registeredPools .~ resp
       ]
+
+  -----------------------------------------------
+  -- Add User Certificate to Builder
+  -----------------------------------------------
+  AddSelectedUserCertificate (mNameAndTicker,certificateAction) ->
+    let StakeWallet{alias,stakeAddress,stakeKeyPath} = delegationModel ^. #selectedWallet 
+        userCertificate = UserCertificate
+          { stakeAddress = stakeAddress
+          , stakeKeyPath = stakeKeyPath
+          , certificateAction = certificateAction
+          , walletAlias = alias
+          , poolName = mNameAndTicker
+          }
+    in case processNewUserCertificate userCertificate txBuilderModel of
+        Left err -> [ Task $ return $ Alert err ]
+        Right newTxModel ->
+          [ Model $ model & #txBuilderModel .~ newTxModel
+          , Task $ return $ Alert "Successfully added to builder!"
+          ]
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | Validate the new user certificate and add it to the builder. Balance the transaction after.
+processNewUserCertificate :: UserCertificate -> TxBuilderModel -> Either Text TxBuilderModel
+processNewUserCertificate u@UserCertificate{..} model@TxBuilderModel{userCertificates} = do
+    -- Make sure this is not a duplicate registration.
+    when (certificateAction == Registration) $
+      flip when (Left "This stake address is already being registered.") $
+        flip any userCertificates $ \(_,userCert) -> and
+          [ isJust (userCert ^? #certificateAction % _Registration)
+          , userCert ^. #stakeAddress == stakeAddress
+          ]
+      
+    -- Make sure this is not a duplicate deregistration.
+    when (certificateAction == Deregistration) $
+      flip when (Left "This stake address is already being deregistered.") $
+        flip any userCertificates $ \(_,userCert) -> and
+          [ isJust (userCert ^? #certificateAction % _Deregistration)
+          , userCert ^. #stakeAddress == stakeAddress
+          ]
+
+    return $ balanceTx $ 
+      model 
+        -- Add the new certificate to the list, sort the list so that stake address actions are
+        -- grouped together, and then immediately re-index the list.
+        & #userCertificates .~ reIndex (sortOn snd $ (0,u) : filteredCertificates)
+  where
+    -- Previous delegation certificates for this stake address must be replaced by the new one.
+    -- If a deregistration cert was entered first, it should be overridden by a delegation cert,
+    -- and vice versa.
+    filteredCertificates :: [(Int,UserCertificate)]
+    filteredCertificates = case certificateAction of
+      Registration -> 
+        -- Don't filter the certificates. Duplicate registrations would have been caught already.
+        userCertificates
+      Deregistration -> flip filter userCertificates $ \(_,userCert) -> 
+        -- All previous certificates for this stake address should be overridden.
+        userCert ^. #stakeAddress /= stakeAddress
+      Delegation _ -> flip filter userCertificates $ \(_,userCert) -> 
+        -- All previous deregistration certificates and delegation certificates for this stake 
+        -- address should be overridden.
+        not $ and
+          [ userCert ^. #stakeAddress == stakeAddress
+          , isJust (userCert ^? #certificateAction % _Delegation) ||
+              isJust (userCert ^? #certificateAction % _Deregistration)
+          ]

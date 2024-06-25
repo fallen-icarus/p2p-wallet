@@ -33,7 +33,11 @@ data UserOutput = UserOutput
 makeFieldLabelsNoPrefix ''UserOutput
 
 instance AddToTxBody UserOutput where
-  addToTxBody txBody UserOutput{..} = txBody & #outputs %~ (<> replicate count newOutput)
+  addToTxBody txBody UserOutput{..} = 
+      txBody 
+        -- Add one instance of the output per count and preserve ordering of the
+        -- output list.
+        & #outputs %~ (<> replicate count newOutput)
     where 
       newOutput :: TxBodyOutput
       newOutput = TxBodyOutput

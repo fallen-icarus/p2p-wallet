@@ -33,7 +33,10 @@ instance Default ChangeOutput where
     }
 
 instance AddToTxBody ChangeOutput where
-  addToTxBody txBody ChangeOutput{..} = txBody & #outputs %~ flip snoc newOutput
+  addToTxBody txBody ChangeOutput{..} = 
+      txBody 
+        -- Add the output while preserving ordering.
+        & #outputs %~ flip snoc newOutput
     where 
       newOutput :: TxBodyOutput
       newOutput = TxBodyOutput

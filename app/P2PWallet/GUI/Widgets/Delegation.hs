@@ -10,6 +10,7 @@ import Data.Text qualified as Text
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.StakeReward
+import P2PWallet.Data.Core.TxBody
 import P2PWallet.Data.Core.Wallets.StakeWallet
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.GUI.Colors
@@ -141,7 +142,7 @@ mainWidget AppModel{..} =
               vscroll_ [scrollOverlay, wheelRate 50, barWidth 3, thumbWidth 3] $ 
                 vstack_ [childSpacing_ 1] $ 
                   for linkedAddresses $ \addr ->
-                    centerWidgetH $ copyableLabelSelf 12 lightGray (fitAddress $ toText addr)
+                    centerWidgetH $ copyableLabelSelfWith 12 lightGray fitAddress (toText addr)
                       `styleBasic` [textCenter,radius 20, padding 5, bgColor customGray4]
           ] `styleBasic` [radius 15, bgColor customGray2, padding 10]
       ] `styleBasic` [padding 10]
@@ -251,27 +252,28 @@ withdrawButton registrationStatus = do
 
 registrationButton :: RegistrationStatus -> AppNode
 registrationButton registrationStatus = do
-  let (tip,icon)
-        | registrationStatus == NotRegistered = ("Register",registerIcon)
-        | otherwise = ("Deregister",deregisterIcon)
-  tooltip_ tip [tooltipDelay 0] $ box_ [onClick AppInit] $ 
-    label icon
-      `styleBasic`
-        [ textSize 10
-        , textFont "Remix"
-        , bgColor customGray2
-        , padding 2
-        , textMiddle
-        , radius 10
-        , if registrationStatus == NotRegistered then 
-            textColor customBlue 
-          else 
-            textColor customRed
-        ]
-      `styleHover`
-        [ bgColor customGray1 
-        , cursorIcon CursorHand
-        ]
+  let (tip,icon,newAction)
+        | registrationStatus == NotRegistered = ("Register",registerIcon,Registration)
+        | otherwise = ("Deregister",deregisterIcon,Deregistration)
+  tooltip_ tip [tooltipDelay 0] $ 
+    box_ [onClick $ DelegationEvent $ AddSelectedUserCertificate (Nothing,newAction)] $ 
+      label icon
+        `styleBasic`
+          [ textSize 10
+          , textFont "Remix"
+          , bgColor customGray2
+          , padding 2
+          , textMiddle
+          , radius 10
+          , if registrationStatus == NotRegistered then 
+              textColor customBlue 
+            else 
+              textColor customRed
+          ]
+        `styleHover`
+          [ bgColor customGray1 
+          , cursorIcon CursorHand
+          ]
 
 registrationStatusWidget :: RegistrationStatus -> AppNode
 registrationStatusWidget registrationStatus = do
@@ -440,7 +442,7 @@ poolInfoWidget Pool{..} = do
           , changeDelegationButton
           ]
       , spacer_ [width 5]
-      , copyableLabelSelf 9 lightGray $ fitPoolId $ display poolId
+      , copyableLabelSelfWith 9 lightGray fitPoolId $ display poolId
       , spacer_ [width 3]
       , copyableLabelSelf 9 lightGray homepage
       , spacer
@@ -591,6 +593,22 @@ subField caption helpMsg field =
 copyableLabelSelf :: Double -> Color -> Text -> WidgetNode s AppEvent
 copyableLabelSelf fontSize mainColor caption = 
   tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
+    `styleBasic`
+      [ padding 0
+      , textLeft
+      , textMiddle
+      , textSize fontSize
+      , border 0 transparent
+      , textColor mainColor
+      , bgColor transparent
+      ]
+    `styleHover` [textColor customBlue, cursorIcon CursorHand]
+
+-- | A label button that will copy itself but show a formatted version.
+copyableLabelSelfWith :: Double -> Color -> (Text -> Text) -> Text -> WidgetNode s AppEvent
+copyableLabelSelfWith fontSize mainColor modifier fullInfo = do
+  let formattedInfo = modifier fullInfo
+  tooltip_ "Copy" [tooltipDelay 0] $ button formattedInfo (CopyText fullInfo)
     `styleBasic`
       [ padding 0
       , textLeft

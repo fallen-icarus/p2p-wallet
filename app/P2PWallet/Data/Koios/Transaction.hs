@@ -14,10 +14,12 @@ which is why there is a dedicated `TransactionUTxO` type.
 module P2PWallet.Data.Koios.Transaction where
 
 import Data.Aeson
+import Data.Aeson.Types (Parser, parseMaybe)
 
 import P2PWallet.Prelude
 import P2PWallet.Data.Core.Internal.Assets
 import P2PWallet.Data.Core.Internal.Bech32Address
+import P2PWallet.Data.Core.Internal.PoolID
 import P2PWallet.Plutus
 
 -------------------------------------------------
@@ -57,6 +59,109 @@ instance FromJSON TransactionUTxO where
       concatRef hash idx = hash <> "#" <> show idx
 
 -------------------------------------------------
+-- TransactionCertificate
+-------------------------------------------------
+data CertificateType
+  = DelegationCertificate
+  | StakeRegistrationCertificate
+  | StakeDeregistrationCertificate
+  | PoolUpdateCertificate
+  | PoolRetireCertificate
+  | ParamProposalCertificate
+  | ReserveMirCertificate
+  | TreasuryMirCertificate
+  deriving (Show,Eq)
+
+instance Display CertificateType where
+  display DelegationCertificate = "Delegation"
+  display StakeRegistrationCertificate = "Stake Registration"
+  display StakeDeregistrationCertificate = "Stake Deregistration"
+  display PoolUpdateCertificate = "Pool Update"
+  display PoolRetireCertificate = "Pool Retirement"
+  display ParamProposalCertificate = "Parameter Proposal"
+  display ReserveMirCertificate = "Reserve MIR"
+  display TreasuryMirCertificate = "Treasury MIR"
+
+parseCertificateType :: Text -> Maybe CertificateType
+parseCertificateType "delegation" = Just DelegationCertificate
+parseCertificateType "stake_registration" = Just StakeRegistrationCertificate
+parseCertificateType "stake_deregistration" = Just StakeDeregistrationCertificate
+parseCertificateType "pool_update" = Just PoolUpdateCertificate
+parseCertificateType "pool_retire" = Just PoolRetireCertificate
+parseCertificateType "reserve_MIR" = Just ReserveMirCertificate
+parseCertificateType "treasury_MIR" = Just TreasuryMirCertificate
+parseCertificateType "param_proposal" = Just ParamProposalCertificate
+parseCertificateType _ = Nothing
+
+showCertificateType :: CertificateType -> Text
+showCertificateType DelegationCertificate = "delegation"
+showCertificateType StakeRegistrationCertificate = "stake_registration"
+showCertificateType StakeDeregistrationCertificate = "stake_deregistration"
+showCertificateType PoolUpdateCertificate = "pool_update"
+showCertificateType PoolRetireCertificate = "pool_retire"
+showCertificateType ParamProposalCertificate = "param_proposal"
+showCertificateType ReserveMirCertificate = "reserve_MIR"
+showCertificateType TreasuryMirCertificate = "treasury_MIR"
+
+data CertificateInfo
+  = DelegationInfo { poolId :: PoolID , stakeAddress :: StakeAddress }
+  -- Both Registration and Deregistration have the same info.
+  | StakeRegistrationInfo { stakeAddress :: StakeAddress }
+  | OtherInfo Value
+  deriving (Show,Eq)
+
+makePrisms ''CertificateInfo
+
+instance FromJSON CertificateInfo where
+  parseJSON value = 
+      pure $ fromMaybe (OtherInfo value) $ asum
+        [ parseMaybe delegationInfoParser value 
+        , parseMaybe stakeRegistrationInfoParser value
+        ]
+    where
+      delegationInfoParser :: Value -> Parser CertificateInfo
+      delegationInfoParser = withObject "DelegationInfo" $ \o ->
+        DelegationInfo
+          <$> o .: "pool_id_bech32"
+          <*> o .: "stake_address"
+
+      stakeRegistrationInfoParser :: Value -> Parser CertificateInfo
+      stakeRegistrationInfoParser = withObject "StakeRegistrationInfo" $ \o ->
+        StakeRegistrationInfo
+          <$> o .: "stake_address"
+
+instance ToJSON CertificateInfo where
+  toJSON DelegationInfo{..} =
+    object [ "pool_id_bech32" .= poolId
+           , "stake_address" .= stakeAddress
+           ]
+
+  toJSON StakeRegistrationInfo{..} =
+    object [ "stake_address" .= stakeAddress ]
+
+  toJSON (OtherInfo value) = value
+
+data TransactionCertificate = TransactionCertificate
+  { certificateType :: CertificateType
+  , info :: CertificateInfo
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TransactionCertificate
+
+instance FromJSON TransactionCertificate where
+  parseJSON =
+    withObject "TransactionCertificate" $ \o ->
+      TransactionCertificate
+        <$> (o .: "type" >>= maybe mzero return . parseCertificateType)
+        <*> o .: "info"
+
+instance ToJSON TransactionCertificate where
+  toJSON TransactionCertificate{..} =
+    object [ "type" .= showCertificateType certificateType
+           , "info" .= info
+           ]
+
+-------------------------------------------------
 -- Transaction
 -------------------------------------------------
 -- | The type respesenting the overall information returned with the tx_info query.
@@ -73,7 +178,7 @@ data Transaction = Transaction
   , referenceInputs :: [TransactionUTxO]
   , inputs :: [TransactionUTxO]
   , outputs :: [TransactionUTxO]
-  -- , certificates :: [TransactionCertificate]
+  , certificates :: [TransactionCertificate]
   -- , withdrawals :: [TransactionWithdrawal]
   -- , nativeAssetsMinted :: Value
   -- , nativeScripts :: Value
@@ -98,7 +203,7 @@ instance FromJSON Transaction where
         <*> o .: "reference_inputs"
         <*> o .: "inputs"
         <*> o .: "outputs"
-        -- <*> o .: "certificates"
+        <*> o .: "certificates"
         -- <*> o .: "withdrawals"
         -- <*> o .: "assets_minted"
         -- <*> o .: "native_scripts"

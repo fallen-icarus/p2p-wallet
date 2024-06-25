@@ -10,9 +10,11 @@ import Monomer hiding
   , popupAlignToOuterH
   )
 import Prettyprinter (pretty, align, vsep, tupled)
+import Data.Text qualified as Text
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.TxBody
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
@@ -78,7 +80,7 @@ txBuilderWidget model@AppModel{..} = do
       [ maybe False (("" /=) . view #paymentAddress) $ txBuilderModel ^. #changeOutput
       -- The transaction must be balanced.
       , txBuilderModel ^. #isBalanced
-      -- If it requires collateral, than a colalteral input must be set.
+      -- If it requires collateral, then a colalteral input must be set.
       , bool True (isJust $ txBuilderModel ^. #collateralInput) $ 
           txBuilderModel ^. #requiresCollateral
       ]
@@ -102,8 +104,11 @@ txBuilderWidget model@AppModel{..} = do
             , spacer_ [width 2]
             , statusBar model
             ]
-        , actionsList model
-        , widgetIf (txBuilderModel ^. #userInputs /= []) $ userInputsList model
+        , vscroll_ [wheelRate 50] $
+            vstack 
+              [ actionsList model
+              , widgetIf (txBuilderModel ^. #userInputs /= []) $ userInputsList model
+              ]
         ]
 
     addPopup :: AppNode
@@ -284,9 +289,8 @@ userInputsList AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerM
   vstack
     [ label ("Personal UTxOs " <> show (tupled [pretty $ length userInputs]))
         `styleBasic` [textSize 12]
-    , flip styleBasic [padding 5] $
-        vscroll_ [wheelRate 50] $ vstack_ [childSpacing] (map utxoRow userInputs)
-          `styleBasic` [padding 10]
+    , vstack_ [childSpacing] (map utxoRow userInputs)
+        `styleBasic` [padding 10]
     ] `styleBasic` [padding 5]
   where
     moreTip :: Bool -> Text
@@ -308,14 +312,14 @@ userInputsList AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerM
       vstack
         [ vstack
             [ hstack 
-                [ copyableLabelSelf (display utxoRef) white 12
+                [ copyableLabelSelf (display utxoRef) white 10
                 , filler
                 , label (display lovelace) 
-                    `styleBasic` [textSize 12, textColor white]
+                    `styleBasic` [textSize 10, textColor white]
                 ]
             , hstack
                 [ label ("From: " <> walletAlias)
-                    `styleBasic` [textSize 10, textColor lightGray]
+                    `styleBasic` [textSize 8, textColor lightGray]
                 , spacer_ [width 3]
                 , widgetIf (not $ null nativeAssets) $ 
                     tooltip_ "Native Assets" [tooltipDelay 0] $ label coinsIcon
@@ -370,14 +374,14 @@ userInputsList AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerM
       hstack
         [ filler
         , vstack
-            [ copyableLabelFor 10 "Payment Address:" (toText paymentAddress)
+            [ copyableLabelFor 8 "Payment Address:" (toText paymentAddress)
                 `styleBasic` [padding 2]
             , widgetIf (not $ null nativeAssets) $
                 vstack
-                  [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
+                  [ label "Native Assets:" `styleBasic` [textSize 8, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , flip styleBasic [textSize 10, textColor lightGray, maxWidth 300] $
+                      , flip styleBasic [textSize 8, textColor lightGray, maxWidth 300] $
                           copyableTextArea $ show $ align $ vsep $ 
                             map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
                       ]
@@ -392,17 +396,66 @@ userInputsList AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerM
 actionsList :: AppModel -> AppNode
 actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
   let numActions = length userOutputs
+                 + length userCertificates
   vstack
     [ label ("Actions " <> show (tupled [pretty numActions]))
         `styleBasic` [textSize 12]
-    , vscroll_ [wheelRate 50] $ userOutputsList reverseTickerMap userOutputs
+    , flip styleBasic [padding 10] $ vstack_ [childSpacing_ 5] $ mconcat
+        [ userOutputsList reverseTickerMap userOutputs
+        , userCertificatesList userCertificates
+        ]
     ] `styleBasic` [padding 5]
 
-userOutputsList :: ReverseTickerMap -> [(Int,UserOutput)] -> AppNode
-userOutputsList reverseTickerMap userOutputs = do
-    flip styleBasic [padding 5] $
-      vstack_ [childSpacing] (map utxoRow userOutputs)
-        `styleBasic` [padding 10]
+userCertificatesList :: [(Int,UserCertificate)] -> [AppNode]
+userCertificatesList userCertificates = map certificateRow userCertificates
+  where
+    certificateRow :: (Int,UserCertificate) -> AppNode
+    certificateRow (idx,UserCertificate{..}) = do
+      let mainLabelCaption = fromString $ case certificateAction of
+            Registration -> printf "Register %s" walletAlias
+            Deregistration -> printf "Deregister %s" walletAlias
+            Delegation _ -> printf "Delegate %s" walletAlias
+      hstack
+        [ vstack
+            [ hstack
+                [ label mainLabelCaption
+                    `styleBasic` [textSize 10, textColor white]
+                , filler
+                , widgetMaybe poolName $ \name ->
+                    label name
+                      `styleBasic` [textSize 10, textColor white]
+                ]
+            , spacer_ [width 2]
+            , hstack
+                [ copyableLabelSelf (toText stakeAddress) lightGray 8
+                , filler
+                , widgetMaybe (certificateAction ^? _Delegation) $ \poolId ->
+                    copyableLabelSelfWith 8 trimBech32 poolId lightGray
+                ]
+            ] `styleBasic` 
+                [ padding 10
+                , bgColor customGray2
+                , radius 5
+                , border 1 black
+                ]
+        , spacer_ [width 3]
+        , box_ [alignCenter,alignMiddle] $ tooltip_ "Remove Action" [tooltipDelay 0] $
+            button closeCircleIcon (TxBuilderEvent $ RemoveSelectedUserCertificate idx)
+              `styleBasic` 
+                [ textSize 10
+                , textColor customRed
+                , textFont "Remix"
+                , textMiddle
+                , padding 3
+                , radius 3
+                , bgColor transparent
+                , border 0 transparent
+                ]
+              `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+        ]
+
+userOutputsList :: ReverseTickerMap -> [(Int,UserOutput)] -> [AppNode]
+userOutputsList reverseTickerMap userOutputs = map utxoRow userOutputs
   where
     moreTip :: Bool -> Text
     moreTip detailsOpen
@@ -421,50 +474,11 @@ userOutputsList reverseTickerMap userOutputs = do
     utxoRow :: (Int,UserOutput) -> AppNode
     utxoRow o@(idx,u@UserOutput{..}) =
       hstack
-        [ hstack
-            [ vstack
-                [ spacer_ [width 15]
-                , box_ [alignCenter,alignTop] $ tooltip_ "Edit Output" [tooltipDelay 0] $
-                    button editIcon 
-                        (TxBuilderEvent $ EditSelectedUserOutput $ StartAdding $ Just o)
-                      `styleBasic` 
-                        [ textSize 10
-                        , textColor customBlue
-                        , textFont "Remix"
-                        , textMiddle
-                        , padding 3
-                        , radius 3
-                        , bgColor transparent
-                        , border 0 transparent
-                        ]
-                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-                ]
-            , spacer_ [width 2]
-            , countWidget idx count
-            , spacer_ [width 2]
-            , vstack
-                [ spacer_ [width 15]
-                , box_ [alignCenter,alignTop] $ tooltip_ "Remove Output" [tooltipDelay 0] $
-                    button closeCircleIcon (TxBuilderEvent $ RemoveSelectedUserOutput idx)
-                      `styleBasic` 
-                        [ textSize 10
-                        , textColor customRed
-                        , textFont "Remix"
-                        , textMiddle
-                        , padding 3
-                        , radius 3
-                        , bgColor transparent
-                        , border 0 transparent
-                        ]
-                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-                ]
-            ]
-        , spacer_ [width 3]
-        , vstack
+        [ vstack
             [ vstack
                 [ hstack 
                     [ label ("Pay " <> if alias == "" then "external address" else alias)
-                        `styleBasic` [textSize 12, textColor white]
+                        `styleBasic` [textSize 10, textColor white]
                     , spacer_ [width 5]
                     , widgetIf (not $ null nativeAssets) $ 
                         tooltip_ "Native Assets" [tooltipDelay 0] $ label coinsIcon
@@ -476,10 +490,11 @@ userOutputsList reverseTickerMap userOutputs = do
                             ]
                     , filler
                     , label (display lovelace) 
-                        `styleBasic` [textSize 12, textColor white]
+                        `styleBasic` [textSize 10, textColor white]
                     ]
+                , spacer_ [width 2]
                 , hstack
-                    [ copyableLabelSelf (toText paymentAddress) lightGray 10
+                    [ copyableLabelSelf (toText paymentAddress) lightGray 8
                     , filler
                     , widgetIf (nativeAssets /= []) $ hstack
                         [ spacer_ [width 5]
@@ -508,6 +523,45 @@ userOutputsList reverseTickerMap userOutputs = do
                     , border 1 black
                     ]
             , widgetIf showDetails $ utxoDetails u
+            ]
+        , spacer_ [width 3]
+        , hstack
+            [ vstack
+                [ spacer_ [width 15]
+                , box_ [alignCenter,alignTop] $ tooltip_ "Edit Action" [tooltipDelay 0] $
+                    button editIcon 
+                        (TxBuilderEvent $ EditSelectedUserOutput $ StartAdding $ Just o)
+                      `styleBasic` 
+                        [ textSize 10
+                        , textColor customBlue
+                        , textFont "Remix"
+                        , textMiddle
+                        , padding 3
+                        , radius 3
+                        , bgColor transparent
+                        , border 0 transparent
+                        ]
+                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                ]
+            , spacer_ [width 2]
+            , countWidget idx count
+            , spacer_ [width 2]
+            , vstack
+                [ spacer_ [width 15]
+                , box_ [alignCenter,alignTop] $ tooltip_ "Remove Action" [tooltipDelay 0] $
+                    button closeCircleIcon (TxBuilderEvent $ RemoveSelectedUserOutput idx)
+                      `styleBasic` 
+                        [ textSize 10
+                        , textColor customRed
+                        , textFont "Remix"
+                        , textMiddle
+                        , padding 3
+                        , radius 3
+                        , bgColor transparent
+                        , border 0 transparent
+                        ]
+                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                ]
             ]
         ]
 
@@ -554,10 +608,10 @@ userOutputsList reverseTickerMap userOutputs = do
         , vstack
             [ widgetIf (not $ null nativeAssets) $
                 vstack
-                  [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
+                  [ label "Native Assets:" `styleBasic` [textSize 8, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , flip styleBasic [textSize 10,textColor lightGray, maxWidth 300] $ 
+                      , flip styleBasic [textSize 8,textColor lightGray, maxWidth 300] $ 
                           copyableTextArea $ show $ align $ vsep $ 
                             map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
                       ]
@@ -646,6 +700,15 @@ importSignedTxWidget = do
     ] `styleBasic` [bgColor customGray3, padding 20]
 
 -------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | Trim the stake address or pool id so that they fit better on the same line.
+trimBech32 :: (ToText a) => a -> Text
+trimBech32 info = Text.take 25 text <> "..." <> Text.drop 35 text
+  where
+    text = toText info
+
+-------------------------------------------------
 -- Helper Widgets
 -------------------------------------------------
 -- | A label button that will copy itself.
@@ -679,9 +742,24 @@ copyableLabelFor fontSize caption info =
           ]
         `styleHover` [textColor lightGray, cursorIcon CursorHand]
     , spacer
-    , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize 10]
+    , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize fontSize]
     ]
 
+copyableLabelSelfWith :: (ToText a) => Double -> (a -> Text) -> a -> Color -> WidgetNode s AppEvent
+copyableLabelSelfWith fontSize modifier fullInfo color = do
+  let formattedInfo = modifier fullInfo
+  tooltip_ "Copy" [tooltipDelay 0] $ button formattedInfo (CopyText $ toText fullInfo)
+    `styleBasic`
+      [ padding 0
+      , radius 5
+      , textMiddle
+      , border 0 transparent
+      , textColor color
+      , bgColor transparent
+      , textSize fontSize
+      ]
+    `styleHover` [textColor customBlue, cursorIcon CursorHand]
+    
 -------------------------------------------------
 -- Helper Lens
 -------------------------------------------------

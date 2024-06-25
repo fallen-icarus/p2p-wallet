@@ -12,12 +12,14 @@ module P2PWallet.Data.AppModel.TxBuilderModel
   , convertToTxBody
 
   , module P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
+  , module P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserInput
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserOutput
   ) where
 
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
+import P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
 import P2PWallet.Data.AppModel.TxBuilderModel.UserInput
 import P2PWallet.Data.AppModel.TxBuilderModel.UserOutput
 import P2PWallet.Data.Core.Internal
@@ -55,6 +57,8 @@ data TxBuilderEvent
   | RemoveSelectedUserInput Int
   -- | Remove the selected user output from the tx builder.
   | RemoveSelectedUserOutput Int
+  -- | Remove the selected user certificate from the tx builder.
+  | RemoveSelectedUserCertificate Int
   -- | Change the desired number of user outputs with these conditions. The first int is the index
   -- into the outputs list and the second is the new count.
   | ChangeUserOutputCount Int Int
@@ -96,6 +100,9 @@ data TxBuilderModel = TxBuilderModel
   , newChangeOutput :: NewChangeOutput
   -- | Whether the add change output widget should be open.
   , addingChangeOutput :: Bool
+  -- | A list of certificate actions for the user's stake address. They are indexed to
+  -- make deleting easier.
+  , userCertificates :: [(Int,UserCertificate)]
   -- | The transaction fee for the built transaction.
   , fee :: Lovelace
   -- | A list of required witnesses. This is used to determine whether the transaction can be signed
@@ -137,6 +144,7 @@ instance Default TxBuilderModel where
     , changeOutput = Nothing
     , newChangeOutput = def
     , addingChangeOutput = False
+    , userCertificates = []
     , fee = 0
     , witnesses = []
     , allWitnessesKnown = True -- This is set to true so the default GUI button is to submit.
@@ -152,26 +160,30 @@ instance Default TxBuilderModel where
     }
 
 -- | Check whether the builder has anything yet. Not all fields correspond to the actual
--- transaction so this function only checks the related fields.
+-- transaction (some are for the GUI) so this function only checks the related fields.
 isEmptyBuilder :: TxBuilderModel -> Bool
 isEmptyBuilder TxBuilderModel{..} = and
   [ null userInputs
   , null userOutputs
+  , null userCertificates
   , isNothing targetUserOutput
   , isNothing changeOutput
   ]
 
 -- | Convert the `TxBuilderModel` to a `TxBody`.
 convertToTxBody :: TxBuilderModel -> TxBody
-convertToTxBody TxBuilderModel{..} = foldMap' id -- a strict fold that merges all pieces
-  -- Add the normal user inputs to the list of inputs.
-  [ foldMap' (addToTxBody mempty . snd) userInputs
-  -- Add the normal user outputs to the list of outputs.
-  , foldMap' (addToTxBody mempty . snd) userOutputs
-  -- Add the change output to the list of outputs.
-  , maybe mempty (addToTxBody mempty) changeOutput
-  -- Overide the fee with the fee in the builder model.
-  , mempty & #fee .~ fee
-  -- Get the spending witnesses. Duplicates will be removed with the final `foldMap' id`.
-  , mempty & #witnesses .~ mapMaybe (requiredWitness . snd) userInputs
-  ]
+convertToTxBody TxBuilderModel{..} = 
+  -- A strict fold that merges all pieces. The `Semigroup` instance can be found in 
+  -- `P2PWallet.Data.Core.TxBody`.
+  foldMap' id 
+    -- Add the normal user inputs to the list of inputs.
+    [ foldMap' (addToTxBody mempty . snd) userInputs
+    -- Add the normal user outputs to the list of outputs.
+    , foldMap' (addToTxBody mempty . snd) userOutputs
+    -- Add the change output to the list of outputs.
+    , maybe mempty (addToTxBody mempty) changeOutput
+    -- Add the certificates to the list of certificates.
+    , foldMap' (addToTxBody mempty . snd) userCertificates
+    -- Overide the fee with the fee in the builder model.
+    , mempty & #fee .~ fee
+    ]
