@@ -6,11 +6,12 @@ module P2PWallet.GUI.Widgets.Delegation.PoolPicker
 
 import Monomer hiding (icon)
 import Data.Text qualified as Text
-import Prettyprinter ((<+>), pretty)
+import Prettyprinter ((<+>), pretty, tupled)
 import Data.Ord qualified as Ord
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.TxBody
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
@@ -108,10 +109,14 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
                   displayName = if Text.length name <= 10 then name else Text.take 10 name <> "..."
                   nameAndTicker = show $ 
                     pretty ticker <+> "-" <+> pretty displayName
+                  fullNameAndTicker =
+                    show $ pretty name <+> tupled [pretty ticker]
                   (pledgeIcon,pledgeColor)
                     | pledge > livePledge = (closeCircleIcon, customRed)
                     | otherwise = (circleCheckboxFillIcon, customBlue)
                   actualPledge = display $ fromMaybe 0 livePledge
+                  newDelegationEvent = DelegationEvent $ 
+                    AddSelectedUserCertificate (Just fullNameAndTicker, Delegation poolId)
               hgrid_ [childSpacing]
                 [ vstack 
                     [ tooltip_ name [tooltipDelay 0] $ label nameAndTicker
@@ -142,7 +147,7 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
                 , box_ [alignMiddle] $ 
                     label (fromString $ printf "%D%%" $ (*100) $ fromMaybe 0 margin)
                       `styleBasic` [textMiddle, textSize 8]
-                , box_ [ignoreEmptyArea, alignMiddle, onClick AppInit] $
+                , box_ [ignoreEmptyArea, alignMiddle, onClick newDelegationEvent] $
                     label "Delegate" 
                       `styleBasic`
                         [ textSize 10
@@ -174,9 +179,6 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
           ]
   where
     PoolFilterModel{..} = poolFilterModel
-
-    -- sortMethod :: PoolSortMethod
-    -- sortMethod = poolFilterModel ^. #sortMethod
 
     previousPage :: Int
     previousPage = currentPage - 1

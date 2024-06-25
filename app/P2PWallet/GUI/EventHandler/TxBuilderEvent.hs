@@ -60,6 +60,15 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
     ]
 
   -----------------------------------------------
+  -- Remove User Certificate from Builder
+  -----------------------------------------------
+  RemoveSelectedUserCertificate idx ->
+    [ Model $ model & #txBuilderModel % #userCertificates %~ removeAction idx
+                    & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
   -- Increment the number of copies of that User Output
   -----------------------------------------------
   ChangeUserOutputCount idx newCount ->

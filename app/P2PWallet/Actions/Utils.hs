@@ -6,6 +6,7 @@ import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.TxBody
 -- import P2PWallet.Plutus
 import P2PWallet.Prelude
 
@@ -76,16 +77,20 @@ toNetworkFlag Testnet = "--testnet-magic 1"
 -- fee.
 balanceTx :: TxBuilderModel -> TxBuilderModel
 balanceTx tx@TxBuilderModel{..} =
-    tx & #changeOutput .~ (if newChange == def then Nothing else Just newChange)
+    tx & #changeOutput .~ 
+          -- Deleting elements can result in `newChange` being `def` which should signal an empty
+          -- builder.
+          (if newChange == def then Nothing else Just newChange)
        & #isBalanced .~ balanced
        & #isBuilt .~ False
   where
-    newChange :: ChangeOutput
-    newChange = ChangeOutput
-      { paymentAddress = fromMaybe "" $ changeOutput ^? _Just % #paymentAddress
-      , lovelace = loves - fee
-      , nativeAssets = assets
-      }
+    -- The total deposit required from certificates.
+    requiredDeposits :: Lovelace
+    requiredDeposits = (flip . flip foldl') 0 userCertificates $ \acc (_,cert) ->
+      case cert ^. #certificateAction of
+        Registration -> acc + 2_000_000 -- 2 ADA must be paid.
+        Deregistration -> acc - 2_000_000 -- 2 ADA must be returned.
+        Delegation _ -> acc
 
     -- The amount of ADA and native assets available as change.
     (loves :: Lovelace, assets :: [NativeAsset]) =
@@ -108,5 +113,16 @@ balanceTx tx@TxBuilderModel{..} =
               $ Map.unionWith (+) inMap outMap
       in (inLoves - outLoves,bal)
 
+    lovelaceChange :: Lovelace
+    lovelaceChange = loves - fee - requiredDeposits
+
+    newChange :: ChangeOutput
+    newChange = ChangeOutput
+      { paymentAddress = fromMaybe "" $ changeOutput ^? _Just % #paymentAddress
+      , lovelace = lovelaceChange
+      , nativeAssets = assets
+      }
+
     -- Whether all assets are balanced.
-    balanced = all ((>= 0) . view #quantity) assets && loves - fee >= 0
+    balanced :: Bool
+    balanced = all ((>= 0) . view #quantity) assets && lovelaceChange >= 0

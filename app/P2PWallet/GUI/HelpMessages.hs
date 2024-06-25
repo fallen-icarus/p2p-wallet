@@ -191,7 +191,7 @@ utxoSortMsg = unlines
 depositSignMsg :: Text
 depositSignMsg = unlines
   [ mconcat $ intersperse " "
-      [ "Negative means the deposit was paid. Positive means the deposit was reclaimed."
+      [ "Positive means the deposit was paid. Negative means the deposit was reclaimed."
       , "When stake registration deposits are paid/reclaimed, they will appear here."
       ]
   ]

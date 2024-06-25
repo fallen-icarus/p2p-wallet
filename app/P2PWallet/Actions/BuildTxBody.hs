@@ -12,7 +12,7 @@ import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
 import P2PWallet.Prelude
 
--- Since `cardano-cli transaction build-raw` can throw confusing error messages if certain pieces
+-- | Since `cardano-cli transaction build-raw` can throw confusing error messages if certain pieces
 -- are missing from the transaction, this check validates those cases will not occur. It will throw
 -- an `AppError` with a more user friendly error message if cardano-cli is likely to throw an error.
 -- The UI should catch these errors sooner but the redundant checks can't hurt and enable building
@@ -51,32 +51,91 @@ buildTxBody network tx = do
 
   -- Convert the model to `TxBody` and extract out the required witnesses for returning
   -- with the finalized `TxBuilderModel`.
-  let initialTxBody@TxBody{witnesses} = convertToTxBody tx
+  let initialTxBody@TxBody{witnesses,certificates} = convertToTxBody $ 
+        -- Initialize the fee to zero so previous builds don't influence this interation's fee
+        -- calculation.
+        tx & #fee .~ 0
 
-  -- Calculate the fee. This calculation is done twice to account for adding the fee the second
-  -- time.
+  -- Build the certificate files so they are available in the tmp directory. Registrations must
+  -- appear first in the transaction.
+  certificateFiles <- mapM (buildCertificate tmpDir) certificates
+
+  -- Calculate the fee. This calculation is done twice to account for adding the fee after the
+  -- first calculation.
   fee <- do
-    feeCalc1 <- estimateTxFee network paramsFile txBodyFile initialTxBody
-    estimateTxFee network paramsFile txBodyFile $
+    feeCalc1 <- estimateTxFee network paramsFile txBodyFile certificateFiles initialTxBody
+    estimateTxFee network paramsFile txBodyFile certificateFiles $
       -- Add the fee to the transaction, rebalance, and calculate again.
       convertToTxBody $ balanceTx $ tx & #fee .~ feeCalc1
 
   -- Build the transaction one more time so that the tx.body file has the finalized transaction.
   -- Also set the witnesses since the GUI will need them to determine what actions can be taken
   -- on the tx.body file.
-  let finalizedTx = balanceTx $ tx & #fee .~ fee
-                                   & #witnesses .~ witnesses
-                                   & #allWitnessesKnown .~ all (isJust . snd . unWitness) witnesses
-  runCmd_ $ buildRawCmd paramsFile txBodyFile $ convertToTxBody finalizedTx
+  let finalizedTx = 
+        balanceTx $ 
+          tx & #fee .~ fee
+             & #witnesses .~ witnesses
+             & #allWitnessesKnown .~ all (isJust . snd . unWitness) witnesses
+  runCmd_ $ buildRawCmd paramsFile txBodyFile certificateFiles $ convertToTxBody finalizedTx
 
   -- Return the updated `TxBuilderModel`. Mark the model as built.
   return $ finalizedTx & #isBuilt .~ True
 
+-- | Build all required certificates and return the filepaths used. Since the transaction
+-- can contain multiple certificates for a given stake address, the file name is suffixed with
+-- the action to keep the certificate files distinct. Later certificate actions override previous
+-- actions!
+buildCertificate :: FilePath -> TxBodyCertificate -> IO CertificateFile
+buildCertificate tmpDir TxBodyCertificate{stakeAddress,certificateAction} = do
+  let certFile suffix = tmpDir </> (toString stakeAddress <> "_" <> suffix) <.> "cert"
+  case certificateAction of
+    Registration -> do
+      -- Suffix the file name with the action.
+      let fullFileName = certFile "registration"
+
+      -- Create the certificate file.
+      runCmd_ $ toString $ unwords
+        [ "cardano-cli stake-address registration-certificate"
+        , "--stake-address " <> toText stakeAddress
+        , "--out-file " <> toText fullFileName
+        ]
+
+      -- Return the suffixed file name.
+      return $ CertificateFile fullFileName
+    Deregistration -> do
+      -- Suffix the file name with the action.
+      let fullFileName = certFile "deregistration"
+
+      -- Create the certificate file.
+      runCmd_ $ toString $ unwords
+        [ "cardano-cli stake-address deregistration-certificate"
+        , "--stake-address " <> toText stakeAddress
+        , "--out-file " <> toText fullFileName
+        ]
+
+      -- Return the suffixed file name.
+      return $ CertificateFile fullFileName
+
+    Delegation (PoolID poolID) -> do
+      -- Suffix the file name with the action.
+      let fullFileName = certFile "delegation"
+
+      -- Create the certificate file.
+      runCmd_ $ toString $ unwords
+        [ "cardano-cli stake-address delegation-certificate"
+        , "--stake-address " <> toText stakeAddress
+        , "--stake-pool-id " <> poolID
+        , "--out-file " <> toText (certFile "delegation")
+        ]
+
+      -- Return the suffixed file name.
+      return $ CertificateFile fullFileName
+
 -- | Calculate the fee.
-estimateTxFee :: Network -> ParamsFile -> TxBodyFile -> TxBody -> IO Lovelace
-estimateTxFee network paramsFile txBodyFile tx@TxBody{inputs,outputs,witnesses} = do
+estimateTxFee :: Network -> ParamsFile -> TxBodyFile -> [CertificateFile] -> TxBody -> IO Lovelace
+estimateTxFee network paramsFile txBodyFile certificateFiles tx@TxBody{inputs,outputs,witnesses} = do
     -- This builds the tx.body file and stores it in the tmp directory. 
-    runCmd_ $ buildRawCmd paramsFile txBodyFile tx
+    runCmd_ $ buildRawCmd paramsFile txBodyFile certificateFiles tx
 
     -- This uses the tx.body file to estimate the transaction fee. 
     fromJustOrAppError "Could not parse min fee." . fmap Lovelace . readMaybe =<<
@@ -95,11 +154,12 @@ estimateTxFee network paramsFile txBodyFile tx@TxBody{inputs,outputs,witnesses} 
         ]
 
 -- | Create the actual `cardano-cli transaction build-raw` command.
-buildRawCmd :: ParamsFile -> TxBodyFile -> TxBody -> String
-buildRawCmd paramsFile outFile tx = toString $ unwords
+buildRawCmd :: ParamsFile -> TxBodyFile -> [CertificateFile] -> TxBody -> String
+buildRawCmd paramsFile outFile certificateFiles tx = toString $ unwords
     [ "cardano-cli transaction build-raw"
     , unwords $ map inputField $ tx ^. #inputs
     , unwords $ map outputField $ tx ^. #outputs
+    , unwords $ for certificateFiles $ \certFile -> "--certificate-file " <> toText certFile
     , "--protocol-params-file " <> toText paramsFile
     , "--fee " <> show (unLovelace $ tx ^. #fee)
     , "--out-file " <> toText outFile

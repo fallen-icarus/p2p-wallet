@@ -240,6 +240,7 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverse
                   maybe "none" (fromString . printf "slot %s") invalidBefore
               , copyableLabelFor 10 "Invalid After:" $ 
                   maybe "none" (fromString . printf "slot %s") invalidAfter
+              , certificateField certificates
               , utxoField "Reference Inputs:" 
                   Nothing
                   #showReferenceInputs 
@@ -374,9 +375,8 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverse
                   `styleHover` [bgColor customGray1, cursorIcon CursorHand]
               ]
           , widgetIf (inspectedTransaction ^. toggleShow finalLens) $
-              flip styleBasic [padding 5] $
-                vstack_ [childSpacing] (map (utxoRow userSymbol utxoLens) utxos)
-                  `styleBasic` [padding 10]
+              vstack_ [childSpacing] (map (utxoRow userSymbol utxoLens) utxos)
+                `styleBasic` [padding 10]
           ]
 
     utxoRow :: Maybe AppNode -> Lens' Transaction [TransactionUTxO] -> TransactionUTxO -> AppNode
@@ -474,6 +474,85 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverse
                 ]
         , widgetIf showDetails $ utxoDetails reverseTickerMap u
         ]
+
+    certificateField :: [TransactionCertificate] -> AppNode
+    certificateField certs =
+      if null certs then
+        hstack
+          [ label "Certificates:"
+              `styleBasic`
+                [ padding 0
+                , radius 5
+                , textMiddle
+                , textSize 10
+                , border 0 transparent
+                , textColor customBlue
+                , bgColor transparent
+                ]
+          , spacer
+          , label "none" `styleBasic` [textColor lightGray, textSize 10]
+          ]
+      else
+        vstack
+          [ hstack
+              [ label "Certificates:"
+                  `styleBasic`
+                    [ padding 0
+                    , radius 5
+                    , textMiddle
+                    , textSize 10
+                    , border 0 transparent
+                    , textColor customBlue
+                    , bgColor transparent
+                    ]
+              , spacer
+              , toggleButton_ horizontalMoreIcon 
+                  (toLensVL $ #homeModel % #inspectedTransaction % toggleShow #showCertificates)
+                  [toggleButtonOffStyle txMoreOffStyle]
+                  `styleBasic` 
+                    [ textSize 10
+                    , textColor customRed
+                    , textFont "Remix"
+                    , textMiddle
+                    , radius 20
+                    , paddingT 2
+                    , paddingB 2
+                    , paddingR 5
+                    , paddingL 5
+                    , bgColor black
+                    , border 0 transparent
+                    ]
+                  `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+              ]
+          , widgetIf (inspectedTransaction ^. toggleShow #showCertificates) $
+              vstack_ [childSpacing] (map certificateRow certs)
+                `styleBasic` [padding 10]
+          ]
+
+    certificateRow :: TransactionCertificate -> AppNode
+    certificateRow TransactionCertificate{..} =
+      vstack
+        [ hstack
+            [ label (display certificateType)
+                `styleBasic` [textSize 10, textColor white]
+            ]
+        , spacer_ [width 2]
+        , widgetMaybe (info ^? _DelegationInfo) $ \(poolId,stakeAddress) ->
+            vstack
+              [ copyableLabelFor 8 "Stake Address:" (display stakeAddress)
+              , spacer_ [width 2]
+              , copyableLabelFor 8 "Pool ID:" (display poolId)
+              ]
+        , widgetMaybe (info ^? _StakeRegistrationInfo) $ \stakeAddress ->
+            copyableLabelFor 8 "Stake Address:" (display stakeAddress)
+        , widgetMaybe (info ^? _OtherInfo) $ \value ->
+            copyableLabelFor 8 "JSON:" (showValue value)
+        ] `styleBasic` 
+            [ padding 10
+            , bgColor customGray2
+            , radius 5
+            , border 1 black
+            ]
 
 utxoDetails :: ReverseTickerMap -> TransactionUTxO -> AppNode
 utxoDetails reverseTickerMap TransactionUTxO{..} = 
@@ -681,7 +760,7 @@ copyableLabelFor fontSize caption info =
           , textSize fontSize
           ]
         `styleHover` [textColor lightGray, cursorIcon CursorHand]
-    , spacer
+    , spacer_ [width 5]
     , label_ info [ellipsis,resizeFactor 2] `styleBasic` [padding 0, textColor lightGray, textSize fontSize]
     ]
 
@@ -792,6 +871,22 @@ matchesUTxO wallet reverseTickerMap searchTarget TransactionUTxO{..} = or
       , Just searchTarget == fmap (display . fst) (Map.lookup (policyId,tokenName) reverseTickerMap)
       ]
 
+matchesCertificate :: Text -> TransactionCertificate -> Bool
+matchesCertificate searchTarget TransactionCertificate{info} = or
+    [ matchesDelegation
+    , matchesRegistration
+    ]
+  where
+    matchesDelegation :: Bool
+    matchesDelegation = flip (maybe False) (info ^? _DelegationInfo) $ \(poolId,stakeAddress) -> or
+      [ searchTarget `Text.isPrefixOf` (display poolId)
+      , searchTarget `Text.isPrefixOf` (display stakeAddress)
+      ]
+
+    matchesRegistration :: Bool
+    matchesRegistration = flip (maybe False) (info ^? _StakeRegistrationInfo) $ \(stakeAddress) -> 
+      searchTarget `Text.isPrefixOf` (display stakeAddress)
+
 searchFilter :: PaymentWallet -> ReverseTickerMap -> Text -> [Transaction] -> [Transaction]
 searchFilter selectedWallet reverseTickerMap searchTarget xs
   | searchTarget == "" = xs
@@ -799,4 +894,5 @@ searchFilter selectedWallet reverseTickerMap searchTarget xs
       [ any (matchesUTxO selectedWallet reverseTickerMap searchTarget) inputs
       , any (matchesUTxO selectedWallet reverseTickerMap searchTarget) outputs
       , any (matchesUTxO selectedWallet reverseTickerMap searchTarget) referenceInputs
+      , any (matchesCertificate searchTarget) certificates
       ]

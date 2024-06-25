@@ -11,7 +11,23 @@ a new form. Technically, newtype wrappers could work, but I would rather only do
 once. Wrappers would required "unwrapping" with every use.
 
 -}
-module P2PWallet.Data.Core.Transaction where
+module P2PWallet.Data.Core.Transaction 
+  ( -- * UTxOs
+    TransactionUTxO(..)
+  , toTransactionUTxO
+
+    -- * Certificates
+  , Koios.TransactionCertificate(..)
+  , Koios.CertificateType(..)
+  , Koios.CertificateInfo(..)
+  , Koios._DelegationInfo
+  , Koios._StakeRegistrationInfo
+  , Koios._OtherInfo
+
+   -- * Transactions
+  , Transaction(..)
+  , toTransaction
+  ) where
 
 import Data.Aeson
 
@@ -101,7 +117,8 @@ data Transaction = Transaction
   , showInputs :: Bool
   , outputs :: [TransactionUTxO]
   , showOutputs :: Bool
-  -- , certificates :: [TransactionCertificate]
+  , certificates :: [Koios.TransactionCertificate]
+  , showCertificates :: Bool
   -- , withdrawals :: [TransactionWithdrawal]
   -- , nativeAssetsMinted :: Value
   -- , nativeScripts :: Value
@@ -126,6 +143,7 @@ instance FromRow Transaction where
     referenceInputs <- fromMaybe mzero . decode <$> field
     inputs <- fromMaybe mzero . decode <$> field
     outputs <- fromMaybe mzero . decode <$> field
+    certificates <- fromMaybe mzero . decode <$> field
     return $ Transaction
       { txHash = txHash
       , profileId = profileId
@@ -141,10 +159,12 @@ instance FromRow Transaction where
       , referenceInputs = referenceInputs
       , inputs = inputs
       , outputs = outputs
+      , certificates = certificates
       , showCollateralInputs = False
       , showReferenceInputs = False
       , showInputs = False
       , showOutputs = False
+      , showCertificates = False
       }
 
 instance ToRow Transaction where
@@ -163,6 +183,7 @@ instance ToRow Transaction where
     , toField $ encode referenceInputs
     , toField $ encode inputs
     , toField $ encode outputs
+    , toField $ encode certificates
     ]
 
 instance TableName Transaction where
@@ -187,6 +208,7 @@ instance Creatable Transaction where
         , "reference_inputs BLOB"
         , "inputs BLOB"
         , "outputs BLOB"
+        , "certificates BLOB"
         , "PRIMARY KEY (tx_hash,payment_id)"
         ]
     , ");"
@@ -211,9 +233,10 @@ instance Insertable Transaction where
         , "reference_inputs"
         , "inputs"
         , "outputs"
+        , "certificates"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 -- | Convert a Koios Transaction to a P2PWallet Transaction.
@@ -233,8 +256,10 @@ toTransaction profileId paymentId Koios.Transaction{..} = Transaction
   , referenceInputs = map toTransactionUTxO referenceInputs
   , inputs = map toTransactionUTxO inputs
   , outputs = map toTransactionUTxO outputs
+  , certificates = certificates
   , showCollateralInputs = False
   , showReferenceInputs = False
   , showInputs = False
   , showOutputs = False
+  , showCertificates = False
   }

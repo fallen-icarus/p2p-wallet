@@ -216,3 +216,4 @@ instance ToField Time.POSIXTime where
 instance Default.Default Time.Day where
   -- The default is the beginning of utc time.
   def = Time.localDay $ Time.utcToLocalTime Time.utc $ Time.posixSecondsToUTCTime 0
+

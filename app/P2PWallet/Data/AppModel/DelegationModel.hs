@@ -12,6 +12,7 @@ The Delegation scene is dedicated to `StakeWallet`s.
 module P2PWallet.Data.AppModel.DelegationModel where
 
 import P2PWallet.Data.AppModel.Common
+import P2PWallet.Data.Core.TxBody
 import P2PWallet.Data.Core.Wallets.StakeWallet
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Prelude
@@ -39,6 +40,9 @@ data DelegationEvent
   | ResetPoolFilters
   -- | Sync all registered pools.
   | SyncRegisteredPools (ProcessEvent [Pool])
+  -- | Add the selected user certificate to the tx builder. The `Text` is the target
+  -- pool name so that the GUI can show it on the Builder scene.
+  | AddSelectedUserCertificate (Maybe Text,CertificateAction)
 
 -------------------------------------------------
 -- Pool Filter Model

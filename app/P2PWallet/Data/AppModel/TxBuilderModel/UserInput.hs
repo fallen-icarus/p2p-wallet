@@ -35,22 +35,28 @@ data UserInput = UserInput
 makeFieldLabelsNoPrefix ''UserInput
 
 instance AddToTxBody UserInput where
-  addToTxBody txBody UserInput{utxoRef} = txBody & #inputs %~ flip snoc newInput
+  addToTxBody txBody UserInput{utxoRef,paymentAddress,paymentKeyPath} = 
+      txBody 
+        -- Add the input while preserving ordering.
+        & #inputs %~ flip snoc newInput
+        -- Add the witness if required. Duplicate witnesses are removed by the `Semigroup` 
+        -- instance of `TxBody`. They will also be sorted.
+        & #witnesses %~ maybe id (:) requiredWitness
     where 
       newInput :: TxBodyInput
       newInput = TxBodyInput
         { utxoRef = utxoRef
         }
 
-instance RequiredWitness UserInput where
-  requiredWitness UserInput{paymentAddress,paymentKeyPath} = case toPubKeyHash plutusAddress of
-      Nothing -> Nothing
-      Just pkHash -> Just $ Witness (pkHash, paymentKeyPath)
-    where
       plutusAddress :: PlutusAddress
       plutusAddress =
         -- This should have been verified at an earlier step.
         fromRight (Address (PubKeyCredential "") Nothing) $ paymentAddressToPlutusAddress paymentAddress
+
+      requiredWitness :: Maybe Witness
+      requiredWitness = case toPubKeyHash plutusAddress of
+          Nothing -> Nothing
+          Just pkHash -> Just $ Witness (pkHash, paymentKeyPath)
 
 fromPersonalUTxO :: Text -> PaymentAddress -> Maybe DerivationPath -> PersonalUTxO -> UserInput
 fromPersonalUTxO alias paymentAddress mKeyPath PersonalUTxO{utxoRef,lovelace,nativeAssets} = UserInput
@@ -62,4 +68,3 @@ fromPersonalUTxO alias paymentAddress mKeyPath PersonalUTxO{utxoRef,lovelace,nat
   , showDetails = False
   , walletAlias = alias
   }
-
