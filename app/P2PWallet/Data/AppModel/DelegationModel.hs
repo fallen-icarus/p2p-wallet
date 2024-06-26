@@ -43,6 +43,8 @@ data DelegationEvent
   -- | Add the selected user certificate to the tx builder. The `Text` is the target
   -- pool name so that the GUI can show it on the Builder scene.
   | AddSelectedUserCertificate (Maybe Text,CertificateAction)
+  -- | Add the selected user withdrawal to the tx builder. 
+  | AddSelectedUserWithdrawal StakeWallet
 
 -------------------------------------------------
 -- Pool Filter Model

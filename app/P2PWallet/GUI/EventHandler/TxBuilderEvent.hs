@@ -69,6 +69,15 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
     ]
 
   -----------------------------------------------
+  -- Remove User Withdrawal from Builder
+  -----------------------------------------------
+  RemoveSelectedUserWithdrawal idx ->
+    [ Model $ model & #txBuilderModel % #userWithdrawals %~ removeAction idx
+                    & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
   -- Increment the number of copies of that User Output
   -----------------------------------------------
   ChangeUserOutputCount idx newCount ->
@@ -93,10 +102,10 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
             processNewUserOutput (config ^. #network) tickerMap fingerprintMap newOutput
       ]
     AddResult newInfo@(idx,_) ->
-      [ Model $
-          model & #txBuilderModel % #userOutputs % ix idx .~ newInfo
-                & #txBuilderModel % #targetUserOutput .~ Nothing
-                & #txBuilderModel %~ balanceTx
+      [ Model $ model 
+          & #txBuilderModel % #userOutputs % ix idx .~ newInfo
+          & #txBuilderModel % #targetUserOutput .~ Nothing
+          & #txBuilderModel %~ balanceTx
       ]
 
   -----------------------------------------------

@@ -73,6 +73,7 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
       P2PWallet.Data.AppModel.TxBuilderModel.UserInput
       P2PWallet.Data.AppModel.TxBuilderModel.UserOutput
+      P2PWallet.Data.AppModel.TxBuilderModel.UserWithdrawal
       P2PWallet.Data.Core.AddressBook
       P2PWallet.Data.Core.AssetMaps
       P2PWallet.Data.Core.Internal

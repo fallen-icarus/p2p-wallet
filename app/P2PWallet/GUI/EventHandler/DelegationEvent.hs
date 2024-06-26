@@ -244,6 +244,26 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           , Task $ return $ Alert "Successfully added to builder!"
           ]
 
+  -----------------------------------------------
+  -- Add User Withdrawal to Builder
+  -----------------------------------------------
+  AddSelectedUserWithdrawal StakeWallet{alias,stakeAddress,stakeKeyPath,availableRewards} ->
+    let userWithdrawal = UserWithdrawal
+          { stakeAddress = stakeAddress
+          , stakeKeyPath = stakeKeyPath
+          , lovelace = availableRewards
+          , walletAlias = alias
+          }
+        filteredWithdrawals = flip filter (txBuilderModel ^. #userWithdrawals) $ \(_,wtdr) ->
+            wtdr ^. #stakeAddress /= stakeAddress
+    in [ Model $ model 
+            & #txBuilderModel % #userWithdrawals .~ 
+                -- Add the new withdrawal, sort them by stake address, and immediately reindex.
+                reIndex (sortOn snd $ (0,userWithdrawal) : filteredWithdrawals)
+            & #txBuilderModel %~ balanceTx
+        , Task $ return $ Alert "Successfully added to builder!"
+        ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------

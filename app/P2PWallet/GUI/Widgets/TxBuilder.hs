@@ -83,6 +83,8 @@ txBuilderWidget model@AppModel{..} = do
       -- If it requires collateral, then a colalteral input must be set.
       , bool True (isJust $ txBuilderModel ^. #collateralInput) $ 
           txBuilderModel ^. #requiresCollateral
+      -- At least one input must be specified.
+      , txBuilderModel ^. #userInputs /= []
       ]
 
     isAddingChangeOutput :: Bool
@@ -397,12 +399,14 @@ actionsList :: AppModel -> AppNode
 actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
   let numActions = length userOutputs
                  + length userCertificates
+                 + length userWithdrawals
   vstack
     [ label ("Actions " <> show (tupled [pretty numActions]))
         `styleBasic` [textSize 12]
     , flip styleBasic [padding 10] $ vstack_ [childSpacing_ 5] $ mconcat
         [ userOutputsList reverseTickerMap userOutputs
         , userCertificatesList userCertificates
+        , userWithdrawalsList userWithdrawals
         ]
     ] `styleBasic` [padding 5]
 
@@ -441,6 +445,48 @@ userCertificatesList userCertificates = map certificateRow userCertificates
         , spacer_ [width 3]
         , box_ [alignCenter,alignMiddle] $ tooltip_ "Remove Action" [tooltipDelay 0] $
             button closeCircleIcon (TxBuilderEvent $ RemoveSelectedUserCertificate idx)
+              `styleBasic` 
+                [ textSize 10
+                , textColor customRed
+                , textFont "Remix"
+                , textMiddle
+                , padding 3
+                , radius 3
+                , bgColor transparent
+                , border 0 transparent
+                ]
+              `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+        ]
+
+userWithdrawalsList :: [(Int,UserWithdrawal)] -> [AppNode]
+userWithdrawalsList userWithdrawals = map withdrawalRow userWithdrawals
+  where
+    withdrawalRow :: (Int,UserWithdrawal) -> AppNode
+    withdrawalRow (idx,UserWithdrawal{..}) = do
+      let mainLabelCaption = fromString $
+            printf "Withdraw Rewards from %s" walletAlias
+      hstack
+        [ vstack
+            [ hstack
+                [ label mainLabelCaption
+                    `styleBasic` [textSize 10, textColor white]
+                , filler
+                , label (display lovelace)
+                    `styleBasic` [textSize 10, textColor white]
+                ]
+            , spacer_ [width 2]
+            , hstack
+                [ copyableLabelSelf (toText stakeAddress) lightGray 8
+                ]
+            ] `styleBasic` 
+                [ padding 10
+                , bgColor customGray2
+                , radius 5
+                , border 1 black
+                ]
+        , spacer_ [width 3]
+        , box_ [alignCenter,alignMiddle] $ tooltip_ "Remove Action" [tooltipDelay 0] $
+            button closeCircleIcon (TxBuilderEvent $ RemoveSelectedUserWithdrawal idx)
               `styleBasic` 
                 [ textSize 10
                 , textColor customRed

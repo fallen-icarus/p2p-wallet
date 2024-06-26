@@ -92,7 +92,7 @@ mainWidget AppModel{..} =
                   , spacer_ [width 5]
                   , totalDelegatedWidget totalDelegation
                   , spacer_ [width 5]
-                  , rewardsBalanceWidget registrationStatus availableRewards
+                  , rewardsBalanceWidget registrationStatus wallet
                   ]
               , spacer
               , widgetMaybe (wallet ^. #delegatedPool) poolInfoWidget
@@ -229,10 +229,14 @@ notDelegatedWidget registrationStatus = do
       , centerWidgetH $ mainButton "Delegate" $ DelegationEvent OpenPoolPicker
       ]
 
-withdrawButton :: RegistrationStatus -> AppNode
-withdrawButton registrationStatus = do
+withdrawButton :: StakeWallet -> RegistrationStatus -> AppNode
+withdrawButton stakeWallet registrationStatus = do
   let (tip,mainColor,highlightColor,event)
-        | registrationStatus == Registered = ("Withdraw",customBlue,customGray1,AppInit)
+        | registrationStatus == Registered = 
+            ( "Withdraw"
+            , customBlue
+            , customGray1
+            , DelegationEvent $ AddSelectedUserWithdrawal stakeWallet)
         | otherwise = ("Register to enable withdrawals",customRed,transparent,AppInit)
   tooltip_ tip [tooltipDelay 0] $ box_ [onClick event] $ 
     label withdrawRewardsIcon
@@ -323,8 +327,8 @@ totalDelegatedWidget totalDelegation = do
         , radius 8
         ]
 
-rewardsBalanceWidget :: RegistrationStatus -> Lovelace -> AppNode
-rewardsBalanceWidget registrationStatus availableRewards = do
+rewardsBalanceWidget :: RegistrationStatus -> StakeWallet -> AppNode
+rewardsBalanceWidget registrationStatus wallet@StakeWallet{availableRewards} = do
   vstack
     [ hstack
         [ label "Rewards Balance"
@@ -332,7 +336,7 @@ rewardsBalanceWidget registrationStatus availableRewards = do
               [ textSize 8
               , textColor lightGray
               ]
-        , withdrawButton registrationStatus
+        , withdrawButton wallet registrationStatus
         ]
     , spacer_ [width 3]
     , label (display availableRewards)

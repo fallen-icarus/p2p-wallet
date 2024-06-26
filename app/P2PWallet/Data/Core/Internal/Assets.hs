@@ -39,6 +39,9 @@ instance FromJSON Lovelace where
 instance ToJSON Lovelace where
   toJSON = toJSON . show @String . unLovelace
 
+instance ToText Lovelace where
+  toText = show . unLovelace
+
 -------------------------------------------------
 -- Ada
 -------------------------------------------------
@@ -55,18 +58,21 @@ instance Printf.PrintfArg Ada where
 instance Display Ada where
   display = fromString . printf "%D ADA"
 
--- | Read the amount of ada meant for a new UTxO. Zero is not a valid amount of ada since
--- all UTxOs must have at least some ada.
-parseAda :: Text -> Either Text Ada
-parseAda text = do
+-- | Read the amount of ada meant for a new UTxO. Zero is sometimes not a valid amount of ada since
+-- all UTxOs must have at least some ada, while stake withdrawals can have a zero amount.
+parseAda :: Bool -> Text -> Either Text Ada
+parseAda canBeZero text = do
   -- It must be a number.
   decimal <- maybeToRight "Not a valid ada quantity" $ readMaybe @Decimal $ toString text
 
   -- The number can have no more than 6 decimal places.
   when (decimalPlaces decimal > 6) $ Left "Ada only has up to 6 decimal places."
 
-  -- The number must be greater than 0. All UTxOs require ada.
-  when (decimal <= 0) $ Left "All UTxOs require at least some ada."
+  -- The number must not be negative.
+  when (decimal < 0) $ Left "Ada quantity cannot be negative."
+
+  -- The ada balance may not be zero.
+  when (not canBeZero && decimal == 0) $ Left "Ada quantity cannot be zero."
 
   return $ Ada decimal
 

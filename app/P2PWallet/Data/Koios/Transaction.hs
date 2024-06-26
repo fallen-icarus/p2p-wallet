@@ -162,6 +162,29 @@ instance ToJSON TransactionCertificate where
            ]
 
 -------------------------------------------------
+-- TransactionWithdrawal
+-------------------------------------------------
+-- | The type representing withdrawal information in a transaction.
+data TransactionWithdrawal = TransactionWithdrawal
+  { lovelace :: Lovelace
+  , stakeAddress :: StakeAddress
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TransactionWithdrawal
+
+instance FromJSON TransactionWithdrawal where
+  parseJSON = withObject "TransactionWithdrawal" $ \o ->
+    TransactionWithdrawal
+      <$> o .: "amount"
+      <*> o .: "stake_addr"
+
+instance ToJSON TransactionWithdrawal where
+  toJSON TransactionWithdrawal{..} =
+    object [ "amount" .= lovelace
+           , "stake_addr" .= stakeAddress
+           ]
+
+-------------------------------------------------
 -- Transaction
 -------------------------------------------------
 -- | The type respesenting the overall information returned with the tx_info query.
@@ -179,7 +202,7 @@ data Transaction = Transaction
   , inputs :: [TransactionUTxO]
   , outputs :: [TransactionUTxO]
   , certificates :: [TransactionCertificate]
-  -- , withdrawals :: [TransactionWithdrawal]
+  , withdrawals :: [TransactionWithdrawal]
   -- , nativeAssetsMinted :: Value
   -- , nativeScripts :: Value
   -- , plutusContracts :: Value
@@ -204,7 +227,7 @@ instance FromJSON Transaction where
         <*> o .: "inputs"
         <*> o .: "outputs"
         <*> o .: "certificates"
-        -- <*> o .: "withdrawals"
+        <*> o .: "withdrawals"
         -- <*> o .: "assets_minted"
         -- <*> o .: "native_scripts"
         -- <*> o .: "plutus_contracts"
