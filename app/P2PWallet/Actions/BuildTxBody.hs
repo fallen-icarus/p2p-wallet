@@ -18,8 +18,7 @@ import P2PWallet.Prelude
 -- The UI should catch these errors sooner but the redundant checks can't hurt and enable building
 -- to be tested without a UI.
 canBeBuilt :: TxBuilderModel -> IO ()
-canBeBuilt TxBuilderModel{userInputs,changeOutput}
-  -- The tx must have inputs.
+canBeBuilt TxBuilderModel{userInputs,changeOutput,collateralInput,requiresCollateral}
   | null userInputs = throwIO $ AppError "No inputs specified."
   -- A change address must be specified.
   | change ^. #paymentAddress == "" = throwIO $ AppError "Change address missing."
@@ -27,6 +26,9 @@ canBeBuilt TxBuilderModel{userInputs,changeOutput}
   | change ^. #lovelace < 0 = throwIO $ AppError "Ada is not balanced."
   -- The value of the native assets must be balanced.
   | nativeAssetsNotBalanced = throwIO $ AppError "Native assets are not balanced."
+  -- If it requires collateral, then a collateral input must be set.
+  | requiresCollateral && isNothing collateralInput =
+      throwIO $ AppError "Transaction requires collateral."
   | otherwise = return ()
   where
     change :: ChangeOutput
@@ -159,6 +161,7 @@ buildRawCmd paramsFile outFile certificateFiles tx = toString $ unwords
     [ "cardano-cli transaction build-raw"
     , unwords $ map inputField $ tx ^. #inputs
     , unwords $ map outputField $ tx ^. #outputs
+    , unwords $ map withdrawalField $ tx ^. #withdrawals
     , unwords $ for certificateFiles $ \certFile -> "--certificate-file " <> toText certFile
     , "--protocol-params-file " <> toText paramsFile
     , "--fee " <> show (unLovelace $ tx ^. #fee)
@@ -181,4 +184,10 @@ buildRawCmd paramsFile outFile certificateFiles tx = toString $ unwords
                   "+ " <> show quantity <> " " <> display policyId <> "." <> display tokenName
               ] 
           ]
+      ]
+
+    withdrawalField :: TxBodyWithdrawal -> Text
+    withdrawalField TxBodyWithdrawal{..} = unwords
+      [ "--withdrawal"
+      , toText stakeAddress <> "+" <> toText lovelace
       ]

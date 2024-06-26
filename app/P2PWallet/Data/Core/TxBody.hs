@@ -76,12 +76,26 @@ data TxBodyCertificate = TxBodyCertificate
 makeFieldLabelsNoPrefix ''TxBodyCertificate
 
 -------------------------------------------------
+-- Withdrawals
+-------------------------------------------------
+-- | Information for a particular withdrawal.
+data TxBodyWithdrawal = TxBodyWithdrawal
+  -- | The target address.
+  { stakeAddress :: StakeAddress
+  -- | The amount of lovelace withdrawn from the rewards address.
+  , lovelace :: Lovelace
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TxBodyWithdrawal
+
+-------------------------------------------------
 -- Tx Body
 -------------------------------------------------
 data TxBody = TxBody
   { inputs :: [TxBodyInput]
   , outputs :: [TxBodyOutput]
   , certificates :: [TxBodyCertificate]
+  , withdrawals :: [TxBodyWithdrawal]
   , witnesses :: [Witness]
   , fee :: Lovelace
   } deriving (Show,Eq)
@@ -101,6 +115,9 @@ instance Semigroup TxBody where
         -- The registration certificate must appear before the delegation certificate for a given
         -- stake address.
         sort $ txBody1 ^. #certificates <> txBody2 ^. #certificates
+    , withdrawals = 
+        -- The ordering is irrelevant since the node will reorder the withdrawals by credential.
+        txBody1 ^. #withdrawals <> txBody2 ^. #withdrawals
     , witnesses = 
         -- Remove duplicates.
         ordNub $ txBody1 ^. #witnesses <> txBody2 ^. #witnesses
@@ -115,6 +132,7 @@ instance Monoid TxBody where
     { inputs = []
     , outputs = []
     , certificates = []
+    , withdrawals = []
     , witnesses = []
     , fee = 0
     }

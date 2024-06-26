@@ -74,7 +74,7 @@ toNetworkFlag Mainnet = "--mainnet"
 toNetworkFlag Testnet = "--testnet-magic 1"
 
 -- | Balance the inputs with the outputs by updating the changeOutput and subtracting off the
--- fee.
+-- fee. This also accounts for registration deposits and reward withdrawals.
 balanceTx :: TxBuilderModel -> TxBuilderModel
 balanceTx tx@TxBuilderModel{..} =
     tx & #changeOutput .~ 
@@ -84,6 +84,9 @@ balanceTx tx@TxBuilderModel{..} =
        & #isBalanced .~ balanced
        & #isBuilt .~ False
   where
+    totalWithdrawn :: Lovelace
+    totalWithdrawn = sum $ map (view #lovelace . snd) userWithdrawals
+
     -- The total deposit required from certificates.
     requiredDeposits :: Lovelace
     requiredDeposits = (flip . flip foldl') 0 userCertificates $ \acc (_,cert) ->
@@ -114,7 +117,7 @@ balanceTx tx@TxBuilderModel{..} =
       in (inLoves - outLoves,bal)
 
     lovelaceChange :: Lovelace
-    lovelaceChange = loves - fee - requiredDeposits
+    lovelaceChange = loves - fee - requiredDeposits + totalWithdrawn
 
     newChange :: ChangeOutput
     newChange = ChangeOutput

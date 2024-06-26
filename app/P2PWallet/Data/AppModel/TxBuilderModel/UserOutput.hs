@@ -89,7 +89,7 @@ processNewUserOutput network tickerMap fingerprintMap NewUserOutput{..} = do
   addr <- parsePaymentAddress network paymentAddress
 
   -- Check that the ada balance is positive. It cannot be zero.
-  adaQuantity <- parseAda ada
+  adaQuantity <- parseAda False ada
 
   -- Check that the assets are valid. Returns the first error, if any.
   assets <- mapM (parseNativeAssets tickerMap fingerprintMap) $ lines nativeAssets

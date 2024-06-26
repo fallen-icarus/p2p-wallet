@@ -207,7 +207,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
             ]
 
 inspectionWidget :: Transaction -> AppModel -> AppNode
-inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverseTickerMap} = do
+inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerMap} = do
     vstack
       [ vstack
           [ centerWidgetH $ label "Transaction Summary" 
@@ -240,7 +240,8 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverse
                   maybe "none" (fromString . printf "slot %s") invalidBefore
               , copyableLabelFor 10 "Invalid After:" $ 
                   maybe "none" (fromString . printf "slot %s") invalidAfter
-              , certificateField certificates
+              , certificateField inspectedTransaction
+              , withdrawalField inspectedTransaction
               , utxoField "Reference Inputs:" 
                   Nothing
                   #showReferenceInputs 
@@ -301,20 +302,6 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverse
       def `styleBasic` 
             [ bgColor transparent
             , textColor customBlue
-            ]
-          `styleHover`
-            [ bgColor customGray1]
-
-    txMoreOffStyle :: Style
-    txMoreOffStyle = 
-      def `styleBasic` 
-            [ bgColor black
-            , textColor customBlue
-            , radius 20
-            , paddingT 2
-            , paddingB 2
-            , paddingR 5
-            , paddingL 5
             ]
           `styleHover`
             [ bgColor customGray1]
@@ -390,52 +377,26 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverse
                     `styleBasic` [textSize 9]
                 ]
             , hstack
-                [ label calendarIcon
-                    `styleBasic` 
-                      [ textSize 9
-                      , textColor customBlue
-                      , textFont "Remix"
-                      , paddingT 5
-                      ]
-                , spacer_ [width 3]
-                , label (showLocalDate (config ^. #timeZone) blockTime)
-                    `styleBasic` 
-                      [ textSize 9
-                      , textColor lightGray
-                      ]
-                , spacer
-                , label clockIcon
-                    `styleBasic` 
-                      [ textSize 9
-                      , textColor customBlue
-                      , textFont "Remix"
-                      , paddingT 5
-                      ]
-                , spacer_ [width 3]
-                , label (showLocalTime (config ^. #timeZone) blockTime)
-                    `styleBasic` 
-                      [ textSize 9
-                      , textColor lightGray
-                      ]
-                , spacer
-                , widgetIf (not $ null nativeAssets) $ 
-                    tooltip_ "Native Assets" [tooltipDelay 0] $ label coinsIcon
-                      `styleBasic` 
-                        [ textSize 9
-                        , textColor customBlue
-                        , textFont "Remix"
-                        , textMiddle
-                        ]
-                , widgetIf (not $ null nativeAssets) $ spacer_ [width 3]
-                , widgetIf (isJust datumHash) $ 
-                    tooltip_ "Datum" [tooltipDelay 0] $ label datumIcon
-                      `styleBasic` 
-                        [ textSize 9
-                        , textColor customBlue
-                        , textFont "Remix"
-                        , textMiddle
-                        ]
-                , widgetIf (isJust datumHash) $ spacer_ [width 3]
+                [ widgetIf (not $ null nativeAssets) $ vstack
+                    [ tooltip_ "Native Assets" [tooltipDelay 0] $ label coinsIcon
+                        `styleBasic` 
+                          [ textSize 9
+                          , textColor customBlue
+                          , textFont "Remix"
+                          , textMiddle
+                          ]
+                    , spacer_ [width 3]
+                    ]
+                , widgetIf (isJust datumHash) $ vstack
+                    [ tooltip_ "Datum" [tooltipDelay 0] $ label datumIcon
+                        `styleBasic` 
+                          [ textSize 9
+                          , textColor customBlue
+                          , textFont "Remix"
+                          , textMiddle
+                          ]
+                    , spacer_ [width 3]
+                    ]
                 , widgetIf (isJust referenceScriptHash) $ 
                     tooltip_ "Reference Script" [tooltipDelay 0] $ label scriptIcon
                       `styleBasic` 
@@ -475,10 +436,26 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverse
         , widgetIf showDetails $ utxoDetails reverseTickerMap u
         ]
 
-    certificateField :: [TransactionCertificate] -> AppNode
-    certificateField certs =
-      if null certs then
-        hstack
+certificateField :: Maybe Transaction -> AppNode
+certificateField inspectedTransaction =
+  if null certs then
+    hstack
+      [ label "Certificates:"
+          `styleBasic`
+            [ padding 0
+            , radius 5
+            , textMiddle
+            , textSize 10
+            , border 0 transparent
+            , textColor customBlue
+            , bgColor transparent
+            ]
+      , spacer
+      , label "none" `styleBasic` [textColor lightGray, textSize 10]
+      ]
+  else
+    vstack
+      [ hstack
           [ label "Certificates:"
               `styleBasic`
                 [ padding 0
@@ -490,44 +467,31 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverse
                 , bgColor transparent
                 ]
           , spacer
-          , label "none" `styleBasic` [textColor lightGray, textSize 10]
+          , toggleButton_ horizontalMoreIcon 
+              (toLensVL $ #homeModel % #inspectedTransaction % toggleShow #showCertificates)
+              [toggleButtonOffStyle txMoreOffStyle]
+              `styleBasic` 
+                [ textSize 10
+                , textColor customRed
+                , textFont "Remix"
+                , textMiddle
+                , radius 20
+                , paddingT 2
+                , paddingB 2
+                , paddingR 5
+                , paddingL 5
+                , bgColor black
+                , border 0 transparent
+                ]
+              `styleHover` [bgColor customGray1, cursorIcon CursorHand]
           ]
-      else
-        vstack
-          [ hstack
-              [ label "Certificates:"
-                  `styleBasic`
-                    [ padding 0
-                    , radius 5
-                    , textMiddle
-                    , textSize 10
-                    , border 0 transparent
-                    , textColor customBlue
-                    , bgColor transparent
-                    ]
-              , spacer
-              , toggleButton_ horizontalMoreIcon 
-                  (toLensVL $ #homeModel % #inspectedTransaction % toggleShow #showCertificates)
-                  [toggleButtonOffStyle txMoreOffStyle]
-                  `styleBasic` 
-                    [ textSize 10
-                    , textColor customRed
-                    , textFont "Remix"
-                    , textMiddle
-                    , radius 20
-                    , paddingT 2
-                    , paddingB 2
-                    , paddingR 5
-                    , paddingL 5
-                    , bgColor black
-                    , border 0 transparent
-                    ]
-                  `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-              ]
-          , widgetIf (inspectedTransaction ^. toggleShow #showCertificates) $
-              vstack_ [childSpacing] (map certificateRow certs)
-                `styleBasic` [padding 10]
-          ]
+      , widgetIf (inspectedTransaction ^. toggleShow #showCertificates) $
+          vstack_ [childSpacing] (map certificateRow certs)
+            `styleBasic` [padding 10]
+      ]
+  where
+    certs :: [TransactionCertificate]
+    certs = fromMaybe [] $ inspectedTransaction ^? _Just % #certificates
 
     certificateRow :: TransactionCertificate -> AppNode
     certificateRow TransactionCertificate{..} =
@@ -547,6 +511,76 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},config,reverse
             copyableLabelFor 8 "Stake Address:" (display stakeAddress)
         , widgetMaybe (info ^? _OtherInfo) $ \value ->
             copyableLabelFor 8 "JSON:" (showValue value)
+        ] `styleBasic` 
+            [ padding 10
+            , bgColor customGray2
+            , radius 5
+            , border 1 black
+            ]
+
+withdrawalField :: Maybe Transaction -> AppNode
+withdrawalField inspectedTransaction =
+  if null withdrawals then
+    hstack
+      [ label "Withdrawals:"
+          `styleBasic`
+            [ padding 0
+            , radius 5
+            , textMiddle
+            , textSize 10
+            , border 0 transparent
+            , textColor customBlue
+            , bgColor transparent
+            ]
+      , spacer
+      , label "none" `styleBasic` [textColor lightGray, textSize 10]
+      ]
+  else
+    vstack
+      [ hstack
+          [ label "Withdrawals:"
+              `styleBasic`
+                [ padding 0
+                , radius 5
+                , textMiddle
+                , textSize 10
+                , border 0 transparent
+                , textColor customBlue
+                , bgColor transparent
+                ]
+          , spacer
+          , toggleButton_ horizontalMoreIcon 
+              (toLensVL $ #homeModel % #inspectedTransaction % toggleShow #showWithdrawals)
+              [toggleButtonOffStyle txMoreOffStyle]
+              `styleBasic` 
+                [ textSize 10
+                , textColor customRed
+                , textFont "Remix"
+                , textMiddle
+                , radius 20
+                , paddingT 2
+                , paddingB 2
+                , paddingR 5
+                , paddingL 5
+                , bgColor black
+                , border 0 transparent
+                ]
+              `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+          ]
+      , widgetIf (inspectedTransaction ^. toggleShow #showWithdrawals) $
+          vstack_ [childSpacing] (map withdrawalRow withdrawals)
+            `styleBasic` [padding 10]
+      ]
+  where
+    withdrawals :: [TransactionWithdrawal]
+    withdrawals = fromMaybe [] $ inspectedTransaction ^? _Just % #withdrawals
+
+    withdrawalRow :: TransactionWithdrawal -> AppNode
+    withdrawalRow TransactionWithdrawal{..} =
+      hstack
+        [ copyableLabelSelf (display stakeAddress) 10 white
+        , filler
+        , label (display lovelace) `styleBasic` [textSize 10]
         ] `styleBasic` 
             [ padding 10
             , bgColor customGray2
@@ -725,6 +759,20 @@ txFilterWidget model = do
             , spacer
             ]
         ]
+
+txMoreOffStyle :: Style
+txMoreOffStyle = 
+  def `styleBasic` 
+        [ bgColor black
+        , textColor customBlue
+        , radius 20
+        , paddingT 2
+        , paddingB 2
+        , paddingR 5
+        , paddingL 5
+        ]
+      `styleHover`
+        [ bgColor customGray1]
 
 -------------------------------------------------
 -- Helper Widgets

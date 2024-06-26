@@ -24,6 +24,9 @@ module P2PWallet.Data.Core.Transaction
   , Koios._StakeRegistrationInfo
   , Koios._OtherInfo
 
+    -- * Withdrawals
+  , Koios.TransactionWithdrawal(..)
+
    -- * Transactions
   , Transaction(..)
   , toTransaction
@@ -43,6 +46,7 @@ import P2PWallet.Prelude
 -------------------------------------------------
 -- Transaction UTxO
 -------------------------------------------------
+-- | A custom UTxO type since the Koios version uses different json encoding.
 data TransactionUTxO = TransactionUTxO
   { paymentAddress :: PaymentAddress
   , stakeAddress :: Maybe StakeAddress
@@ -98,6 +102,7 @@ toTransactionUTxO Koios.TransactionUTxO{..} = TransactionUTxO
 -------------------------------------------------
 -- Transaction
 -------------------------------------------------
+-- | The transaction type used by the GUI.
 data Transaction = Transaction
   { txHash :: Text
   , profileId :: ProfileId
@@ -119,7 +124,8 @@ data Transaction = Transaction
   , showOutputs :: Bool
   , certificates :: [Koios.TransactionCertificate]
   , showCertificates :: Bool
-  -- , withdrawals :: [TransactionWithdrawal]
+  , withdrawals :: [Koios.TransactionWithdrawal]
+  , showWithdrawals :: Bool
   -- , nativeAssetsMinted :: Value
   -- , nativeScripts :: Value
   -- , plutusContracts :: Value
@@ -144,6 +150,7 @@ instance FromRow Transaction where
     inputs <- fromMaybe mzero . decode <$> field
     outputs <- fromMaybe mzero . decode <$> field
     certificates <- fromMaybe mzero . decode <$> field
+    withdrawals <- fromMaybe mzero . decode <$> field
     return $ Transaction
       { txHash = txHash
       , profileId = profileId
@@ -160,11 +167,13 @@ instance FromRow Transaction where
       , inputs = inputs
       , outputs = outputs
       , certificates = certificates
+      , withdrawals = withdrawals
       , showCollateralInputs = False
       , showReferenceInputs = False
       , showInputs = False
       , showOutputs = False
       , showCertificates = False
+      , showWithdrawals = False
       }
 
 instance ToRow Transaction where
@@ -184,6 +193,7 @@ instance ToRow Transaction where
     , toField $ encode inputs
     , toField $ encode outputs
     , toField $ encode certificates
+    , toField $ encode withdrawals
     ]
 
 instance TableName Transaction where
@@ -209,6 +219,7 @@ instance Creatable Transaction where
         , "inputs BLOB"
         , "outputs BLOB"
         , "certificates BLOB"
+        , "withdrawals BLOB"
         , "PRIMARY KEY (tx_hash,payment_id)"
         ]
     , ");"
@@ -234,9 +245,10 @@ instance Insertable Transaction where
         , "inputs"
         , "outputs"
         , "certificates"
+        , "withdrawals"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 -- | Convert a Koios Transaction to a P2PWallet Transaction.
@@ -257,9 +269,11 @@ toTransaction profileId paymentId Koios.Transaction{..} = Transaction
   , inputs = map toTransactionUTxO inputs
   , outputs = map toTransactionUTxO outputs
   , certificates = certificates
+  , withdrawals = withdrawals
   , showCollateralInputs = False
   , showReferenceInputs = False
   , showInputs = False
   , showOutputs = False
   , showCertificates = False
+  , showWithdrawals = False
   }

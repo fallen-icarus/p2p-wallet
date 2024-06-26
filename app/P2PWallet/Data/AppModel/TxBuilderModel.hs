@@ -15,6 +15,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserInput
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserOutput
+  , module P2PWallet.Data.AppModel.TxBuilderModel.UserWithdrawal
   ) where
 
 import P2PWallet.Data.AppModel.Common
@@ -22,6 +23,7 @@ import P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
 import P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
 import P2PWallet.Data.AppModel.TxBuilderModel.UserInput
 import P2PWallet.Data.AppModel.TxBuilderModel.UserOutput
+import P2PWallet.Data.AppModel.TxBuilderModel.UserWithdrawal
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
 import P2PWallet.Prelude
@@ -59,6 +61,8 @@ data TxBuilderEvent
   | RemoveSelectedUserOutput Int
   -- | Remove the selected user certificate from the tx builder.
   | RemoveSelectedUserCertificate Int
+  -- | Remove the selected user withdrawal from the tx builder.
+  | RemoveSelectedUserWithdrawal Int
   -- | Change the desired number of user outputs with these conditions. The first int is the index
   -- into the outputs list and the second is the new count.
   | ChangeUserOutputCount Int Int
@@ -103,6 +107,9 @@ data TxBuilderModel = TxBuilderModel
   -- | A list of certificate actions for the user's stake address. They are indexed to
   -- make deleting easier.
   , userCertificates :: [(Int,UserCertificate)]
+  -- | A list of withdrawal actions for the user's stake address. They are indexed to
+  -- make editing/deleting easier.
+  , userWithdrawals :: [(Int,UserWithdrawal)]
   -- | The transaction fee for the built transaction.
   , fee :: Lovelace
   -- | A list of required witnesses. This is used to determine whether the transaction can be signed
@@ -145,6 +152,7 @@ instance Default TxBuilderModel where
     , newChangeOutput = def
     , addingChangeOutput = False
     , userCertificates = []
+    , userWithdrawals = []
     , fee = 0
     , witnesses = []
     , allWitnessesKnown = True -- This is set to true so the default GUI button is to submit.
@@ -166,6 +174,7 @@ isEmptyBuilder TxBuilderModel{..} = and
   [ null userInputs
   , null userOutputs
   , null userCertificates
+  , null userWithdrawals
   , isNothing targetUserOutput
   , isNothing changeOutput
   ]
@@ -184,6 +193,8 @@ convertToTxBody TxBuilderModel{..} =
     , maybe mempty (addToTxBody mempty) changeOutput
     -- Add the certificates to the list of certificates.
     , foldMap' (addToTxBody mempty . snd) userCertificates
+    -- Add the withdrawals to the list of withdrawals.
+    , foldMap' (addToTxBody mempty . snd) userWithdrawals
     -- Overide the fee with the fee in the builder model.
     , mempty & #fee .~ fee
     ]
