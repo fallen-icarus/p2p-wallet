@@ -5,13 +5,14 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module P2PWallet.Data.AppModel.TxBuilderModel
-  ( TxBuilderScene(..)
-  , TxBuilderEvent(..)
+  ( TxBuilderEvent(..)
   , TxBuilderModel(..)
   , isEmptyBuilder
   , convertToTxBody
 
   , module P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
+  , module P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
+  , module P2PWallet.Data.AppModel.TxBuilderModel.TestMint
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserInput
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserOutput
@@ -20,6 +21,8 @@ module P2PWallet.Data.AppModel.TxBuilderModel
 
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
+import P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
+import P2PWallet.Data.AppModel.TxBuilderModel.TestMint
 import P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
 import P2PWallet.Data.AppModel.TxBuilderModel.UserInput
 import P2PWallet.Data.AppModel.TxBuilderModel.UserOutput
@@ -29,32 +32,19 @@ import P2PWallet.Data.Core.TxBody
 import P2PWallet.Prelude
 
 -------------------------------------------------
--- TxBuilder Scenes and Overlays
--------------------------------------------------
--- | The subscenes for the Tx Builder page.
-data TxBuilderScene
-  -- | Show the builder in a simple manner. This only shows high-level actions like: creating a
-  -- swap and sending 10 ADA to Bob.
-  = TxBuilderSimpleView
-  -- | Show what the actual transaction looks like. This shows the low-level actions like:
-  -- executing minting policy x to mint beacons a, b, and c.
-  | TxBuilderAdvancedView 
-  deriving (Eq,Show)
-
--------------------------------------------------
 -- Tx Builder UI Events
 -------------------------------------------------
 -- | All events unique to the transaction builder. Some events can happen directly from other
 -- scenes. Those actions are not here; they are part of the events for those scenes.
 data TxBuilderEvent
-  -- | Change the subscene to the specified scene.
-  = ChangeBuilderScene TxBuilderScene 
   -- | Reset all fields in the transaction builder.
-  | ResetBuilder
+  = ResetBuilder
   -- | Open the add popup widget
   | ShowTxAddPopup
   -- | Open the change popup widget
   | ShowTxChangePopup
+  -- | Open the collateral popup widget
+  | ShowTxCollateralPopup
   -- | Remove the selected user input from the tx builder.
   | RemoveSelectedUserInput Int
   -- | Remove the selected user output from the tx builder.
@@ -63,6 +53,8 @@ data TxBuilderEvent
   | RemoveSelectedUserCertificate Int
   -- | Remove the selected user withdrawal from the tx builder.
   | RemoveSelectedUserWithdrawal Int
+  -- | Remove the test token mint.
+  | RemoveTestMint
   -- | Change the desired number of user outputs with these conditions. The first int is the index
   -- into the outputs list and the second is the new count.
   | ChangeUserOutputCount Int Int
@@ -70,12 +62,16 @@ data TxBuilderEvent
   | EditSelectedUserOutput (AddEvent (Int,UserOutput) (Int,UserOutput))
   -- | Add the new change output.
   | AddNewChangeOutput (AddEvent NewChangeOutput ChangeOutput)
+  -- | Add the new test mint.
+  | AddNewTestMint (AddEvent NewTestMint TestMint)
+  -- | Convert the user's input to hexidecimal.
+  | ConvertExampleTestMintNameToHexidecimal
   -- | Build the transaction while also estimating the execution budgets and tx fee. Return the
   -- updated TxBuilderModel.
   | BuildTx (ProcessEvent TxBuilderModel)
   -- | Witness a transaction that was built using the TxBuilder. Return the absolute filepaths for
   -- the witness files.
-  | WitnessTx (ProcessEvent [WitnessFile])
+  | WitnessTx (ProcessEvent [KeyWitnessFile])
   -- | Assemble the witness files to produced the signed tx file.
   | AssembleWitnesses (ProcessEvent SignedTxFile)
   -- | Export the transaction body and any witnesses. It will be exported to the user's home
@@ -89,10 +85,9 @@ data TxBuilderEvent
 -- Builder State
 -------------------------------------------------
 data TxBuilderModel = TxBuilderModel
-  { scene :: TxBuilderScene
   -- | A list of normal UTxOs being spent. These are non-defi inputs. They are indexed to
   -- make editing/deleting easier.
-  , userInputs :: [(Int,UserInput)]
+  { userInputs :: [(Int,UserInput)]
   -- | A list of normal UTxO outputs. These are non-defi outputs. They are indexed to
   -- make editing/deleting easier.
   , userOutputs :: [(Int,UserOutput)]
@@ -110,17 +105,23 @@ data TxBuilderModel = TxBuilderModel
   -- | A list of withdrawal actions for the user's stake address. They are indexed to
   -- make editing/deleting easier.
   , userWithdrawals :: [(Int,UserWithdrawal)]
+  -- | The test tokens to mint.
+  , testMint :: Maybe TestMint
+  -- | The new test mint information.
+  , newTestMint :: NewTestMint
+  -- | Whether the add test mint widget should be open.
+  , addingTestMint :: Bool
   -- | The transaction fee for the built transaction.
   , fee :: Lovelace
   -- | A list of required witnesses. This is used to determine whether the transaction can be signed
   -- and submitted, or exported. This is set internally by the app.
-  , witnesses :: [Witness]
+  , keyWitnesses :: [KeyWitness]
   -- | Whether all witnesses are known hardware wallet keys. If they are, the witness files can be
   -- directly assembled and the final transaction submitted. If not, then the transaction file and
   -- known witnesses must be exported for assembling externally.
-  , allWitnessesKnown :: Bool
-  -- | The witness files for this transaction.
-  , witnessFiles :: [WitnessFile]
+  , allKeyWitnessesKnown :: Bool
+  -- | The key witness files for this transaction.
+  , keyWitnessFiles :: [KeyWitnessFile]
   -- | Whether the model is the correct mirror for the tx.body file located in the tmp directory.
   -- This is helpful for knowing whether it is okay to sign, or export.
   , isBuilt :: Bool
@@ -133,19 +134,20 @@ data TxBuilderModel = TxBuilderModel
   -- | Whether the transaction requires collateral.
   , requiresCollateral :: Bool
   -- | The chosen collateral input.
-  , collateralInput :: Maybe UserInput
+  , collateralInput :: Maybe CollateralInput
   -- | Whether to show the add popup widget.
   , showAddPopup :: Bool
   -- | Whether to show the change popup widget.
   , showChangePopup :: Bool
+  -- | Whether to show the collateral popup widget.
+  , showCollateralPopup :: Bool
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''TxBuilderModel
 
 instance Default TxBuilderModel where
   def = TxBuilderModel
-    { scene = TxBuilderSimpleView
-    , userInputs = []
+    { userInputs = []
     , userOutputs = []
     , targetUserOutput = Nothing
     , changeOutput = Nothing
@@ -153,10 +155,13 @@ instance Default TxBuilderModel where
     , addingChangeOutput = False
     , userCertificates = []
     , userWithdrawals = []
+    , testMint = Nothing
+    , newTestMint = def
+    , addingTestMint = False
     , fee = 0
-    , witnesses = []
-    , allWitnessesKnown = True -- This is set to true so the default GUI button is to submit.
-    , witnessFiles = []
+    , keyWitnesses = []
+    , allKeyWitnessesKnown = True -- This is set to true so the default GUI button is to submit.
+    , keyWitnessFiles = []
     , isBuilt = False
     , isBalanced = False
     , importing = False
@@ -165,10 +170,11 @@ instance Default TxBuilderModel where
     , collateralInput = Nothing
     , showAddPopup = False
     , showChangePopup = False
+    , showCollateralPopup = False
     }
 
 -- | Check whether the builder has anything yet. Not all fields correspond to the actual
--- transaction (some are for the GUI) so this function only checks the related fields.
+-- transaction (some are for the GUI) so this function only checks the required fields.
 isEmptyBuilder :: TxBuilderModel -> Bool
 isEmptyBuilder TxBuilderModel{..} = and
   [ null userInputs
@@ -177,6 +183,8 @@ isEmptyBuilder TxBuilderModel{..} = and
   , null userWithdrawals
   , isNothing targetUserOutput
   , isNothing changeOutput
+  , isNothing testMint
+  , isNothing collateralInput
   ]
 
 -- | Convert the `TxBuilderModel` to a `TxBody`.
@@ -195,6 +203,10 @@ convertToTxBody TxBuilderModel{..} =
     , foldMap' (addToTxBody mempty . snd) userCertificates
     -- Add the withdrawals to the list of withdrawals.
     , foldMap' (addToTxBody mempty . snd) userWithdrawals
+    -- Add the testMint to the list of mints.
+    , maybe mempty (addToTxBody mempty) testMint
+    -- Add the collateral to the transaction.
+    , maybe mempty (addToTxBody mempty) collateralInput
     -- Overide the fee with the fee in the builder model.
     , mempty & #fee .~ fee
     ]

@@ -7,7 +7,7 @@ import Data.Aeson (parseJSON)
 import Data.Aeson.Types (parseMaybe)
 
 import P2PWallet.Actions.Query.Koios
-import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Internal.AppError
 import P2PWallet.Data.Core.Internal.Files
 import P2PWallet.Data.Core.Internal.Network
 import P2PWallet.Data.Koios.TxSubmissionResponse

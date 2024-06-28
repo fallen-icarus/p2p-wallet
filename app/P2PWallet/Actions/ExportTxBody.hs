@@ -11,7 +11,7 @@ import P2PWallet.Prelude
 
 -- | Export the transaction body file and any witness files to either the user's configured 
 -- export directory or the user's home directory.
-exportTxBody :: [WitnessFile] -> IO FilePath
+exportTxBody :: [KeyWitnessFile] -> IO FilePath
 exportTxBody witnessFiles = do
   destinationDir <- getHomeDirectory
   tmpDir <- getTemporaryDirectory
@@ -26,7 +26,7 @@ exportTxBody witnessFiles = do
   copyFile tmpTxBody txBodyDestination
 
   -- Copy the witness files to the export destination.
-  forM_ witnessFiles $ \(WitnessFile witnessFile) ->
+  forM_ witnessFiles $ \(KeyWitnessFile witnessFile) ->
     copyFile witnessFile $ appDir </> takeFileName witnessFile
 
   -- Return the destination directory so the user knows where to look.

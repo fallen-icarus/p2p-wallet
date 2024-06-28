@@ -142,3 +142,12 @@ uncheckedBoxIcon = remixCheckboxBlankLine
 
 notificationCircleIcon :: Text
 notificationCircleIcon = toGlyph 0XF3C1
+
+collateralIcon :: Text
+collateralIcon = remixSafe2Line
+
+changeIcon :: Text
+changeIcon = remixExchangeDollarLine
+
+commandIcon :: Text
+commandIcon = remixCommandLine

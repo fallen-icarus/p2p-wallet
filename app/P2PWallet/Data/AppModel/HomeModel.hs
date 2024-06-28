@@ -12,6 +12,7 @@ The Home scene is dedicated to `PaymentWallet`s.
 module P2PWallet.Data.AppModel.HomeModel where
 
 import P2PWallet.Data.AppModel.Common
+import P2PWallet.Data.Core.Internal.Bech32Address
 import P2PWallet.Data.Core.Transaction
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
@@ -76,6 +77,10 @@ data HomeEvent
   | CloseInspectedHomeTransaction
   -- | Add the selected user input to the tx builder.
   | AddSelectedUserInput PersonalUTxO
+  -- | Add the selected collateral input to the tx builder.
+  | AddSelectedCollateralInput PersonalUTxO
+  -- | Add the selected change address to the tx builder.
+  | AddSelectedChangeAddress PaymentAddress
 
 -------------------------------------------------
 -- UTxO Filter Model

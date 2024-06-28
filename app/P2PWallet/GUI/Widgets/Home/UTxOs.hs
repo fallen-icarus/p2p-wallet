@@ -190,6 +190,24 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap,config} =
                         , textMiddle
                         ]
                 , filler
+                , hstack
+                    [ tooltip_ "Use as collateral" [tooltipDelay 0] $
+                        button collateralIcon (HomeEvent $ AddSelectedCollateralInput u)
+                          `styleBasic` 
+                            [ textSize 10
+                            , textColor customRed
+                            , textFont "Remix"
+                            , textMiddle
+                            , padding 0
+                            , bgColor transparent
+                            , border 0 transparent
+                            ]
+                          `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                    , spacer_ [width 5]
+                    ] `nodeVisible` and
+                        [ null nativeAssets
+                        , lovelace >= 5_000_000
+                        ]
                 , tooltip_ "Spend UTxO" [tooltipDelay 0] $
                     button spendUTxOIcon (HomeEvent $ AddSelectedUserInput u)
                       `styleBasic` 
@@ -479,8 +497,10 @@ utxoFilterWidget AppModel{homeModel=HomeModel{..}} = do
             , label "Find:"
             , spacer
             , textField_ 
-                (toLensVL $ #homeModel % #utxoFilterModel % #search) 
-                [placeholder "many of: native token, reference script hash, datum hash, tx hash"] 
+                  (toLensVL $ #homeModel % #utxoFilterModel % #search) 
+                  [placeholder "many of: native token, reference script hash, datum hash, tx hash"] 
+                `styleBasic` [bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
             , mainButton helpIcon (Alert utxoSearchMsg)
                 `styleBasic`
                   [ border 0 transparent

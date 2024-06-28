@@ -10,6 +10,7 @@ import P2PWallet.Actions.Database
 import P2PWallet.Actions.LookupPools
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude

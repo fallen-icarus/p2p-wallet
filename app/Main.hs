@@ -11,6 +11,7 @@ import System.Directory qualified as Dir
 
 import P2PWallet.Actions.Database
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Internal.AppError
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.EventHandler
 import P2PWallet.GUI.UIBuilder

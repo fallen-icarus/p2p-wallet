@@ -9,9 +9,6 @@ module P2PWallet.Data.AppModel
     AppWenv
   , AppNode
 
-    -- * App Errors
-  , AppError(..)
-
     -- * Main App Types
   , MainScene(..)
   , AppEvent(..)
@@ -206,11 +203,3 @@ instance Default AppModel where
 -------------------------------------------------
 type AppWenv = Monomer.WidgetEnv AppModel AppEvent
 type AppNode = Monomer.WidgetNode AppModel AppEvent
-
--------------------------------------------------
--- App Errors
--------------------------------------------------
--- | The type for an app error that can be caught in `IO`.
-newtype AppError = AppError Text deriving (Show)
-
-instance Exception AppError

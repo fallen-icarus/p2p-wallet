@@ -44,12 +44,15 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
                   , spacer_ [width 5]
                     -- A search bar.
                   , textField_ 
-                      (toLensVL $ #homeModel % #assetFilterModel % #search) 
-                      [placeholder "one of: full name, policy id, asset name, fingerprint, ticker"] 
+                        (toLensVL $ #homeModel % #assetFilterModel % #search) 
+                        [placeholder "one of: full name, policy id, asset name, fingerprint, ticker"] 
                       `styleBasic`
                         [ textSize 12
                         , width 400
+                        , bgColor customGray1
+                        , sndColor darkGray
                         ]
+                      `styleFocus` [border 1 customBlue]
                   , spacer_ [width 5]
                     -- The confirm search button. The redrawing is delayed until this button is
                     -- pressed.

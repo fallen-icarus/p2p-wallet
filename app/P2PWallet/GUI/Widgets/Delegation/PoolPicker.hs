@@ -57,8 +57,10 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
                   ]
                 `styleHover` [bgColor customGray1, cursorIcon CursorHand]
           , textField_ 
-              (toLensVL $ #delegationModel % #poolFilterModel % #search) 
-              [placeholder "ticker, name, pool id"] 
+                (toLensVL $ #delegationModel % #poolFilterModel % #search) 
+                [placeholder "ticker, name, pool id"] 
+              `styleBasic` [bgColor customGray1, sndColor darkGray]
+              `styleFocus` [border 1 customBlue]
           ]
       , spacer
       , hgrid_ [childSpacing]
@@ -239,7 +241,8 @@ poolFilterWidget = do
             , spacer_ [width 5]
             , numericField_ (toLensVL $ #delegationModel % #poolFilterModel % #sampleSize)
                   [minValue 0, decimals 0]
-                `styleBasic` [width 100, height 30, textSize 10]
+                `styleBasic` [bgColor customGray1, width 100, height 30, textSize 10]
+                `styleFocus` [border 1 customBlue]
             ] 
         , spacer
         , vstack
@@ -253,14 +256,16 @@ poolFilterWidget = do
                 , spacer_ [width 5]
                 , numericField_ (toLensVL $ #delegationModel % #poolFilterModel % #marginRange % _1)
                       [minValue 0, maxValue 100, decimals 3]
-                    `styleBasic` [width 100, textSize 10, height 30]
+                    `styleBasic` [bgColor customGray1, width 100, textSize 10, height 30]
+                    `styleFocus` [border 1 customBlue]
                 , spacer_ [width 10]
                 , label "max"
                     `styleBasic` [textSize 10, textColor lightGray]
                 , spacer_ [width 5]
                 , numericField_ (toLensVL $ #delegationModel % #poolFilterModel % #marginRange % _2)
                       [minValue 0, maxValue 100, decimals 3]
-                    `styleBasic` [width 100, textSize 10, height 30]
+                    `styleBasic` [bgColor customGray1, width 100, textSize 10, height 30]
+                    `styleFocus` [border 1 customBlue]
                 ]
             ] 
         , spacer
@@ -276,7 +281,8 @@ poolFilterWidget = do
                 , numericField_ 
                       (toLensVL $ #delegationModel % #poolFilterModel % #liveSaturationRange % _1)
                       [minValue 0, maxValue 100, decimals 3]
-                    `styleBasic` [width 100, textSize 10, height 30]
+                    `styleBasic` [bgColor customGray1, width 100, textSize 10, height 30]
+                    `styleFocus` [border 1 customBlue]
                 , spacer_ [width 10]
                 , label "max"
                     `styleBasic` [textSize 10, textColor lightGray]
@@ -284,7 +290,8 @@ poolFilterWidget = do
                 , numericField_ 
                       (toLensVL $ #delegationModel % #poolFilterModel % #liveSaturationRange % _2)
                       [minValue 0, maxValue 100, decimals 3]
-                    `styleBasic` [width 100, textSize 10, height 30]
+                    `styleBasic` [bgColor customGray1, width 100, textSize 10, height 30]
+                    `styleFocus` [border 1 customBlue]
                 ]
             ] 
         , spacer
@@ -300,7 +307,14 @@ poolFilterWidget = do
                 , textField_ 
                       (toLensVL $ #delegationModel % #poolFilterModel % fixedCostMinimum)
                       [placeholder "170"]
-                    `styleBasic` [width 100, textSize 10, height 30]
+                    `styleBasic` 
+                      [ width 100
+                      , textSize 10
+                      , height 30
+                      , bgColor customGray1
+                      , sndColor darkGray
+                      ]
+                    `styleFocus` [border 1 customBlue]
                 , spacer_ [width 10]
                 , label "max"
                     `styleBasic` [textSize 10, textColor lightGray]
@@ -308,7 +322,14 @@ poolFilterWidget = do
                 , textField_ 
                       (toLensVL $ #delegationModel % #poolFilterModel % fixedCostMaximum)
                       [placeholder "340"]
-                    `styleBasic` [width 100, textSize 10, height 30]
+                    `styleBasic` 
+                      [ width 100
+                      , textSize 10
+                      , height 30
+                      , bgColor customGray1
+                      , sndColor darkGray
+                      ]
+                    `styleFocus` [border 1 customBlue]
                 ]
             ] 
         , spacer
@@ -324,7 +345,14 @@ poolFilterWidget = do
                 , textField_ 
                       (toLensVL $ #delegationModel % #poolFilterModel % pledgeMinimum)
                       [placeholder "1"]
-                    `styleBasic` [width 100, textSize 10, height 30]
+                    `styleBasic` 
+                      [ width 100
+                      , textSize 10
+                      , height 30
+                      , bgColor customGray1
+                      , sndColor darkGray
+                      ]
+                    `styleFocus` [border 1 customBlue]
                 , spacer_ [width 10]
                 , label "max"
                     `styleBasic` [textSize 10, textColor lightGray]
@@ -332,7 +360,14 @@ poolFilterWidget = do
                 , textField_ 
                       (toLensVL $ #delegationModel % #poolFilterModel % pledgeMaximum)
                       [placeholder "100000"]
-                    `styleBasic` [width 100, textSize 10, height 30]
+                    `styleBasic` 
+                      [ width 100
+                      , textSize 10
+                      , height 30
+                      , bgColor customGray1
+                      , sndColor darkGray
+                      ]
+                    `styleFocus` [border 1 customBlue]
                 ]
             ] 
         , spacer

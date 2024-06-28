@@ -197,7 +197,7 @@ transactionsWidget model@AppModel{homeModel=HomeModel{..},config,reverseTickerMa
                   ]
            ] 
         , widgetIf (not $ null assetFlux) $ vstack_ [childSpacing_ 3] $ 
-            for (groupInto 3 assetFlux) $ \assetRow -> 
+            for (groupInto 2 assetFlux) $ \assetRow -> 
               hstack_ [childSpacing_ 3] $ [filler] <> map txAssetFluxWidget assetRow
         ] `styleBasic` 
             [ padding 10
@@ -702,7 +702,8 @@ txFilterWidget model = do
                 , label "Start Date:"
                 , spacer
                 , textField_ (toLensVL $ rootLens % lowerBoundText) [placeholder "MM-DD-YYYY"]
-                    `styleBasic` [width 150]
+                    `styleBasic` [width 150, bgColor customGray1, sndColor darkGray]
+                    `styleFocus` [border 1 customBlue]
                 , mainButton helpIcon (Alert txStartDateMsg)
                     `styleBasic`
                       [ border 0 transparent
@@ -720,7 +721,8 @@ txFilterWidget model = do
                 , label "End Date:"
                 , spacer
                 , textField_ (toLensVL $ rootLens % upperBoundText) [placeholder "MM-DD-YYYY"]
-                    `styleBasic` [width 150]
+                    `styleBasic` [width 150, bgColor customGray1, sndColor darkGray]
+                    `styleFocus` [border 1 customBlue]
                 , mainButton helpIcon (Alert txEndDateMsg)
                     `styleBasic`
                       [ border 0 transparent
@@ -744,8 +746,10 @@ txFilterWidget model = do
             , label "Find:"
             , spacer
             , textField_ 
-                (toLensVL $ #homeModel % #txFilterModel % #search) 
-                [placeholder "many of: address, native asset, script hash, datum hash"] 
+                  (toLensVL $ #homeModel % #txFilterModel % #search) 
+                  [placeholder "many of: address, native asset, script hash, datum hash"] 
+                `styleBasic` [bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
             , mainButton helpIcon (Alert txSearchMsg)
                 `styleBasic`
                   [ border 0 transparent
@@ -876,21 +880,16 @@ txValueFromWallet addr Transaction{inputs,outputs} =
       addressOutputs = filter isFromAddress outputs
       (spentLoves,spentAssets) = 
         ( sum $ map (view #lovelace) addressInputs
-        , concatMap (view #nativeAssets) addressInputs
+        , concatMap (map (over #quantity negate) . view #nativeAssets) addressInputs
         )
       (receivedLoves,receivedAssets) = 
         ( sum $ map (view #lovelace) addressOutputs
         , concatMap (view #nativeAssets) addressOutputs
         )
-      spentMap = 
-        Map.fromList $ map (\a -> (a ^. onChainName, negate $ a ^. #quantity)) spentAssets
-      receivedMap = 
-        Map.fromList $ map (\a -> (a ^. onChainName, a ^. #quantity)) receivedAssets
-      bal = map (fromMaybe def . parseNativeAsset . \(name,q) -> show q <> " " <> name) 
-          $ filter (\(_,q) -> q /= 0)
-          $ Map.toList 
-          $ Map.unionWith (+) spentMap receivedMap
-  in (toAda $ receivedLoves - spentLoves, bal)
+      assetChange = filter ((/= 0) . view #quantity) -- filter out zero quantities
+                  $ sumNativeAssets 
+                  $ spentAssets <> receivedAssets
+  in (toAda $ receivedLoves - spentLoves, assetChange)
 
 applySearchFilter :: PaymentWallet -> ReverseTickerMap -> [Text] -> [Transaction] -> [Transaction]
 applySearchFilter _ _ [] xs = xs

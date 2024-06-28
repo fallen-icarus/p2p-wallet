@@ -15,19 +15,42 @@ module P2PWallet.Plutus
   , PV1.TxOutRef(..)
   , PV1.CurrencySymbol(..)
   , PV1.TokenName(..)
+  , PV1.Redeemer(..)
+  , PV1.Datum(..)
+  , PV1.SerialisedScript
+  , PV1.RedeemerHash(..)
+  , PV1.DatumHash(..)
 
     -- * Parsing
   , parseHex
   , parseTxOutRef
   , parsePubKeyHash
 
+    -- * Script Utils
+  , hashScript
+  , alwaysSucceedPolicyScript
+  , alwaysSucceedPolicyHash
+  , toRedeemer
+  , toDatum
+  , scriptHashToPolicyId
+  , hashRedeemer
+  , hashDatum
+
+    -- * Serialization
+  , decodeDatum
+  , writeData
+  , writeScript
+
     -- * Misc
+  , toHexidecimal
   , unBuiltinByteString
   , isPubKeyCredential
   ) where
 
 import Data.Text qualified as T
-import Data.Aeson
+import Data.Text.Encoding qualified as E
+import Data.Aeson as Aeson
+import qualified Data.ByteString.Lazy as LBS
 
 import Database.SQLite.Simple (SQLData(SQLText))
 import Database.SQLite.Simple.FromField (FromField(..), returnError, ResultError(ConversionFailed))
@@ -38,7 +61,13 @@ import Database.SQLite.Simple.Internal (Field(..))
 import PlutusLedgerApi.V1 qualified as PV1
 import PlutusLedgerApi.V1.Address qualified as PV1
 import PlutusTx.Builtins.Internal (BuiltinByteString(..))
-import PlutusLedgerApi.V1.Bytes (LedgerBytes(..),fromHex)
+import PlutusLedgerApi.V1.Bytes (LedgerBytes(..),fromHex,encodeByteString)
+
+import Plutus.Script.Utils.V2.Generators (alwaysSucceedPolicy)
+import Plutus.Script.Utils.Scripts qualified as PV2
+import Cardano.Api qualified as Api 
+import Cardano.Api.Shelley (toPlutusData,fromPlutusData,PlutusScript(..))
+import PlutusTx.Builtins qualified as Builtins
 
 import P2PWallet.Prelude
 
@@ -72,8 +101,73 @@ parsePubKeyHash :: Text -> Maybe PV1.PubKeyHash
 parsePubKeyHash = fmap PV1.PubKeyHash . parseHex
 
 -------------------------------------------------
+-- Script Utils
+-------------------------------------------------
+hashScript :: PV1.SerialisedScript -> PV1.ScriptHash
+hashScript = PV1.ScriptHash
+           . Builtins.toBuiltin
+           . Api.serialiseToRawBytes
+           . Api.hashScript
+           . Api.PlutusScript Api.PlutusScriptV2 
+           . PlutusScriptSerialised
+
+-- | The minting policy script used for test tokens.
+alwaysSucceedPolicyScript :: PV1.SerialisedScript
+alwaysSucceedPolicyScript = PV2.unScript $ PV2.unMintingPolicyScript alwaysSucceedPolicy
+
+-- | The hash of the minting policy used for test tokens.
+alwaysSucceedPolicyHash :: PV1.ScriptHash
+alwaysSucceedPolicyHash = hashScript alwaysSucceedPolicyScript
+
+hashDatum :: (PV1.ToData a) => a -> PV1.DatumHash
+hashDatum = PV2.datumHash . toDatum
+
+hashRedeemer :: (PV1.ToData a) => a -> PV1.RedeemerHash
+hashRedeemer = PV2.redeemerHash . toRedeemer
+
+toRedeemer :: (PV1.ToData a) => a -> PV1.Redeemer
+toRedeemer = PV1.Redeemer . PV1.dataToBuiltinData . PV1.toData
+
+toDatum :: (PV1.ToData a) => a -> PV1.Datum
+toDatum = PV1.Datum . PV1.dataToBuiltinData . PV1.toData
+
+scriptHashToPolicyId :: PV1.ScriptHash -> PV1.CurrencySymbol
+scriptHashToPolicyId = PV1.CurrencySymbol . PV1.getScriptHash
+
+------------------------------------------------
+-- Serialization
+------------------------------------------------
+toJSONValue :: PV1.ToData a => a -> Aeson.Value
+toJSONValue = Api.scriptDataToJson Api.ScriptDataJsonDetailedSchema
+            . Api.unsafeHashableScriptData
+            . fromPlutusData
+            . PV1.toData
+
+-- | Export a plutus script for use with cardano-cli.
+writeScript :: FilePath -> PV1.SerialisedScript -> IO (Either (Api.FileError ()) ())
+writeScript file script = 
+  Api.writeFileTextEnvelope @(Api.PlutusScript Api.PlutusScriptV2) (Api.File file) Nothing $ 
+    PlutusScriptSerialised script
+
+-- | Export a datum, redeemer for use with cardano-cli.
+writeData :: PV1.ToData a => FilePath -> a -> IO ()
+writeData file = LBS.writeFile file . Aeson.encode . toJSONValue
+
+fromCardanoScriptData :: Api.HashableScriptData -> PV1.BuiltinData
+fromCardanoScriptData = PV1.dataToBuiltinData . toPlutusData . Api.getScriptData
+
+decodeDatum :: (PV1.FromData a) => Aeson.Value -> Maybe a
+decodeDatum = either (const Nothing) (PV1.fromBuiltinData . fromCardanoScriptData)
+            . Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema
+
+-------------------------------------------------
 -- Miscellaneous
 -------------------------------------------------
+-- | Convert a human-readable text to its hexidecimal equivalent. This is useful for getting
+-- token names from users.
+toHexidecimal :: Text -> Text
+toHexidecimal = encodeByteString . E.encodeUtf8
+
 unBuiltinByteString :: BuiltinByteString -> ByteString
 unBuiltinByteString (BuiltinByteString bs) = bs
 

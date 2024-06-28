@@ -70,6 +70,8 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.TickerRegistryModel
       P2PWallet.Data.AppModel.TxBuilderModel
       P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
+      P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
+      P2PWallet.Data.AppModel.TxBuilderModel.TestMint
       P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
       P2PWallet.Data.AppModel.TxBuilderModel.UserInput
       P2PWallet.Data.AppModel.TxBuilderModel.UserOutput
@@ -77,18 +79,19 @@ executable p2p-wallet
       P2PWallet.Data.Core.AddressBook
       P2PWallet.Data.Core.AssetMaps
       P2PWallet.Data.Core.Internal
+      P2PWallet.Data.Core.Internal.AppError
       P2PWallet.Data.Core.Internal.Assets
       P2PWallet.Data.Core.Internal.Bech32Address
       P2PWallet.Data.Core.Internal.Config
       P2PWallet.Data.Core.Internal.DerivationPath
       P2PWallet.Data.Core.Internal.Files
       P2PWallet.Data.Core.Internal.HardwareDevice
+      P2PWallet.Data.Core.Internal.KeyWitness
       P2PWallet.Data.Core.Internal.Network
       P2PWallet.Data.Core.Internal.PrimaryKeys
       P2PWallet.Data.Core.Internal.PoolID
       P2PWallet.Data.Core.Internal.RegistrationStatus
       P2PWallet.Data.Core.Internal.TxCBOR
-      P2PWallet.Data.Core.Internal.Witness
       P2PWallet.Data.Core.Profile
       P2PWallet.Data.Core.StakeReward
       P2PWallet.Data.Core.Transaction
@@ -97,6 +100,7 @@ executable p2p-wallet
       P2PWallet.Data.Core.Wallets.PaymentWallet
       P2PWallet.Data.Core.Wallets.StakeWallet
       P2PWallet.Data.Koios.AddressUTxO
+      P2PWallet.Data.Koios.BudgetEstimations
       P2PWallet.Data.Koios.LinkedPaymentAddresses
       P2PWallet.Data.Koios.Pool
       P2PWallet.Data.Koios.PostTypes
@@ -164,6 +168,8 @@ executable p2p-wallet
       , plutus-ledger
       , plutus-ledger-api
       , plutus-tx
+      , plutus-script-utils
+      , cardano-api
       , prettyprinter
       , unliftio
       , containers

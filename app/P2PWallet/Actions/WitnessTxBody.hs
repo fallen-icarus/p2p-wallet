@@ -15,8 +15,8 @@ import P2PWallet.Prelude
 -- | Witness a transaction using the hardware wallet. Witnesssing assumes the same hardware wallet
 -- seed phrase manages all relevant keys for the transaction. It returns the filepath to the new
 -- witness files.
-witnessTxBody :: Network -> TxBuilderModel -> IO [WitnessFile]
-witnessTxBody network TxBuilderModel{witnesses,isBuilt} = do
+witnessTxBody :: Network -> TxBuilderModel -> IO [KeyWitnessFile]
+witnessTxBody network TxBuilderModel{keyWitnesses,isBuilt} = do
   -- The transaction must be built.
   unless isBuilt $ throwIO $ AppError "The transaction must be built first."
 
@@ -33,11 +33,11 @@ witnessTxBody network TxBuilderModel{witnesses,isBuilt} = do
   -- Export all required pubkeys. Return the file names used for the hwsKeyFile. The file names
   -- will be prefixed by the respective key hashes. Skip witnesses for unknown derivation paths
   -- since these may be for a watched wallet.
-  (hwsFiles,witnessFiles) <- fmap (unzip . catMaybes) $ forM witnesses $ 
-    \(Witness (pkh,mPath)) -> flip (maybe (return Nothing)) mPath $ \path -> do
+  (hwsFiles,witnessFiles) <- fmap (unzip . catMaybes) $ forM keyWitnesses $ 
+    \(KeyWitness (pkh,mPath)) -> flip (maybe (return Nothing)) mPath $ \path -> do
         let hash = show pkh 
         hwsFile <- snd <$> exportHwKeyFiles (Just hash) path
-        return $ Just (hwsFile, WitnessFile $ tmpDir </> hash <.> "witness")
+        return $ Just (hwsFile, KeyWitnessFile $ tmpDir </> hash <.> "witness")
   
   -- Create the required witness files.
   runCmd_ $ witnessTxCmd network transformedTxFile hwsFiles witnessFiles
@@ -54,7 +54,7 @@ transformTxBodyCmd txBodyFile transformedTxFile =
 
 -- | The command to witness a transaction using the hardware wallet. It can be used to witness for
 -- multiple hardware wallet keys as long as all keys are for the same `account_index`.
-witnessTxCmd :: Network -> TransformedTxFile -> [HwSigningFile] -> [WitnessFile] -> String
+witnessTxCmd :: Network -> TransformedTxFile -> [HwSigningFile] -> [KeyWitnessFile] -> String
 witnessTxCmd network transformedTxFile hwsFiles witnessFiles = 
   String.unwords
     [ "cardano-hw-cli transaction witness"

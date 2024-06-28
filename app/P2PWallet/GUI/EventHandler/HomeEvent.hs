@@ -272,7 +272,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   AddSelectedUserInput personalUTxO ->
     let PaymentWallet{alias,paymentAddress,paymentKeyPath} = homeModel ^. #selectedWallet
-        newInput = fromPersonalUTxO alias paymentAddress paymentKeyPath personalUTxO
+        newInput = personalUTxOToUserInput alias paymentAddress paymentKeyPath personalUTxO
     in  case processNewUserInput newInput txBuilderModel of
           Left err -> [ Task $ return $ Alert err ]
           Right newTxModel ->
@@ -280,18 +280,62 @@ handleHomeEvent model@AppModel{..} evt = case evt of
             , Task $ return $ Alert "Successfully added to builder!"
             ]
 
+  -----------------------------------------------
+  -- Add Collateral UTxO to Builder
+  -----------------------------------------------
+  AddSelectedCollateralInput personalUTxO ->
+    let PaymentWallet{alias,paymentAddress,paymentKeyPath} = homeModel ^. #selectedWallet
+        newInput = personalUTxOToCollateralInput alias paymentAddress paymentKeyPath personalUTxO
+    in  case processNewCollateralInput newInput txBuilderModel of
+          Left err -> [ Task $ return $ Alert err ]
+          Right newTxModel ->
+            [ Model $ model & #txBuilderModel .~ newTxModel
+            , Task $ return $ Alert "Successfully added to builder!"
+            ]
+
+  -----------------------------------------------
+  -- Set address as change address.
+  -----------------------------------------------
+  AddSelectedChangeAddress paymentAddress ->
+    let oldChange = fromMaybe def $ txBuilderModel ^. #changeOutput 
+        newChange = oldChange & #paymentAddress .~ paymentAddress
+    in  [ Model $ model & #txBuilderModel % #changeOutput ?~ newChange
+        , Task $ return $ Alert "Successfully added to builder!"
+        ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
 -- | Validate the new user input and add it to the builder. Balance the transaction after.
 processNewUserInput :: UserInput -> TxBuilderModel -> Either Text TxBuilderModel
-processNewUserInput u@UserInput{utxoRef} model@TxBuilderModel{userInputs} = do
+processNewUserInput u@UserInput{utxoRef} model@TxBuilderModel{userInputs, collateralInput} = do
   -- Verify that the new utxo is not already being spent.
   maybeToLeft () $ "This input is already being spent." <$
     find (\i -> i ^. _2 % #utxoRef == utxoRef) userInputs
+
+  -- Verify that the new utxo is not being used as collateral.
+  whenJust collateralInput $ \collateral ->
+    when (collateral ^. #utxoRef == utxoRef) $ 
+      Left "This input is being used as collateral."
 
   -- Get the input's new index.
   let newIdx = length userInputs
 
   -- Add the new input to the end of the list of user inputs.
   return $ balanceTx $ model & #userInputs %~ flip snoc (newIdx,u)
+
+-- | Validate the new collateral input and add it to the builder. Balance the transaction after.
+processNewCollateralInput :: CollateralInput -> TxBuilderModel -> Either Text TxBuilderModel
+processNewCollateralInput u@CollateralInput{..} model@TxBuilderModel{userInputs} = do
+  -- There must be at least 5 ada in the input.
+  when (lovelace < 5_000_000) $ Left "Collateral must contain at least 5 ada."
+
+  -- There can be no native assets.
+  when (nativeAssets /= []) $ Left "Collateral cannot contain native assets."
+
+  -- Verify that the collateral utxo is not already being spent.
+  maybeToLeft () $ "This input is already being spent." <$
+    find (\i -> i ^. _2 % #utxoRef == utxoRef) userInputs
+
+  -- Add the new input to the end of the list of user inputs.
+  return $ balanceTx $ model & #collateralInput ?~ u
