@@ -83,25 +83,35 @@ profilesWidget model@AppModel{..} = do
 
 addProfileWidget :: AppModel -> AppNode
 addProfileWidget _ = do
-  let editFields = 
+  let innerDormantStyle = 
+        def `styleBasic` [textSize 10, bgColor customGray3, border 1 black]
+            `styleHover` [textSize 10, bgColor customGray2, border 1 black]
+      innerFocusedStyle = 
+        def `styleFocus` [textSize 10, bgColor customGray3, border 1 customBlue]
+            `styleFocusHover` [textSize 10, bgColor customGray2, border 1 customBlue]
+      editFields = 
         vstack_ [childSpacing]
           [ hstack 
               [ label "Profile Name:"
               , spacer
               , textField_ (toLensVL $ #profileModel % #newProfile % #alias) [placeholder "Personal"] 
-                  `styleBasic` [width 300]
+                  `styleBasic` [width 300, bgColor customGray1, sndColor darkGray]
+                  `styleFocus` [border 1 customBlue]
               ]
         , hstack
             [ label "Hardware Wallet:"
             , spacer
-            , textDropdown_ (toLensVL $ #profileModel % #newProfile % #device) supportedDevices display []
-                `styleBasic` [width 200]
+            , textDropdown_ (toLensVL $ #profileModel % #newProfile % #device) supportedDevices display
+                [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+                `styleBasic` [width 200, bgColor customGray1]
+                `styleFocus` [border 1 customBlue]
             ]
           , hstack 
               [ label "Account ID:"
               , spacer
               , numericField_ (toLensVL $ #profileModel % #newProfile % #accountIndex) [decimals 0]
-                  `styleBasic` [width 100]
+                  `styleBasic` [width 100, bgColor customGray1]
+                  `styleFocus` [border 1 customBlue]
               , mainButton helpIcon (Alert accountIdInfoMsg)
                   `styleBasic`
                     [ border 0 transparent

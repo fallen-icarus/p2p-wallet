@@ -12,7 +12,7 @@ import P2PWallet.Prelude
 
 -- | Assemble a list of witness files to produce the signed file. It returns the filepath to the
 -- signed transaction file.
-assembleWitnesses :: [WitnessFile] -> IO SignedTxFile
+assembleWitnesses :: [KeyWitnessFile] -> IO SignedTxFile
 assembleWitnesses witnessFiles = do
   tmpDir <- getTemporaryDirectory
   let transformedTxFile = TransformedTxFile $ tmpDir </> "tx" <.> "transformed"
@@ -25,7 +25,7 @@ assembleWitnesses witnessFiles = do
   return signedFile
 
 -- | The command to assemble a list of witnesses and produce a tx.signed file.
-assembleWitnessesCmd :: TransformedTxFile -> [WitnessFile] -> SignedTxFile -> String
+assembleWitnessesCmd :: TransformedTxFile -> [KeyWitnessFile] -> SignedTxFile -> String
 assembleWitnessesCmd transformedTxFile witnessFiles signedFile =
   String.unwords 
     [ "cardano-cli transaction assemble"

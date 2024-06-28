@@ -8,7 +8,6 @@ module P2PWallet.Actions.AddWallet
 
 import P2PWallet.Actions.ExportHwKey
 import P2PWallet.Actions.Utils
-import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Profile
 import P2PWallet.Data.Core.Wallets

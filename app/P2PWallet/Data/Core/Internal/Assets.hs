@@ -17,9 +17,19 @@ import Codec.Binary.Bech32.TH (humanReadablePart)
 import Crypto.Hash (hash)
 import Crypto.Hash.Algorithms (Blake2b_160)
 import Data.ByteArray (convert)
+import Data.Map.Strict qualified as StrictMap
 
 import P2PWallet.Plutus
 import P2PWallet.Prelude
+
+-------------------------------------------------
+-- MergeWith Class
+-------------------------------------------------
+-- | Combine like units of type `a` in `[a]`. For example, native assets should have
+-- their values summed, but leave the rest of the fields unchanged. How the values are merged
+-- is configurable (addition, subtraction, etc). `b` is assumed to be a field inside of `a`.
+class MergeWith a where
+  mergeWith :: (a -> a -> Either Text a) -> [a] -> Either Text [a]
 
 -------------------------------------------------
 -- Lovelace
@@ -139,7 +149,7 @@ data NativeAsset = NativeAsset
   , tokenName :: TokenName
   , fingerprint :: Fingerprint
   , quantity :: Integer
-  } deriving (Show,Eq)
+  } deriving (Show,Eq,Ord)
 
 makeFieldLabelsNoPrefix ''NativeAsset
 
@@ -169,6 +179,24 @@ instance FromJSON NativeAsset where
         <*> o .: "fingerprint"
         <*> (o .: "quantity" >>= maybe mzero return . readMaybe)
 
+instance MergeWith NativeAsset where
+  mergeWith f = sequence 
+              . toList 
+              . StrictMap.fromListWith (\a b -> join $ liftA2 f a b)
+              . map (\asset@NativeAsset{..} -> ((policyId,tokenName), Right asset))
+
+-- | Merge a list of `NativeAsset` by summing the quantities for like tokens.
+sumNativeAssets :: [NativeAsset] -> [NativeAsset]
+sumNativeAssets xs = fromRight [] $ mergeWith sumAssets xs
+  where
+    sumAssets :: NativeAsset -> NativeAsset -> Either Text NativeAsset
+    sumAssets NativeAsset{..} na2 = Right $ NativeAsset
+      { policyId = policyId
+      , tokenName = tokenName
+      , fingerprint = fingerprint
+      , quantity = quantity + na2 ^. #quantity
+      }
+
 onChainName :: Getter NativeAsset Text
 onChainName = to name
   where
@@ -189,4 +217,39 @@ parseNativeAsset t = case words $ replace "." " " t of
     tokenName <- TokenName <$> parseHex name
     let fingerprint = mkAssetFingerprint policyId tokenName
     return $ NativeAsset policyId tokenName fingerprint n
+  _ -> Nothing
+
+-------------------------------------------------
+-- Token Mints
+-------------------------------------------------
+-- | Token mints only contain the quantity and token name since the policy id is set by the
+-- script used to mint them.
+newtype TokenMint = TokenMint { unTokenMint :: (TokenName,Integer) }
+  deriving (Show,Eq,Ord)
+
+instance Display TokenMint where
+  display (TokenMint (name,num)) = show num <> " " <> display name
+
+instance MergeWith TokenMint where
+  mergeWith f = sequence 
+              . toList 
+              . StrictMap.fromListWith (\a b -> join $ liftA2 f a b)
+              . map (\mint@(TokenMint (name,_)) -> (name, Right mint))
+
+-- | Merge a list of `TokenMint` by summing the quantities for like tokens.
+sumTokenMints :: [TokenMint] -> [TokenMint]
+sumTokenMints xs = fromRight [] $ mergeWith sumMints xs
+  where
+    sumMints :: TokenMint -> TokenMint -> Either Text TokenMint
+    sumMints (TokenMint (name,num1)) (TokenMint (_,num2)) = 
+      Right $ TokenMint (name, num1 + num2)
+
+-- | Parse tokens that are assumed to be of the format: '# asset_name'. The `asset_name` is assumed
+-- to be in hexidecimal.
+parseTokenMint :: Text -> Maybe TokenMint
+parseTokenMint t = case words t of
+  [num,name] -> do
+    tokenName <- TokenName <$> parseHex name
+    n <- readMaybe @Integer $ toString num
+    return $ TokenMint (tokenName, n)
   _ -> Nothing

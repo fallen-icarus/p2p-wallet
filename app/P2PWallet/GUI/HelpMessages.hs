@@ -302,7 +302,7 @@ spendableEpochMsg = unlines
 
 nativeAssetAreaEntryMsg :: Text
 nativeAssetAreaEntryMsg = unlines
-  [ "Native assets must in one of the following formats:"
+  [ "Native assets must be in one of the following formats:"
   , "1. '# policy_id.asset_name'"
   , "2. '# fingerprint'"
   , "3. '# ticker'"
@@ -322,5 +322,35 @@ nativeAssetAreaEntryMsg = unlines
       , "fingerprint is 'abc123', the ticker is `ABC`, and the asset uses 6 decimal places, then"
       , "'1 abc123' is NOT the same as '1 ABC'! Instead, '1 ABC' would be '1000000 abc123'! Pay"
       , "attention to the conversions!"
+      ]
+  ]
+
+testTokenMintQuantitiesMsg :: Text
+testTokenMintQuantitiesMsg = unlines
+  [ mconcat $ intersperse " " 
+      [ "Test token names must be in the format '# asset_name' where 'asset_name' is in"
+      , "hexidecimal. You can use the provided converter to convert human-readable text"
+      , "to hexidecimal."
+      ]
+  , ""
+  , "Negative quantities imply burning while positive quantities imply minting."
+  ]
+
+aboutCollateralMsg :: Text
+aboutCollateralMsg = unlines
+  [ "Only transactions with smart contract executions require collateral."
+  , ""
+  , mconcat $ intersperse " " 
+      [ "Collateral UTxOs are NOT spent unless a smart contract execution fails."
+      , "This should never actually happen for any of the protocols supported by this wallet."
+      , "If someone beats you to a DeFi UTxO, the transaction will fail due to the UTxO no longer"
+      , "being present; no smart contracts will be executed in this scenario."
+      , "However, even if the collateral is never taken, it must still be included with each"
+      , "transaction."
+      ]
+  , ""
+  , mconcat $ intersperse " " 
+      [ "Collateral UTxOs must contain at least 5 ADA and not have any native assets present."
+      , "Only one collateral UTxO is required per transaction with smart contract executions."
       ]
   ]

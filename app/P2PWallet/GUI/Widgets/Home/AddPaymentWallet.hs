@@ -76,13 +76,15 @@ pairPaymentWidget model = do
               [ label "Payment Wallet Name:"
               , spacer
               , textField_ (toLensVL $ #homeModel % #newPaymentWallet % #alias) [placeholder "Personal"] 
-                  `styleBasic` [width 300]
+                  `styleBasic` [width 300, bgColor customGray1, sndColor darkGray]
+                  `styleFocus` [border 1 customBlue]
               ]
           , hstack 
               [ label "Payment Key Address Index:"
               , spacer
               , numericField (toLensVL $ #homeModel % #newPaymentWallet % #paymentAddressIndex)
-                  `styleBasic` [width 100]
+                  `styleBasic` [width 100, bgColor customGray1]
+                  `styleFocus` [border 1 customBlue]
               , mainButton helpIcon (Alert paymentAddressIndexMsg)
                   `styleBasic`
                     [ border 0 transparent
@@ -98,6 +100,7 @@ pairPaymentWidget model = do
               [ label "Enable Staking"
               , spacer
               , checkbox_ (toLensVL boolLens') [checkboxSquare]
+                  `styleBasic` [fgColor customGray1, hlColor customBlue]
               ]
           , hstack
               [ spacer_ [width 20]
@@ -106,7 +109,8 @@ pairPaymentWidget model = do
               , label "Staking Key Address Index:"
               , spacer
               , numericField (toLensVL numLens')
-                  `styleBasic` [width 100]
+                  `styleBasic` [width 100, bgColor customGray1]
+                  `styleFocus` [border 1 customBlue]
               , mainButton helpIcon (Alert stakeAddressIndexMsg)
                   `styleBasic`
                     [ border 0 transparent
@@ -153,14 +157,17 @@ watchPaymentWidget _ = do
               [ label "Payment Wallet Name:"
               , spacer
               , textField_ 
-                  (toLensVL $ #homeModel % #newPaymentWallet % #alias) 
-                  [placeholder "Personal Watched"] 
-                  `styleBasic` [width 300]
+                    (toLensVL $ #homeModel % #newPaymentWallet % #alias) 
+                    [placeholder "Personal Watched"] 
+                  `styleBasic` [width 300, bgColor customGray1, sndColor darkGray]
+                  `styleFocus` [border 1 customBlue]
               ]
           , hstack 
               [ label "Payment Address:"
               , spacer
               , textField (toLensVL $ #homeModel % #newPaymentWallet % #paymentAddress)
+                  `styleBasic` [bgColor customGray1]
+                  `styleFocus` [border 1 customBlue]
               ]
           ]
 

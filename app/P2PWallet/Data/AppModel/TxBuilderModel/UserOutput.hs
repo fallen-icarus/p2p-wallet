@@ -99,7 +99,7 @@ processNewUserOutput network tickerMap fingerprintMap NewUserOutput{..} = do
     { alias = alias
     , paymentAddress = addr
     , lovelace = toLovelace adaQuantity
-    , nativeAssets = assets
+    , nativeAssets = sumNativeAssets assets
     , showDetails = False
     , count = count
     }

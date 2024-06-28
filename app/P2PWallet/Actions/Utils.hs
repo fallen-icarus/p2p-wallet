@@ -2,7 +2,6 @@ module P2PWallet.Actions.Utils where
 
 import System.Exit (ExitCode(ExitSuccess))
 import System.Process (readCreateProcessWithExitCode, shell)
-import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
@@ -82,10 +81,16 @@ balanceTx tx@TxBuilderModel{..} =
           -- builder.
           (if newChange == def then Nothing else Just newChange)
        & #isBalanced .~ balanced
+       & #requiresCollateral .~ txNeedsCollateral
        & #isBuilt .~ False
   where
     totalWithdrawn :: Lovelace
     totalWithdrawn = sum $ map (view #lovelace . snd) userWithdrawals
+
+    totalMinted :: [NativeAsset]
+    totalMinted = mconcat
+      [ maybe [] (testMintToNativeAssets . view #mint) testMint
+      ]
 
     -- The total deposit required from certificates.
     requiredDeposits :: Lovelace
@@ -104,17 +109,15 @@ balanceTx tx@TxBuilderModel{..} =
           (outLoves,outAssets) = 
             -- Increase the quantity of lovelace for each output by the count.
             ( sum $ map (\(_,UserOutput{count,lovelace}) -> fromIntegral count * lovelace) userOutputs
-            -- Increase the quantity of each native asset by the count.
+            -- Increase the quantity of each native asset by the count, then negate it so that it
+            -- can be subtracted from the inputs.
             , flip concatMap userOutputs $ \(_,UserOutput{count,nativeAssets}) -> 
-                for nativeAssets $ \asset -> asset & #quantity %~ (fromIntegral count *)
+                for nativeAssets $ \asset -> asset & #quantity %~ (fromIntegral (-count) *)
             )
-          inMap = Map.fromList $ map (\a -> (a ^. onChainName, a ^. #quantity)) inAssets
-          outMap = Map.fromList $ map (\a -> (a ^. onChainName, negate $ a ^. #quantity)) outAssets
-          bal = map (fromMaybe def . parseNativeAsset . \(name',q) -> show q <> " " <> name') 
-              $ filter (\(_,q) -> q /= 0)
-              $ Map.toList 
-              $ Map.unionWith (+) inMap outMap
-      in (inLoves - outLoves,bal)
+          assetChange = filter ((/= 0) . view #quantity) -- filter out zero quantities
+                      $ sumNativeAssets 
+                      $ inAssets <> outAssets <> totalMinted
+      in (inLoves - outLoves, assetChange)
 
     lovelaceChange :: Lovelace
     lovelaceChange = loves - fee - requiredDeposits + totalWithdrawn
@@ -129,3 +132,9 @@ balanceTx tx@TxBuilderModel{..} =
     -- Whether all assets are balanced.
     balanced :: Bool
     balanced = all ((>= 0) . view #quantity) assets && lovelaceChange >= 0
+
+    -- Whether this transaction requires collateral.
+    txNeedsCollateral :: Bool
+    txNeedsCollateral = or
+      [ totalMinted /= []
+      ]

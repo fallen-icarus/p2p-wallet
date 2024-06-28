@@ -11,15 +11,19 @@ import Monomer hiding
   )
 import Prettyprinter (pretty, align, vsep, tupled)
 import Data.Text qualified as Text
+import Data.Map qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal.Assets
+import P2PWallet.Data.Core.Internal.Network
 import P2PWallet.Data.Core.TxBody
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 txBuilderWidget :: AppModel -> AppNode
@@ -59,12 +63,15 @@ txBuilderWidget model@AppModel{..} = do
           ] `nodeVisible` and
               [ isNothing targetUserOutput
               , not isAddingChangeOutput
+              , not isAddingTestMint
               , not isImporting
               ]
       , editUserOutputWidget (maybe "" (view (_2 % #alias)) targetUserOutput)
           `nodeVisible` isJust targetUserOutput
       , addChangeOutputWidget
           `nodeVisible` isAddingChangeOutput
+      , addTestMintWidget model
+          `nodeVisible` isAddingTestMint
       , importSignedTxWidget
           `nodeVisible` isImporting
       ] `styleBasic`
@@ -90,6 +97,9 @@ txBuilderWidget model@AppModel{..} = do
     isAddingChangeOutput :: Bool
     isAddingChangeOutput = txBuilderModel ^. #addingChangeOutput
 
+    isAddingTestMint :: Bool
+    isAddingTestMint = txBuilderModel ^. #addingTestMint
+
     isImporting :: Bool
     isImporting = txBuilderModel ^. #importing
 
@@ -100,11 +110,19 @@ txBuilderWidget model@AppModel{..} = do
     mainWidget = do
       vstack
         [ centerWidgetH $ label "Tx Builder"
-            `styleBasic` [paddingT 10, paddingB 10, textFont "Italics", textColor white, textSize 18]
+            `styleBasic` 
+              [ paddingT 10
+              , paddingB 10
+              , textFont "Italics"
+              , textColor white
+              , textSize 18
+              ]
         , box_ [alignMiddle] $ hstack
             [ changeInfoPopup model
             , spacer_ [width 2]
             , statusBar model
+            , spacer_ [width 2]
+            , collateralInfoPopup model `nodeVisible` isJust (txBuilderModel ^. #collateralInput)
             ]
         , vscroll_ [wheelRate 50] $
             vstack 
@@ -116,7 +134,7 @@ txBuilderWidget model@AppModel{..} = do
     addPopup :: AppNode
     addPopup = do
       let anchor = 
-            button remixCommandLine (TxBuilderEvent ShowTxAddPopup)
+            button commandIcon (TxBuilderEvent ShowTxAddPopup)
               `styleBasic`
                 [ border 0 transparent
                 , radius 20
@@ -141,6 +159,17 @@ txBuilderWidget model@AppModel{..} = do
                     , textMiddle
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              -- Minting test tokens is only available for the testnet.
+              , widgetIf (config ^. #network == Testnet) $
+                  button "Mint Test Tokens" (TxBuilderEvent $ AddNewTestMint $ StartAdding Nothing)
+                    `styleBasic`
+                      [ border 0 transparent
+                      , textSize 12
+                      , bgColor transparent
+                      , textColor customBlue
+                      , textMiddle
+                      ]
+                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
               , separatorLine `styleBasic` [fgColor black, padding 5]
               , button "Submit External Tx" (TxBuilderEvent $ ImportSignedTxFile $ StartAdding Nothing)
                   `styleBasic`
@@ -181,6 +210,7 @@ statusBar AppModel{txBuilderModel=TxBuilderModel{..}} = do
         | requiresCollateral = Just $ isJust collateralInput
         | otherwise = Nothing
       changeAddressSet = maybe False (("" /=) . view #paymentAddress) changeOutput
+      hasInputs = userInputs /= []
   hstack_ [childSpacing]
     [ hstack
         [ label "Change Address"
@@ -191,6 +221,20 @@ statusBar AppModel{txBuilderModel=TxBuilderModel{..}} = do
             `styleBasic`
               [ textFont "Remix"
               , textColor $ checkboxColor $ Just changeAddressSet
+              , textMiddle
+              , textSize 12
+              ]
+        ]
+    , separatorLine
+    , hstack
+        [ label "Inputs"
+            `styleBasic`
+              [ textSize 12 ]
+        , spacer_ [width 3]
+        , label (checkboxIcon $ Just hasInputs)
+            `styleBasic`
+              [ textFont "Remix"
+              , textColor $ checkboxColor $ Just hasInputs
               , textMiddle
               , textSize 12
               ]
@@ -214,6 +258,19 @@ statusBar AppModel{txBuilderModel=TxBuilderModel{..}} = do
         [ label "Collateral"
             `styleBasic`
               [ textSize 12 ]
+        , box_ [onClick $ Alert aboutCollateralMsg] $
+            label helpIcon
+              `styleBasic`
+                [ padding 2
+                , textSize 8
+                , border 0 transparent
+                , radius 20
+                , textMiddle
+                , bgColor transparent
+                , textColor customBlue
+                , textFont "Remix"
+                ]
+              `styleHover` [bgColor customGray1, cursorIcon CursorHand]
         , spacer_ [width 3]
         , label (checkboxIcon collateralState)
             `styleBasic`
@@ -235,7 +292,7 @@ changeInfoPopup AppModel{txBuilderModel,reverseTickerMap} = do
   let ChangeOutput{..} = fromMaybe def $ txBuilderModel ^. #changeOutput
       anchor = 
         box_ [alignMiddle] $ tooltip_ "Change Info" [tooltipDelay 0] $
-          button remixExchangeDollarLine (TxBuilderEvent ShowTxChangePopup)
+          button changeIcon (TxBuilderEvent ShowTxChangePopup)
             `styleBasic`
               [ border 0 transparent
               , radius 20
@@ -279,6 +336,63 @@ changeInfoPopup AppModel{txBuilderModel,reverseTickerMap} = do
                       map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
                 ]
             ]
+      ] `styleBasic`
+          [ bgColor customGray3
+          , border 1 black
+          , padding 10
+          , maxWidth 600
+          ]
+
+collateralInfoPopup :: AppModel -> AppNode
+collateralInfoPopup AppModel{txBuilderModel} = do
+  let CollateralInput{..} = fromMaybe def $ txBuilderModel ^. #collateralInput
+      anchor = 
+        box_ [alignMiddle] $ tooltip_ "Collateral Info" [tooltipDelay 0] $
+          button collateralIcon (TxBuilderEvent ShowTxCollateralPopup)
+            `styleBasic`
+              [ border 0 transparent
+              , radius 20
+              , padding 2
+              , bgColor transparent
+              , textColor customBlue
+              , textMiddle
+              , textFont "Remix"
+              ]
+            `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+  customPopup_ (toLensVL $ #txBuilderModel % #showCollateralPopup) 
+    [popupAnchor anchor, alignBottom, popupAlignToOuterV] $
+    vstack
+      [ hstack 
+          [ label "Output Reference:"
+              `styleBasic` [textSize 8]
+          , spacer
+          , label (display utxoRef)
+               `styleBasic` [textSize 8]
+          ]
+      , spacer_ [width 5]
+      , hstack 
+          [ label "From Wallet:"
+              `styleBasic` [textSize 8]
+          , spacer
+          , label walletAlias
+              `styleBasic` [textSize 8]
+          ]
+      , spacer_ [width 5]
+      , hstack 
+          [ label "Payment Address:"
+              `styleBasic` [textSize 8]
+          , spacer
+          , label (display paymentAddress)
+              `styleBasic` [textSize 8]
+          ]
+      , spacer_ [width 5]
+      , hstack 
+          [ label "Value:"
+              `styleBasic` [textSize 8]
+          , spacer
+          , label (display lovelace)
+              `styleBasic` [textSize 8]
+          ]
       ] `styleBasic`
           [ bgColor customGray3
           , border 1 black
@@ -376,7 +490,7 @@ userInputsList AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerM
       hstack
         [ filler
         , vstack
-            [ copyableLabelFor 8 "Payment Address:" (toText paymentAddress)
+            [ copyableLabelFor 8 lightGray "Payment Address:" (toText paymentAddress)
                 `styleBasic` [padding 2]
             , widgetIf (not $ null nativeAssets) $
                 vstack
@@ -400,11 +514,13 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
   let numActions = length userOutputs
                  + length userCertificates
                  + length userWithdrawals
+                 + maybe 0 (const 1) testMint
   vstack
     [ label ("Actions " <> show (tupled [pretty numActions]))
         `styleBasic` [textSize 12]
     , flip styleBasic [padding 10] $ vstack_ [childSpacing_ 5] $ mconcat
         [ userOutputsList reverseTickerMap userOutputs
+        , maybe [] (pure . testMintRow reverseTickerMap) testMint
         , userCertificatesList userCertificates
         , userWithdrawalsList userWithdrawals
         ]
@@ -499,6 +615,83 @@ userWithdrawalsList userWithdrawals = map withdrawalRow userWithdrawals
                 ]
               `styleHover` [bgColor customGray1, cursorIcon CursorHand]
         ]
+
+testMintRow :: ReverseTickerMap -> TestMint -> AppNode
+testMintRow reverseTickerMap TestMint{..} = do
+    hstack
+      [ vstack
+          [ hstack
+              [ label "Mint/Burn Test Tokens" `styleBasic` [textSize 10]
+              , filler
+              , copyableLabelSelf (show alwaysSucceedPolicyHash) white 10
+              ] 
+          , spacer_ [width 2]
+          , vstack_ [childSpacing_ 3] $ for (groupInto 2 $ testMintToNativeAssets mint) $ 
+              \assetRow -> 
+                hstack_ [childSpacing_ 3] $ [filler] <> map assetMintWidget assetRow
+          ] `styleBasic` 
+              [ padding 10
+              , bgColor customGray2
+              , radius 5
+              , border 1 black
+              ]
+      , spacer_ [width 3]
+      , box_ [alignCenter,alignMiddle] $ tooltip_ "Edit Action" [tooltipDelay 0] $
+          button editIcon 
+              (TxBuilderEvent $ AddNewTestMint $ StartAdding Nothing)
+            `styleBasic` 
+              [ textSize 10
+              , textColor customBlue
+              , textFont "Remix"
+              , textMiddle
+              , padding 3
+              , radius 3
+              , bgColor transparent
+              , border 0 transparent
+              ]
+            `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+      , box_ [alignCenter,alignMiddle] $ tooltip_ "Remove Action" [tooltipDelay 0] $
+          button closeCircleIcon (TxBuilderEvent RemoveTestMint)
+            `styleBasic` 
+              [ textSize 10
+              , textColor customRed
+              , textFont "Remix"
+              , textMiddle
+              , padding 3
+              , radius 3
+              , bgColor transparent
+              , border 0 transparent
+              ]
+            `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+      ]
+  where
+    assetMintWidget :: NativeAsset -> AppNode
+    assetMintWidget NativeAsset{..} = do
+      let (fluxIcon,color)
+            | quantity < 0 = (remixSubtractLine, customRed)
+            | otherwise = (remixAddLine, customBlue)
+          (name,formattedQuantity) = case Map.lookup (policyId,tokenName) reverseTickerMap of
+            Nothing -> (display fingerprint, show quantity)
+            Just (tckr,decimal) -> (display tckr, show $ formatQuantity decimal quantity)
+      hstack
+        [ label fluxIcon 
+            `styleBasic` 
+              [ textFont "Remix"
+              , textSize 8
+              , bgColor color
+              , padding 1
+              , radius 20
+              , textMiddle
+              , textCenter
+              ]
+        , spacer_ [width 3]
+        , copyableLabelSelf name lightGray 8
+        , spacer_ [width 3]
+        , label formattedQuantity
+            `styleBasic` 
+              [ textSize 8, padding 3, radius 3, bgColor customGray3, textColor color]
+        , spacer_ [width 2]
+        ] `styleBasic` [bgColor customGray4, paddingT 2, paddingB 2, paddingL 2, paddingR 0]
 
 userOutputsList :: ReverseTickerMap -> [(Int,UserOutput)] -> [AppNode]
 userOutputsList reverseTickerMap userOutputs = map utxoRow userOutputs
@@ -680,7 +873,8 @@ editUserOutputWidget recipient = do
         , spacer
         , textField_ (toLensVL $ maybeLens' % _2 % #ada)
               [placeholder "1.234567"]
-            `styleBasic` [width 200]
+            `styleBasic` [width 200, bgColor customGray1, sndColor darkGray]
+            `styleFocus` [border 1 customBlue]
         ]
     , spacer
     , hstack
@@ -697,7 +891,8 @@ editUserOutputWidget recipient = do
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         ]
     , textArea (toLensVL $ maybeLens' % _2 % #nativeAssets)
-        `styleBasic` [height 180, textSize 10]
+        `styleBasic` [height 180, textSize 10, bgColor customGray1]
+        `styleFocus` [border 1 customBlue]
     , spacer
     , hstack 
         [ filler
@@ -714,8 +909,8 @@ addChangeOutputWidget = do
         [ label "Change Address:"
         , spacer
         , textField (toLensVL $ #txBuilderModel % #newChangeOutput % #paymentAddress)
-            `styleBasic`
-              [textSize 10]
+            `styleBasic` [textSize 10, bgColor customGray1]
+            `styleFocus` [border 1 customBlue]
         ]
     , spacer
     , hstack 
@@ -726,6 +921,72 @@ addChangeOutputWidget = do
         ]
     ] `styleBasic` [bgColor customGray3, padding 20]
 
+addTestMintWidget :: AppModel -> AppNode
+addTestMintWidget AppModel{txBuilderModel=TxBuilderModel{newTestMint=NewTestMint{..}}} = do
+  centerWidget $ vstack 
+    [ centerWidgetH $ label "Which tokens would you like to mint/burn?"
+    , spacer
+    -- A converter from human-readable text to hexidecimal.
+    , hstack
+        [ label "Converter:" `styleBasic` [textSize 14]
+        , spacer_ [width 10]
+        , textField_ (toLensVL $ #txBuilderModel % #newTestMint % #exampleInput)
+              [placeholder "TestToken1"]
+            `styleBasic` [bgColor customGray1, width 200, textSize 10, sndColor darkGray]
+            `styleFocus` [border 1 customBlue]
+        , spacer_ [width 10]
+        , box_ [alignMiddle, onClick $ TxBuilderEvent $ ConvertExampleTestMintNameToHexidecimal] $
+            label remixArrowRightLine 
+              `styleBasic` [textMiddle, textFont "Remix", textColor customBlue, radius 5]
+              `styleHover` [bgColor customGray1]
+        , spacer_ [width 10]
+        , tooltip_ "Copy" [tooltipDelay 0] $ box_ [alignMiddle, onClick (CopyText exampleOutput)] $
+            label_ exampleOutput [ellipsis]
+              `styleBasic`
+                [ padding 10
+                , radius 5
+                , textLeft
+                , textSize 10
+                , border 1 black
+                , textColor white
+                , bgColor customGray2
+                , width 200
+                ]
+              `styleHover` [textColor customBlue, cursorIcon CursorHand]
+        ]
+    , widgetIf (Text.length exampleOutput > 64) $
+        label "Hexidecimal token names must be less than 64 characters."
+          `styleBasic`
+              [ textSize 8
+              , textColor customRed
+              ]
+    , spacer
+    , hstack
+        [ label "Token Quantities (separated with newlines)"
+            `styleBasic` [textSize 14]
+        , mainButton helpIcon (Alert testTokenMintQuantitiesMsg)
+            `styleBasic`
+              [ border 0 transparent
+              , radius 20
+              , bgColor transparent
+              , textColor customBlue
+              , textMiddle
+              , textFont "Remix"
+              ]
+            `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+        ]
+    , textArea (toLensVL $ #txBuilderModel % #newTestMint % #mint)
+        `styleBasic` [height 180, textSize 10, bgColor customGray1]
+        `styleFocus` [border 1 customBlue]
+    , spacer
+    , hstack 
+        [ filler
+        , button "Cancel" $ TxBuilderEvent $ AddNewTestMint CancelAdding
+        , spacer
+        , mainButton "Confirm" $ TxBuilderEvent $ AddNewTestMint ConfirmAdding
+        ]
+    ] `styleBasic` [bgColor customGray3, padding 20]
+
 importSignedTxWidget :: AppNode
 importSignedTxWidget = do
   centerWidget $ vstack 
@@ -733,8 +994,8 @@ importSignedTxWidget = do
         [ label "Absolute FilePath:"
         , spacer
         , textField (toLensVL $ #txBuilderModel % #importedSignedTxFile)
-            `styleBasic`
-              [textSize 10]
+            `styleBasic` [textSize 10, bgColor customGray1]
+            `styleFocus` [border 1 customBlue]
         ]
     , spacer
     , hstack 
@@ -773,8 +1034,8 @@ copyableLabelSelf caption color fontSize =
     `styleHover` [textColor customBlue, cursorIcon CursorHand]
 
 -- | A label button that will copy other data. The font size is configurable.
-copyableLabelFor :: Double -> Text -> Text -> WidgetNode s AppEvent
-copyableLabelFor fontSize caption info = 
+copyableLabelFor :: Double -> Color -> Text -> Text -> WidgetNode s AppEvent
+copyableLabelFor fontSize color caption info = 
   hstack
     [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
         `styleBasic`
@@ -788,7 +1049,7 @@ copyableLabelFor fontSize caption info =
           ]
         `styleHover` [textColor lightGray, cursorIcon CursorHand]
     , spacer
-    , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize fontSize]
+    , label_ info [ellipsis] `styleBasic` [textColor color, textSize fontSize]
     ]
 
 copyableLabelSelfWith :: (ToText a) => Double -> (a -> Text) -> a -> Color -> WidgetNode s AppEvent

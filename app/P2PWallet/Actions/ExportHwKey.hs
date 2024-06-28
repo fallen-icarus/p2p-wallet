@@ -8,7 +8,6 @@ import System.FilePath ((</>), (<.>))
 import Data.String qualified as String
 
 import P2PWallet.Actions.Utils
-import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Plutus
 import P2PWallet.Prelude

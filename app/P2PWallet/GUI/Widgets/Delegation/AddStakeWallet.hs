@@ -72,14 +72,16 @@ pairStakeWidget = do
               [ label "Stake Wallet Name:"
               , spacer
               , textField_ (toLensVL $ #delegationModel % #newStakeWallet % #alias) 
-                  [placeholder "Personal Stake"]
-                  `styleBasic` [width 300]
+                    [placeholder "Personal Stake"]
+                  `styleBasic` [width 300, bgColor customGray1, sndColor darkGray]
+                  `styleFocus` [border 1 customBlue]
               ]
           , hstack 
               [ label "Stake Key Address Index:"
               , spacer
               , numericField (toLensVL $ #delegationModel % #newStakeWallet % #stakeAddressIndex)
-                  `styleBasic` [width 100]
+                  `styleBasic` [width 100, bgColor customGray1]
+                  `styleFocus` [border 1 customBlue]
               , mainButton helpIcon (Alert stakeAddressIndexMsg)
                   `styleBasic`
                     [ border 0 transparent
@@ -126,14 +128,17 @@ watchStakeWidget = do
               [ label "Stake Wallet Name:"
               , spacer
               , textField_ 
-                  (toLensVL $ #delegationModel % #newStakeWallet % #alias) 
-                  [placeholder "Personal Stake Watched"] 
-                  `styleBasic` [width 300]
+                    (toLensVL $ #delegationModel % #newStakeWallet % #alias) 
+                    [placeholder "Personal Stake Watched"] 
+                  `styleBasic` [width 300, bgColor customGray1, sndColor darkGray]
+                  `styleFocus` [border 1 customBlue]
               ]
           , hstack 
               [ label "Stake Address:"
               , spacer
               , textField (toLensVL $ #delegationModel % #newStakeWallet % #stakeAddress)
+                  `styleBasic` [bgColor customGray1]
+                  `styleFocus` [border 1 customBlue]
               ]
           ]
 

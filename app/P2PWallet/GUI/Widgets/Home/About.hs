@@ -11,6 +11,7 @@ import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -48,8 +49,23 @@ addressInfoWidget AppModel{homeModel=HomeModel{selectedWallet},..} = do
         \addr -> find (\stake -> addr == stake ^. #stakeAddress) knownStakeWallets
 
   vstack 
-    [ centerWidgetH $ label "Address Info" 
-        `styleBasic` [textFont "Italics", textSize 18, padding 10]
+    [ centerWidgetH $ 
+        hstack
+          [ label "Address Info" 
+              `styleBasic` [textFont "Italics", textSize 18, padding 10, paddingR 2]
+          , box_ [alignMiddle] $ tooltip_ "Use for change" [tooltipDelay 0] $
+              button changeIcon (HomeEvent $ AddSelectedChangeAddress paymentAddress)
+                `styleBasic`
+                  [ border 0 transparent
+                  , radius 20
+                  , padding 2
+                  , bgColor transparent
+                  , textColor customBlue
+                  , textMiddle
+                  , textFont "Remix"
+                  ]
+                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          ]
     , vstack
         [ hstack
             [ spacer_ [width 10]

@@ -93,7 +93,8 @@ editProfileWidget _ = do
             [ label "Profile Name:"
             , spacer
             , textField (toLensVL $ #profileModel % #newProfile % #alias)
-                `styleBasic` [width 300]
+                `styleBasic` [width 300, bgColor customGray1]
+                `styleFocus` [border 1 customBlue]
             ]
         ]
     , spacer

@@ -28,16 +28,17 @@ tickerRegistryWidget AppModel{..} = do
       , centerWidgetH $ hstack
           [ label "Ticker:"
           , spacer_ [width 5]
-          , textField_ (toLensVL $ #tickerRegistryModel % #search) [placeholder "DJED"] 
+          , textField_ (toLensVL $ #tickerRegistryModel % #search) 
+                [ placeholder "DJED" ] 
               `styleBasic`
                 [ textSize 12
                 , width 200
+                , bgColor customGray1
+                , sndColor darkGray
                 ]
-              `nodeEnabled` and
-                [ not isAdding
-                , not isEditing
-                , not isDeleting
-                ]
+              `styleDisabled` [textColor white]
+              `styleFocus` [border 1 customBlue]
+              `nodeEnabled` not isChanging
           , spacer_ [width 5]
           , toggleButton_ "Search" (toLensVL #forceRedraw)
               [toggleButtonOffStyle searchOffStyle]
@@ -47,29 +48,21 @@ tickerRegistryWidget AppModel{..} = do
                 , textSize 12
                 , border 1 customBlue
                 ]
-              `styleHover`
-                [ bgColor customGray1
+              `styleHover` [ bgColor customGray1 ]
+              `styleDisabled`
+                [ textColor darkGray
+                , border 1 darkGray
                 ]
-              `nodeEnabled` and
-                [ not isAdding
-                , not isEditing
-                , not isDeleting
-                ]
+              `nodeEnabled` not isChanging
           ]
       , box_ [mergeRequired reqUpdate] $ zstack
           [ widgetMaybe result resultWidget
-              `nodeVisible` and
-                [ not isAdding 
-                , not isEditing 
-                , not isDeleting
-                ]
+              `nodeVisible` not isChanging
           , unknownTickerWidget
               `nodeVisible` and
                 [ isNothing result
                 , searchTarget /= ""
-                , not isAdding
-                , not isEditing
-                , not isDeleting
+                , not isChanging
                 ]
           , addingTickerWidget `nodeVisible` isAdding
           , editingTickerWidget `nodeVisible` isEditing
@@ -83,6 +76,13 @@ tickerRegistryWidget AppModel{..} = do
           , radius 20
           ]
   where
+    isChanging :: Bool
+    isChanging = or
+      [ isAdding
+      , isEditing
+      , isDeleting
+      ]
+
     isAdding :: Bool
     isAdding = tickerRegistryModel ^. #addingTicker
 
@@ -197,21 +197,24 @@ tickerRegistryWidget AppModel{..} = do
             [ label "Policy Id:"
             , spacer
             , textField (toLensVL $ #tickerRegistryModel % #newTickerInfo % #policyId) 
-                `styleBasic` [textSize 12]
+                `styleBasic` [textSize 12, bgColor customGray1]
+                `styleFocus` [border 1 customBlue]
             ]
         , spacer
         , hstack 
             [ label "Asset Name:"
             , spacer
             , textField (toLensVL $ #tickerRegistryModel % #newTickerInfo % #assetName) 
-                `styleBasic` [textSize 12]
+                `styleBasic` [textSize 12, bgColor customGray1]
+                `styleFocus` [border 1 customBlue]
             ]
         , spacer
         , hstack 
             [ label "Decimals:"
             , spacer
             , numericField (toLensVL $ #tickerRegistryModel % #newTickerInfo % #decimals)
-                `styleBasic` [textSize 12, width 100]
+                `styleBasic` [textSize 12, width 100, bgColor customGray1]
+                `styleFocus` [border 1 customBlue]
             ]
         , spacer
         , hstack 
@@ -229,21 +232,24 @@ tickerRegistryWidget AppModel{..} = do
             [ label "Policy Id:"
             , spacer
             , textField (toLensVL $ #tickerRegistryModel % #newTickerInfo % #policyId) 
-                `styleBasic` [textSize 12]
+                `styleBasic` [textSize 12, bgColor customGray1]
+                `styleFocus` [border 1 customBlue]
             ]
         , spacer
         , hstack 
             [ label "Asset Name:"
             , spacer
             , textField (toLensVL $ #tickerRegistryModel % #newTickerInfo % #assetName) 
-                `styleBasic` [textSize 12]
+                `styleBasic` [textSize 12, bgColor customGray1]
+                `styleFocus` [border 1 customBlue]
             ]
         , spacer
         , hstack 
             [ label "Decimals:"
             , spacer
             , numericField (toLensVL $ #tickerRegistryModel % #newTickerInfo % #decimals)
-                `styleBasic` [textSize 12, width 100]
+                `styleBasic` [textSize 12, width 100, bgColor customGray1]
+                `styleFocus` [border 1 customBlue]
             ]
         , spacer
         , hstack 

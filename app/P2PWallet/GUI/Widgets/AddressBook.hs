@@ -40,11 +40,10 @@ addressBookWidget AppModel{..} = do
               ]
           , spacer_ [width 3]
           , textField_ 
-              (toLensVL $ #addressBookModel % #search) 
-              [placeholder "one of: alias, bech32 payment address"] 
-              `styleBasic`
-                [ textSize 12
-                ]
+                (toLensVL $ #addressBookModel % #search) 
+                [placeholder "one of: alias, bech32 payment address"] 
+              `styleBasic` [ textSize 12 , bgColor customGray1, sndColor darkGray]
+              `styleFocus` [border 1 customBlue]
 
           , widgetIf (sample /= []) $ cushionWidget $ vscroll_ [wheelRate 50] $ 
               vstack_ [childSpacing] (map contactRow sample)
@@ -182,14 +181,16 @@ addContactWidget = do
             , spacer
             , textField_ (toLensVL $ #addressBookModel % #newAddressEntry % #alias) 
                   [placeholder "Alice"]
-                `styleBasic` [width 300]
+                `styleBasic` [width 300, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
             ]
         , hstack 
             [ label "Payment Address:"
             , spacer
             , textField_ (toLensVL $ #addressBookModel % #newAddressEntry % #paymentAddress) 
                   [placeholder "bech32 address"]
-                `styleBasic` [textSize 10]
+                `styleBasic` [textSize 10, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
             ]
         ]
     , spacer
@@ -210,14 +211,16 @@ editContactWidget = do
             , spacer
             , textField_ (toLensVL $ #addressBookModel % #newAddressEntry % #alias) 
                   [placeholder "Alice"]
-                `styleBasic` [width 300]
+                `styleBasic` [width 300, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
             ]
         , hstack 
             [ label "Payment Address:"
             , spacer
             , textField_ (toLensVL $ #addressBookModel % #newAddressEntry % #paymentAddress) 
                   [placeholder "bech32 address"]
-                `styleBasic` [textSize 10]
+                `styleBasic` [textSize 10, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
             ]
         ]
     , spacer
@@ -257,7 +260,8 @@ addNewUserOutputWidget recipient = do
         , spacer
         , textField_ (toLensVL $ #addressBookModel % #newUserOutput % #ada)
               [placeholder "1.234567"]
-            `styleBasic` [width 200]
+            `styleBasic` [width 200, bgColor customGray1, sndColor darkGray]
+            `styleFocus` [border 1 customBlue]
         ]
     , spacer
     , hstack
@@ -274,7 +278,8 @@ addNewUserOutputWidget recipient = do
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         ]
     , textArea (toLensVL $ #addressBookModel % #newUserOutput % #nativeAssets)
-        `styleBasic` [height 180, textSize 10]
+        `styleBasic` [height 180, textSize 10, bgColor customGray1]
+        `styleFocus` [border 1 customBlue]
     , spacer
     , hstack 
         [ filler

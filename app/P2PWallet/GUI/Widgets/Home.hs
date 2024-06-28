@@ -240,7 +240,8 @@ editPaymentWalletWidget = do
             [ label "Wallet Name:"
             , spacer
             , textField (toLensVL #extraTextField) 
-                `styleBasic` [width 400]
+                `styleBasic` [width 400, bgColor customGray1]
+                `styleFocus` [border 1 customBlue]
             ]
         ]
     , spacer

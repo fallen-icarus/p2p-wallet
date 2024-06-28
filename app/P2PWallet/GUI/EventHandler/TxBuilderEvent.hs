@@ -13,16 +13,11 @@ import P2PWallet.Actions.WitnessTxBody
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 handleTxBuilderEvent :: AppModel -> TxBuilderEvent -> [AppEventResponse AppModel AppEvent]
 handleTxBuilderEvent model@AppModel{..} evt = case evt of
-  -----------------------------------------------
-  -- Changing Scenes
-  -----------------------------------------------
-  ChangeBuilderScene newScene -> 
-    [ Model $ model & #txBuilderModel % #scene .~ newScene ]
-
   -----------------------------------------------
   -- Reset the Builder
   -----------------------------------------------
@@ -40,6 +35,12 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   ShowTxChangePopup -> 
     [ Model $ model & #txBuilderModel % #showChangePopup .~ True ]
+
+  -----------------------------------------------
+  -- Open the Collateral Popup
+  -----------------------------------------------
+  ShowTxCollateralPopup -> 
+    [ Model $ model & #txBuilderModel % #showCollateralPopup .~ True ]
 
   -----------------------------------------------
   -- Remove User Input from Builder
@@ -73,6 +74,15 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   RemoveSelectedUserWithdrawal idx ->
     [ Model $ model & #txBuilderModel % #userWithdrawals %~ removeAction idx
+                    & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Remove Test Mint from Builder
+  -----------------------------------------------
+  RemoveTestMint ->
+    [ Model $ model & #txBuilderModel % #testMint .~ Nothing
                     & #txBuilderModel %~ balanceTx
     , Task $ return $ Alert "Successfully removed from builder!"
     ]
@@ -134,6 +144,44 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
       ]
 
   -----------------------------------------------
+  -- Add the new test mint
+  -----------------------------------------------
+  AddNewTestMint modal -> case modal of
+    StartAdding _ ->
+      -- Set the `newTestMint` field to either the current info if set, or a fresh
+      -- entry.
+      let currentMint = maybe def toNewTestMint $ txBuilderModel ^. #testMint in
+      [ Model $ model & #txBuilderModel % #newTestMint .~ currentMint
+                      & #txBuilderModel % #addingTestMint .~ True
+      ]
+    CancelAdding ->
+      [ Model $ model & #txBuilderModel % #newTestMint .~ def 
+                      & #txBuilderModel % #addingTestMint .~ False
+      ]
+    ConfirmAdding -> 
+      [ Task $ runActionOrAlert (TxBuilderEvent . AddNewTestMint . AddResult) $ do
+          fromRightOrAppError $
+            processNewTestMint $ txBuilderModel ^. #newTestMint
+      ]
+    AddResult verifiedTestMint ->
+      [ Model $
+          model & #txBuilderModel % #testMint ?~ verifiedTestMint
+                & #txBuilderModel % #newTestMint .~ def
+                & #txBuilderModel % #addingTestMint .~ False
+                & #txBuilderModel %~ balanceTx
+      ]
+
+  -----------------------------------------------
+  -- Convert the user's token name to hexidecimal
+  -----------------------------------------------
+  ConvertExampleTestMintNameToHexidecimal ->
+    [ Model $ model
+        & #txBuilderModel % #newTestMint % #exampleOutput .~
+            (toHexidecimal $ txBuilderModel ^. #newTestMint % #exampleInput)
+    ]
+
+
+  -----------------------------------------------
   -- Building transactions
   -----------------------------------------------
   BuildTx modal -> case modal of
@@ -174,9 +222,9 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
       [ Model $ 
           -- The waitingOnDevice flag is left active. It will be disabled by whatever gets called
           -- next.
-          model & #txBuilderModel % #witnessFiles .~ witnessFiles
+          model & #txBuilderModel % #keyWitnessFiles .~ witnessFiles
       , Task $ 
-          if txBuilderModel ^. #allWitnessesKnown then
+          if txBuilderModel ^. #allKeyWitnessesKnown then
             -- The witnesses can be assembled and then submitted to the blockchain.
             return $ TxBuilderEvent $ AssembleWitnesses StartProcess
           else
@@ -191,7 +239,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   AssembleWitnesses modal -> case modal of
     StartProcess ->
       [ Task $ runActionOrAlert (TxBuilderEvent . AssembleWitnesses . ProcessResults) $
-          assembleWitnesses (txBuilderModel ^. #witnessFiles)
+          assembleWitnesses (txBuilderModel ^. #keyWitnessFiles)
       ]
     ProcessResults signedFile -> 
       [ Model $ 
@@ -205,7 +253,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   ExportTxBody modal -> case modal of
     StartProcess ->
       [ Task $ runActionOrAlert (TxBuilderEvent . ExportTxBody . ProcessResults) $
-          exportTxBody (txBuilderModel ^. #witnessFiles)
+          exportTxBody (txBuilderModel ^. #keyWitnessFiles)
       ]
     ProcessResults exportDestination -> 
       [ Model $ 

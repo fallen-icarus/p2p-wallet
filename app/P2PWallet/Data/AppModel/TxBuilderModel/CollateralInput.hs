@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module P2PWallet.Data.AppModel.TxBuilderModel.UserInput where
+module P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput where
 
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
@@ -13,10 +13,10 @@ import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------
--- User Inputs
+-- Collateral Input
 -------------------------------------------------
--- | Information for a user input. These are non-defi spending inputs.
-data UserInput = UserInput
+-- | Information for a collateral input.
+data CollateralInput = CollateralInput
   { utxoRef :: TxOutRef
   -- | The bech32 address for this input. This is used to get any required key hashes.
   , paymentAddress :: PaymentAddress
@@ -26,26 +26,36 @@ data UserInput = UserInput
   , lovelace :: Lovelace
   -- | The native assets in this UTxO.
   , nativeAssets :: [NativeAsset]
-  -- | Whether the widget expands the info for this input.
-  , showDetails :: Bool 
   -- | Wallet this UTxO is from.
   , walletAlias :: Text
   } deriving (Show,Eq)
 
-makeFieldLabelsNoPrefix ''UserInput
+makeFieldLabelsNoPrefix ''CollateralInput
 
-instance AddToTxBody UserInput where
-  addToTxBody txBody UserInput{utxoRef,paymentAddress,paymentKeyPath} = 
+instance Default CollateralInput where
+  def = CollateralInput
+    { utxoRef = TxOutRef "" 0
+    , paymentAddress = ""
+    , paymentKeyPath = Nothing
+    , lovelace = 0
+    , nativeAssets = []
+    , walletAlias = ""
+    }
+
+instance AddToTxBody CollateralInput where
+  addToTxBody txBody CollateralInput{utxoRef,paymentAddress,paymentKeyPath,lovelace} = 
       txBody 
-        -- Add the input while preserving ordering.
-        & #inputs %~ flip snoc newInput
+        -- Add the collateral input.
+        & #collateralInput ?~ newCollateral
         -- Add the witness if required. Duplicate witnesses are removed by the `Semigroup` 
         -- instance of `TxBody`. They will also be sorted.
         & #keyWitnesses %~ maybe id (:) requiredWitness
     where 
-      newInput :: TxBodyInput
-      newInput = TxBodyInput
+      newCollateral :: TxBodyCollateral
+      newCollateral = TxBodyCollateral
         { utxoRef = utxoRef
+        , lovelace = lovelace
+        , paymentAddress = paymentAddress
         }
 
       plutusAddress :: PlutusAddress
@@ -58,19 +68,18 @@ instance AddToTxBody UserInput where
           Nothing -> Nothing
           Just pkHash -> Just $ KeyWitness (pkHash, paymentKeyPath)
 
-personalUTxOToUserInput 
+personalUTxOToCollateralInput
   :: Text 
   -> PaymentAddress 
   -> Maybe DerivationPath 
   -> PersonalUTxO 
-  -> UserInput
-personalUTxOToUserInput alias paymentAddress mKeyPath PersonalUTxO{utxoRef,lovelace,nativeAssets} = 
-  UserInput
+  -> CollateralInput
+personalUTxOToCollateralInput alias paymentAddress mKeyPath PersonalUTxO{utxoRef,lovelace,nativeAssets} = 
+  CollateralInput
     { utxoRef = utxoRef
     , paymentAddress = paymentAddress
     , paymentKeyPath = mKeyPath
     , lovelace = lovelace
     , nativeAssets = nativeAssets
-    , showDetails = False
     , walletAlias = alias
     }
