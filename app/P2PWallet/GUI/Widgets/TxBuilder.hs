@@ -134,18 +134,19 @@ txBuilderWidget model@AppModel{..} = do
     addPopup :: AppNode
     addPopup = do
       let anchor = 
-            button commandIcon (TxBuilderEvent ShowTxAddPopup)
-              `styleBasic`
-                [ border 0 transparent
-                , radius 20
-                , paddingT 2
-                , paddingB 2
-                , bgColor black
-                , textColor customBlue
-                , textMiddle
-                , textFont "Remix"
-                ]
-              `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            tooltip_ "Tools" [tooltipDelay 0] $
+              button toolsIcon (TxBuilderEvent ShowTxAddPopup)
+                `styleBasic`
+                  [ border 0 transparent
+                  , radius 20
+                  , paddingT 2
+                  , paddingB 2
+                  , bgColor customGray3
+                  , textColor customBlue
+                  , textMiddle
+                  , textFont "Remix"
+                  ]
+                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
       vstack
         [ customPopup_ (toLensVL $ #txBuilderModel % #showAddPopup) 
             [popupAnchor anchor, alignTop, alignLeft, popupAlignToOuterV] $
@@ -290,6 +291,7 @@ statusBar AppModel{txBuilderModel=TxBuilderModel{..}} = do
 changeInfoPopup :: AppModel -> AppNode
 changeInfoPopup AppModel{txBuilderModel,reverseTickerMap} = do
   let ChangeOutput{..} = fromMaybe def $ txBuilderModel ^. #changeOutput
+      prettyAssets = map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
       anchor = 
         box_ [alignMiddle] $ tooltip_ "Change Info" [tooltipDelay 0] $
           button changeIcon (TxBuilderEvent ShowTxChangePopup)
@@ -331,9 +333,15 @@ changeInfoPopup AppModel{txBuilderModel,reverseTickerMap} = do
             , label "Native Assets:" `styleBasic` [textSize 8]
             , hstack
                 [ spacer_ [width 10]
-                , flip styleBasic [textSize 8, maxWidth 300] $
-                    copyableTextArea $ show $ align $ vsep $ 
-                      map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
+                , vstack
+                    [ spacer_ [width 10]
+                    , copyableTextArea (show $ align $ vsep prettyAssets)
+                        `styleBasic` 
+                          [ height $ 20 + 12 * (fromIntegral (length nativeAssets) - 1)
+                          , textSize 8
+                          , maxWidth 300
+                          ]
+                    ]
                 ]
             ]
       ] `styleBasic`
@@ -357,6 +365,7 @@ collateralInfoPopup AppModel{txBuilderModel} = do
               , textColor customBlue
               , textMiddle
               , textFont "Remix"
+              , textSize 14
               ]
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
   customPopup_ (toLensVL $ #txBuilderModel % #showCollateralPopup) 
@@ -486,7 +495,8 @@ userInputsList AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerM
         ]
 
     utxoDetails :: UserInput -> AppNode
-    utxoDetails UserInput{..} = 
+    utxoDetails UserInput{..} = do
+      let prettyAssets = map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
       hstack
         [ filler
         , vstack
@@ -497,9 +507,16 @@ userInputsList AppModel{txBuilderModel=TxBuilderModel{userInputs},reverseTickerM
                   [ label "Native Assets:" `styleBasic` [textSize 8, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , flip styleBasic [textSize 8, textColor lightGray, maxWidth 300] $
-                          copyableTextArea $ show $ align $ vsep $ 
-                            map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
+                      , vstack
+                          [ spacer_ [width 10]
+                          , copyableTextArea (show $ align $ vsep prettyAssets)
+                              `styleBasic` 
+                                [ height $ 20 + 12 * (fromIntegral (length nativeAssets) - 1)
+                                , textSize 8
+                                , textColor lightGray
+                                , maxWidth 300
+                                ]
+                          ]
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`
@@ -527,7 +544,7 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
     ] `styleBasic` [padding 5]
 
 userCertificatesList :: [(Int,UserCertificate)] -> [AppNode]
-userCertificatesList userCertificates = map certificateRow userCertificates
+userCertificatesList = map certificateRow
   where
     certificateRow :: (Int,UserCertificate) -> AppNode
     certificateRow (idx,UserCertificate{..}) = do
@@ -575,7 +592,7 @@ userCertificatesList userCertificates = map certificateRow userCertificates
         ]
 
 userWithdrawalsList :: [(Int,UserWithdrawal)] -> [AppNode]
-userWithdrawalsList userWithdrawals = map withdrawalRow userWithdrawals
+userWithdrawalsList = map withdrawalRow
   where
     withdrawalRow :: (Int,UserWithdrawal) -> AppNode
     withdrawalRow (idx,UserWithdrawal{..}) = do
@@ -694,7 +711,7 @@ testMintRow reverseTickerMap TestMint{..} = do
         ] `styleBasic` [bgColor customGray4, paddingT 2, paddingB 2, paddingL 2, paddingR 0]
 
 userOutputsList :: ReverseTickerMap -> [(Int,UserOutput)] -> [AppNode]
-userOutputsList reverseTickerMap userOutputs = map utxoRow userOutputs
+userOutputsList reverseTickerMap = map utxoRow
   where
     moreTip :: Bool -> Text
     moreTip detailsOpen
@@ -841,7 +858,8 @@ userOutputsList reverseTickerMap userOutputs = map utxoRow userOutputs
         ]
 
     utxoDetails :: UserOutput -> AppNode
-    utxoDetails UserOutput{nativeAssets} = 
+    utxoDetails UserOutput{nativeAssets} = do
+      let prettyAssets = map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
       hstack
         [ filler
         , vstack
@@ -850,9 +868,16 @@ userOutputsList reverseTickerMap userOutputs = map utxoRow userOutputs
                   [ label "Native Assets:" `styleBasic` [textSize 8, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , flip styleBasic [textSize 8,textColor lightGray, maxWidth 300] $ 
-                          copyableTextArea $ show $ align $ vsep $ 
-                            map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
+                      , vstack
+                          [ spacer_ [width 10]
+                          , copyableTextArea (show $ align $ vsep prettyAssets)
+                              `styleBasic` 
+                                [ height $ 20 + 12 * (fromIntegral (length nativeAssets) - 1)
+                                , textSize 8
+                                , textColor lightGray
+                                , maxWidth 300
+                                ]
+                          ]
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`
@@ -935,7 +960,7 @@ addTestMintWidget AppModel{txBuilderModel=TxBuilderModel{newTestMint=NewTestMint
             `styleBasic` [bgColor customGray1, width 200, textSize 10, sndColor darkGray]
             `styleFocus` [border 1 customBlue]
         , spacer_ [width 10]
-        , box_ [alignMiddle, onClick $ TxBuilderEvent $ ConvertExampleTestMintNameToHexidecimal] $
+        , box_ [alignMiddle, onClick $ TxBuilderEvent ConvertExampleTestMintNameToHexidecimal] $
             label remixArrowRightLine 
               `styleBasic` [textMiddle, textFont "Remix", textColor customBlue, radius 5]
               `styleHover` [bgColor customGray1]
@@ -985,7 +1010,7 @@ addTestMintWidget AppModel{txBuilderModel=TxBuilderModel{newTestMint=NewTestMint
         , spacer
         , mainButton "Confirm" $ TxBuilderEvent $ AddNewTestMint ConfirmAdding
         ]
-    ] `styleBasic` [bgColor customGray3, padding 20]
+    ] `styleBasic` [bgColor customGray3, padding 20, radius 10, paddingB 5]
 
 importSignedTxWidget :: AppNode
 importSignedTxWidget = do

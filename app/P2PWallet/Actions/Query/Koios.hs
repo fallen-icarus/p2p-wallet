@@ -450,7 +450,7 @@ queryAddressTransactions = txInfoApi select "block_height.desc" . TxHashes
         , "outputs"
         , "certificates"
         , "withdrawals"
-        -- , "assets_minted"
+        , "assets_minted"
         -- , "native_scripts"
         -- , "plutus_contracts" 
         ]

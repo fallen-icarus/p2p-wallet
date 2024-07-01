@@ -61,10 +61,12 @@ handleProfileEvent model@AppModel{..} evt = case evt of
   -- Log the user out of the currently selected profile, and return the user to the profile 
   -- picker screen.
   LogoutProfile -> 
-    [ Model $ model & #scene .~ ProfilesScene 
-                    & #selectedProfile .~ Nothing
-                    & #knownWallets .~ def
-                    & #addressBook .~ []
+    [ Model $ model 
+        & #scene .~ ProfilesScene 
+        & #selectedProfile .~ Nothing
+        & #knownWallets .~ def
+        & #addressBook .~ []
+        & #txBuilderModel .~ def -- reset builder
     ]
 
   -----------------------------------------------

@@ -43,18 +43,10 @@ runCmd cmd =
         ('\n':xs) -> reverse xs
         _ -> s
 
--- | Run the command without returning anything except an error message if an error occurs. The trailing newline is
--- dropped for the error message.
+-- | Run the command without returning anything except an error message if an error occurs. The
+-- trailing newline is dropped for the error message.
 runCmd_ :: String -> IO ()
-runCmd_ cmd =
-    readCreateProcessWithExitCode (shell cmd) [] >>= \case
-      (ExitSuccess,_,_) -> return ()
-      (_,_,errMsg) -> throwIO $ AppError $ toText $ dropTrailingNewline errMsg
-  where
-    dropTrailingNewline s = 
-      case reverse s of
-        ('\n':xs) -> reverse xs
-        _ -> s
+runCmd_ = void . runCmd
 
 -- | Re-index the lists while preserving ordering.
 reIndex :: [(Int,a)] -> [(Int,a)]
