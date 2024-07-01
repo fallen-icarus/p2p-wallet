@@ -17,6 +17,10 @@ data ValidatorIndex
   | Minting Int
   deriving (Show,Eq,Ord)
 
+instance ToJSON ValidatorIndex where
+  toJSON (Spending idx) = toJSON $ "spend:" <> show @Text idx
+  toJSON (Minting idx) = toJSON $ "mint:" <> show @Text idx
+
 instance FromJSON ValidatorIndex where
   parseJSON = withObject "ValidatorIndex" $ \o -> do
     purpose <- o .: "purpose"
@@ -34,6 +38,12 @@ data BudgetEstimation = BudgetEstimation
   } deriving (Show,Eq,Ord)
 
 makeFieldLabelsNoPrefix ''BudgetEstimation
+
+instance ToJSON BudgetEstimation where
+  toJSON BudgetEstimation{..} = object
+    [ "validator" .= validatorIndex
+    , "budget" .= executionBudget
+    ]
 
 instance FromJSON BudgetEstimation where
   parseJSON = withObject "BudgetEstimation" $ \o ->

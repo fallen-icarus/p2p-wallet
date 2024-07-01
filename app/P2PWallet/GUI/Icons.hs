@@ -149,5 +149,5 @@ collateralIcon = remixSafe2Line
 changeIcon :: Text
 changeIcon = remixExchangeDollarLine
 
-commandIcon :: Text
-commandIcon = remixCommandLine
+toolsIcon :: Text
+toolsIcon = remixToolsFill

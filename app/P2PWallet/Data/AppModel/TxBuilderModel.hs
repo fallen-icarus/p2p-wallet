@@ -141,6 +141,8 @@ data TxBuilderModel = TxBuilderModel
   , showChangePopup :: Bool
   -- | Whether to show the collateral popup widget.
   , showCollateralPopup :: Bool
+  -- | The current network parameters.
+  , parameters :: Maybe ByteString
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''TxBuilderModel
@@ -171,6 +173,7 @@ instance Default TxBuilderModel where
     , showAddPopup = False
     , showChangePopup = False
     , showCollateralPopup = False
+    , parameters = Nothing
     }
 
 -- | Check whether the builder has anything yet. Not all fields correspond to the actual

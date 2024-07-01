@@ -203,7 +203,7 @@ data Transaction = Transaction
   , outputs :: [TransactionUTxO]
   , certificates :: [TransactionCertificate]
   , withdrawals :: [TransactionWithdrawal]
-  -- , nativeAssetsMinted :: Value
+  , mints :: [NativeAsset]
   -- , nativeScripts :: Value
   -- , plutusContracts :: Value
   } deriving (Show,Eq)
@@ -228,6 +228,6 @@ instance FromJSON Transaction where
         <*> o .: "outputs"
         <*> o .: "certificates"
         <*> o .: "withdrawals"
-        -- <*> o .: "assets_minted"
+        <*> o .: "assets_minted"
         -- <*> o .: "native_scripts"
         -- <*> o .: "plutus_contracts"

@@ -7,8 +7,7 @@
 {-
 
 In order to store the transactions in the sqlite database, the Koios version must be converted to
-a new form. Technically, newtype wrappers could work, but I would rather only do the conversions
-once. Wrappers would required "unwrapping" with every use.
+a new form. 
 
 -}
 module P2PWallet.Data.Core.Transaction 
@@ -126,7 +125,8 @@ data Transaction = Transaction
   , showCertificates :: Bool
   , withdrawals :: [Koios.TransactionWithdrawal]
   , showWithdrawals :: Bool
-  -- , nativeAssetsMinted :: Value
+  , mints :: [NativeAsset]
+  , showMints :: Bool
   -- , nativeScripts :: Value
   -- , plutusContracts :: Value
   } deriving (Show,Eq)
@@ -151,6 +151,7 @@ instance FromRow Transaction where
     outputs <- fromMaybe mzero . decode <$> field
     certificates <- fromMaybe mzero . decode <$> field
     withdrawals <- fromMaybe mzero . decode <$> field
+    mints <- fromMaybe mzero . decode <$> field
     return $ Transaction
       { txHash = txHash
       , profileId = profileId
@@ -168,12 +169,14 @@ instance FromRow Transaction where
       , outputs = outputs
       , certificates = certificates
       , withdrawals = withdrawals
+      , mints = mints
       , showCollateralInputs = False
       , showReferenceInputs = False
       , showInputs = False
       , showOutputs = False
       , showCertificates = False
       , showWithdrawals = False
+      , showMints = False
       }
 
 instance ToRow Transaction where
@@ -194,6 +197,7 @@ instance ToRow Transaction where
     , toField $ encode outputs
     , toField $ encode certificates
     , toField $ encode withdrawals
+    , toField $ encode mints
     ]
 
 instance TableName Transaction where
@@ -220,6 +224,7 @@ instance Creatable Transaction where
         , "outputs BLOB"
         , "certificates BLOB"
         , "withdrawals BLOB"
+        , "mints BLOB"
         , "PRIMARY KEY (tx_hash,payment_id)"
         ]
     , ");"
@@ -246,9 +251,10 @@ instance Insertable Transaction where
         , "outputs"
         , "certificates"
         , "withdrawals"
+        , "mints"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 -- | Convert a Koios Transaction to a P2PWallet Transaction.
@@ -270,10 +276,12 @@ toTransaction profileId paymentId Koios.Transaction{..} = Transaction
   , outputs = map toTransactionUTxO outputs
   , certificates = certificates
   , withdrawals = withdrawals
+  , mints = mints
   , showCollateralInputs = False
   , showReferenceInputs = False
   , showInputs = False
   , showOutputs = False
   , showCertificates = False
   , showWithdrawals = False
+  , showMints = False
   }

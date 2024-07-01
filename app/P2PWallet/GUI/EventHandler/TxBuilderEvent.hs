@@ -177,7 +177,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   ConvertExampleTestMintNameToHexidecimal ->
     [ Model $ model
         & #txBuilderModel % #newTestMint % #exampleOutput .~
-            (toHexidecimal $ txBuilderModel ^. #newTestMint % #exampleInput)
+            toHexidecimal (txBuilderModel ^. #newTestMint % #exampleInput)
     ]
 
 

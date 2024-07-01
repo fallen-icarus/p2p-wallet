@@ -161,7 +161,7 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap,config} =
                 , spacer
                 , widgetIf (not $ null nativeAssets) $ 
                     hstack
-                      [ tooltip_ "Native Assets" [tooltipDelay 500] $ label coinsIcon
+                      [ tooltip_ "Native Assets" [tooltipDelay 0] $ label coinsIcon
                           `styleBasic` 
                             [ textSize 10
                             , textColor customBlue
@@ -172,7 +172,7 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap,config} =
                       ]
                 , widgetIf (isJust datumHash) $ 
                     hstack
-                      [ tooltip_ "Datum" [tooltipDelay 500] $ label datumIcon
+                      [ tooltip_ "Datum" [tooltipDelay 0] $ label datumIcon
                           `styleBasic` 
                             [ textSize 10
                             , textColor customBlue
@@ -182,7 +182,7 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap,config} =
                       , spacer_ [width 3]
                       ]
                 , widgetIf (isJust referenceScriptHash) $ 
-                    tooltip_ "Reference Script" [tooltipDelay 500] $ label scriptIcon
+                    tooltip_ "Reference Script" [tooltipDelay 0] $ label scriptIcon
                       `styleBasic` 
                         [ textSize 10
                         , textColor customBlue
@@ -246,35 +246,44 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap,config} =
         ]
 
     utxoDetails :: PersonalUTxO -> AppNode
-    utxoDetails PersonalUTxO{..} = 
+    utxoDetails PersonalUTxO{..} = do
+      let prettyAssets = map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
       hstack
         [ filler
         , vstack
-            [ copyableLabelFor "Block Height:" (show @Text blockHeight)
+            [ copyableLabelFor 8 "Block Height:" (show @Text blockHeight)
                   `styleBasic` [padding 2]
             , widgetMaybe referenceScriptHash $ \hash ->
-                copyableLabelFor "Reference Script Hash:" hash
+                copyableLabelFor 8 "Reference Script Hash:" hash
                   `styleBasic` [padding 2]
             , widgetMaybe datumHash $ \hash ->
-                copyableLabelFor "Datum Hash:" hash
+                copyableLabelFor 8 "Datum Hash:" hash
                   `styleBasic` [padding 2]
             , widgetMaybe inlineDatum $ \x ->
-                copyableLabelFor "Inline Datum:" (showValue x)
+                copyableLabelFor 8 "Inline Datum:" (showValue x)
                   `styleBasic` [padding 2]
             , widgetIf (not $ null nativeAssets) $
                 vstack
-                  [ label "Native Assets:" `styleBasic` [textSize 10, textColor customBlue]
+                  [ label "Native Assets:" `styleBasic` [textSize 8, textColor customBlue]
                   , hstack
                       [ spacer_ [width 10]
-                      , flip styleBasic [textSize 10, textColor lightGray, maxWidth 300] $
-                          copyableTextArea $ show $ align $ vsep $ 
-                            map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
+                      , vstack
+                          [ spacer_ [width 10]
+                          , copyableTextArea (show $ align $ vsep prettyAssets)
+                              `styleBasic` 
+                                [ height $ 20 + 12 * (fromIntegral (length nativeAssets) - 1)
+                                , textSize 8
+                                , textColor lightGray
+                                , maxWidth 300
+                                ]
+                          ]
                       ]
                   ] `styleBasic` [padding 2]
             ] `styleBasic`
                 [ bgColor black
                 , padding 10
                 , border 1 black
+                -- , maxHeight 100
                 ]
         ]
 
@@ -534,8 +543,8 @@ copyableLabelSelf fontSize caption =
     `styleHover` [textColor customBlue, cursorIcon CursorHand]
 
 -- | A label button that will copy other data.
-copyableLabelFor :: Text -> Text -> WidgetNode s AppEvent
-copyableLabelFor caption info = 
+copyableLabelFor :: Double -> Text -> Text -> WidgetNode s AppEvent
+copyableLabelFor fontSize caption info = 
   hstack
     [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
         `styleBasic`
@@ -545,11 +554,11 @@ copyableLabelFor caption info =
           , border 0 transparent
           , textColor customBlue
           , bgColor transparent
-          , textSize 10
+          , textSize fontSize
           ]
         `styleHover` [textColor lightGray, cursorIcon CursorHand]
     , spacer
-    , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize 10]
+    , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize fontSize]
     ]
 
 -------------------------------------------------

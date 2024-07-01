@@ -2,7 +2,9 @@
 
 module P2PWallet.Data.Core.Internal.Files
   ( 
-    ParamsFile(..)
+    TmpDirectory(..)
+  , BuilderLogFile(..)
+  , ParamsFile(..)
   , TxBodyFile(..)
   , TransformedTxFile(..)
   , KeyWitnessFile(..)
@@ -10,10 +12,19 @@ module P2PWallet.Data.Core.Internal.Files
   , HwSigningFile(..)
   , PubKeyFile(..)
   , CertificateFile(..)
-  , TmpDirectory(..)
   ) where
 
 import P2PWallet.Prelude
+
+-- | A newtype wrapper around the temporary directory's absolute path.
+newtype TmpDirectory = TmpDirectory FilePath
+  deriving (Show)
+  deriving newtype (Eq,Ord,ToText,ToString,IsString)
+
+-- | A newtype wrapper around the builder.log's `FilePath`.
+newtype BuilderLogFile = BuilderLogFile FilePath
+  deriving (Show)
+  deriving newtype (Eq,Ord,ToText,ToString,IsString)
 
 -- | A newtype wrapper around the parameter's `FilePath`.
 newtype ParamsFile = ParamsFile FilePath
@@ -52,10 +63,5 @@ newtype PubKeyFile = PubKeyFile FilePath
 
 -- | A newtype wrapper around a certificate's `FilePath`.
 newtype CertificateFile = CertificateFile FilePath
-  deriving (Show)
-  deriving newtype (Eq,Ord,ToText,ToString,IsString)
-
--- | A newtype wrapper around the temporary directory's absolute path.
-newtype TmpDirectory = TmpDirectory FilePath
   deriving (Show)
   deriving newtype (Eq,Ord,ToText,ToString,IsString)

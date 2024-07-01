@@ -129,9 +129,9 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #syncingWallets .~ True 
       , Task $ do
           runActionOrAlert (SyncWallets . ProcessResults) $ 
-            syncWallets databaseFile knownWallets
+            syncWallets databaseFile (config ^. #network) knownWallets
       ]
-    ProcessResults resp@Wallets{..} ->
+    ProcessResults (resp@Wallets{..}, networkParams) ->
       -- Disable `syncing` and update the list of wallets. Also update the information for
       -- the `selectedWallet`.
       let paymentTarget = model ^. #homeModel % #selectedWallet % #paymentId
@@ -140,16 +140,16 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
           stakeTarget = model ^. #delegationModel % #selectedWallet % #stakeId
           updatedStakeTarget = 
             fromMaybe def $ find (\w -> w ^. #stakeId == stakeTarget) stakeWallets
-      in
-        [ Model $ 
-            model & #waitingStatus % #syncingWallets .~ False
-                  & #knownWallets .~ resp
-                  & #homeModel % #selectedWallet .~ updatedPaymentTarget
-                  & #delegationModel % #selectedWallet .~ updatedStakeTarget
-                  & #fingerprintMap .~ 
-                      toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
-        , Task $ return $ UpdateCurrentDate StartProcess
-        ]
+      in  [ Model $ model 
+              & #waitingStatus % #syncingWallets .~ False
+              & #knownWallets .~ resp
+              & #homeModel % #selectedWallet .~ updatedPaymentTarget
+              & #delegationModel % #selectedWallet .~ updatedStakeTarget
+              & #txBuilderModel % #parameters ?~ networkParams
+              & #fingerprintMap .~ 
+                  toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
+          , Task $ return $ UpdateCurrentDate StartProcess
+          ]
 
   -----------------------------------------------
   -- Submit Transaction

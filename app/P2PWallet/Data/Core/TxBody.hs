@@ -61,6 +61,12 @@ instance FromJSON ExecutionBudget where
       <$> o .: "memory"
       <*> o .: "cpu"
 
+instance ToJSON ExecutionBudget where
+  toJSON ExecutionBudget{..} = object
+    [ "memory" .= memory
+    , "cpu" .= cpu
+    ]
+  
 -------------------------------------------------
 -- Script Witness
 -------------------------------------------------

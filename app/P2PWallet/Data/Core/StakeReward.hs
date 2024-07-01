@@ -7,8 +7,7 @@
 {-
 
 In order to store the stake rewards in the sqlite database, the Koios version must be converted to a
-new form. Technically, newtype wrappers could work, but I would rather only do the conversions once.
-Wrappers would required "unwrapping" with every use.
+new form.
 
 -}
 module P2PWallet.Data.Core.StakeReward where

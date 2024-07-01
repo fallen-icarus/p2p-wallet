@@ -242,6 +242,7 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
                   maybe "none" (fromString . printf "slot %s") invalidAfter
               , certificateField inspectedTransaction
               , withdrawalField inspectedTransaction
+              , mintField reverseTickerMap inspectedTransaction
               , utxoField "Reference Inputs:" 
                   Nothing
                   #showReferenceInputs 
@@ -588,8 +589,93 @@ withdrawalField inspectedTransaction =
             , border 1 black
             ]
 
+mintField :: ReverseTickerMap -> Maybe Transaction -> AppNode
+mintField reverseTickerMap inspectedTransaction =
+  if null mints then
+    hstack
+      [ label "Mints:"
+          `styleBasic`
+            [ padding 0
+            , radius 5
+            , textMiddle
+            , textSize 10
+            , border 0 transparent
+            , textColor customBlue
+            , bgColor transparent
+            ]
+      , spacer
+      , label "none" `styleBasic` [textColor lightGray, textSize 10]
+      ]
+  else
+    vstack
+      [ hstack
+          [ label "Mints:"
+              `styleBasic`
+                [ padding 0
+                , radius 5
+                , textMiddle
+                , textSize 10
+                , border 0 transparent
+                , textColor customBlue
+                , bgColor transparent
+                ]
+          , spacer
+          , toggleButton_ horizontalMoreIcon 
+              (toLensVL $ #homeModel % #inspectedTransaction % toggleShow #showMints)
+              [toggleButtonOffStyle txMoreOffStyle]
+              `styleBasic` 
+                [ textSize 10
+                , textColor customRed
+                , textFont "Remix"
+                , textMiddle
+                , radius 20
+                , paddingT 2
+                , paddingB 2
+                , paddingR 5
+                , paddingL 5
+                , bgColor black
+                , border 0 transparent
+                ]
+              `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+          ]
+      , widgetIf (inspectedTransaction ^. toggleShow #showMints) $ 
+          flip styleBasic [padding 10] $ box $
+            flip styleBasic [padding 10, bgColor customGray2, radius 5, border 1 black] $
+              vstack_ [childSpacing_ 3] $
+                for (groupInto 2 mints) $ \mintRow -> 
+                  hstack_ [childSpacing_ 3] $ map mintQuantityWidget mintRow <> [filler]
+      ]
+  where
+    mints :: [NativeAsset]
+    mints = fromMaybe [] $ inspectedTransaction ^? _Just % #mints
+
+    mintQuantityWidget :: NativeAsset -> AppNode
+    mintQuantityWidget NativeAsset{..} = do
+      let (fluxIcon,color)
+            | quantity < 0 = (remixSubtractLine, customRed)
+            | otherwise = (remixAddLine, customBlue)
+          (name,formattedQuantity) = case Map.lookup (policyId,tokenName) reverseTickerMap of
+            Nothing -> (display fingerprint, show quantity)
+            Just (tckr,decimal) -> (display tckr, show $ formatQuantity decimal quantity)
+      hstack_ [childSpacing_ 3]
+        [ label fluxIcon 
+            `styleBasic` 
+              [ textFont "Remix"
+              , textSize 7
+              , bgColor color
+              , padding 1
+              , radius 20
+              , textMiddle
+              ]
+        , copyableLabelSelf name 7 lightGray
+        , label formattedQuantity
+            `styleBasic` 
+              [ textSize 7, padding 3, radius 3, bgColor customGray3, textColor color]
+        ] `styleBasic` [bgColor customGray4, paddingT 2, paddingB 2, paddingL 2, paddingR 0]
+
 utxoDetails :: ReverseTickerMap -> TransactionUTxO -> AppNode
-utxoDetails reverseTickerMap TransactionUTxO{..} = 
+utxoDetails reverseTickerMap TransactionUTxO{..} = do
+  let prettyAssets = map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
   hstack
     [ filler
     , vstack
@@ -611,9 +697,16 @@ utxoDetails reverseTickerMap TransactionUTxO{..} =
               [ label "Native Assets:" `styleBasic` [textSize 8, textColor customBlue]
               , hstack
                   [ spacer_ [width 10]
-                  , flip styleBasic [textSize 8, textColor lightGray, maxWidth 300] $
-                      copyableTextArea $ show $ align $ vsep $ 
-                        map (pretty . showAssetBalance True reverseTickerMap) nativeAssets
+                  , vstack
+                      [ spacer_ [width 10]
+                      , copyableTextArea (show $ align $ vsep prettyAssets)
+                          `styleBasic` 
+                            [ height $ 20 + 12 * (fromIntegral (length nativeAssets) - 1)
+                            , textSize 8
+                            , textColor lightGray
+                            , maxWidth 300
+                            ]
+                      ]
                   ]
               ] `styleBasic` [padding 2]
         ] `styleBasic`
@@ -926,13 +1019,13 @@ matchesCertificate searchTarget TransactionCertificate{info} = or
   where
     matchesDelegation :: Bool
     matchesDelegation = flip (maybe False) (info ^? _DelegationInfo) $ \(poolId,stakeAddress) -> or
-      [ searchTarget `Text.isPrefixOf` (display poolId)
-      , searchTarget `Text.isPrefixOf` (display stakeAddress)
+      [ searchTarget `Text.isPrefixOf` display poolId
+      , searchTarget `Text.isPrefixOf` display stakeAddress
       ]
 
     matchesRegistration :: Bool
-    matchesRegistration = flip (maybe False) (info ^? _StakeRegistrationInfo) $ \(stakeAddress) -> 
-      searchTarget `Text.isPrefixOf` (display stakeAddress)
+    matchesRegistration = flip (maybe False) (info ^? _StakeRegistrationInfo) $ \stakeAddress -> 
+      searchTarget `Text.isPrefixOf` display stakeAddress
 
 searchFilter :: PaymentWallet -> ReverseTickerMap -> Text -> [Transaction] -> [Transaction]
 searchFilter selectedWallet reverseTickerMap searchTarget xs
