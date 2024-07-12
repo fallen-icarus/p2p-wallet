@@ -13,6 +13,7 @@ import P2PWallet.Data.Core.AssetMaps
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.GUI.EventHandler.AddressBookEvent
 import P2PWallet.GUI.EventHandler.DelegationEvent
+import P2PWallet.GUI.EventHandler.DexEvent
 import P2PWallet.GUI.EventHandler.HomeEvent
 import P2PWallet.GUI.EventHandler.ProfileEvent
 import P2PWallet.GUI.EventHandler.TickerRegistryEvent
@@ -105,6 +106,11 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   AddressBookEvent modal -> handleAddressBookEvent model modal
 
   -----------------------------------------------
+  -- Dex Events
+  -----------------------------------------------
+  DexEvent modal -> handleDexEvent model modal
+
+  -----------------------------------------------
   -- TxBuilder Events
   -----------------------------------------------
   TxBuilderEvent modal -> handleTxBuilderEvent model modal
@@ -140,11 +146,15 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
           stakeTarget = model ^. #delegationModel % #selectedWallet % #stakeId
           updatedStakeTarget = 
             fromMaybe def $ find (\w -> w ^. #stakeId == stakeTarget) stakeWallets
+          dexTarget = model ^. #dexModel % #selectedWallet % #paymentId
+          updateDexTarget = 
+            fromMaybe def $ find (\w -> w ^. #paymentId == dexTarget) dexWallets
       in  [ Model $ model 
               & #waitingStatus % #syncingWallets .~ False
               & #knownWallets .~ resp
               & #homeModel % #selectedWallet .~ updatedPaymentTarget
               & #delegationModel % #selectedWallet .~ updatedStakeTarget
+              & #dexModel % #selectedWallet .~ updateDexTarget
               & #txBuilderModel % #parameters ?~ networkParams
               & #fingerprintMap .~ 
                   toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)

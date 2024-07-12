@@ -18,9 +18,18 @@ import P2PWallet.Prelude
 -- Pairing Wallets
 -------------------------------------------------
 -- | Validate the `NewPaymentWallet`, and export the keys from the hardware wallet.
-pairPaymentWallet :: Network -> Profile -> PaymentId -> NewPaymentWallet -> IO PaymentWallet
-pairPaymentWallet network Profile{profileId,accountIndex} paymentId NewPaymentWallet{..} = do
+pairPaymentWallet 
+  :: Network 
+  -> Profile 
+  -> PaymentId 
+  -> NewPaymentWallet 
+  -> [PaymentWallet] -- ^ The currently tracked payment wallets.
+  -> IO PaymentWallet
+pairPaymentWallet network Profile{profileId,accountIndex} paymentId NewPaymentWallet{..} known = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
+
+    when (any ((== alias) . view #alias) known) $ 
+      throwIO $ AppError "This name is already being used by another payment wallet."
 
     pKeyPath <- 
       fromJustOrAppError "Invalid payment address index." $ 
@@ -65,9 +74,18 @@ pairPaymentWallet network Profile{profileId,accountIndex} paymentId NewPaymentWa
       fromRightOrAppError $ plutusToBech32 network $ Address paymentKeyHash mStakingKeyHash
 
 -- | Validate and then pair the new stake wallet.
-pairStakeWallet :: Network -> Profile -> StakeId -> NewStakeWallet -> IO StakeWallet
-pairStakeWallet network Profile{profileId,accountIndex} stakeId NewStakeWallet{..} = do
+pairStakeWallet 
+  :: Network 
+  -> Profile 
+  -> StakeId 
+  -> NewStakeWallet 
+  -> [StakeWallet] -- ^ Currently tracked stake wallets.
+  -> IO StakeWallet
+pairStakeWallet network Profile{profileId,accountIndex} stakeId NewStakeWallet{..} known = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
+
+    when (any ((== alias) . view #alias) known) $ 
+      throwIO $ AppError "This name is already being used by another stake wallet."
 
     sKeyPath <- 
       fromJustOrAppError "Invalid stake address index." $ 
@@ -110,9 +128,18 @@ pairStakeWallet network Profile{profileId,accountIndex} stakeId NewStakeWallet{.
 -- Watching Wallets
 -------------------------------------------------
 -- | Validate and then watch the new wallet.
-watchPaymentWallet :: Network -> Profile -> PaymentId -> NewPaymentWallet -> IO PaymentWallet
-watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} = do
+watchPaymentWallet 
+  :: Network 
+  -> Profile 
+  -> PaymentId 
+  -> NewPaymentWallet 
+  -> [PaymentWallet] -- ^ Currently tracked payment wallets.
+  -> IO PaymentWallet
+watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} known = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
+
+    when (any ((== alias) . view #alias) known) $ 
+      throwIO $ AppError "This name is already being used by another payment wallet."
 
     -- Check if the paymentAddress is a valid bech32 payment address. If it is, convert
     -- it to `PlutusAddress` and then back again since `plutusToBech32` will also generate
@@ -140,9 +167,18 @@ watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} = d
       parsePaymentAddress network >=> paymentAddressToPlutusAddress >=> plutusToBech32 network
 
 -- | Validate and then watch the new wallet.
-watchStakeWallet :: Network -> Profile -> StakeId -> NewStakeWallet -> IO StakeWallet
-watchStakeWallet network Profile {profileId} stakeId NewStakeWallet{..} = do
+watchStakeWallet 
+  :: Network 
+  -> Profile 
+  -> StakeId 
+  -> NewStakeWallet 
+  -> [StakeWallet] -- ^ Currently tracked stake wallets.
+  -> IO StakeWallet
+watchStakeWallet network Profile {profileId} stakeId NewStakeWallet{..} known = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
+
+    when (any ((== alias) . view #alias) known) $ 
+      throwIO $ AppError "This name is already being used by another stake wallet."
 
     -- Check if the stakeAddress is a valid bech32 stake address. 
     stakeAddr <- fromRightOrAppError $ parseStakeAddress network stakeAddress

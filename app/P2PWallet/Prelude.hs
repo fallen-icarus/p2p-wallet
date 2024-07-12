@@ -41,7 +41,12 @@ module P2PWallet.Prelude
   , boolLens
   , maybeLens
 
-  -- * Exceptions
+    -- * Rational Parsers and Printers
+  , parseDecimal
+  , parsePercentage
+  , displayPercentage
+
+    -- * Exceptions
   , throwIO
   , catch
   , handle
@@ -170,13 +175,22 @@ maybeLens def' targetLens =
   lens (\m -> fromMaybe def' $ m ^. targetLens)
        (\m t -> m & targetLens ?~ t)
 
--- -- | A lens into a sum type `a` with a default choice of type `b`. The unWrapper `(a -> b)`
--- -- must cover the cases where the other data constructors are present. This is useful for
--- -- editing the inner `Text` for types like `CertificateAction`.
--- sumsOfProductsLens :: (a -> b) -> (b -> a) -> A_Lens s a -> A_Lens s b
--- sumsOfProductsLens unWrapper wrapper targetLens =
---   lens (\m -> unWrapper $ m ^# targetLens)
---        (\m t -> m & targetLens #~ wrapper t)
+-------------------------------------------------
+-- Rational Parsers
+-------------------------------------------------
+-- | Parse a `Rational` entered as a decimal.
+parseDecimal :: Text -> Maybe Rational
+parseDecimal = fmap toRational . readMaybe @Decimal . T.unpack
+
+-- | Parse a "12.5%" to a `Rational`.
+parsePercentage :: Text -> Maybe Rational
+parsePercentage = fmap (toRational . (/100)) 
+                . readMaybe @Double 
+                . T.unpack 
+
+-- | Show a `Rational` as a percentage. This shows four decimal places.
+displayPercentage :: Rational -> Text
+displayPercentage = show @_ @Decimal . (*100) . realFracToDecimal 4
 
 -------------------------------------------------
 -- Display Class
@@ -216,4 +230,3 @@ instance ToField Time.POSIXTime where
 instance Default.Default Time.Day where
   -- The default is the beginning of utc time.
   def = Time.localDay $ Time.utcToLocalTime Time.utc $ Time.posixSecondsToUTCTime 0
-

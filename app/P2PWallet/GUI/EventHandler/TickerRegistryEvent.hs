@@ -4,7 +4,7 @@ module P2PWallet.GUI.EventHandler.TickerRegistryEvent
   ) where
 
 import Monomer hiding (decimals)
-import Data.Map qualified as Map
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.Utils
@@ -23,15 +23,17 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   AddNewTickerInfo modal -> case modal of
     StartAdding ticker -> 
-      [ Model $ model & #tickerRegistryModel % #addingTicker .~ True -- Show widget.
-                      & #tickerRegistryModel % #newTickerInfo % #ticker .~ fromMaybe "" ticker
-                      & #tickerRegistryModel % #newTickerInfo % #policyId .~ ""
-                      & #tickerRegistryModel % #newTickerInfo % #assetName .~ ""
-                      & #tickerRegistryModel % #newTickerInfo % #decimals .~ 0
+      [ Model $ model 
+          & #tickerRegistryModel % #addingTicker .~ True -- Show widget.
+          & #tickerRegistryModel % #newTickerInfo % #ticker .~ fromMaybe "" ticker
+          & #tickerRegistryModel % #newTickerInfo % #policyId .~ ""
+          & #tickerRegistryModel % #newTickerInfo % #assetName .~ ""
+          & #tickerRegistryModel % #newTickerInfo % #decimals .~ 0
       ]
     CancelAdding -> 
-      [ Model $ model & #tickerRegistryModel % #addingTicker .~ False
-                      & #tickerRegistryModel % #newTickerInfo .~ def -- Clear for next time.
+      [ Model $ model 
+          & #tickerRegistryModel % #addingTicker .~ False
+          & #tickerRegistryModel % #newTickerInfo .~ def -- Clear for next time.
       ]
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (TickerRegistryEvent . AddNewTickerInfo . AddResult) $ do
@@ -47,12 +49,12 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
           return verifiedTickerInfo
       ]
     AddResult TickerInfo{..} ->
-      [ Model $
-          model & #tickerRegistryModel % #addingTicker .~ False
-                & #tickerRegistryModel % #newTickerInfo .~ def -- Clear for next time.
-                & #tickerMap %~ Map.insert ticker (policyId,assetName,decimals)
-                & #reverseTickerMap %~ 
-                    Map.insert (policyId,assetName) (ticker,decimals)
+      [ Model $ model 
+          & #tickerRegistryModel % #addingTicker .~ False
+          & #tickerRegistryModel % #newTickerInfo .~ def -- Clear for next time.
+          & #tickerMap %~ Map.insert ticker (policyId,assetName,decimals)
+          & #reverseTickerMap %~ 
+              Map.insert (policyId,assetName) (ticker,decimals)
       ]
 
   -----------------------------------------------
@@ -60,12 +62,14 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   ChangeTickerInfo modal -> case modal of
     StartAdding mOldInfo -> 
-      [ Model $ model & #tickerRegistryModel % #editingTicker .~ True -- Show widget.
-                      & #tickerRegistryModel % #newTickerInfo .~ fromMaybe def mOldInfo
+      [ Model $ model 
+          & #tickerRegistryModel % #editingTicker .~ True -- Show widget.
+          & #tickerRegistryModel % #newTickerInfo .~ fromMaybe def mOldInfo
       ]
     CancelAdding -> 
-      [ Model $ model & #tickerRegistryModel % #editingTicker .~ False
-                      & #tickerRegistryModel % #newTickerInfo .~ def -- Clear for next time.
+      [ Model $ model 
+          & #tickerRegistryModel % #editingTicker .~ False
+          & #tickerRegistryModel % #newTickerInfo .~ def -- Clear for next time.
       ]
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (TickerRegistryEvent . ChangeTickerInfo . AddResult) $ do
@@ -81,11 +85,11 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
           return verifiedTickerInfo
       ]
     AddResult TickerInfo{..} ->
-      [ Model $
-          model & #tickerRegistryModel % #editingTicker .~ False
-                & #tickerRegistryModel % #newTickerInfo .~ def -- Clear for next time.
-                & #tickerMap %~ Map.insert ticker (policyId,assetName,decimals)
-                & #reverseTickerMap %~ Map.insert (policyId,assetName) (ticker,decimals)
+      [ Model $ model 
+          & #tickerRegistryModel % #editingTicker .~ False
+          & #tickerRegistryModel % #newTickerInfo .~ def -- Clear for next time.
+          & #tickerMap %~ Map.insert ticker (policyId,assetName,decimals)
+          & #reverseTickerMap %~ Map.insert (policyId,assetName) (ticker,decimals)
       ]
 
   -----------------------------------------------
@@ -93,12 +97,14 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   DeleteTickerInfo modal -> case modal of
     GetDeleteConfirmation mTarget -> 
-      [ Model $ model & #tickerRegistryModel % #deletingTicker .~ True -- Show widget.
-                      & #tickerRegistryModel % #newTickerInfo .~ fromMaybe def mTarget
+      [ Model $ model 
+          & #tickerRegistryModel % #deletingTicker .~ True -- Show widget.
+          & #tickerRegistryModel % #newTickerInfo .~ fromMaybe def mTarget
       ]
     CancelDeletion -> 
-      [ Model $ model & #tickerRegistryModel % #deletingTicker .~ False -- Close widget.
-                      & #tickerRegistryModel % #newTickerInfo .~ def
+      [ Model $ model 
+          & #tickerRegistryModel % #deletingTicker .~ False -- Close widget.
+          & #tickerRegistryModel % #newTickerInfo .~ def
       ]
     ConfirmDeletion ->
       [ Task $ runActionOrAlert (const $ TickerRegistryEvent $ DeleteTickerInfo PostDeletionAction) $ do
@@ -111,9 +117,9 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
       -- Get the entry id for the contact to delete.
       let NewTickerInfo{ticker} = tickerRegistryModel ^. #newTickerInfo
           (policy,name,_) = fromMaybe ("","",0) $ Map.lookup (Ticker ticker) tickerMap
-      in  [ Model $ 
-              model & #tickerRegistryModel % #deletingTicker .~ False
-                    & #tickerRegistryModel % #newTickerInfo .~ def
-                    & #tickerMap %~ Map.delete (Ticker ticker)
-                    & #reverseTickerMap %~ Map.delete (policy,name)
+      in  [ Model $ model 
+              & #tickerRegistryModel % #deletingTicker .~ False
+              & #tickerRegistryModel % #newTickerInfo .~ def
+              & #tickerMap %~ Map.delete (Ticker ticker)
+              & #reverseTickerMap %~ Map.delete (policy,name)
           ]

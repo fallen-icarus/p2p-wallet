@@ -12,6 +12,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel
 
   , module P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
   , module P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
+  , module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
   , module P2PWallet.Data.AppModel.TxBuilderModel.TestMint
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserInput
@@ -22,6 +23,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
 import P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
+import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
 import P2PWallet.Data.AppModel.TxBuilderModel.TestMint
 import P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
 import P2PWallet.Data.AppModel.TxBuilderModel.UserInput
@@ -66,6 +68,8 @@ data TxBuilderEvent
   | AddNewTestMint (AddEvent NewTestMint TestMint)
   -- | Convert the user's input to hexidecimal.
   | ConvertExampleTestMintNameToHexidecimal
+  -- | Builder events for swaps.
+  | SwapBuilderEvent SwapBuilderEvent
   -- | Build the transaction while also estimating the execution budgets and tx fee. Return the
   -- updated TxBuilderModel.
   | BuildTx (ProcessEvent TxBuilderModel)
@@ -111,6 +115,8 @@ data TxBuilderModel = TxBuilderModel
   , newTestMint :: NewTestMint
   -- | Whether the add test mint widget should be open.
   , addingTestMint :: Bool
+  -- | The swap builder sub model for swap related builder information.
+  , swapBuilderModel :: SwapBuilderModel
   -- | The transaction fee for the built transaction.
   , fee :: Lovelace
   -- | A list of required witnesses. This is used to determine whether the transaction can be signed
@@ -160,6 +166,7 @@ instance Default TxBuilderModel where
     , testMint = Nothing
     , newTestMint = def
     , addingTestMint = False
+    , swapBuilderModel = def
     , fee = 0
     , keyWitnesses = []
     , allKeyWitnessesKnown = True -- This is set to true so the default GUI button is to submit.
@@ -188,6 +195,7 @@ isEmptyBuilder TxBuilderModel{..} = and
   , isNothing changeOutput
   , isNothing testMint
   , isNothing collateralInput
+  , isEmptySwapBuilderModel swapBuilderModel
   ]
 
 -- | Convert the `TxBuilderModel` to a `TxBody`.
@@ -208,6 +216,8 @@ convertToTxBody TxBuilderModel{..} =
     , foldMap' (addToTxBody mempty . snd) userWithdrawals
     -- Add the testMint to the list of mints.
     , maybe mempty (addToTxBody mempty) testMint
+    -- Add any swap actions.
+    , addToTxBody mempty swapBuilderModel
     -- Add the collateral to the transaction.
     , maybe mempty (addToTxBody mempty) collateralInput
     -- Overide the fee with the fee in the builder model.

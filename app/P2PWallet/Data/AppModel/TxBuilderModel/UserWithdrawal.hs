@@ -43,6 +43,7 @@ instance AddToTxBody UserWithdrawal where
         { stakeAddress = stakeAddress
         , lovelace = lovelace
         , stakeCredential = stakeCredential
+        , stakingScriptInfo = Nothing
         }
 
       stakeCredential :: Credential

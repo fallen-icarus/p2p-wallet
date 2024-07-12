@@ -197,13 +197,13 @@ mainWidget AppModel{..} =
               , textSize 10
               ]
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-        , spacer
-        , tooltip_ "Refresh" [tooltipDelay 0] $
+        , spacer_ [width 5]
+        , box_ [alignMiddle] $ tooltip_ "Refresh" [tooltipDelay 0] $
             button refreshIcon (SyncWallets StartProcess)
             `styleBasic`
               [ border 0 transparent
               , radius 20
-              , padding 0
+              , padding 5
               , bgColor transparent
               , textColor customBlue
               , textMiddle

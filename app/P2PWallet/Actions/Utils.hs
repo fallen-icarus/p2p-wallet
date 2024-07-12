@@ -65,7 +65,8 @@ toNetworkFlag Mainnet = "--mainnet"
 toNetworkFlag Testnet = "--testnet-magic 1"
 
 -- | Balance the inputs with the outputs by updating the changeOutput and subtracting off the
--- fee. This also accounts for registration deposits and reward withdrawals.
+-- fee. This also accounts for registration deposits and reward withdrawals. This does not need
+-- to account for beacon tokens since the management of those is automated.
 balanceTx :: TxBuilderModel -> TxBuilderModel
 balanceTx tx@TxBuilderModel{..} =
     tx & #changeOutput .~ 
@@ -79,10 +80,8 @@ balanceTx tx@TxBuilderModel{..} =
     totalWithdrawn :: Lovelace
     totalWithdrawn = sum $ map (view #lovelace . snd) userWithdrawals
 
-    totalMinted :: [NativeAsset]
-    totalMinted = mconcat
-      [ maybe [] (testMintToNativeAssets . view #mint) testMint
-      ]
+    testTokensMinted :: [NativeAsset]
+    testTokensMinted = maybe [] (testMintToNativeAssets . view #mint) testMint
 
     -- The total deposit required from certificates.
     requiredDeposits :: Lovelace
@@ -92,41 +91,42 @@ balanceTx tx@TxBuilderModel{..} =
         Deregistration -> acc - 2_000_000 -- 2 ADA must be returned.
         Delegation _ -> acc
 
-    -- The amount of ADA and native assets available as change.
-    (loves :: Lovelace, assets :: [NativeAsset]) =
-      let (inLoves,inAssets) = 
-            ( sum $ map (view #lovelace . snd) userInputs
-            , concatMap (view #nativeAssets . snd) userInputs
-            )
-          (outLoves,outAssets) = 
-            -- Increase the quantity of lovelace for each output by the count.
-            ( sum $ map (\(_,UserOutput{count,lovelace}) -> fromIntegral count * lovelace) userOutputs
-            -- Increase the quantity of each native asset by the count, then negate it so that it
-            -- can be subtracted from the inputs.
-            , flip concatMap userOutputs $ \(_,UserOutput{count,nativeAssets}) -> 
-                for nativeAssets $ \asset -> asset & #quantity %~ (fromIntegral (-count) *)
-            )
-          assetChange = filter ((/= 0) . view #quantity) -- filter out zero quantities
-                      $ sumNativeAssets 
-                      $ inAssets <> outAssets <> totalMinted
-      in (inLoves - outLoves, assetChange)
+    -- The amount of ADA and native assets from the input sources.
+    inputValue :: (Lovelace,[NativeAsset])
+    inputValue = sumAssetBalances
+      [ assetBalances False userInputs
+      , (totalWithdrawn, [])
+      , (0, testTokensMinted)
+      , assetBalances False $ swapBuilderModel ^. #swapCloses
+      ]
 
-    lovelaceChange :: Lovelace
-    lovelaceChange = loves - fee - requiredDeposits + totalWithdrawn
+    -- The amount of ADA and native assets from the output sources. All quantities in this list must
+    -- be negative so that they can be subtracted from the `inputValue`.
+    outputValue :: (Lovelace,[NativeAsset])
+    outputValue = sumAssetBalances
+      [ assetBalances True userOutputs
+      , assetBalances True $ swapBuilderModel ^. #swapCreations
+      , (requiredDeposits, [])
+      , (-fee, [])
+      ]
+
+    (lovelaceChange, assetsChange) = sumAssetBalances [inputValue, outputValue]
 
     newChange :: ChangeOutput
     newChange = ChangeOutput
       { paymentAddress = fromMaybe "" $ changeOutput ^? _Just % #paymentAddress
       , lovelace = lovelaceChange
-      , nativeAssets = assets
+      , nativeAssets = assetsChange
       }
 
     -- Whether all assets are balanced.
     balanced :: Bool
-    balanced = all ((>= 0) . view #quantity) assets && lovelaceChange >= 0
+    balanced = all ((>= 0) . view #quantity) assetsChange && lovelaceChange >= 0
 
     -- Whether this transaction requires collateral.
     txNeedsCollateral :: Bool
     txNeedsCollateral = or
-      [ totalMinted /= []
+      [ testTokensMinted /= []
+      , swapBuilderModel ^. #swapCreations /= []
+      , swapBuilderModel ^. #swapCloses /= []
       ]

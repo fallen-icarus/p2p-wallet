@@ -16,6 +16,9 @@ module P2PWallet.Database
     -- * Deleting Entries
   , delete
 
+    -- * Updating Entries
+  , update
+
     -- * Inserting Entries
   , Insertable(..)
   , insert
@@ -53,6 +56,13 @@ create dbName = Sqlite.withConnection dbName $ \conn ->
 delete :: String -> Sqlite.Query -> IO ()
 delete dbName deleteStmt = Sqlite.withConnection dbName $ \conn ->
   Sqlite.execute_ conn deleteStmt
+
+-------------------------------------------------
+-- Updating Entries
+-------------------------------------------------
+update :: String -> Sqlite.Query -> IO ()
+update dbName updateStmt = Sqlite.withConnection dbName $ \conn ->
+  Sqlite.execute_ conn updateStmt
 
 -------------------------------------------------
 -- Inserting Entries

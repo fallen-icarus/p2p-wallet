@@ -7,7 +7,8 @@
 module P2PWallet.Data.Core.AssetMaps where
 
 import Database.SQLite.Simple (ToRow(..),FromRow(..))
-import Data.Map (lookup)
+import Data.Decimal (decimalPlaces)
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Database
@@ -116,7 +117,7 @@ processNewTickerInfo NewTickerInfo{..} reverseTickerMap = do
   tokenName <- maybeToRight "Not a valid asset name" $ TokenName <$> parseHex assetName
 
   -- Check the on-chain name is not already linked to another ticker.
-  whenJust (lookup (policy,tokenName) reverseTickerMap) $ \(tckr,_) ->
+  whenJust (Map.lookup (policy,tokenName) reverseTickerMap) $ \(tckr,_) ->
     -- If they match, that means this ticker info is about to be replaced while keeping the
     -- asset/ticker pair the same; this is okay.
     when (tckr /= Ticker ticker) $ 
@@ -170,7 +171,7 @@ parseNativeAssets tickerMap fingerprintMap assetLine =
 
     parseTickerEntry :: Text -> Text -> Maybe NativeAsset
     parseTickerEntry num name =
-      case lookup (Ticker name) tickerMap of
+      case Map.lookup (Ticker name) tickerMap of
         Nothing -> Nothing
         Just (policy,assetName,decimal) -> do
           rawQuantity <- readMaybe @Decimal $ toString num
@@ -181,13 +182,100 @@ parseNativeAssets tickerMap fingerprintMap assetLine =
 
     parseFingerprintEntry :: Text -> Text -> Maybe NativeAsset
     parseFingerprintEntry num name =
-      case lookup (Fingerprint name) fingerprintMap of
+      case Map.lookup (Fingerprint name) fingerprintMap of
         Nothing -> Nothing
         Just (policy,assetName) -> do
           parseNativeAsset $ unwords
             [ num
             , display policy <> "." <> display assetName
             ]
+
+-- | Parse native asset names separated by newlines. Native assets names can be one of:
+-- 'policy_id.asset_name'
+-- 'ticker'
+--
+-- This can also be used to parse "ADA" into a `NativeAsset`.
+parseNativeAssetName :: TickerMap -> Text -> Either Text NativeAsset
+parseNativeAssetName tickerMap text =
+    maybeToRight parseErrorMsg $ asum
+      [ parseAdaEntry text
+      , parseTickerEntry text
+      , parseOnChainEntry text
+      ]
+  where
+    parseErrorMsg :: Text
+    parseErrorMsg = unlines
+      [ "Invalid native asset name. Names must be one of:"
+      , "'policy_id.asset_name'"
+      , "'ticker'"
+      , ""
+      , "Could not parse: '" <> text <> "'"
+      , ""
+      , mconcat $ intersperse " " 
+          [ "If using a ticker, make sure it is in the Ticker Registry."
+          , "The ticker for the ada token is 'ADA'"
+          ]
+      , ""
+      , mconcat $ intersperse " "
+          [ "Fingerprints are not supported because there is no way for the p2p-wallet to know"
+          , "which asset the fingerprint corresponds to unless it knows the asset in advance."
+          ]
+      ]
+
+    parseAdaEntry :: Text -> Maybe NativeAsset
+    parseAdaEntry t
+      | t == "ADA" = Just lovelaceAsNativeAsset
+      | otherwise = Nothing
+
+    parseOnChainEntry :: Text -> Maybe NativeAsset
+    parseOnChainEntry = parseNativeAsset
+
+    parseTickerEntry :: Text -> Maybe NativeAsset
+    parseTickerEntry name =
+      case Map.lookup (Ticker name) tickerMap of
+        Nothing -> Nothing
+        Just (policy,assetName,_) -> do
+          parseNativeAsset $ unwords
+            [ "0"
+            , display policy <> "." <> display assetName
+            ]
+
+-- | Parse the quantity of an asset, accounting for any decimal places.
+parseFormattedAssetQuantity :: ReverseTickerMap -> NativeAsset -> Text -> Either Text NativeAsset
+parseFormattedAssetQuantity reverseTickerMap asset@NativeAsset{policyId,tokenName} text =
+  case Map.lookup (policyId,tokenName) reverseTickerMap of
+    Nothing ->
+      -- Ada is not in the ticker map, but will be provided as a decimal.
+      if policyId == "" then do
+        let errMsg = unlines
+              [ "Could not parse: " <> text
+              , "Expecting a decimal with 6 decimal places for: 'ADA'"
+              ]
+        amountAsDecimal <- maybeToRight errMsg $ readMaybe @Decimal (toString text)
+        if decimalPlaces amountAsDecimal > 6 then
+          Left errMsg
+        else
+          return $ asset & #quantity .~ unFormatQuantity 6 amountAsDecimal
+      else do
+        let errMsg = unlines
+              [ "Could not parse: " <> text
+              , "Expecting a whole number for: " <> display policyId <> "." <> display tokenName
+              ]
+        amount <- maybeToRight errMsg $ readMaybe @Integer $ toString text
+        return $ asset & #quantity .~ amount
+    Just (tckr,decimal) -> do
+      let errMsg = unlines
+            [ "Could not parse: " <> text
+            , fromString $ printf 
+                "Expecting a decimal with %d decimal place(s) for: '%s'" 
+                decimal 
+                (display tckr)
+            ]
+      amountAsDecimal <- maybeToRight errMsg $ readMaybe @Decimal (toString text)
+      if decimalPlaces amountAsDecimal > decimal then
+        Left errMsg
+      else
+        return $ asset & #quantity .~ unFormatQuantity decimal amountAsDecimal
 
 -------------------------------------------------
 -- Showing Native Asset Balances
@@ -196,13 +284,88 @@ parseNativeAssets tickerMap fingerprintMap assetLine =
 -- using a fingerprint instead can be toggled with True/False. It is not always
 -- desirable to use the fingerprint when a ticker is not set.
 showAssetBalance :: Bool -> ReverseTickerMap -> NativeAsset -> Text
-showAssetBalance withFingerprint reverseMap NativeAsset{..} =
-  case lookup (policyId,tokenName) reverseMap of
-    Nothing ->
-      if withFingerprint
-      then show quantity <> " " <> display fingerprint
-      else show quantity
-    Just (ticker,decimal) -> unwords
-      [ show $ formatQuantity decimal quantity
-      , display ticker
+showAssetBalance withFingerprint reverseMap NativeAsset{..}
+  | policyId == "" = display $ Lovelace quantity 
+  | otherwise = case Map.lookup (policyId,tokenName) reverseMap of
+      Nothing ->
+        if withFingerprint
+        then show quantity <> " " <> display fingerprint
+        else show quantity
+      Just (ticker,decimal) -> unwords
+        [ show $ formatQuantity decimal quantity
+        , display ticker
+        ]
+
+-- | Show the asset quantity without the name/fingerprint/ticker.
+showAssetQuantityOnly :: ReverseTickerMap -> NativeAsset -> Text
+showAssetQuantityOnly reverseMap NativeAsset{..}
+  | policyId == "" = show $ unAda $ toAda $ Lovelace quantity
+  | otherwise = case Map.lookup (policyId,tokenName) reverseMap of
+      Nothing -> show quantity
+      Just (_,decimal) -> show $ formatQuantity decimal quantity
+
+-- | Show the asset name using the ticker if possible. If a ticker is not set,
+-- use the asset fingerprint.
+showAssetNameOnly :: ReverseTickerMap -> NativeAsset -> Text
+showAssetNameOnly reverseMap NativeAsset{..}
+  | policyId == "" = "ADA"
+  | otherwise = case Map.lookup (policyId,tokenName) reverseMap of
+      Nothing -> display fingerprint
+      Just (ticker,_) -> display ticker
+
+-------------------------------------------------
+-- Price Parsing
+-------------------------------------------------
+-- | Format a `Rational` (representing the on-chain price) to the required number of decimals,
+-- and convert it to `Text`.
+showPriceFormatted
+  :: ReverseTickerMap 
+  -> NativeAsset -- ^ Numerator asset.
+  -> NativeAsset -- ^ Denominator asset.
+  -> Rational
+  -> Text
+showPriceFormatted reverseTickerMap numAsset denAsset price =
+    show @Text @Decimal $ 
+      realFracToDecimal numDecimals $ -- Use the number of decimals for the numerator.
+        price * mkScaleFactor (decimals denAsset) / mkScaleFactor (decimals numAsset)
+  where
+    numDecimals :: Word8
+    numDecimals = decimals numAsset
+
+    decimals :: NativeAsset -> Word8
+    decimals NativeAsset{policyId,tokenName}
+      | policyId == "" = 6
+      | otherwise = case Map.lookup (policyId,tokenName) reverseTickerMap of
+          Nothing -> 0
+          Just (_,decimal) -> decimal
+
+-- | Parse a formatted decimal to the on-chain price.
+parseFormattedPrice 
+  :: ReverseTickerMap 
+  -> NativeAsset -- ^ Numerator asset.
+  -> NativeAsset -- ^ Denominator asset.
+  -> Text
+  -> Either Text Rational
+parseFormattedPrice reverseTickerMap numAsset denAsset text = do
+    price <- maybeToRight ("'" <> text <> "' is not a decimal") $ 
+      readMaybe @Decimal $ toString text
+
+    -- The price cannot have more decimal places than the numerator asset supports.
+    when (decimalPlaces price > numeratorDecimals) $ Left errMsg
+
+    return $ toRational price * mkScaleFactor numeratorDecimals / mkScaleFactor (decimals denAsset)
+  where
+    errMsg = unlines
+      [ "Could not parse: " <> text
+      , fromString $ printf "Expecting a decimal with %d decimal place(s)." numeratorDecimals
       ]
+
+    numeratorDecimals :: Word8
+    numeratorDecimals = decimals numAsset
+
+    decimals :: NativeAsset -> Word8
+    decimals NativeAsset{policyId,tokenName}
+      | policyId == "" = 6
+      | otherwise = case Map.lookup (policyId,tokenName) reverseTickerMap of
+          Nothing -> 0
+          Just (_,decimal) -> decimal

@@ -13,13 +13,16 @@ module P2PWallet.Actions.Query.Koios
   , runQueryPaymentWalletInfo
   , runQueryStakeWalletInfo
   , runQueryAllRegisteredPools
+  , runQuerySwaps
+  , runQueryDexWallet
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
 import Servant.Client qualified as Client
 import Servant.API ((:<|>)(..), JSON, Post, Get, (:>), ReqBody, Required, QueryParam', QueryParam)
+import Network.HTTP.Client qualified as HTTP
+import Network.HTTP.Client.TLS qualified as HTTPS
 import Network.HTTP.Client (newManager)
-import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Data.Aeson
 import Data.Text qualified as Text
 import UnliftIO.Async (mapConcurrently,concurrently)
@@ -35,6 +38,9 @@ import P2PWallet.Data.Koios.Transaction
 import P2PWallet.Data.Core.Transaction qualified as P2P
 import P2PWallet.Data.Core.StakeReward qualified as P2P
 import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.DeFi.CardanoSwaps.Common
+import P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps qualified as OneWay
+import P2PWallet.Data.DeFi.CardanoSwaps.TwoWaySwaps qualified as TwoWay
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -55,6 +61,14 @@ handleTimeoutError query = query >>= \case
     isTimeoutError err =
       "ResponseTimeout)" == Text.takeEnd 16 (show err)
 
+-- | Koios instances occasionally take too long to respond. If they take longer than 10 seconds,
+-- odds are, they won't reply by 30 seconds either (the default timeout). These settings just change
+-- the default timeout to 10 seconds.
+customTlsSettings :: HTTP.ManagerSettings
+customTlsSettings = HTTPS.tlsManagerSettings
+  { HTTP.managerResponseTimeout = HTTP.responseTimeoutMicro 10_000_000
+  }
+
 -------------------------------------------------
 -- High-Level API
 -------------------------------------------------
@@ -65,7 +79,7 @@ runSubmitTx network txFile = do
   case tx' of
     Nothing -> return $ Left "Failed to deserialise transaction file."
     Just tx -> do
-      manager <- newManager tlsManagerSettings
+      manager <- newManager customTlsSettings
       res <-
         runClientM (submitApi $ SubmitTxCBOR tx) $
           mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1/ogmios")
@@ -83,7 +97,7 @@ runEvaluateTx network txFile = do
   case tx' of
     Nothing -> return $ Left "Failed to deserialise transaction file"
     Just tx -> do
-      manager <- newManager tlsManagerSettings
+      manager <- newManager customTlsSettings
       res <-
         runClientM (evaluateApi $ EvaluateTxCBOR tx) $
           mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1/ogmios")
@@ -97,7 +111,7 @@ runEvaluateTx network txFile = do
 -- | Get the current parameters for use with cardano-cli.
 runGetParams :: Network -> IO (Either Text ByteString)
 runGetParams network = do
-  manager' <- newManager tlsManagerSettings
+  manager' <- newManager customTlsSettings
   let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network) 443 "api/v1")
   bimap show valueAsByteString <$> runClientM paramsApi env
 
@@ -106,19 +120,22 @@ runGetParams network = do
 -- if a particular instance is not properly synced/configured.
 runQueryPaymentWalletInfo :: PaymentWallet -> IO (Either Text PaymentWallet)
 runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
-    (utxoRes,(assetRes,txRes)) <- 
-      concurrently queryUTxOsWithRedundancies $
-        concurrently queryNativeAssetsWithRedundancies queryTxsConcurrently
+    (utxoRes,txRes) <- concurrently queryUTxOsWithRedundancies queryTxsConcurrently
 
-    case (,,) <$> utxoRes <*> assetRes <*> txRes of
-      Right (us,as,txs) -> do
+    case (,) <$> utxoRes <*> txRes of
+      Right (us,txs) -> do
         return $ Right $ 
           wallet & #utxos .~ map toPersonalUTxO us
                  & #lovelace .~ sum (map (view #lovelace) us)
                  & #transactions %~ mappend (map (P2P.toTransaction profileId paymentId) txs)
-                 & #nativeAssets .~ as
+                 & populateNativeAssets
       Left err -> return $ Left err
   where
+    -- | Aggregate all native assets located at the address.
+    populateNativeAssets :: PaymentWallet -> PaymentWallet
+    populateNativeAssets p@PaymentWallet{utxos=us} =
+      p & #nativeAssets .~ sumNativeAssets (concatMap (view #nativeAssets) us)
+
     -- Add one to the blockHeight for the most recently recorded transaction for this wallet.
     -- Koios will return any transactions for that block or later.
     afterBlock :: Integer
@@ -143,32 +160,14 @@ runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
     -- Try to query the UTxOs. If a timeout error occurs, just try again.
     fetchUTxOs :: IO (Either Text [AddressUTxO])
     fetchUTxOs = do
-      manager <- newManager tlsManagerSettings
+      manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
       first show <$> handleTimeoutError (runClientM (queryAddressUTxOs [paymentAddress]) env)
-
-    -- Since Koios instances may occassionally return incorrect native assets if they are not close
-    -- enough to the chain tip, this would mess with the wallet's notifications. To account for
-    -- this, the native assets are queried three times and compared. At least two responses must
-    -- match to move on. The redundant queries occur concurrently.
-    queryNativeAssetsWithRedundancies :: IO (Either Text [NativeAsset])
-    queryNativeAssetsWithRedundancies = do
-      (res1,(res2,res3)) <- concurrently fetchAssets (concurrently fetchAssets fetchAssets)
-      if res1 == res2 || res1 == res2 then return res1
-      else if res2 == res3 then return res2
-      else return $ Left "There was an error syncing assets. Wait a few seconds and try again."
-
-    -- Try to query the Native Assets. If a timeout error occurs, just try again.
-    fetchAssets :: IO (Either Text [NativeAsset])
-    fetchAssets = do
-      manager <- newManager tlsManagerSettings
-      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
-      first show <$> handleTimeoutError (runClientM (queryAddressAssets [paymentAddress]) env)
 
     -- Try to query the tx hashes since last time. If a timeout error occurs, just try again.
     fetchTxHashes :: IO (Either Text [Text])
     fetchTxHashes = do
-      manager <- newManager tlsManagerSettings
+      manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
       first show <$> 
         handleTimeoutError (runClientM (queryAddressTxHashes [paymentAddress] afterBlock) env)
@@ -180,7 +179,7 @@ runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
       fetchTxHashes >>= \case
         Left err -> return $ Left $ show err
         Right hashes -> do
-          manager <- newManager tlsManagerSettings
+          manager <- newManager customTlsSettings
           let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
           bimap show concat . sequence <$> 
             mapConcurrently 
@@ -218,21 +217,21 @@ runQueryStakeWalletInfo wallet@StakeWallet{network,profileId,stakeId,stakeAddres
     -- Try to query the stake address' status.
     fetchAccountStatus :: IO (Either Text [StakeAccount])
     fetchAccountStatus = do
-      manager <- newManager tlsManagerSettings
+      manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
       first show <$> handleTimeoutError (runClientM (queryStakeAccounts [stakeAddress]) env)
 
     -- Try to query the stake address' rewards.
     fetchRewards :: IO (Either Text [StakeReward])
     fetchRewards = do
-      manager <- newManager tlsManagerSettings
+      manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
       first show <$> handleTimeoutError (runClientM (queryStakeRewards [stakeAddress]) env)
     
     -- Try to query the information for the pool this stake address is delegated to.
     fetchDelegatedPoolInfo :: Maybe PoolID -> IO (Either Text [Pool])
     fetchDelegatedPoolInfo mDelegatedPool = do
-      manager <- newManager tlsManagerSettings
+      manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
           query = queryPoolInfo Nothing Nothing $ Pools $ catMaybes [mDelegatedPool]
       first show <$> handleTimeoutError (runClientM query env)
@@ -240,7 +239,7 @@ runQueryStakeWalletInfo wallet@StakeWallet{network,profileId,stakeId,stakeAddres
     -- Try to query the stake address' rewards.
     fetchLinkedAddresses :: IO (Either Text [PaymentAddress])
     fetchLinkedAddresses = do
-      manager <- newManager tlsManagerSettings
+      manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
       first show <$> handleTimeoutError (runClientM (queryLinkedPaymentAddresses [stakeAddress]) env)
     
@@ -248,7 +247,7 @@ runQueryStakeWalletInfo wallet@StakeWallet{network,profileId,stakeId,stakeAddres
 -- possible.
 runQueryAllRegisteredPools :: Network -> IO (Either Text [Pool])
 runQueryAllRegisteredPools network = do
-    manager' <- newManager tlsManagerSettings
+    manager' <- newManager customTlsSettings
     let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network) 443 "api/v1")
 
     -- Get the list of pool ids. Group them 70 at a time so that the next query is not too large.
@@ -265,6 +264,63 @@ runQueryAllRegisteredPools network = do
     case info of
       Right rs -> return $ Right $ concat rs
       Left err -> return $ Left $ show err
+
+-- | Get the current order-book for a specific trading pair. This queries both one-way and two-way
+-- swaps. Ask and offer queries are _not_ supported.
+runQuerySwaps :: Network -> OfferAsset -> AskAsset -> IO (Either Text [SwapUTxO])
+runQuerySwaps network offerAsset askAsset = do
+    (oneWayRes,twoWayRes) <- concurrently fetchOneWaySwaps fetchTwoWaySwaps
+
+    case (,) <$> oneWayRes <*> twoWayRes of
+      Right (oneWayUTxOs,twoWayUTxOs) -> do
+        return $ Right $ sortOn (swapUTxOPrice offerAsset askAsset) $ 
+          map toSwapUTxO $ oneWayUTxOs <> twoWayUTxOs
+      Left err -> return $ Left err
+  where
+    -- Try to query the one-way swaps.
+    fetchOneWaySwaps :: IO (Either Text [AddressUTxO])
+    fetchOneWaySwaps = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryOneWaySwaps offerAsset askAsset) env)
+
+    -- Try to query the two-way swaps.
+    fetchTwoWaySwaps :: IO (Either Text [AddressUTxO])
+    fetchTwoWaySwaps = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryTwoWaySwaps offerAsset askAsset) env)
+
+-- | Get all information for a particular dex wallet.
+runQueryDexWallet :: DexWallet -> IO (Either Text DexWallet)
+runQueryDexWallet dexWallet@DexWallet{network,oneWaySwapAddress,twoWaySwapAddress} = do
+    (oneWayRes,twoWayRes) <- concurrently fetchOneWaySwaps fetchTwoWaySwaps
+
+    case (,) <$> oneWayRes <*> twoWayRes of
+      Right (oneWayUTxOs,twoWayUTxOs) -> do
+        return $ Right $ dexWallet
+          & #utxos .~ map toSwapUTxO (oneWayUTxOs <> twoWayUTxOs)
+          & populateNativeAssets
+      Left err -> return $ Left err
+  where
+    -- | Aggregate all native assets located at the wallet.
+    populateNativeAssets :: DexWallet -> DexWallet
+    populateNativeAssets s@DexWallet{utxos=us} =
+      s & #nativeAssets .~ sumNativeAssets (concatMap (view #nativeAssets) us)
+
+    -- Try to query the one-way swaps.
+    fetchOneWaySwaps :: IO (Either Text [AddressUTxO])
+    fetchOneWaySwaps = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryAddressUTxOs [oneWaySwapAddress]) env)
+
+    -- Try to query the two-way swaps.
+    fetchTwoWaySwaps :: IO (Either Text [AddressUTxO])
+    fetchTwoWaySwaps = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryAddressUTxOs [twoWaySwapAddress]) env)
 
 -------------------------------------------------
 -- Low-Level API
@@ -293,12 +349,6 @@ type KoiosApi
      :> QueryParam' '[Required] "offset" Int
      :> ReqBody '[JSON] PaymentAddressesAfterBlock
      :> Post '[JSON] TxHashes
-
-  :<|> "address_assets"
-     :> QueryParam' '[Required] "select" Text
-     :> QueryParam' '[Required] "offset" Int
-     :> ReqBody '[JSON] PaymentAddresses
-     :> Post '[JSON] [NativeAsset]
 
   :<|> "tx_info"
      :> QueryParam' '[Required] "select" Text
@@ -334,18 +384,25 @@ type KoiosApi
      :> QueryParam' '[Required] "pool_status" Text
      :> Get '[JSON] Pools
 
+  :<|>  "asset_utxos"
+     :> QueryParam' '[Required] "select" Text
+     :> QueryParam' '[Required] "is_spent" Text
+     :> QueryParam "asset_list" Text
+     :> ReqBody '[JSON] AssetList
+     :> Post '[JSON] [AddressUTxO]
+
 submitApi
   :<|> evaluateApi 
   :<|> paramsApi
   :<|> addressUTxOsApi 
   :<|> addressTxsApi
-  :<|> addressAssetsApi 
   :<|> txInfoApi 
   :<|> stakeAccountApi
   :<|> stakeRewardsApi
   :<|> poolInfoApi
   :<|> linkedPaymentAddressesApi
   :<|> poolListApi
+  :<|> assetUTxOsApi
   = client (Proxy :: Proxy KoiosApi)
 
 -- Query all UTxOs for a list of payment addresses.
@@ -385,29 +442,6 @@ queryAddressUTxOs addrs = queryUTxOs 0 []
         , "reference_script"
         , "block_time"
         , "block_height"
-        ]
-
--- Query all native assets owned by a list of payment addresses.
-queryAddressAssets :: [PaymentAddress] -> ClientM [NativeAsset]
-queryAddressAssets addrs = queryAssets 0 []
-  where
-    queryAssets :: Int -> [NativeAsset] -> ClientM [NativeAsset]
-    queryAssets offset !acc = do
-      !res <- addressAssetsApi select offset (PaymentAddresses addrs)
-      if length res == 1000 then 
-        -- Query again since there may be more.
-        queryAssets (offset + 1000) $ acc <> res
-      else
-        -- That should be the last of the results.
-        return $ acc <> res
-
-    select :: Text
-    select =
-      mconcat $ intersperse ","
-        [ "policy_id"
-        , "asset_name"
-        , "fingerprint"
-        , "quantity"
         ]
 
 -- Query all transactions for a list of addresses but only transactions at or after the specified
@@ -510,3 +544,71 @@ queryPoolIds offset !acc = do
   else
     -- That should be the last of the results.
     return $ acc <> poolIds
+
+queryOneWaySwaps :: OfferAsset -> AskAsset -> ClientM [AddressUTxO]
+queryOneWaySwaps offerAsset askAsset = do
+    let offerFilter 
+          | offerAsset ^. #unOfferAsset % #policyId == "" = Nothing
+          | otherwise = Just $ "cs." <> assetToQueryParam (unOfferAsset offerAsset)
+
+    assetUTxOsApi select "eq.false" offerFilter $ 
+      AssetList [(OneWay.beaconCurrencySymbol, OneWay.genPairBeaconName offerAsset askAsset)]
+  where
+    assetToQueryParam :: NativeAsset -> Text
+    assetToQueryParam NativeAsset{policyId,tokenName} = mconcat
+      [ "[{\"policy_id\":\""
+      , display policyId
+      , "\",\"asset_name\":\""
+      , display tokenName
+      , "\"}]"
+      ]
+
+    select :: Text
+    select = fromString $ mconcat $ intersperse ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]
+
+queryTwoWaySwaps :: OfferAsset -> AskAsset -> ClientM [AddressUTxO]
+queryTwoWaySwaps (OfferAsset offerAsset) (AskAsset askAsset) = do
+    let offerFilter 
+          | offerAsset ^. #policyId == "" = Nothing
+          | otherwise = Just $ "cs." <> assetToQueryParam offerAsset
+
+    assetUTxOsApi select "eq.false" offerFilter $ 
+      AssetList [(TwoWay.beaconCurrencySymbol, TwoWay.genPairBeaconName offerAsset askAsset)]
+  where
+    assetToQueryParam :: NativeAsset -> Text
+    assetToQueryParam NativeAsset{policyId,tokenName} = mconcat
+      [ "[{\"policy_id\":\""
+      , display policyId
+      , "\",\"asset_name\":\""
+      , display tokenName
+      , "\"}]"
+      ]
+
+    select :: Text
+    select = fromString $ mconcat $ intersperse ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]

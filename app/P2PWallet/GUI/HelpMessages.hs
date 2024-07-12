@@ -13,7 +13,7 @@ accountIdInfoMsg = unlines
   , "This example is for the second stake key from account 0:"
   , "1852'/1815'/0'/2/1"
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "All keys used for a given profile MUST be from the same account."
       , "This requirement is because hardware wallets only allow signing transactions"
       , "when all of its required keys are from the same account. It is technically possible"
@@ -25,18 +25,18 @@ accountIdInfoMsg = unlines
       , "to enable supporting multiple account indices for each profile."
       ]
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "The p2p-wallet will use this account index when pairing any hardware wallet keys with"
       , "this profile."
       ]
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "NOTE: Derivation paths can also be written with 'H' instead of '''; they are equivalent."
       , "For example, the path for the first payment key from account 0 can also be written as:"
       ]
   , "1852H/1815H/0H/0/0"
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "Since the single quote sometimes has a special meaning inside programming languages, the"
       , "'H' is occasionally used instead."
       ]
@@ -47,7 +47,7 @@ paymentAddressIndexMsg = unlines
   [ "Hardware wallet key derivation paths take the form:"
   , "m / purpose' / coin_type' / account' / chain / address_index "
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "All payment keys have 'chain' set to 0, but the 'address_index' can technically"
       , "be any whole number >= 0."
       ]
@@ -58,7 +58,7 @@ paymentAddressIndexMsg = unlines
   , "This example is for the second payment key from account 0:"
   , "1852'/1815'/0'/0/1"
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "You have full control over which payment key to use for each payment address."
       , "To keep things simple, it is recommended to go in order; jumping around with the"
       , "'address_index' will make it harder for you to remember which indices you are using."
@@ -66,18 +66,18 @@ paymentAddressIndexMsg = unlines
       , "and 'address_index' were used in the payment key's deriviation path."
       ]
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "The p2p-wallet will use the account index set for this profile"
       , "when pairing the new hardware wallet keys."
       ]
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "NOTE: Derivation paths can also be written with 'H' instead of '''; they are equivalent."
       , "For example, the path for the first payment key from account 0 can also be written as:"
       ]
   , "1852H/1815H/0H/0/0"
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "Since the single quote sometimes has a special meaning inside programming languages, the"
       , "'H' is occasionally used instead."
       ]
@@ -88,7 +88,7 @@ stakeAddressIndexMsg = unlines
   [ "Hardware wallet key derivation paths take the form:"
   , "m / purpose' / coin_type' / account' / chain / address_index "
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "All stake keys have 'chain' set to 2, but the 'address_index' can technically"
       , "be any whole number >= 0."
       ]
@@ -99,7 +99,7 @@ stakeAddressIndexMsg = unlines
   , "This example is for the second stake key from account 0:"
   , "1852'/1815'/0'/2/1"
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "You have full control over which stake key to use for each stake address."
       , "To keep things simple, it is recommended to go in order; jumping around with the"
       , "'address_index' will make it harder for you to remember which indices you are using."
@@ -107,25 +107,25 @@ stakeAddressIndexMsg = unlines
       , "and 'address_index' were used in the stake key's deriviation path."
       ]
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "The p2p-wallet will use the account index set for this profile"
       , "when pairing the new hardware wallet keys."
       ]
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "NOTE: Derivation paths can also be written with 'H' instead of '''; they are equivalent."
       , "For example, the path for the first payment key from account 0 can also be written as:"
       ]
   , "1852H/1815H/0H/0/0"
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "Since the single quote sometimes has a special meaning inside programming languages, the"
       , "'H' is occasionally used instead."
       ]
   ]
 
 whatIsPairedWalletMsg :: Text
-whatIsPairedWalletMsg = mconcat $ intersperse " "
+whatIsPairedWalletMsg = unwords
   [ "A paired wallet is a hardware wallet address where the p2p-wallet knows about the associated"
   , "hardware wallet keys. Because it is aware of the keys, users can sign/witness any transaction"
   , "involving the paired wallet. The p2p-wallet only supports signing/witnessing transactions"
@@ -134,7 +134,7 @@ whatIsPairedWalletMsg = mconcat $ intersperse " "
 
 whatIsWatchedWalletMsg :: Text
 whatIsWatchedWalletMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "A watched wallet is an address where the p2p-wallet does NOT know about the associated"
       , "credentials. For example, if the user has a cold wallet where the keys are on an air-gapped"
       , "computer, there is no possible way for the p2p-wallet to safely automate the"
@@ -144,7 +144,7 @@ whatIsWatchedWalletMsg = unlines
       , "watched addresses, the transaction builder is able to use UTxOs from these addresses."
       ]
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "Any transaction built for watched wallets can be exported from the p2p-wallet so that it"
       , "can be signed externally. Once signed, the completed transaction can be imported back"
       , "into the p2p-wallet for submission to the blockchain. If a paired wallet must also"
@@ -157,7 +157,7 @@ whatIsWatchedWalletMsg = unlines
 
 utxoSearchMsg :: Text
 utxoSearchMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "You can search through all of the UTxOs for specific native tokens, reference script"
       , "hashes, datum hashes, or tx hashes. You can even search for UTxOs containing a"
       , "combination of targets by separating them with commas."
@@ -179,7 +179,7 @@ utxoSortMsg = unlines
   , "3. Chronologically based on the time the UTxO was created"
   , "4. Based on the balance of a specific native asset"
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "The last option is only possible when search is being used for the UTxOs. This option"
       , "will be hidden if search is not being used. The asset that will be sorted on will"
       , "be the FIRST criteria used in the search. Make sure the first"
@@ -190,7 +190,7 @@ utxoSortMsg = unlines
 
 depositSignMsg :: Text
 depositSignMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "Positive means the deposit was paid. Negative means the deposit was reclaimed."
       , "When stake registration deposits are paid/reclaimed, they will appear here."
       ]
@@ -213,7 +213,7 @@ txSearchMsg = unlines
   , "2. policy_id"
   , "3. asset_name"
   , "4. fingerprint"
-  , "5. ticker"
+  , "5. ticker - if in Ticker Registry"
   , ""
   , "The search will try to match against any of:"
   , "1. Inputs"
@@ -225,7 +225,7 @@ txSearchMsg = unlines
 
 txStartDateMsg :: Text
 txStartDateMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "Show only transactions after the specfied date. Leave it blank to show transactions since"
       , "the beginning. The default setting is to only show transactions within the past 30 days."
       ]
@@ -233,7 +233,7 @@ txStartDateMsg = unlines
 
 txEndDateMsg :: Text
 txEndDateMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "Show only transactions up through the specfied date. Leave it blank to show transactions"
       , "up through the present."
       ]
@@ -241,7 +241,7 @@ txEndDateMsg = unlines
 
 totalDelegatedMsg :: Text
 totalDelegatedMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "The total amount delegated across all payment addresses using this staking credential +"
       , "the current reward balance."
       ]
@@ -249,7 +249,7 @@ totalDelegatedMsg = unlines
 
 pledgeMsg :: Text
 pledgeMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "The amount of ADA the stake pool owners have committed as pledge. If this is not met,"
       , "the stake pool will be penalized."
       ]
@@ -257,7 +257,7 @@ pledgeMsg = unlines
 
 activePledgeMsg :: Text
 activePledgeMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "The actual amount of ADA pledged by the stake pool owners. It must be at the pledge"
       , "amount to avoid penalties."
       ]
@@ -265,7 +265,7 @@ activePledgeMsg = unlines
 
 fixedCostMsg :: Text
 fixedCostMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "A fixed amount of ADA deducted from the total rewards to cover the stake pool's"
       , "operating expenses."
       ]
@@ -273,7 +273,7 @@ fixedCostMsg = unlines
 
 marginMsg :: Text
 marginMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "The percentage of the pool's total rewards that will be taken by the stake pool operator"
       , "after the fixed cost."
       ]
@@ -281,21 +281,21 @@ marginMsg = unlines
 
 liveSaturationMsg :: Text
 liveSaturationMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "The percent saturation for this pool."
       ]
   ]
 
 activeLinkedAddressesMsg :: Text
 activeLinkedAddressesMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "Payment addresses with non-zero balances that are using this staking credential."
       ]
   ]
 
 spendableEpochMsg :: Text
 spendableEpochMsg = unlines
-  [ mconcat $ intersperse " "
+  [ unwords
       [ "The epoch when these rewards became spendable."
       ]
   ]
@@ -305,19 +305,19 @@ nativeAssetAreaEntryMsg = unlines
   [ "Native assets must be in one of the following formats:"
   , "1. '# policy_id.asset_name'"
   , "2. '# fingerprint'"
-  , "3. '# ticker'"
+  , "3. '# ticker' - if in Ticker Registry"
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "You can go to another page and copy the name; then return here to paste it in."
       , "Your place will be saved."
       ]
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "The first two formats must always be paired with a whole number (the fingerprint is just"
       , "an alias for 'policy_id.asset_name'), but the third format can be paired with a decimal."
       ]
   , ""
-  , mconcat $ intersperse " "
+  , unwords
       [ "If you use the ticker, be sure to account for the decimal places! For example, if the"
       , "fingerprint is 'abc123', the ticker is `ABC`, and the asset uses 6 decimal places, then"
       , "'1 abc123' is NOT the same as '1 ABC'! Instead, '1 ABC' would be '1000000 abc123'! Pay"
@@ -327,7 +327,7 @@ nativeAssetAreaEntryMsg = unlines
 
 testTokenMintQuantitiesMsg :: Text
 testTokenMintQuantitiesMsg = unlines
-  [ mconcat $ intersperse " " 
+  [ unwords 
       [ "Test token names must be in the format '# asset_name' where 'asset_name' is in"
       , "hexidecimal. You can use the provided converter to convert human-readable text"
       , "to hexidecimal."
@@ -340,7 +340,7 @@ aboutCollateralMsg :: Text
 aboutCollateralMsg = unlines
   [ "Only transactions with smart contract executions require collateral."
   , ""
-  , mconcat $ intersperse " " 
+  , unwords 
       [ "Collateral UTxOs are NOT spent unless a smart contract execution fails."
       , "This should never actually happen for any of the protocols supported by this wallet."
       , "If someone beats you to a DeFi UTxO, the transaction will fail due to the UTxO no longer"
@@ -349,8 +349,160 @@ aboutCollateralMsg = unlines
       , "transaction."
       ]
   , ""
-  , mconcat $ intersperse " " 
+  , unwords 
       [ "Collateral UTxOs must contain at least 5 ADA and not have any native assets present."
       , "Only one collateral UTxO is required per transaction with smart contract executions."
       ]
+  ]
+
+defiStakeCredentialMsg :: Text
+defiStakeCredentialMsg = unlines
+  [ unwords 
+      [ "All p2p-DeFi DApps allow you to use your own staking credential to protect your DeFi"
+      , "assets. This enables you to maintain custody, delegation control, and voting control"
+      , "of all assets currently being used for DeFi."
+      ]
+  , ""
+  , unwords 
+      [ "Please choose one of your tracked stake wallets to use for the stake credential."
+      , "If you wish to use a different one, you must first add that stake wallet from the"
+      , "`Staking` page."
+      ]
+  ]
+
+offerAssetMsg :: Text
+offerAssetMsg = unlines
+  [ "Which asset do you currently have and wish to convert?"
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , ""
+  , unwords
+      [ "Fingerprints are not supported because there is no way for the p2p-wallet to know"
+      , "which asset the fingerprint corresponds to unless it knows the asset in advance."
+      , "Due to the composability of cardano-swaps, users may not always have the offer asset"
+      , "in question."
+      ]
+  ]
+
+askAssetMsg :: Text
+askAssetMsg = unlines
+  [ "Which asset do you wish to receive?"
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , ""
+  , unwords
+      [ "Fingerprints are not supported because there is no way for the p2p-wallet to know"
+      , "which asset the fingerprint corresponds to unless it knows the asset in advance."
+      , "This may not be realistic in most scenarios since users don't typically have the"
+      , "asset they wish to receive."
+      ]
+  ]
+
+p2pLimitOrderMsg :: Text
+p2pLimitOrderMsg = unlines
+  [ unwords
+      [ "A p2p limit order is a one-directional swap where users can take some of your offer"
+      , "asset as long as they deposit enough of the ask asset to satisfy the limit price."
+      , "Anyone can directly interact with your swap without needing to go through batchers."
+      ]
+  ]
+
+limitPositionSizeMsg :: Text
+limitPositionSizeMsg = unlines
+  [ unwords
+      [ "How much of the offer asset are you going to deposit into the swap?"
+      , "All swaps must be stored with the minimum UTxO value amount of ADA in addition"
+      , "to the offer amount! The minimum UTxO value is effectively a deposit you can"
+      , "get back by closing the swap."
+      ]
+  ]
+
+limitPriceMsg :: Text
+limitPriceMsg = unlines
+  [ unwords
+      [ "Anyone who wishes to swap with your assets must satisfy the price you set here."
+      , "The price must be specified as a decimal. Pay attention to the required units!"
+      ]
+  ]
+
+swapArbitrageFeeMsg :: Text
+swapArbitrageFeeMsg = unlines
+  [ unwords
+      [ "Directly interacting with swaps carries a risk that another user will beat you to your"
+      , "desired swap before your transaction goes through. This would mean you must keep trying"
+      , "different swaps until you find one that goes through. This can get quite annoying..."
+      ]
+  , ""
+  , unwords
+      [ "Alternatively, you can pay an arbitrager to take on this role for you: you specify a"
+      , "limit order price and the arbitrager will keep trying to satisfy your swap until it goes"
+      , "through."
+      ]
+  , ""
+  , unwords
+      [ "You have full control over how much to pay arbitragers to take on the concurrency risk"
+      , "on your behalf. It is NOT possible for arbitragers to cheat you! The more you are willing"
+      , "to pay, the faster your swap is likely to get processed. If you do not want to pay"
+      , "arbitragers a fee, you can set the 'Arbitrage Fee' to '0%' or leave the field blank."
+      ]
+  , ""
+  , unwords
+      [ "WARNING: In the early days of p2p-DeFi, there may not be many arbitragers and so your swaps"
+      , "may still sit for a while, even with an 'Arbitrage Fee' set. This is just growing pains..."
+      , "However, this also means there may be very little concurrency risk in the early days and"
+      , "you may be able to directly interact with swaps without much of a problem."
+      ]
+  , ""
+  , "The formula for the actual price used in your swap is:"
+  , "limit_price * (1 - arbitrage_fee_as_decimal)"
+  ]
+
+p2pLiquiditySwapMsg :: Text
+p2pLiquiditySwapMsg = unlines
+  [ unwords
+      [ "A p2p liquidity swap is a two-directional swap where users can swap with your assets"
+      , "in either direction. Since you can specify a separate price for each direction,"
+      , "you can charge a fee for each conversion using your liquidity swap. The liquidity swap"
+      , "can be endlessly converted back and forth. The prices can be used to favor one direction"
+      , "over the other."
+      ]
+  ]
+
+liquidityPositionSizeMsg :: Text
+liquidityPositionSizeMsg = unlines
+  [ unwords
+      [ "How much of this asset are you going to deposit into the liquidity swap?"
+      , "All swaps must be stored with at the minimum UTxO value of ADA in addition to the"
+      , "liquidity amount! The minimum UTxO value is effectively a deposit you can get back"
+      , "by closing the swap."
+      ]
+  ]
+
+liquidityPriceMsg :: Text
+liquidityPriceMsg = unlines
+  [ "The price must be specified as a decimal. Pay attention to the required units!"
+  ]
+
+cardanoSwapsBugMsg :: (Show a) => a -> Text
+cardanoSwapsBugMsg a = unlines
+  [ unwords
+      [ "You found a critical bug in cardano-swaps! Beacons were found with an invalid swap UTxO."
+      , "This bug can be used to denial-of-service attack the order book!"
+      ]
+  , ""
+  , unwords
+      [ "Your funds are still safe; no one can swap your assets for less than the amount you asked for."
+      , "This bug just means it may be hard for other users to find your swaps."
+      ]
+  , ""
+  , unwords 
+      [ "Please open an issue on github explaining how you came across the bug and please attach"
+      , "the following information (you can copy/paste it into the new issue):"
+      ]
+  , ""
+  , show a
   ]

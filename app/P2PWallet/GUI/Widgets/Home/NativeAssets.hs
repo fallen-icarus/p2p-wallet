@@ -4,7 +4,7 @@ module P2PWallet.GUI.Widgets.Home.NativeAssets
   ) where
 
 import Monomer
-import Data.Map qualified as Map
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps

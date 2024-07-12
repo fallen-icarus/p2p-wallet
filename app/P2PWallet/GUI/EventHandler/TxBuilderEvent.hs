@@ -8,11 +8,13 @@ import System.Directory qualified as Dir
 
 import P2PWallet.Actions.AssembleWitnesses
 import P2PWallet.Actions.BuildTxBody
+import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.ExportTxBody
 import P2PWallet.Actions.WitnessTxBody
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
+import P2PWallet.GUI.EventHandler.TxBuilderEvent.SwapBuilderEvent
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
@@ -23,6 +25,11 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   ResetBuilder -> 
     [ Model $ model & #txBuilderModel .~ def ]
+
+  -----------------------------------------------
+  -- Run swap event
+  -----------------------------------------------
+  SwapBuilderEvent swapEvent -> handleSwapBuilderEvent model swapEvent
 
   -----------------------------------------------
   -- Open the Add Popup
@@ -46,8 +53,9 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Remove User Input from Builder
   -----------------------------------------------
   RemoveSelectedUserInput idx ->
-    [ Model $ model & #txBuilderModel % #userInputs %~ removeAction idx
-                    & #txBuilderModel %~ balanceTx
+    [ Model $ model 
+        & #txBuilderModel % #userInputs %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
     , Task $ return $ Alert "Successfully removed from builder!"
     ]
 
@@ -55,8 +63,9 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Remove User Output from Builder
   -----------------------------------------------
   RemoveSelectedUserOutput idx ->
-    [ Model $ model & #txBuilderModel % #userOutputs %~ removeAction idx
-                    & #txBuilderModel %~ balanceTx
+    [ Model $ model 
+        & #txBuilderModel % #userOutputs %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
     , Task $ return $ Alert "Successfully removed from builder!"
     ]
 
@@ -64,8 +73,9 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Remove User Certificate from Builder
   -----------------------------------------------
   RemoveSelectedUserCertificate idx ->
-    [ Model $ model & #txBuilderModel % #userCertificates %~ removeAction idx
-                    & #txBuilderModel %~ balanceTx
+    [ Model $ model 
+        & #txBuilderModel % #userCertificates %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
     , Task $ return $ Alert "Successfully removed from builder!"
     ]
 
@@ -73,8 +83,9 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Remove User Withdrawal from Builder
   -----------------------------------------------
   RemoveSelectedUserWithdrawal idx ->
-    [ Model $ model & #txBuilderModel % #userWithdrawals %~ removeAction idx
-                    & #txBuilderModel %~ balanceTx
+    [ Model $ model 
+        & #txBuilderModel % #userWithdrawals %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
     , Task $ return $ Alert "Successfully removed from builder!"
     ]
 
@@ -82,8 +93,9 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Remove Test Mint from Builder
   -----------------------------------------------
   RemoveTestMint ->
-    [ Model $ model & #txBuilderModel % #testMint .~ Nothing
-                    & #txBuilderModel %~ balanceTx
+    [ Model $ model 
+        & #txBuilderModel % #testMint .~ Nothing
+        & #txBuilderModel %~ balanceTx
     , Task $ return $ Alert "Successfully removed from builder!"
     ]
 
@@ -91,8 +103,9 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Increment the number of copies of that User Output
   -----------------------------------------------
   ChangeUserOutputCount idx newCount ->
-    [ Model $ model & #txBuilderModel % #userOutputs % ix idx % _2 % #count .~ newCount
-                    & #txBuilderModel %~ balanceTx
+    [ Model $ model 
+        & #txBuilderModel % #userOutputs % ix idx % _2 % #count .~ newCount
+        & #txBuilderModel %~ balanceTx
     ]
 
   -----------------------------------------------
@@ -100,19 +113,36 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   EditSelectedUserOutput modal -> case modal of
     StartAdding mTarget ->
-      [ Model $ model & #txBuilderModel % #targetUserOutput .~ 
-          (mTarget & _Just % _2 %~ toNewUserOutput reverseTickerMap)
+      [ Model $ model 
+          & #txBuilderModel % #targetUserOutput .~ 
+              (mTarget & _Just % _2 %~ toNewUserOutput reverseTickerMap)
       ]
     CancelAdding ->
       [ Model $ model & #txBuilderModel % #targetUserOutput .~ Nothing ]
     ConfirmAdding -> 
-      [ Task $ runActionOrAlert (TxBuilderEvent . EditSelectedUserOutput . AddResult) $ do
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (TxBuilderEvent . EditSelectedUserOutput . AddResult) $ do
           let (idx,newOutput) = fromMaybe (0,def) $ txBuilderModel ^. #targetUserOutput
-          fromRightOrAppError $ (idx,) <$>
-            processNewUserOutput (config ^. #network) tickerMap fingerprintMap newOutput
+          verifiedOutput <- 
+            fromRightOrAppError $ 
+              processNewUserOutput (config ^. #network) tickerMap fingerprintMap newOutput
+
+          -- There should only be one output in the `TxBody` for this action.
+          minUTxOValue <-
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network) 
+                (txBuilderModel ^. #parameters) 
+                verifiedOutput
+
+          when (minUTxOValue > verifiedOutput ^. #lovelace) $
+            throwIO $ AppError $ minUTxOErrorMessage minUTxOValue
+
+          return (idx,verifiedOutput)
       ]
     AddResult newInfo@(idx,_) ->
       [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
           & #txBuilderModel % #userOutputs % ix idx .~ newInfo
           & #txBuilderModel % #targetUserOutput .~ Nothing
           & #txBuilderModel %~ balanceTx
@@ -123,12 +153,14 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   AddNewChangeOutput modal -> case modal of
     StartAdding _ ->
-      [ Model $ model & #txBuilderModel % #newChangeOutput .~ def
-                      & #txBuilderModel % #addingChangeOutput .~ True
+      [ Model $ model 
+          & #txBuilderModel % #newChangeOutput .~ def
+          & #txBuilderModel % #addingChangeOutput .~ True
       ]
     CancelAdding ->
-      [ Model $ model & #txBuilderModel % #newChangeOutput .~ def 
-                      & #txBuilderModel % #addingChangeOutput .~ False
+      [ Model $ model 
+          & #txBuilderModel % #newChangeOutput .~ def 
+          & #txBuilderModel % #addingChangeOutput .~ False
       ]
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (TxBuilderEvent . AddNewChangeOutput . AddResult) $ do
@@ -136,11 +168,11 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
             processNewChangeOutput (config ^. #network) (txBuilderModel ^. #newChangeOutput)
       ]
     AddResult verifiedChangeOutput ->
-      [ Model $
-          model & #txBuilderModel % #changeOutput ?~ verifiedChangeOutput
-                & #txBuilderModel % #newChangeOutput .~ def
-                & #txBuilderModel % #addingChangeOutput .~ False
-                & #txBuilderModel %~ balanceTx
+      [ Model $ model 
+          & #txBuilderModel % #changeOutput ?~ verifiedChangeOutput
+          & #txBuilderModel % #newChangeOutput .~ def
+          & #txBuilderModel % #addingChangeOutput .~ False
+          & #txBuilderModel %~ balanceTx
       ]
 
   -----------------------------------------------
@@ -151,12 +183,14 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
       -- Set the `newTestMint` field to either the current info if set, or a fresh
       -- entry.
       let currentMint = maybe def toNewTestMint $ txBuilderModel ^. #testMint in
-      [ Model $ model & #txBuilderModel % #newTestMint .~ currentMint
-                      & #txBuilderModel % #addingTestMint .~ True
+      [ Model $ model 
+          & #txBuilderModel % #newTestMint .~ currentMint
+          & #txBuilderModel % #addingTestMint .~ True
       ]
     CancelAdding ->
-      [ Model $ model & #txBuilderModel % #newTestMint .~ def 
-                      & #txBuilderModel % #addingTestMint .~ False
+      [ Model $ model 
+          & #txBuilderModel % #newTestMint .~ def 
+          & #txBuilderModel % #addingTestMint .~ False
       ]
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (TxBuilderEvent . AddNewTestMint . AddResult) $ do
@@ -164,11 +198,11 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
             processNewTestMint $ txBuilderModel ^. #newTestMint
       ]
     AddResult verifiedTestMint ->
-      [ Model $
-          model & #txBuilderModel % #testMint ?~ verifiedTestMint
-                & #txBuilderModel % #newTestMint .~ def
-                & #txBuilderModel % #addingTestMint .~ False
-                & #txBuilderModel %~ balanceTx
+      [ Model $ model 
+          & #txBuilderModel % #testMint ?~ verifiedTestMint
+          & #txBuilderModel % #newTestMint .~ def
+          & #txBuilderModel % #addingTestMint .~ False
+          & #txBuilderModel %~ balanceTx
       ]
 
   -----------------------------------------------
@@ -199,11 +233,11 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
       -- `building` flag. An `alertMessage` is used to tell the user the estimated transaction fee.
       -- Finally, now that is built, the `isBuilt` is set to True to allow acting on the tx.body
       -- file currently in the tmp directory; this was already toggled by `buildTxBody`.
-      [ Model $ 
-          model & #txBuilderModel .~ newTx 
-                & #waitingStatus % #building .~ False
-                & #alertMessage ?~
-                    fromString (printf "Estimated Fee: %D ADA" (toAda $ newTx ^. #fee))
+      [ Model $ model 
+          & #txBuilderModel .~ newTx 
+          & #waitingStatus % #building .~ False
+          & #alertMessage ?~
+              fromString (printf "Estimated Fee: %D ADA" (toAda $ newTx ^. #fee))
       ]
 
   -----------------------------------------------
@@ -219,10 +253,10 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
             witnessTxBody (config ^. #network) txBuilderModel
         ]
     ProcessResults witnessFiles -> 
-      [ Model $ 
+      [ Model $ model
           -- The waitingOnDevice flag is left active. It will be disabled by whatever gets called
           -- next.
-          model & #txBuilderModel % #keyWitnessFiles .~ witnessFiles
+          & #txBuilderModel % #keyWitnessFiles .~ witnessFiles
       , Task $ 
           if txBuilderModel ^. #allKeyWitnessesKnown then
             -- The witnesses can be assembled and then submitted to the blockchain.
@@ -242,8 +276,8 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
           assembleWitnesses (txBuilderModel ^. #keyWitnessFiles)
       ]
     ProcessResults signedFile -> 
-      [ Model $ 
-          model & #waitingStatus % #waitingOnDevice .~ False
+      [ Model $ model 
+          & #waitingStatus % #waitingOnDevice .~ False
       , Task $ return $ SubmitTx signedFile
       ]
 
@@ -256,8 +290,8 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
           exportTxBody (txBuilderModel ^. #keyWitnessFiles)
       ]
     ProcessResults exportDestination -> 
-      [ Model $ 
-          model & #waitingStatus % #waitingOnDevice .~ False -- This can be called from `WitnessTx`.
+      [ Model $ model 
+          & #waitingStatus % #waitingOnDevice .~ False -- This can be called from `WitnessTx`.
       , Task $ return $ Alert $ unlines
           [ "Transaction file(s) successfully exported to the following directory:"
           , toText exportDestination
@@ -269,12 +303,14 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   ImportSignedTxFile modal -> case modal of
     StartAdding _ ->
-      [ Model $ model & #txBuilderModel % #importedSignedTxFile .~ ""
-                      & #txBuilderModel % #importing .~ True
+      [ Model $ model 
+          & #txBuilderModel % #importedSignedTxFile .~ ""
+          & #txBuilderModel % #importing .~ True
       ]
     CancelAdding ->
-      [ Model $ model & #txBuilderModel % #importedSignedTxFile .~ ""
-                      & #txBuilderModel % #importing .~ False
+      [ Model $ model 
+          & #txBuilderModel % #importedSignedTxFile .~ ""
+          & #txBuilderModel % #importing .~ False
       ]
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (TxBuilderEvent . ImportSignedTxFile . AddResult) $ do

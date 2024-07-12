@@ -6,15 +6,14 @@ module P2PWallet.Actions.BuildTxBody
 import System.FilePath ((</>), (<.>))
 import Data.Aeson (encode,parseJSON)
 import Data.Aeson.Types (parseMaybe)
-import Data.String qualified as String
 
 import P2PWallet.Actions.Query.Koios
+import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
 import P2PWallet.Data.Koios.BudgetEstimations
-import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -- | The builder steps. This is useful for creating the builder.log file which shows the exact
@@ -32,7 +31,7 @@ logBuilderStep :: BuilderLogFile -> BuilderStep -> IO ()
 logBuilderStep (BuilderLogFile file) step = case step of
   InitializeLogFile -> 
     -- Clear the log file from last time.
-    writeFile file "# Build Logs:\n"
+    writeFile file "# Build Logs:"
   BuildCommandStep cmd -> 
     -- Add the command that is about to be executed.
     appendFile file ("\n\n" <> cmd)
@@ -40,17 +39,21 @@ logBuilderStep (BuilderLogFile file) step = case step of
     -- The execution budgets are not a command but are needed for later steps. They are shown as
     -- commented json objects in the builder.log file.
     appendFile file $ ("\n\n# Estimated budgets using previous tx.body:\n" <>) $ 
-      String.unlines $ map (("# " <>) . show . encode) budgets
+      mconcat $ intersperse "\n" $ map (("# " <>) . show . encode) budgets
 
--- | Log the command before actually running it.
-runBuildCmd_ :: BuilderLogFile -> String -> IO ()
+-- | Log the command before actually running it. The command will be formatted to make it more
+-- human-readable.
+runBuildCmd_ :: BuilderLogFile -> Text -> IO ()
 runBuildCmd_ builderLogFile cmd = 
-  logBuilderStep builderLogFile (BuildCommandStep cmd) >> runCmd_ cmd
+  let formattedCmd = toString $ prettyFormatCmd cmd in
+  logBuilderStep builderLogFile (BuildCommandStep formattedCmd) >> runCmd_ formattedCmd
 
--- | Log the command before actually running it. Return the results of the command.
-runBuildCmd :: BuilderLogFile -> String -> IO String
+-- | Log the command before actually running it. Return the results of the command. The command will
+-- be formatted to make it more human-readable.
+runBuildCmd :: BuilderLogFile -> Text -> IO String
 runBuildCmd builderLogFile cmd = 
-  logBuilderStep builderLogFile (BuildCommandStep cmd) >> runCmd cmd
+  let formattedCmd = toString $ prettyFormatCmd cmd in
+  logBuilderStep builderLogFile (BuildCommandStep formattedCmd) >> runCmd formattedCmd
 
 -- | Since `cardano-cli transaction build-raw` can throw confusing error messages if certain pieces
 -- are missing from the transaction, this check validates those cases will not occur. It will throw
@@ -58,8 +61,8 @@ runBuildCmd builderLogFile cmd =
 -- The UI should catch these errors sooner but the redundant checks can't hurt and enable building
 -- to be tested without a UI.
 canBeBuilt :: TxBuilderModel -> IO ()
-canBeBuilt TxBuilderModel{userInputs,changeOutput,collateralInput,requiresCollateral}
-  | null userInputs = throwIO $ AppError "No inputs specified."
+canBeBuilt TxBuilderModel{userInputs,changeOutput,collateralInput,requiresCollateral,..}
+  | not hasInputs = throwIO $ AppError "No inputs specified."
   -- A change address must be specified.
   | change ^. #paymentAddress == "" = throwIO $ AppError "Change address missing."
   -- The value of ADA must be balanced.
@@ -76,6 +79,24 @@ canBeBuilt TxBuilderModel{userInputs,changeOutput,collateralInput,requiresCollat
 
     nativeAssetsNotBalanced :: Bool
     nativeAssetsNotBalanced = any ((<0) . view #quantity) $ change ^. #nativeAssets
+
+    hasInputs :: Bool
+    hasInputs = or
+      [ userInputs /= []
+      , swapBuilderModel ^. #swapCloses /= []
+      ]
+
+-- | Check whether the change output has enough ada. This should always be called _after_ getting
+-- the parameters so there is no need to query for them again.
+changeAdaValueCheck :: Network -> ByteString -> ChangeOutput -> IO ()
+changeAdaValueCheck network parameters changeOutput@ChangeOutput{lovelace} = do
+  minUTxOValue <-
+    calculateMinUTxOValue network (Just parameters) changeOutput >>= 
+      fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead
+
+  when (minUTxOValue > lovelace) $ 
+    throwIO $ AppError $ changeHasTooLittleAdaMsg minUTxOValue
+  
 
 -- | Build the transaction and generate the tx.body file.
 buildTxBody :: Network -> TxBuilderModel -> IO TxBuilderModel
@@ -157,6 +178,9 @@ buildTxBody network tx = do
           -- time.
           & #parameters ?~ parameters
 
+  -- Check that the change output has enough ada now that the fee has been subtracted.
+  changeAdaValueCheck network parameters $ fromMaybe def $ finalizedTx ^. #changeOutput
+
   -- Build the transaction one more time so that the tx.body file has the finalized transaction.
   -- Also set the witnesses since the app will need them to determine what actions can be taken
   -- on the tx.body file.
@@ -178,11 +202,11 @@ buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificat
   let certFile suffix = toString tmpDir </> (toString stakeAddress <> "_" <> suffix) <.> "cert"
   case certificateAction of
     Registration -> do
-      let -- Suffix the file name with the action.
-          fullFileName = certFile "registration"
+      -- Suffix the file name with the action.
+      let fullFileName = certFile "registration"
 
       -- Create the certificate file.
-      runBuildCmd_ builderLogFile $ toString $ unwords
+      runBuildCmd_ builderLogFile $ unwords
         [ "cardano-cli stake-address registration-certificate"
         , "--stake-address " <> toText stakeAddress
         , "--out-file " <> toText fullFileName
@@ -191,12 +215,12 @@ buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificat
       -- Return the suffixed file name.
       return $ CertificateFile fullFileName
     Deregistration -> do
-      let -- Suffix the file name with the action.
-          fullFileName = certFile "deregistration"
+      -- Suffix the file name with the action.
+      let fullFileName = certFile "deregistration"
           
 
       -- Create the certificate file.
-      runBuildCmd_ builderLogFile $ toString $ unwords
+      runBuildCmd_ builderLogFile $ unwords
         [ "cardano-cli stake-address deregistration-certificate"
         , "--stake-address " <> toText stakeAddress
         , "--out-file " <> toText fullFileName
@@ -205,15 +229,15 @@ buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificat
       -- Return the suffixed file name.
       return $ CertificateFile fullFileName
     Delegation (PoolID poolID) -> do
-      let -- Suffix the file name with the action.
-          fullFileName = certFile "delegation"
+      -- Suffix the file name with the action.
+      let fullFileName = certFile "delegation"
       
       -- Create the certificate file.
-      runBuildCmd_ builderLogFile $ toString $ unwords
+      runBuildCmd_ builderLogFile $ unwords
         [ "cardano-cli stake-address delegation-certificate"
         , "--stake-address " <> toText stakeAddress
         , "--stake-pool-id " <> poolID
-        , "--out-file " <> toText (certFile "delegation")
+        , "--out-file " <> toText fullFileName
         ]
 
       -- Return the suffixed file name.
@@ -250,134 +274,40 @@ estimateTxFee network tmpDir builderLogFile paramsFile txBodyFile certificateFil
       , maybe 0 (const 1) collateralInput 
       ]
 
-    -- This is formatted to be human-readable since it will be added to the builder.log file.
-    calcFeeCmd :: String
-    calcFeeCmd =
-      toString $ unlines
-        [ "(cardano-cli transaction calculate-min-fee \\"
-        , "--tx-body-file " <> toText txBodyFile <> " \\"
-        , toNetworkFlag network <> " \\"
-        , "--protocol-params-file " <> toText paramsFile <> " \\"
-        , "--tx-in-count " <> show numberOfInputs <> " \\"
-        , "--tx-out-count " <> show numberOfOutputs <> " \\"
-        , unwords 
-            [ "--witness-count " <> show (length keyWitnesses) <> ")"
-            , "| cut -d' ' -f1"
-            ]
-        ]
+    calcFeeCmd :: Text
+    calcFeeCmd = unwords
+      [ "(cardano-cli transaction calculate-min-fee"
+      , "--tx-body-file " <> toText txBodyFile
+      , toNetworkFlag network
+      , "--protocol-params-file " <> toText paramsFile
+      , "--tx-in-count " <> show numberOfInputs
+      , "--tx-out-count " <> show numberOfOutputs
+      , unwords 
+          [ "--witness-count " <> show (length keyWitnesses) <> ")"
+          , "| cut -d' ' -f1"
+          ]
+      ]
 
 -- | Create the actual `cardano-cli transaction build-raw` command. This is formatted to be 
 -- human-readable since it will be added to the builder.log file.
-buildRawCmd 
-  :: TmpDirectory 
-  -> ParamsFile 
-  -> TxBodyFile 
-  -> [CertificateFile] 
-  -> TxBody 
-  -> String
+buildRawCmd :: TmpDirectory -> ParamsFile -> TxBodyFile -> [CertificateFile] -> TxBody -> Text
 buildRawCmd tmpDir paramsFile outFile certificateFiles TxBody{..} = 
-    toString $ unlines $ 
-      -- Filter out unused fields.
-      filter (/= "")
-        [ "cardano-cli transaction build-raw \\"
-        , innerUnlines $ map inputField inputs
-        , innerUnlines $ map outputField outputs
-        , totalMint $ concatMap (view #nativeAssets) mints
-        , innerUnlines $ map mintField mints
-        , innerUnlines $ map withdrawalField withdrawals
-        , innerUnlines $ for certificateFiles $ \certFile -> 
-            "--certificate-file " <> toText certFile <> "  \\"
-        , maybe "" collateralField collateralInput
-        , "--protocol-params-file " <> toText paramsFile <> " \\"
-        , "--fee " <> show (unLovelace fee) <> " \\"
-        , "--out-file " <> toText outFile
-        ]
-  where
-    -- `unlines` adds a newline at the end which would break up the stanza. This
-    -- version does not add the final newline. 
-    innerUnlines :: [Text] -> Text
-    innerUnlines = mconcat . intersperse "\n"
-
-    plutusFile :: ScriptHash -> String
-    plutusFile scriptHash = toString tmpDir </> show scriptHash <.> "plutus"
-
-    redeemerFile :: RedeemerHash -> String
-    redeemerFile redeemerHash = toString tmpDir </> show redeemerHash <.> "json"
-
-    -- datumFile :: DatumHahs -> Text
-    -- datumFile datumHash = toText tmpDir </> show datumHash <.> "json"
-
-    inputField :: TxBodyInput -> Text
-    inputField TxBodyInput{utxoRef} = innerUnlines
-      [ "--tx-in " <> display utxoRef <> " \\"
-      ]
-
-    outputField :: TxBodyOutput -> Text
-    outputField TxBodyOutput{..} = innerUnlines
-      [ unwords
-          [ "--tx-out"
-          -- The output amount surrounded by quotes.
-          , show $ unwords
-              [ toText paymentAddress
-              , show (unLovelace lovelace) <> " lovelace"
-              , unwords $ for nativeAssets $ \NativeAsset{..} ->
-                  "+ " <> show quantity <> " " <> display policyId <> "." <> display tokenName
-              ] 
-          , "\\"
-          ]
-      ]
-
-    withdrawalField :: TxBodyWithdrawal -> Text
-    withdrawalField TxBodyWithdrawal{..} = innerUnlines
-      [ "--withdrawal" <> toText stakeAddress <> "+" <> toText lovelace <> " \\"
-      ]
-
-    collateralField :: TxBodyCollateral -> Text
-    collateralField TxBodyCollateral{utxoRef,lovelace,paymentAddress} = 
-      -- The hard-coded collateral amount. I have never seen a transaction require 4 ADA
-      -- as collateral.
-      let actualCollateral = Lovelace 4_000_000 in
-      innerUnlines
-        [ "--tx-in-collateral " <> display utxoRef <> " \\"
-        , "--tx-total-collateral " <> show (unLovelace actualCollateral) <> " \\"
-        , unwords 
-            [ "--tx-out-return-collateral"
-            -- The collateral change output amount surrounded by quotes.
-            , show $ unwords
-                [ toText paymentAddress
-                , show (unLovelace $ lovelace - actualCollateral) <> " lovelace"
-                ] 
-            , "\\"
-            ]
-        ]
-
-    -- The transaction only uses a single `--mint` field no matter how many different policys are
-    -- executed.
-    totalMint :: [NativeAsset] -> Text
-    totalMint [] = "" -- Don't include if there are no mints.
-    totalMint allAssetsMinted = unwords
-      [ "--mint"
-      -- The assets must be surrounded by quotes.
-      , show $ unwords $ intersperse "+" $ for allAssetsMinted $ 
-          \NativeAsset{..} -> show quantity <> " " <> display policyId <> "." <> display tokenName
-      , "\\"
-      ]
-
-    mintField :: TxBodyMint -> Text
-    mintField TxBodyMint{..} = case scriptWitness of
-      NormalWitness script -> 
-        innerUnlines
-          [ "--mint-script-file " <> toText (plutusFile $ hashScript script) <> " \\"
-          , "--mint-redeemer-file " <> toText (redeemerFile $ hashRedeemer redeemer) <> " \\"
-          , "--mint-execution-units " <> display executionBudget <> " \\"
-          ]
-      ReferenceWitness utxoRef -> 
-        innerUnlines
-          [ "--mint-tx-in-reference " <> display utxoRef <> " \\"
-          , "--mint-plutus-script-v2" <> " \\"
-          , "--mint-reference-tx-in-redeemer-file " <> toText (redeemerFile $ hashRedeemer redeemer) <> " \\"
-          , "--mint-reference-tx-in-execution-units " <> display executionBudget <> " \\"
-          ]
+  -- Filter out unused fields.
+  unwords $ filter (/= "")
+    [ "cardano-cli transaction build-raw"
+    , unwords $ map (toBuildCmdField tmpDir) inputs
+    , unwords $ map (toBuildCmdField tmpDir) outputs
+    , toBuildCmdField tmpDir mints
+    , unwords $ map (toBuildCmdField tmpDir) withdrawals
+    , unwords $ for certificateFiles $ 
+        \certFile -> "--certificate-file " <> toText certFile
+    , unwords $ for requiredWitnesses $ 
+        \(KeyWitness (kh,_)) -> "--required-signer-hash " <> show kh
+    , maybe "" (toBuildCmdField tmpDir) collateralInput
+    , "--protocol-params-file " <> toText paramsFile
+    , "--fee " <> show (unLovelace fee)
+    , "--out-file " <> toText outFile
+    ]
 
 -- | Estimate the execution budget for each smart contract in the transaction. Log the results in
 -- the builder.log file before returning them.
@@ -412,7 +342,9 @@ updateBudgets (Just budgets) tx = foldl' updateBudget tx budgets
     -- The validators are assumed to be in the same order as was evaluated.
     updateBudget :: TxBody -> BudgetEstimation -> TxBody
     updateBudget oldTx BudgetEstimation{..} = case validatorIndex of
-      Spending _ -> oldTx
+      Spending idx ->
+        -- Replace the old execution budgets with the newly calculated ones.
+        oldTx & #inputs % ix idx % #spendingScriptInfo % _Just % #executionBudget .~ executionBudget
       Minting idx -> 
         -- Replace the old execution budgets with the newly calculated ones.
         oldTx & #mints % ix idx % #executionBudget .~ executionBudget

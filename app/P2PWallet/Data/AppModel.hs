@@ -14,10 +14,15 @@ module P2PWallet.Data.AppModel
   , AppEvent(..)
   , AppModel(..)
 
+    -- * Helper Functions
+  , configureSelectedDeFiWallets
+  , swapBuilderEvent
+
     -- * Re-exports
   , module P2PWallet.Data.AppModel.AddressBookModel
   , module P2PWallet.Data.AppModel.Common
   , module P2PWallet.Data.AppModel.DelegationModel
+  , module P2PWallet.Data.AppModel.DexModel
   , module P2PWallet.Data.AppModel.HomeModel
   , module P2PWallet.Data.AppModel.ProfileModel
   , module P2PWallet.Data.AppModel.TickerRegistryModel
@@ -29,6 +34,7 @@ import Monomer qualified
 import P2PWallet.Data.AppModel.AddressBookModel
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.DelegationModel
+import P2PWallet.Data.AppModel.DexModel
 import P2PWallet.Data.AppModel.HomeModel
 import P2PWallet.Data.AppModel.ProfileModel
 import P2PWallet.Data.AppModel.TickerRegistryModel
@@ -55,6 +61,7 @@ data MainScene
   | AddressBookScene
   | TickerRegistryScene
   | SettingsScene
+  | DexScene
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -69,12 +76,17 @@ data WaitingStatus = WaitingStatus
   , syncingWallets :: Bool
   -- | The app is syncing the pools.
   , syncingPools :: Bool
+  -- | The app is syncing the order-book for the selected trading pair.
+  , syncingOrderBook :: Bool
   -- | The app is building the transaction.
   , building :: Bool
   -- | The app is loading the profile.
   , loadingProfile :: Bool
   -- | The app is submitting a transaction.
   , submitting :: Bool
+  -- | The app is validating the user supplied information for a new builder action. This is only 
+  -- needed if there is a noticable waiting period.
+  , addingToBuilder :: Bool
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''WaitingStatus
@@ -84,9 +96,11 @@ instance Default WaitingStatus where
     { waitingOnDevice = False
     , syncingWallets = False
     , syncingPools = False
+    , syncingOrderBook = False
     , building = False
     , loadingProfile = False
     , submitting = False
+    , addingToBuilder = False
     }
 
 -------------------------------------------------
@@ -122,6 +136,8 @@ data AppEvent
   | AddressBookEvent AddressBookEvent 
   -- | An event for the Token Registry page.
   | TickerRegistryEvent TickerRegistryEvent 
+  -- | An event for the Dex page.
+  | DexEvent DexEvent 
   -- | An event for the Tx Builder page.
   | TxBuilderEvent TxBuilderEvent 
   -- | Submit a signed transaction.
@@ -156,6 +172,8 @@ data AppModel = AppModel
   , addressBookModel :: AddressBookModel
   -- | The ticker registry model.
   , tickerRegistryModel :: TickerRegistryModel
+  -- | The dex model.
+  , dexModel :: DexModel
   -- | The model for the tx builder scene.
   , txBuilderModel :: TxBuilderModel
   -- | The address book for this profile.
@@ -190,6 +208,7 @@ instance Default AppModel where
     , delegationModel = def
     , addressBookModel = def
     , tickerRegistryModel = def
+    , dexModel = def
     , txBuilderModel = def
     , addressBook = []
     , tickerMap = mempty
@@ -204,3 +223,18 @@ instance Default AppModel where
 -------------------------------------------------
 type AppWenv = Monomer.WidgetEnv AppModel AppEvent
 type AppNode = Monomer.WidgetNode AppModel AppEvent
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | Configure all selected wallets to use the first one in each wallet list. This does not set the
+-- payment wallet for the home model.
+configureSelectedDeFiWallets :: AppModel -> AppModel
+configureSelectedDeFiWallets model@AppModel{..} = 
+  model 
+    & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #stakeWallets)
+    & #dexModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #dexWallets)
+
+-- | This is a useful alias for conciseness.
+swapBuilderEvent :: SwapBuilderEvent -> AppEvent
+swapBuilderEvent = TxBuilderEvent . SwapBuilderEvent

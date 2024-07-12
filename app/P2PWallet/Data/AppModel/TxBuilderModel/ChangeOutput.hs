@@ -8,6 +8,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput where
 
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -43,6 +44,7 @@ instance AddToTxBody ChangeOutput where
         { paymentAddress = paymentAddress
         , lovelace = lovelace
         , nativeAssets = nativeAssets
+        , datum = NoOutputDatum
         }
 
 -------------------------------------------------

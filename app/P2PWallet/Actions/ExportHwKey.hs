@@ -31,7 +31,7 @@ exportHwPubKeyHash key = do
     hash <- toText <$> runCmd (printf hashPubKeyFileCmd $ toString pubKeyFile)
     
     either (throwIO . AppError) return $
-      maybeToRight "Could not parse pubkey hash" $ parsePubKeyHash hash
+      maybeToRight "Could not parse pubkey hash" $ PubKeyHash <$> parseHex hash
 
   where
     hashPubKeyFileCmd = case key of

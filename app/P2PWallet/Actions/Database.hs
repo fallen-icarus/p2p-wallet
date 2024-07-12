@@ -10,7 +10,6 @@ module P2PWallet.Actions.Database
 
     -- * Payment Wallets
   , loadPaymentWallets
-  , getNextPaymentId
   , insertPaymentWallet
   , deletePaymentWallet
 
@@ -23,6 +22,7 @@ module P2PWallet.Actions.Database
   , getNextStakeId
   , insertStakeWallet
   , deleteStakeWallet
+  , changeDeFiWalletAliases
 
     -- * Stake Rewards
   , loadRewards
@@ -41,10 +41,19 @@ module P2PWallet.Actions.Database
   , loadTickerInfo
   , insertTickerInfo
   , deleteTickerInfo
+
+    -- * Swap Wallets
+  , loadDexWallets
+  , insertDexWallet
+  , deleteDexWallet
+
+    -- * Payment Ids
+  , getNextPaymentIdAcrossTables
   ) where
 
 import System.Directory qualified as Dir
 import Database.SQLite.Simple qualified as Sqlite
+import Data.Foldable (maximum)
 
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.Core.AddressBook
@@ -75,6 +84,7 @@ initializeDatabase dbFile = do
       create @Transaction dbFile
       create @AddressEntry dbFile
       create @TickerInfo dbFile
+      create @DexWallet dbFile
       return $ Right ()
 
 -------------------------------------------------
@@ -139,7 +149,7 @@ deleteProfile dbFile (ProfileId profileId) =
 -- | Load the payment wallets for the specified profile.
 loadPaymentWallets :: FilePath -> ProfileId -> IO (Either Text [PaymentWallet])
 loadPaymentWallets dbFile (ProfileId profileId) = do
-    handle @SomeException (return . Left . ("Could not load payment wallets : " <>) . show) $
+    handle @SomeException (return . Left . ("Could not load payment wallets: " <>) . show) $
       Right <$> query dbFile queryStmt
   where
     queryStmt :: Query
@@ -147,21 +157,6 @@ loadPaymentWallets dbFile (ProfileId profileId) = do
       [ "SELECT * FROM " <> tableName @PaymentWallet
       , "WHERE profile_id = " <> show profileId
       , "ORDER BY payment_id ASC;"
-      ]
-
--- | Get the next payment id for a new payment wallet.
-getNextPaymentId :: FilePath -> IO (Either Text PaymentId)
-getNextPaymentId dbFile =
-    handle @SomeException (return . Left . ("Could not get next payment id: " <>) . show) $
-      -- If the result is the empty list, this is the first entry.
-      maybe (Right 0) (Right . PaymentId . (+1) . Sqlite.fromOnly) . maybeHead <$> 
-        query dbFile stmt
-  where
-    stmt = Sqlite.Query $ mconcat $ intersperse " "
-      [ "SELECT payment_id FROM"
-      , tableName @PaymentWallet
-      , "ORDER BY payment_id DESC"
-      , "LIMIT 1;"
       ]
 
 -- | Add a new payment wallet to the database. This also updates payment wallets.
@@ -213,7 +208,7 @@ insertTransactions dbFile txs = do
 -- | Load the stake wallets for the specified profile
 loadStakeWallets :: FilePath -> ProfileId -> IO (Either Text [StakeWallet])
 loadStakeWallets dbFile (ProfileId profileId) = do
-    handle @SomeException (return . Left . ("Could not load stake wallets : " <>) . show) $ do
+    handle @SomeException (return . Left . ("Could not load stake wallets: " <>) . show) $ do
       Right <$> query dbFile queryStmt
   where
     queryStmt :: Query
@@ -250,11 +245,28 @@ deleteStakeWallet dbFile (StakeId stakeId) =
       Right <$> mapM_ (delete dbFile . deleteStmt)
         [ tableName @StakeWallet
         , tableName @StakeReward
+        , tableName @DexWallet
         ]
   where
     deleteStmt :: Text -> Query
     deleteStmt table = Query $ unwords
       [ "DELETE FROM " <> table
+      , "WHERE stake_id = " <> show stakeId
+      ]
+
+-- | Change all aliases for the defi wallets using the specified stake credential. The aliases
+-- need to stay synced.
+changeDeFiWalletAliases :: FilePath -> StakeId -> Text -> IO (Either Text ())
+changeDeFiWalletAliases dbFile (StakeId stakeId) newAlias =
+    handle @SomeException (return . Left . ("Failed to update defi aliases: " <>) . show) $ do
+      Right <$> mapM_ (update dbFile . updateStmt)
+        [ tableName @DexWallet
+        ]
+  where
+    updateStmt :: Text -> Query
+    updateStmt table = Query $ unwords
+      [ "UPDATE " <> table
+      , "SET alias = " <> show newAlias
       , "WHERE stake_id = " <> show stakeId
       ]
 
@@ -305,9 +317,19 @@ loadWallets dbFile Profile{..} = do
         rewards <- loadRewards dbFile (stakeWallet ^. #stakeId) >>= fromRightOrAppError
         return $ stakeWallet & #rewardHistory .~ rewards
 
+    -- Load the swap wallets.
+    dexWalletsWithoutTxHistories <- loadDexWallets dbFile profileId >>= fromRightOrAppError
+
+    -- Load the transaction histories for each swap wallet.
+    dexWalletsWithTxHistories <- forM dexWalletsWithoutTxHistories $ 
+      \dexWallet -> do
+        txs <- loadTransactions dbFile (dexWallet ^. #paymentId) >>= fromRightOrAppError
+        return $ dexWallet & #transactions .~ txs
+
     return $ Right $ Wallets
       { paymentWallets = paymentWalletsWithTxHistories
       , stakeWallets = stakeWalletsWithRewardHistory
+      , dexWallets = dexWalletsWithTxHistories
       }
 
 -------------------------------------------------
@@ -390,3 +412,68 @@ deleteTickerInfo dbFile ticker =
       [ "DELETE FROM " <> tableName @TickerInfo
       , "WHERE ticker = " <> show (display ticker) -- must wrap in quotes
       ]
+
+-------------------------------------------------
+-- Swap Wallet
+-------------------------------------------------
+-- | Load the swap wallets for the specified profile.
+loadDexWallets :: FilePath -> ProfileId -> IO (Either Text [DexWallet])
+loadDexWallets dbFile (ProfileId profileId) = do
+    handle @SomeException (return . Left . ("Could not load swap wallets: " <>) . show) $
+      Right <$> query dbFile queryStmt
+  where
+    queryStmt :: Query
+    queryStmt = Query $ unwords
+      [ "SELECT * FROM " <> tableName @DexWallet
+      , "WHERE profile_id = " <> show profileId
+      , "ORDER BY payment_id ASC;"
+      ]
+
+-- | Add a new swap wallet to the database. This also updates swap wallets.
+insertDexWallet :: FilePath -> DexWallet -> IO (Either Text ())
+insertDexWallet dbFile dexWallet = do
+  handle @SomeException (return . Left . ("Failed to insert swap wallet: " <>) . show) $
+    Right <$> insert @DexWallet dbFile dexWallet
+
+-- | Delete a swap wallet and all of its entries across the database.
+deleteDexWallet :: FilePath -> PaymentId -> IO (Either Text ())
+deleteDexWallet dbFile (PaymentId paymentId) = 
+    handle @SomeException (return . Left . ("Failed to delete swap wallet: " <>) . show) $ do
+      Right <$> mapM_ (delete dbFile . deleteStmt)
+        [ tableName @DexWallet
+        , tableName @Transaction
+        ]
+  where
+    deleteStmt :: Text -> Query
+    deleteStmt table = Query $ unwords
+      [ "DELETE FROM " <> table
+      , "WHERE payment_id = " <> show paymentId
+      ]
+
+-------------------------------------------------
+-- Payment IDs
+-------------------------------------------------
+-- | The payment ID is used as the row id for several tables that all have an entry into the 
+-- `transactions` table. To enable deleting the tx history, the `transactions` table also used the
+-- payment id. This means the payment id is used as the row id across tables.
+getNextPaymentIdAcrossTables :: FilePath -> IO (Either Text PaymentId)
+getNextPaymentIdAcrossTables dbFile =
+    handle @SomeException (return . Left . ("Could not get next payment id: " <>) . show) $ do
+      fmap maximum . sequence <$> mapM (qry . stmt)
+        [ tableName @PaymentWallet
+        , tableName @DexWallet
+        ]
+  where
+    qry :: Query -> IO (Either Text PaymentId)
+    qry = fmap (maybe (Right 0) (Right . PaymentId . (+1) . Sqlite.fromOnly) . maybeHead)
+        -- If the result is the empty list, this is the first entry.
+        . query dbFile
+
+    stmt :: Text -> Query
+    stmt table = Sqlite.Query $ mconcat $ intersperse " "
+      [ "SELECT payment_id FROM"
+      , table -- tableName @PaymentWallet
+      , "ORDER BY payment_id DESC"
+      , "LIMIT 1;"
+      ]
+

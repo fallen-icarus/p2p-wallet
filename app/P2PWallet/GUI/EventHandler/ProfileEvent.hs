@@ -24,14 +24,16 @@ handleProfileEvent model@AppModel{..} evt = case evt of
       ]
     ProcessResults profiles ->
       -- When the profiles are loaded, move the user to the profile picker scene.
-      [ Model $ model & #scene .~ ProfilesScene 
-                      & #profileModel % #knownProfiles .~ profiles
+      [ Model $ model 
+          & #scene .~ ProfilesScene 
+          & #profileModel % #knownProfiles .~ profiles
       ]
 
   -- Set the desired profile to selected.
   LoadSelectedProfile profile -> 
-    [ Model $ model & #selectedProfile ?~ profile 
-                    & #waitingStatus % #loadingProfile .~ True
+    [ Model $ model 
+        & #selectedProfile ?~ profile 
+        & #waitingStatus % #loadingProfile .~ True
     , Task $ return $ ProfileEvent $ LoadProfileInfo StartProcess
     ]
 
@@ -45,16 +47,18 @@ handleProfileEvent model@AppModel{..} evt = case evt of
                <*> (loadTickerInfo databaseFile >>= fromRightOrAppError)
       ]
     ProcessResults (wallets@Wallets{..}, contacts, tickers) -> 
-      [ Model $ model & #knownWallets .~ wallets
-                      & #scene .~ HomeScene
-                      & #waitingStatus % #loadingProfile .~ False
-                      & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead paymentWallets)
-                      & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead stakeWallets)
-                      & #addressBook .~ contacts
-                      & #tickerMap .~ toTickerMap tickers
-                      & #reverseTickerMap .~ toReverseTickerMap tickers
-                      & #fingerprintMap .~ 
-                          toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
+      [ Model $ model 
+          & #knownWallets .~ wallets
+          & #scene .~ HomeScene
+          & #waitingStatus % #loadingProfile .~ False
+          & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead paymentWallets)
+          -- Set the selected stake and DeFi wallets.
+          & configureSelectedDeFiWallets
+          & #addressBook .~ contacts
+          & #tickerMap .~ toTickerMap tickers
+          & #reverseTickerMap .~ toReverseTickerMap tickers
+          & #fingerprintMap .~ 
+              toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
       -- , Task $ return $ SyncWallets StartSync
       ]
 
@@ -75,8 +79,9 @@ handleProfileEvent model@AppModel{..} evt = case evt of
   AddNewProfile modal -> case modal of
     -- Show the addNewProfile widget and clear the old information.
     StartAdding _ -> 
-      [ Model $ model & #profileModel % #newProfile .~ def
-                      & #profileModel % #addingProfile .~ True
+      [ Model $ model 
+          & #profileModel % #newProfile .~ def
+          & #profileModel % #addingProfile .~ True
       ]
     CancelAdding -> 
       -- Close the widget for getting the new info.
@@ -97,9 +102,9 @@ handleProfileEvent model@AppModel{..} evt = case evt of
           return verifiedProfile
       ]
     AddResult verifiedProfile ->
-      [ Model $ 
-          model & #profileModel % #knownProfiles %~ flip snoc verifiedProfile
-                & #profileModel % #addingProfile .~ False
+      [ Model $ model 
+          & #profileModel % #knownProfiles %~ flip snoc verifiedProfile
+          & #profileModel % #addingProfile .~ False
       , Task $ return $ ProfileEvent $ LoadSelectedProfile verifiedProfile
       ]
 
@@ -109,13 +114,15 @@ handleProfileEvent model@AppModel{..} evt = case evt of
   ChangeProfileName modal -> case modal of
     -- Show the edit widget and set the newProfile information to the current profile.
     StartAdding _ -> 
-      [ Model $ model & #profileModel % #newProfile .~ maybe def toNewProfile selectedProfile
-                      & #profileModel % #addingProfile .~ True
+      [ Model $ model 
+          & #profileModel % #newProfile .~ maybe def toNewProfile selectedProfile
+          & #profileModel % #addingProfile .~ True
       ]
     CancelAdding -> 
       -- Close the widget for getting the new info.
-      [ Model $ model & #profileModel % #addingProfile .~ False
-                      & #profileModel % #newProfile .~ def
+      [ Model $ model 
+          & #profileModel % #addingProfile .~ False
+          & #profileModel % #newProfile .~ def
       ]
     ConfirmAdding ->
       [ Task $ runActionOrAlert (ProfileEvent . ChangeProfileName . AddResult) $ do
@@ -137,20 +144,19 @@ handleProfileEvent model@AppModel{..} evt = case evt of
       let knownProfiles = profileModel ^. #knownProfiles
           otherProfiles = filter (\p -> profileId /= p ^. #profileId) knownProfiles
           newProfiles = sortOn (view #profileId) $ verifiedProfile : otherProfiles
-      in [ Model $ 
-             model & #profileModel % #knownProfiles .~ newProfiles
-                   & #profileModel % #addingProfile .~ False
-                   & #profileModel % #newProfile .~ def
-                   & #selectedProfile ?~ verifiedProfile
-         ]
+      in  [ Model $ model 
+              & #profileModel % #knownProfiles .~ newProfiles
+              & #profileModel % #addingProfile .~ False
+              & #profileModel % #newProfile .~ def
+              & #selectedProfile ?~ verifiedProfile
+          ]
 
   -----------------------------------------------
   -- Delete Profile
   -----------------------------------------------
   DeleteProfile modal -> case modal of
     GetDeleteConfirmation _ -> 
-      [ Model $ model & #profileModel % #deletingProfile .~ True
-      ]
+      [ Model $ model & #profileModel % #deletingProfile .~ True ]
     CancelDeletion -> 
       [ Model $ model & #profileModel % #deletingProfile .~ False ]
     ConfirmDeletion ->
@@ -162,7 +168,8 @@ handleProfileEvent model@AppModel{..} evt = case evt of
           deleteProfile databaseFile currentId >>= fromRightOrAppError
       ]
     PostDeletionAction ->
-      [ Model $ model & #profileModel % #deletingProfile .~ False
-                      & #selectedProfile .~ Nothing
+      [ Model $ model 
+          & #profileModel % #deletingProfile .~ False
+          & #selectedProfile .~ Nothing
       , Task $ return $ ProfileEvent $ LoadKnownProfiles StartProcess
       ]

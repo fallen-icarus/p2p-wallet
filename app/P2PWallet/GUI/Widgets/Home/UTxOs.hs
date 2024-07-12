@@ -6,7 +6,7 @@ import Monomer
 
 import Prettyprinter (align, pretty, vsep)
 import Data.Text qualified as Text
-import Data.Map qualified as Map
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
