@@ -32,16 +32,6 @@ data HomeScene
   | HomeAssets 
   deriving (Eq,Show)
 
--- | The filter widget subscene. This is used for all home filter widgets.
-data FilterScene
-  = FilterScene
-  | SortScene
-  | SearchScene
-  deriving (Show,Eq)
-
-instance Default FilterScene where
-  def = FilterScene
-
 -------------------------------------------------
 -- Home Page Events
 -------------------------------------------------

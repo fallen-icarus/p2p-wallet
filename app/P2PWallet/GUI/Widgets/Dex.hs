@@ -69,7 +69,7 @@ mainWidget model@AppModel{scene=_,..} =
       , box_ [mergeRequired reqUpdate] (positionsWidget model)
           `nodeVisible` (dexModel ^. #scene == DexPositions)
       , box_ [mergeRequired reqUpdate] (transactionsWidget model)
-          `nodeVisible` (dexModel ^. #scene == DexTransactions)
+          `nodeVisible` (dexModel ^. #scene == DexTradeHistory)
       , box_ [mergeRequired reqUpdate] (tradeWidget model)
           `nodeVisible` (dexModel ^. #scene == DexMarket)
       ] 
@@ -83,13 +83,17 @@ mainWidget model@AppModel{scene=_,..} =
             | dexModel ^. #scene == scene = customBlue
             | otherwise = lightGray
       button caption (DexEvent $ ChangeDexScene scene)
-        `styleBasic` [bgColor transparent, textColor dormantColor, border 0 transparent]
+        `styleBasic` [textSize 14, bgColor transparent, textColor dormantColor, border 0 transparent]
         `styleHover` [bgColor transparent, textColor hoverColor]
 
     reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
-    reqUpdate _ _ _ = True
-    -- reqUpdate _ old@AppModel{dexModel=oldDex} new@AppModel{dexModel=newDex} 
-    --   | otherwise = True
+    reqUpdate _ old@AppModel{dexModel=oldDex} new@AppModel{dexModel=newDex} 
+      | old ^. #forceRedraw /= new ^. #forceRedraw = True
+      | oldDex ^. #positionsFilterModel % #offerAsset /= 
+          newDex ^. #positionsFilterModel % #offerAsset = False
+      | oldDex ^. #positionsFilterModel % #askAsset /= 
+          newDex ^. #positionsFilterModel % #askAsset = False
+      | otherwise = True
 
     (walletTypeTip,walletTypeIcon)
       | isNothing $ dexModel ^. #selectedWallet % #stakeKeyPath = ("Watched", watchedIcon)
@@ -102,7 +106,7 @@ mainWidget model@AppModel{scene=_,..} =
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer
-      , dexSceneButton "Transactions" DexTransactions
+      , dexSceneButton "History" DexTradeHistory
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer
@@ -132,11 +136,11 @@ mainWidget model@AppModel{scene=_,..} =
     walletMenu :: AppNode
     walletMenu = do
       let innerDormantStyle = 
-            def `styleBasic` [bgColor customGray2, border 1 black]
-                `styleHover` [bgColor customGray1, border 1 black]
+            def `styleBasic` [textSize 14, bgColor customGray2, border 1 black]
+                `styleHover` [textSize 14, bgColor customGray1, border 1 black]
           innerFocusedStyle = 
-            def `styleFocus` [bgColor customGray2, border 1 customBlue]
-                `styleFocusHover` [bgColor customGray1, border 1 customBlue]
+            def `styleFocus` [textSize 14, bgColor customGray2, border 1 customBlue]
+                `styleFocusHover` [textSize 14, bgColor customGray1, border 1 customBlue]
       hstack
         [ box_ [alignMiddle] $ tooltip_ walletTypeTip [tooltipDelay 0] $ label walletTypeIcon
             `styleBasic` [textFont "Remix", textMiddle]
@@ -150,6 +154,7 @@ mainWidget model@AppModel{scene=_,..} =
               [ bgColor customGray2
               , width 150
               , border 1 black
+              , textSize 14
               ]
             `styleHover` [bgColor customGray1, cursorIcon CursorHand]
         , spacer_ [width 5]

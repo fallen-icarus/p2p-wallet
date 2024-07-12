@@ -106,12 +106,56 @@ toSwapUTxO AddressUTxO{..} = SwapUTxO
         , TwoWay <$> decodeDatum @TwoWay.SwapDatum value
         ]
 
--- Get the prices from a SwapUTxO based on the swap direction. 
+-- | Get the prices from a SwapUTxO based on the swap direction. 
 swapUTxOPrice :: OfferAsset -> AskAsset -> SwapUTxO -> Maybe Rational
 swapUTxOPrice (OfferAsset offerAsset) (AskAsset askAsset) SwapUTxO{swapDatum} = case swapDatum of
   Just (OneWay OneWay.SwapDatum{swapPrice=price}) -> Just $ toGHC price
   Just (TwoWay TwoWay.SwapDatum{..}) ->
     Just $ toGHC $ if offerAsset < askAsset then asset1Price else asset2Price
+  _ -> Nothing
+
+-- | Get the offer asset if it is a one-way swap.
+swapUTxOOfferAsset :: SwapUTxO -> Maybe NativeAsset
+swapUTxOOfferAsset SwapUTxO{swapDatum} = case swapDatum of
+  Just (OneWay OneWay.SwapDatum{offerId,offerName}) -> Just NativeAsset
+    { policyId = offerId
+    , tokenName = offerName
+    , fingerprint = mkAssetFingerprint offerId offerName
+    , quantity = 0
+    }
+  _ -> Nothing
+  
+-- | Get the ask asset if it is a one-way swap.
+swapUTxOAskAsset :: SwapUTxO -> Maybe NativeAsset
+swapUTxOAskAsset SwapUTxO{swapDatum} = case swapDatum of
+  Just (OneWay OneWay.SwapDatum{askId,askName}) -> Just NativeAsset
+    { policyId = askId
+    , tokenName = askName
+    , fingerprint = mkAssetFingerprint askId askName
+    , quantity = 0
+    }
+  _ -> Nothing
+  
+-- | Get the asset1 if it is a two-way swap.
+swapUTxOAsset1 :: SwapUTxO -> Maybe NativeAsset
+swapUTxOAsset1 SwapUTxO{swapDatum} = case swapDatum of
+  Just (TwoWay TwoWay.SwapDatum{asset1Id,asset1Name}) -> Just NativeAsset
+    { policyId = asset1Id
+    , tokenName = asset1Name
+    , fingerprint = mkAssetFingerprint asset1Id asset1Name
+    , quantity = 0
+    }
+  _ -> Nothing
+  
+-- | Get the asset2 if it is a two-way swap.
+swapUTxOAsset2 :: SwapUTxO -> Maybe NativeAsset
+swapUTxOAsset2 SwapUTxO{swapDatum} = case swapDatum of
+  Just (TwoWay TwoWay.SwapDatum{asset2Id,asset2Name}) -> Just NativeAsset
+    { policyId = asset2Id
+    , tokenName = asset2Name
+    , fingerprint = mkAssetFingerprint asset2Id asset2Name
+    , quantity = 0
+    }
   _ -> Nothing
 
 -------------------------------------------------

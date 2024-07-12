@@ -585,8 +585,6 @@ toggleDetails ref = lens (getToggleDetails ref) (setToggleDetails ref)
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
--- Sort the list based of the first search criteria. The first criteria is expected to 
--- be a native asset.
 targetQuantity :: ReverseTickerMap -> Maybe Text -> PersonalUTxO -> Maybe Integer
 targetQuantity reverseTickerMap mTarget p =
   flip (maybe Nothing) mTarget $ \target ->
@@ -617,7 +615,7 @@ filterer UTxOFilterModel{..} us = do
   guard $ maybe True (not (null nativeAssets) ==) hasNativeAssets
   return u
 
--- Apply the search filter recursively since users can search for multiple criteria
+-- | Apply the search filter recursively since users can search for multiple criteria
 -- and the UTxOs must match all set criteria.
 applySearchFilter :: ReverseTickerMap -> [Text] -> [PersonalUTxO] -> [PersonalUTxO]
 applySearchFilter _ [] !xs = xs

@@ -68,3 +68,17 @@ instance Display SortDirection where
 -- | A list of possible sorting directions. This is useful for dropdown menus.
 sortingDirections :: [SortDirection]
 sortingDirections = enumFrom SortAscending
+
+-------------------------------------------------
+-- Filtering Scenes
+-------------------------------------------------
+-- | The filter widget subscene.
+data FilterScene
+  = FilterScene
+  | SortScene
+  | SearchScene
+  deriving (Show,Eq)
+
+instance Default FilterScene where
+  def = FilterScene
+

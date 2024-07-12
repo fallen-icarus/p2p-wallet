@@ -294,6 +294,15 @@ handleDexEvent model@AppModel{..} evt = case evt of
             , Task $ return $ Alert "Successfully added to builder!"
             ]
 
+  -----------------------------------------------
+  -- Reset Filters
+  -----------------------------------------------
+  ResetPositionsFilters -> 
+    [ Model $ model 
+        & #dexModel % #positionsFilterModel .~ def
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------

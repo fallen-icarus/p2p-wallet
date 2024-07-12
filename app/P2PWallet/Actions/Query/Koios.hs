@@ -386,6 +386,7 @@ type KoiosApi
 
   :<|>  "asset_utxos"
      :> QueryParam' '[Required] "select" Text
+     :> QueryParam' '[Required] "offset" Int
      :> QueryParam' '[Required] "is_spent" Text
      :> QueryParam "asset_list" Text
      :> ReqBody '[JSON] AssetList
@@ -546,14 +547,25 @@ queryPoolIds offset !acc = do
     return $ acc <> poolIds
 
 queryOneWaySwaps :: OfferAsset -> AskAsset -> ClientM [AddressUTxO]
-queryOneWaySwaps offerAsset askAsset = do
-    let offerFilter 
-          | offerAsset ^. #unOfferAsset % #policyId == "" = Nothing
-          | otherwise = Just $ "cs." <> assetToQueryParam (unOfferAsset offerAsset)
-
-    assetUTxOsApi select "eq.false" offerFilter $ 
-      AssetList [(OneWay.beaconCurrencySymbol, OneWay.genPairBeaconName offerAsset askAsset)]
+queryOneWaySwaps offerAsset askAsset = queryApi 0 []
   where
+    offerFilter :: Maybe Text
+    offerFilter 
+      | offerAsset ^. #unOfferAsset % #policyId == "" = Nothing
+      | otherwise = Just $ "cs." <> assetToQueryParam (unOfferAsset offerAsset)
+
+    queryApi :: Int -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- assetUTxOsApi select offset "eq.false" offerFilter $ 
+        AssetList [(OneWay.beaconCurrencySymbol, OneWay.genPairBeaconName offerAsset askAsset)]
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+      
     assetToQueryParam :: NativeAsset -> Text
     assetToQueryParam NativeAsset{policyId,tokenName} = mconcat
       [ "[{\"policy_id\":\""
@@ -580,14 +592,25 @@ queryOneWaySwaps offerAsset askAsset = do
       ]
 
 queryTwoWaySwaps :: OfferAsset -> AskAsset -> ClientM [AddressUTxO]
-queryTwoWaySwaps (OfferAsset offerAsset) (AskAsset askAsset) = do
-    let offerFilter 
-          | offerAsset ^. #policyId == "" = Nothing
-          | otherwise = Just $ "cs." <> assetToQueryParam offerAsset
-
-    assetUTxOsApi select "eq.false" offerFilter $ 
-      AssetList [(TwoWay.beaconCurrencySymbol, TwoWay.genPairBeaconName offerAsset askAsset)]
+queryTwoWaySwaps (OfferAsset offerAsset) (AskAsset askAsset) = queryApi 0 []
   where
+    offerFilter :: Maybe Text
+    offerFilter 
+      | offerAsset ^. #policyId == "" = Nothing
+      | otherwise = Just $ "cs." <> assetToQueryParam offerAsset
+
+    queryApi :: Int -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- assetUTxOsApi select offset "eq.false" offerFilter $ 
+        AssetList [(TwoWay.beaconCurrencySymbol, TwoWay.genPairBeaconName offerAsset askAsset)]
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+      
     assetToQueryParam :: NativeAsset -> Text
     assetToQueryParam NativeAsset{policyId,tokenName} = mconcat
       [ "[{\"policy_id\":\""
