@@ -35,6 +35,34 @@ exportRedeemer redeemer = do
   tmpDir <- getTemporaryDirectory
   writeData (tmpDir </> show (hashRedeemer redeemer) <.> "json") redeemer
 
+-- | Export a datum for use with a smart contract. The file name is the hash of the 
+-- redeemer `Data`.
+exportDatum :: Datum -> IO ()
+exportDatum datum = do
+  tmpDir <- getTemporaryDirectory
+  writeData (tmpDir </> show (hashDatum datum) <.> "json") datum
+
+-------------------------------------------------
+-- Creating cardano-cli fields
+-------------------------------------------------
+class ToBuildCmdField a where
+  -- | Add something to a cardano-cli command. The temporary directory is needed whenever
+  -- files are required.
+  toBuildCmdField :: TmpDirectory -> a -> Text
+
+-- | Format the bash command so that it is more human-readable.
+prettyFormatCmd :: Text -> Text
+prettyFormatCmd = replace "--" "\\\n  --"
+
+plutusFilePath :: TmpDirectory -> ScriptHash -> FilePath
+plutusFilePath tmpDir scriptHash = toString tmpDir </> show scriptHash <.> "plutus"
+
+redeemerFilePath :: TmpDirectory -> RedeemerHash -> FilePath
+redeemerFilePath tmpDir redeemerHash = toString tmpDir </> show redeemerHash <.> "json"
+
+datumFilePath :: TmpDirectory -> DatumHash -> FilePath
+datumFilePath tmpDir datumHash = toString tmpDir </> show datumHash <.> "json"
+
 -------------------------------------------------
 -- Execution Budgets
 -------------------------------------------------
@@ -89,13 +117,93 @@ exportScriptWitness (NormalWitness script) = do
 -------------------------------------------------
 -- Inputs
 -------------------------------------------------
+-- | The datum attached to an input.
+data InputDatum
+  -- | The input does not have a datum.
+  = NoInputDatum
+  -- | The input has an inline datum.
+  | InputDatum
+  -- | The input has a datum hash. The datum corresponds to the hash in the input.
+  | InputDatumHash Datum
+  deriving (Show,Eq)
+
+makePrisms ''InputDatum
+
+-- | Information for a spending script.
+data SpendingScriptInfo = SpendingScriptInfo
+  -- | The hash of the spending script. This is useful for doing second passes over the
+  -- `TxBody`.
+  { scriptHash :: ScriptHash
+  -- | The spending script witness.
+  , scriptWitness :: ScriptWitness
+  -- | The datum attached to the input. The datum is needed when hashes are used.
+  , datum :: InputDatum
+  -- | The redeemer to use.
+  , redeemer :: Redeemer
+  -- | The estimated execution budget for this spending execution.
+  , executionBudget :: ExecutionBudget
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''SpendingScriptInfo
+
+instance ToBuildCmdField SpendingScriptInfo where
+  toBuildCmdField tmpDir SpendingScriptInfo{..} = case scriptWitness of
+    ReferenceWitness ref -> unwords $ filter (/= "")
+      [ "--spending-tx-in-reference " <> display ref
+      , "--spending-plutus-script-v2"
+      , unwords 
+          [ "--spending-reference-tx-in-redeemer-file"
+          , toText $ redeemerFilePath tmpDir $ hashRedeemer redeemer
+          ]
+      , "--spending-reference-tx-in-execution-units " <> display executionBudget
+      , case datum of
+          NoInputDatum -> ""
+          InputDatum -> "--spending-reference-tx-in-inline-datum-present"
+          InputDatumHash d -> unwords
+            [ "--spending-reference-tx-in-datum-file"
+            , toText $ datumFilePath tmpDir $ hashDatum d
+            ]
+      ]
+    NormalWitness script -> unwords $ filter (/= "")
+      [ "--tx-in-script-file " <> toText (plutusFilePath tmpDir $ hashScript script)
+      , "--tx-in-redeemer-file " <> toText (redeemerFilePath tmpDir $ hashRedeemer redeemer)
+      , "--tx-in-execution-units " <> display executionBudget
+      , case datum of
+          NoInputDatum -> ""
+          InputDatum -> "--tx-in-inline-datum-present"
+          InputDatumHash d -> "--tx-in-datum-file " <> toText (datumFilePath tmpDir $ hashDatum d)
+      ]
+
 -- | Information for a particular input.
-newtype TxBodyInput = TxBodyInput
+data TxBodyInput = TxBodyInput
   -- | The input's output reference.
   { utxoRef :: TxOutRef
-  } deriving (Show,Eq,Ord)
+  -- | The information for the spending script required to spend this input.
+  , spendingScriptInfo :: Maybe SpendingScriptInfo
+  } deriving (Show,Eq)
+
+instance Ord TxBodyInput where
+  TxBodyInput{utxoRef=ref1} <= TxBodyInput{utxoRef=ref2} = ref1 <= ref2
 
 makeFieldLabelsNoPrefix ''TxBodyInput
+
+instance ExportContractFiles TxBodyInput where
+  exportContractFiles TxBodyInput{spendingScriptInfo} =
+    whenJust spendingScriptInfo $ \SpendingScriptInfo{..} -> do
+      -- | Export the spending script.
+      exportScriptWitness scriptWitness
+
+      -- | Export the redeemer file.
+      exportRedeemer redeemer
+
+      -- | Export the datum file if the input is using a datum hash.
+      whenJust (preview _InputDatumHash datum) exportDatum
+
+instance ToBuildCmdField TxBodyInput where
+  toBuildCmdField tmpDir TxBodyInput{..} = unwords $ filter (/= "")
+    [ "--tx-in " <> display utxoRef
+    , maybe "" (toBuildCmdField tmpDir) spendingScriptInfo
+    ]
 
 -------------------------------------------------
 -- Outputs
@@ -108,9 +216,35 @@ data TxBodyOutput = TxBodyOutput
   , lovelace :: Lovelace
   -- | The native assets to store in this output.
   , nativeAssets :: [NativeAsset]
+  -- | The datum to attach to the output.
+  , datum :: OutputDatum
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''TxBodyOutput
+
+instance ExportContractFiles TxBodyOutput where
+  exportContractFiles TxBodyOutput{datum} = do
+    -- | Export the datum file if being used for an inline datum.
+    whenJust (preview _OutputDatum datum) exportDatum
+
+instance ToBuildCmdField TxBodyOutput where
+  toBuildCmdField tmpDir TxBodyOutput{..} = unwords $ filter (/= "")
+      [ "--tx-out"
+      -- The output amount surrounded by quotes.
+      , show $ unwords
+          [ toText paymentAddress
+          , show (unLovelace lovelace) <> " lovelace"
+          , unwords $ for nativeAssets $ \NativeAsset{..} ->
+              "+ " <> show quantity <> " " <> display policyId <> "." <> display tokenName
+          ] 
+      , outputDatumField datum
+      ]
+    where
+      outputDatumField :: OutputDatum -> Text
+      outputDatumField = toText . \case
+        NoOutputDatum -> ""
+        OutputDatumHash ds -> "--tx-out-datum-hash " <> show ds
+        OutputDatum d -> "--tx-out-inline-datum-file " <> datumFilePath tmpDir (hashDatum d)
 
 -------------------------------------------------
 -- Certificates
@@ -148,17 +282,58 @@ makeFieldLabelsNoPrefix ''TxBodyCertificate
 -------------------------------------------------
 -- Withdrawals
 -------------------------------------------------
+-- | Information for a staking script.
+data StakingScriptInfo = StakingScriptInfo
+  -- | The staking script witness.
+  { scriptWitness :: ScriptWitness
+  -- | The redeemer to use.
+  , redeemer :: Redeemer
+  -- | The estimated execution budget for this spending execution.
+  , executionBudget :: ExecutionBudget
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''StakingScriptInfo
+
+instance ToBuildCmdField StakingScriptInfo where
+  toBuildCmdField tmpDir StakingScriptInfo{..} = case scriptWitness of
+    ReferenceWitness ref -> unwords $ filter (/= "")
+      [ "--withdrawal-tx-in-reference " <> display ref
+      , "--withdrawal-plutus-script-v2"
+      , unwords 
+          [ "--withdrawal-reference-tx-in-redeemer-file"
+          , toText $ redeemerFilePath tmpDir $ hashRedeemer redeemer
+          ]
+      , "--withdrawal-reference-tx-in-execution-units " <> display executionBudget
+      ]
+    NormalWitness script -> unwords $ filter (/= "")
+      [ "--withdrawal-script-file " <> toText (plutusFilePath tmpDir $ hashScript script)
+      , "--withdrawal-redeemer-file " <> toText (redeemerFilePath tmpDir $ hashRedeemer redeemer)
+      , "--withdrawal-execution-units " <> display executionBudget
+      ]
+
 -- | Information for a particular withdrawal.
 data TxBodyWithdrawal = TxBodyWithdrawal
-  -- | The staking credential. This is used for sorting.
+  -- | The staking credential.
   { stakeCredential :: Credential
   -- | The target address.
   , stakeAddress :: StakeAddress
   -- | The amount of lovelace withdrawn from the rewards address.
   , lovelace :: Lovelace
-  } deriving (Show,Eq,Ord)
+  -- | The information for the staking script execution.
+  , stakingScriptInfo :: Maybe StakingScriptInfo
+  } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''TxBodyWithdrawal
+
+instance Ord TxBodyWithdrawal where
+  TxBodyWithdrawal{stakeCredential} <= TxBodyWithdrawal{stakeCredential=otherCred} = 
+    stakeCredential <= otherCred
+
+instance ToBuildCmdField TxBodyWithdrawal where
+  toBuildCmdField tmpDir TxBodyWithdrawal{..} = unwords $ filter (/= "")
+    [ "--withdrawal " <> toText stakeAddress <> "+" <> toText lovelace
+    , maybe "" (toBuildCmdField tmpDir) stakingScriptInfo
+    ]
 
 -------------------------------------------------
 -- Mint/Burn
@@ -187,6 +362,39 @@ instance ExportContractFiles TxBodyMint where
     -- | Export the redeemer file.
     exportRedeemer redeemer
 
+-- All mints/burns share a single "--mint" line so this instance must operate on the entire list
+-- of mints/burns.
+instance ToBuildCmdField [TxBodyMint] where
+  toBuildCmdField _ [] = "" -- Don't include if there are no mints.
+  toBuildCmdField tmpDir ms = unwords $ filter (/= "")
+      [ "--mint"
+      -- The assets must be surrounded by quotes.
+      , show $ unwords $ intersperse "+" $ for allAssetsMinted $ 
+          \NativeAsset{..} -> show quantity <> " " <> display policyId <> "." <> display tokenName
+      , unwords $ map mintField ms
+      ]
+    where
+      allAssetsMinted :: [NativeAsset]
+      allAssetsMinted = concatMap (view #nativeAssets) ms
+
+      mintField :: TxBodyMint -> Text
+      mintField TxBodyMint{..} = case scriptWitness of
+        NormalWitness script -> unwords
+          [ "--mint-script-file " <> toText (plutusFilePath tmpDir $ hashScript script)
+          , "--mint-redeemer-file " <> toText (redeemerFilePath tmpDir $ hashRedeemer redeemer)
+          , "--mint-execution-units " <> display executionBudget
+          ]
+        ReferenceWitness utxoRef -> unwords
+          [ "--mint-tx-in-reference " <> display utxoRef
+          , "--mint-plutus-script-v2"
+          , "--policy-id " <> show mintingPolicyHash
+          , unwords
+              [ "--mint-reference-tx-in-redeemer-file"
+              , toText (redeemerFilePath tmpDir $ hashRedeemer redeemer)
+              ]
+          , "--mint-reference-tx-in-execution-units " <> display executionBudget
+          ]
+
 -------------------------------------------------
 -- Collateral
 -------------------------------------------------
@@ -205,6 +413,24 @@ data TxBodyCollateral = TxBodyCollateral
   , paymentAddress :: PaymentAddress
   } deriving (Show,Eq)
 
+instance ToBuildCmdField TxBodyCollateral where
+  toBuildCmdField _ TxBodyCollateral{..} =
+    -- The hard-coded collateral amount. I have never seen a transaction require 4 ADA
+    -- as collateral.
+    let actualCollateral = Lovelace 4_000_000 in
+    unwords
+      [ "--tx-in-collateral " <> display utxoRef
+      , "--tx-total-collateral " <> show (unLovelace actualCollateral)
+      , unwords 
+          [ "--tx-out-return-collateral"
+          -- The collateral change output amount surrounded by quotes.
+          , show $ unwords
+              [ toText paymentAddress
+              , show (unLovelace $ lovelace - actualCollateral) <> " lovelace"
+              ] 
+          ]
+      ]
+
 -------------------------------------------------
 -- Tx Body
 -------------------------------------------------
@@ -215,6 +441,9 @@ data TxBody = TxBody
   , withdrawals :: [TxBodyWithdrawal]
   , mints :: [TxBodyMint]
   , collateralInput :: Maybe TxBodyCollateral -- Only one collateral input is necessary.
+  -- | The keys required for smart contract executions.
+  , requiredWitnesses :: [KeyWitness]
+  -- | The keys that must sign the transaction. This includes the keys in `requiredWitnesses`.
   , keyWitnesses :: [KeyWitness]
   , fee :: Lovelace
   } deriving (Show,Eq)
@@ -245,6 +474,9 @@ instance Semigroup TxBody where
     , collateralInput = 
        -- There should only be one txBody with collateral set.
         txBody1 ^. #collateralInput <|> txBody2 ^. #collateralInput
+    , requiredWitnesses = 
+        -- Remove duplicates.
+        ordNub $ txBody1 ^. #requiredWitnesses <> txBody2 ^. #requiredWitnesses
     , keyWitnesses = 
         -- Remove duplicates.
         ordNub $ txBody1 ^. #keyWitnesses <> txBody2 ^. #keyWitnesses
@@ -262,6 +494,7 @@ instance Monoid TxBody where
     , withdrawals = []
     , mints = []
     , collateralInput = Nothing
+    , requiredWitnesses = []
     , keyWitnesses = []
     , fee = 0
     }

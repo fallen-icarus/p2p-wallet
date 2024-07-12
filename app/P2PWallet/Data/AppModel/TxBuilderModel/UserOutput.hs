@@ -9,6 +9,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel.UserOutput where
 import P2PWallet.Data.Core.AssetMaps
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -32,6 +33,18 @@ data UserOutput = UserOutput
 
 makeFieldLabelsNoPrefix ''UserOutput
 
+-- This instance is used for the change calculation.
+instance AssetBalances (a,UserOutput) where
+  assetBalances negateValues xs =
+    let adjust = if negateValues then negate else id in
+    -- Increase the quantity of lovelace for each output by the count.
+    ( sum $ map (\(_,UserOutput{count,lovelace}) -> fromIntegral (adjust count) * lovelace) xs
+    -- Increase the quantity of each native asset by the count, then negate it so that it
+    -- can be subtracted from the inputs.
+    , flip concatMap xs $ \(_,UserOutput{count,nativeAssets}) -> 
+        for nativeAssets $ \asset -> asset & #quantity %~ (fromIntegral (adjust count) *)
+    )
+
 instance AddToTxBody UserOutput where
   addToTxBody txBody UserOutput{..} = 
       txBody 
@@ -44,6 +57,7 @@ instance AddToTxBody UserOutput where
         { paymentAddress = paymentAddress
         , lovelace = lovelace
         , nativeAssets = nativeAssets
+        , datum = NoOutputDatum
         }
 
 -------------------------------------------------

@@ -48,13 +48,15 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
     StartAdding _ -> 
       -- Set `pairing` to `True` to display the widget for getting the new stake wallet info.
       -- Also reset the `newStakeWallet` field so that the last information is cleared.
-      [ Model $ model & #delegationModel % #addingWallet .~ True -- Show widget.
-                      & #delegationModel % #newStakeWallet .~ def -- Clear information.
+      [ Model $ model 
+          & #delegationModel % #addingWallet .~ True -- Show widget.
+          & #delegationModel % #newStakeWallet .~ def -- Clear information.
       ]
     CancelAdding -> 
       -- Close the widget for getting the new stake wallet info.
-      [ Model $ model & #delegationModel % #addingWallet .~ False
-                      & #delegationModel % #newStakeWallet .~ def -- Clear information.
+      [ Model $ model 
+          & #delegationModel % #addingWallet .~ False
+          & #delegationModel % #newStakeWallet .~ def -- Clear information.
       ]
     ConfirmAdding -> 
       -- Set `waitingOnDevice` to `True` so that users know to check their hardware wallet.
@@ -69,7 +71,8 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           stakeId <- getNextStakeId databaseFile >>= fromRightOrAppError
           
           -- Validate the new stake wallet info, and export the required key.
-          verifiedStakeWallet <- pairStakeWallet network profile stakeId newWallet
+          verifiedStakeWallet <- 
+            pairStakeWallet network profile stakeId newWallet $ knownWallets ^. #stakeWallets
 
           -- Add the new stake wallet to the database.
           insertStakeWallet databaseFile verifiedStakeWallet >>= fromRightOrAppError
@@ -77,12 +80,12 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           return verifiedStakeWallet
       ]
     AddResult verifiedStakeWallet -> 
-       [ Model $
-          model & #knownWallets % #stakeWallets %~ flip snoc verifiedStakeWallet
-                & #waitingStatus % #waitingOnDevice .~ False
-                & #delegationModel % #addingWallet .~ False
-                & #delegationModel % #selectedWallet .~ verifiedStakeWallet
-                & #scene .~ DelegationScene
+       [ Model $ model 
+          & #knownWallets % #stakeWallets %~ flip snoc verifiedStakeWallet
+          & #waitingStatus % #waitingOnDevice .~ False
+          & #delegationModel % #addingWallet .~ False
+          & #delegationModel % #selectedWallet .~ verifiedStakeWallet
+          & #scene .~ DelegationScene
        , Task $ return $ SyncWallets StartProcess
        ]
 
@@ -93,13 +96,15 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
     StartAdding _ -> 
       -- Set `addingWallet` to `True` to display the widget for getting the new wallet info.
       -- Also reset the `newStakeWallet` field so that the last information is cleared.
-      [ Model $ model & #delegationModel % #addingWallet .~ True -- Show widget.
-                      & #delegationModel % #newStakeWallet .~ def -- Clear information.
+      [ Model $ model 
+          & #delegationModel % #addingWallet .~ True -- Show widget.
+          & #delegationModel % #newStakeWallet .~ def -- Clear information.
       ]
     CancelAdding -> 
       -- Close the widget for getting the new wallet info.
-      [ Model $ model & #delegationModel % #addingWallet .~ False
-                      & #delegationModel % #newStakeWallet .~ def -- Clear information.
+      [ Model $ model 
+          & #delegationModel % #addingWallet .~ False
+          & #delegationModel % #newStakeWallet .~ def -- Clear information.
       ]
     ConfirmAdding -> 
       -- Validate the information.
@@ -112,7 +117,8 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           stakeId <- getNextStakeId databaseFile >>= fromRightOrAppError
           
           -- Validate the new wallet info.
-          verifiedStakeWallet <- watchStakeWallet network profile stakeId newWallet
+          verifiedStakeWallet <- 
+            watchStakeWallet network profile stakeId newWallet $ knownWallets ^. #stakeWallets
 
           -- Add the new wallet to the database.
           insertStakeWallet databaseFile verifiedStakeWallet >>= fromRightOrAppError
@@ -120,11 +126,11 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           return verifiedStakeWallet
       ]
     AddResult verifiedStakeWallet -> 
-       [ Model $
-          model & #knownWallets % #stakeWallets %~ flip snoc verifiedStakeWallet
-                & #delegationModel % #addingWallet .~ False
-                & #delegationModel % #selectedWallet .~ verifiedStakeWallet
-                & #scene .~ DelegationScene
+       [ Model $ model 
+          & #knownWallets % #stakeWallets %~ flip snoc verifiedStakeWallet
+          & #delegationModel % #addingWallet .~ False
+          & #delegationModel % #selectedWallet .~ verifiedStakeWallet
+          & #scene .~ DelegationScene
        , Task $ return $ SyncWallets StartProcess
        ]
 
@@ -134,41 +140,52 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
   ChangeStakeWalletName modal -> case modal of
     -- Show the edit widget and set the extraTextField to the current alias.
     StartAdding _ -> 
-      [ Model $ model & #delegationModel % #editingWallet .~ True
-                      & #delegationModel % #showMorePopup .~ False
-                      & #extraTextField .~ (delegationModel ^. #selectedWallet % #alias)
+      [ Model $ model 
+          & #delegationModel % #editingWallet .~ True
+          & #delegationModel % #showMorePopup .~ False
+          & #extraTextField .~ (delegationModel ^. #selectedWallet % #alias)
       ]
     CancelAdding -> 
       -- Close the widget for getting the new info and reset the text field.
-      [ Model $ model & #delegationModel % #editingWallet .~ False 
-                      & #extraTextField .~ ""
+      [ Model $ model 
+          & #delegationModel % #editingWallet .~ False 
+          & #extraTextField .~ ""
       ]
     ConfirmAdding ->
       -- The state is deliberately not updated in case there is an error with any of these steps.
       -- The state will be updated after everything has successfully executed.
       [ Task $ runActionOrAlert (DelegationEvent . ChangeStakeWalletName . AddResult) $ do
-          let currentWallet = delegationModel ^. #selectedWallet
+          let currentWallet@StakeWallet{stakeId} = delegationModel ^. #selectedWallet
               newAlias = model ^. #extraTextField
               newWallet = currentWallet & #alias .~ newAlias
+              -- Filter out the selected wallet from the list of known wallets.
+              otherWallets = filter (\p -> stakeId /= p ^. #stakeId) $
+                knownWallets ^. #stakeWallets
 
           when (newAlias == "") $ throwIO $ AppError "New name is empty."
+
+          when (any ((== newAlias) . view #alias) otherWallets) $ 
+            throwIO $ AppError "This name is already being used by another stake wallet."
 
           -- Overwrite the current stake wallet name.
           insertStakeWallet databaseFile newWallet >>= fromRightOrAppError
 
+          -- Overwrite the current aliases for all DeFi wallets using this stake credential.
+          changeDeFiWalletAliases databaseFile stakeId newAlias >>= fromRightOrAppError
+
           return newWallet
       ] 
-    AddResult newWallet@StakeWallet{stakeId} ->
-      let -- Filter out the selected wallet from the list of known wallets.
-          otherWallets = filter (\p -> stakeId /= p ^. #stakeId) $
-            knownWallets ^. #stakeWallets
-          newWallets = sortOn (view #stakeId) $ newWallet : otherWallets
-      in [ Model $ 
-             model & #knownWallets % #stakeWallets .~ newWallets
-                   & #delegationModel % #editingWallet .~ False
-                   & #delegationModel % #selectedWallet .~ newWallet
-                   & #extraTextField .~ ""
-         ]
+    AddResult newWallet@StakeWallet{alias,stakeId} ->
+      [ Model $ model 
+          & #knownWallets %~ updateStakeIdAliases stakeId alias
+          & #delegationModel % #editingWallet .~ False
+          -- update all selected wallets so the new aliases take effect.
+          & configureSelectedDeFiWallets
+          -- override the selected wallet set by `configureSelectedDeFiWallets` for
+          -- the `delegationModel`.
+          & #delegationModel % #selectedWallet .~ newWallet
+          & #extraTextField .~ ""
+      ]
 
   -----------------------------------------------
   -- Delete Stake Wallet
@@ -176,8 +193,9 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
   DeleteStakeWallet modal -> case modal of
     -- Show the confirmation widget.
     GetDeleteConfirmation _ -> 
-      [ Model $ model & #delegationModel % #deletingWallet .~ True
-                      & #delegationModel % #showMorePopup .~ False
+      [ Model $ model 
+          & #delegationModel % #deletingWallet .~ True
+          & #delegationModel % #showMorePopup .~ False
       ]
     CancelDeletion -> 
       -- Close the widget for confirming deletion.
@@ -194,18 +212,19 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
     PostDeletionAction ->
       -- Delete the wallet from the cache.
       let currentId = delegationModel ^. #selectedWallet % #stakeId
-          newWallets = filter (\w -> w ^. #stakeId /= currentId) $ knownWallets ^. #stakeWallets
-      in [ Model $ model & #delegationModel % #deletingWallet .~ False
-                         & #knownWallets % #stakeWallets .~ newWallets
-                         & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead newWallets)
+      in [ Model $ model 
+            & #delegationModel % #deletingWallet .~ False
+            & #knownWallets %~ deleteStakeIdWallets currentId
+            & configureSelectedDeFiWallets
          ]
 
   -----------------------------------------------
   -- Reset Filters
   -----------------------------------------------
   ResetPoolFilters -> 
-    [ Model $ model & #delegationModel % #poolFilterModel .~ def
-                    & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    [ Model $ model 
+        & #delegationModel % #poolFilterModel .~ def
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
 
   -----------------------------------------------
@@ -221,9 +240,9 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
       ]
     ProcessResults resp -> 
       -- Disable `syncing` and update the list of pools. 
-      [ Model $ 
-          model & #waitingStatus % #syncingPools .~ False
-                & #delegationModel % #registeredPools .~ resp
+      [ Model $ model 
+          & #waitingStatus % #syncingPools .~ False
+          & #delegationModel % #registeredPools .~ resp
       ]
 
   -----------------------------------------------
@@ -257,7 +276,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           }
         filteredWithdrawals = flip filter (txBuilderModel ^. #userWithdrawals) $ \(_,wtdr) ->
             wtdr ^. #stakeAddress /= stakeAddress
-    in [ Model $ model 
+    in  [ Model $ model 
             & #txBuilderModel % #userWithdrawals .~ 
                 -- Add the new withdrawal, sort them by stake address, and immediately reindex.
                 reIndex (sortOn snd $ (0,userWithdrawal) : filteredWithdrawals)
@@ -287,8 +306,7 @@ processNewUserCertificate u@UserCertificate{..} model@TxBuilderModel{userCertifi
           , userCert ^. #stakeAddress == stakeAddress
           ]
 
-    return $ balanceTx $ 
-      model 
+    return $ balanceTx $ model 
         -- Add the new certificate to the list, sort the list so that stake address actions are
         -- grouped together, and then immediately re-index the list.
         & #userCertificates .~ reIndex (sortOn snd $ (0,u) : filteredCertificates)

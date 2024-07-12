@@ -7,7 +7,7 @@ module P2PWallet.GUI.Widgets.Home.Transactions
 import Monomer
 import Prettyprinter (align, pretty, vsep)
 import Data.Text qualified as Text
-import Data.Map qualified as Map
+import Data.Map.Strict qualified as Map
 import Data.Time.Format qualified as Time
 
 import P2PWallet.Data.AppModel

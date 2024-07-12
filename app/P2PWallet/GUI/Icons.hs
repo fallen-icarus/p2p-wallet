@@ -151,3 +151,9 @@ changeIcon = remixExchangeDollarLine
 
 toolsIcon :: Text
 toolsIcon = remixToolsFill
+
+dexIcon :: Text
+dexIcon = remixArrowLeftRightFill
+
+twoWayIcon :: Text
+twoWayIcon = remixArrowLeftLine <> remixArrowRightLine

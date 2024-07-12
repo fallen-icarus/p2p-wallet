@@ -11,6 +11,7 @@ import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.AddressBook
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Delegation
+import P2PWallet.GUI.Widgets.Dex
 import P2PWallet.GUI.Widgets.Home
 import P2PWallet.GUI.Widgets.MainMenu
 import P2PWallet.GUI.Widgets.Networks
@@ -39,6 +40,7 @@ buildUI _ model@AppModel{..} = do
             , txBuilderWidget model `nodeVisible` (TxBuilderScene == scene)
             , addressBookWidget model `nodeVisible` (AddressBookScene == scene)
             , tickerRegistryWidget model `nodeVisible` (TickerRegistryScene == scene)
+            , dexWidget model `nodeVisible` (DexScene == scene)
             ]
         ] `nodeVisible` isJust selectedProfile
     , alertOverlay `nodeVisible` isJust alertMessage
@@ -48,4 +50,6 @@ buildUI _ model@AppModel{..} = do
     , waitingOverlay "Syncing Pools..." `nodeVisible` waitingStatus ^. #syncingPools
     , waitingOverlay "Building..." `nodeVisible` waitingStatus ^. #building
     , waitingOverlay "Submitting Transaction..." `nodeVisible` waitingStatus ^. #submitting
+    , waitingOverlay "Adding to Builder..." `nodeVisible` waitingStatus ^. #addingToBuilder
+    , waitingOverlay "Syncing Order Book..." `nodeVisible` waitingStatus ^. #syncingOrderBook
     ] `styleBasic` [bgColor customGray4]

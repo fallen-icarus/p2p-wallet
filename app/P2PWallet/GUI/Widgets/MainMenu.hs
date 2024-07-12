@@ -17,12 +17,10 @@ mainMenuWidget model@AppModel{txBuilderModel} = do
     vstack 
       [ changeSceneButton "Home" homeIcon HomeScene
       , changeSceneButton "Staking" delegationCenterIcon DelegationScene
-      -- , changeSceneButton "DEX" remixArrowLeftRightFill LimitOrders
-      -- , changeSceneButton "Liquidity" remixWaterFlashLine MarketMakers
+      , changeSceneButton "DEX" dexIcon DexScene
       , changeSceneButton "Contacts" contactsBookIcon AddressBookScene
       , changeSceneButton "Tickers" tickersIcon TickerRegistryScene
       , txBuilderButton
-      -- , changeSceneButton "Builder" txBuilderIcon TxBuilderScene
       , changeSceneButton "Settings" settingsIcon SettingsScene
       , filler
       , logOutButton

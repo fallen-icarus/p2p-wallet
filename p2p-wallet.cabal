@@ -52,6 +52,7 @@ executable p2p-wallet
       P2PWallet.Actions.AddWallet
       P2PWallet.Actions.AssembleWitnesses
       P2PWallet.Actions.BuildTxBody
+      P2PWallet.Actions.CalculateMinUTxOValue
       P2PWallet.Actions.Database
       P2PWallet.Actions.ExportHwKey
       P2PWallet.Actions.ExportTxBody
@@ -59,18 +60,23 @@ executable p2p-wallet
       P2PWallet.Actions.Query.Koios
       P2PWallet.Actions.Utils
       P2PWallet.Actions.SubmitTx
+      P2PWallet.Actions.SyncOrderBooks
       P2PWallet.Actions.SyncWallets
       P2PWallet.Actions.WitnessTxBody
       P2PWallet.Data.AppModel
       P2PWallet.Data.AppModel.AddressBookModel
       P2PWallet.Data.AppModel.Common
       P2PWallet.Data.AppModel.DelegationModel
+      P2PWallet.Data.AppModel.DexModel
       P2PWallet.Data.AppModel.HomeModel
       P2PWallet.Data.AppModel.ProfileModel
       P2PWallet.Data.AppModel.TickerRegistryModel
       P2PWallet.Data.AppModel.TxBuilderModel
       P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
       P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
+      P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
+      P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
+      P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
       P2PWallet.Data.AppModel.TxBuilderModel.TestMint
       P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
       P2PWallet.Data.AppModel.TxBuilderModel.UserInput
@@ -97,8 +103,12 @@ executable p2p-wallet
       P2PWallet.Data.Core.Transaction
       P2PWallet.Data.Core.TxBody
       P2PWallet.Data.Core.Wallets
+      P2PWallet.Data.Core.Wallets.DexWallet
       P2PWallet.Data.Core.Wallets.PaymentWallet
       P2PWallet.Data.Core.Wallets.StakeWallet
+      P2PWallet.Data.DeFi.CardanoSwaps.Common
+      P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps
+      P2PWallet.Data.DeFi.CardanoSwaps.TwoWaySwaps
       P2PWallet.Data.Koios.AddressUTxO
       P2PWallet.Data.Koios.BudgetEstimations
       P2PWallet.Data.Koios.LinkedPaymentAddresses
@@ -113,10 +123,12 @@ executable p2p-wallet
       P2PWallet.GUI.EventHandler
       P2PWallet.GUI.EventHandler.AddressBookEvent
       P2PWallet.GUI.EventHandler.DelegationEvent
+      P2PWallet.GUI.EventHandler.DexEvent
       P2PWallet.GUI.EventHandler.HomeEvent
       P2PWallet.GUI.EventHandler.ProfileEvent
       P2PWallet.GUI.EventHandler.TickerRegistryEvent
       P2PWallet.GUI.EventHandler.TxBuilderEvent
+      P2PWallet.GUI.EventHandler.TxBuilderEvent.SwapBuilderEvent
       P2PWallet.GUI.HelpMessages
       P2PWallet.GUI.Icons
       P2PWallet.GUI.MonomerOptics
@@ -125,6 +137,10 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Delegation
       P2PWallet.GUI.Widgets.Delegation.AddStakeWallet
       P2PWallet.GUI.Widgets.Delegation.PoolPicker
+      P2PWallet.GUI.Widgets.Dex
+      P2PWallet.GUI.Widgets.Dex.Positions
+      P2PWallet.GUI.Widgets.Dex.Trade
+      P2PWallet.GUI.Widgets.Dex.Transactions
       P2PWallet.GUI.Widgets.Internal.Custom
       P2PWallet.GUI.Widgets.Internal.Popup
       P2PWallet.GUI.Widgets.Home
@@ -139,6 +155,16 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Settings
       P2PWallet.GUI.Widgets.TickerRegistry
       P2PWallet.GUI.Widgets.TxBuilder
+      P2PWallet.GUI.Widgets.TxBuilder.Internal
+      P2PWallet.GUI.Widgets.TxBuilder.StatusBar
+      P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder
+      P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCloses
+      P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCreations
+      P2PWallet.GUI.Widgets.TxBuilder.TestMint
+      P2PWallet.GUI.Widgets.TxBuilder.UserCertificates
+      P2PWallet.GUI.Widgets.TxBuilder.UserInputs
+      P2PWallet.GUI.Widgets.TxBuilder.UserOutputs
+      P2PWallet.GUI.Widgets.TxBuilder.UserWithdrawals
       P2PWallet.Plutus
       P2PWallet.Prelude
 
@@ -177,12 +203,13 @@ executable p2p-wallet
       , cardano-loans
       , relude
       , vector
-      , aeson-pretty
       , sqlite-simple
       , bech32
       , bech32-th
       , cryptonite
       , memory
+      , base16-bytestring
+      , plutus-core
 
     -- Directories containing source files.
     hs-source-dirs:   app

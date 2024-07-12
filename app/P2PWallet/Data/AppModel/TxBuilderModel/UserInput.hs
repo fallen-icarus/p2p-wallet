@@ -34,6 +34,14 @@ data UserInput = UserInput
 
 makeFieldLabelsNoPrefix ''UserInput
 
+-- This instance is used for the change calculation.
+instance AssetBalances (a,UserInput) where
+  assetBalances negateValues xs =
+    let adjust = if negateValues then negate else id in
+    ( sum $ map (over #unLovelace adjust . view #lovelace . snd) xs
+    , concatMap (map (over #quantity adjust) . view #nativeAssets . snd) xs
+    )
+
 instance AddToTxBody UserInput where
   addToTxBody txBody UserInput{utxoRef,paymentAddress,paymentKeyPath} = 
       txBody 
@@ -46,6 +54,7 @@ instance AddToTxBody UserInput where
       newInput :: TxBodyInput
       newInput = TxBodyInput
         { utxoRef = utxoRef
+        , spendingScriptInfo = Nothing
         }
 
       plutusAddress :: PlutusAddress

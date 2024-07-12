@@ -36,13 +36,15 @@ handleHomeEvent model@AppModel{..} evt = case evt of
     StartAdding _ -> 
       -- Set `pairing` to `True` to display the widget for getting the new payment wallet info.
       -- Also reset the `newPaymentWallet` field so that the last information is cleared.
-      [ Model $ model & #homeModel % #addingWallet .~ True -- Show widget.
-                      & #homeModel % #newPaymentWallet .~ def -- Clear information.
+      [ Model $ model 
+          & #homeModel % #addingWallet .~ True -- Show widget.
+          & #homeModel % #newPaymentWallet .~ def -- Clear information.
       ]
     CancelAdding -> 
       -- Close the widget for getting the new payment wallet info.
-      [ Model $ model & #homeModel % #addingWallet .~ False 
-                      & #homeModel % #newPaymentWallet .~ def -- Clear information.
+      [ Model $ model 
+          & #homeModel % #addingWallet .~ False 
+          & #homeModel % #newPaymentWallet .~ def -- Clear information.
       ]
     ConfirmAdding -> 
       -- Set `waitingOnDevice` to `True` so that users know to check their hardware wallet.
@@ -54,10 +56,11 @@ handleHomeEvent model@AppModel{..} evt = case evt of
               newWallet = homeModel ^. #newPaymentWallet
 
           -- Get the new payment id for the new entry into the payment_wallet table.
-          paymentId <- getNextPaymentId databaseFile >>= fromRightOrAppError
+          paymentId <- getNextPaymentIdAcrossTables databaseFile >>= fromRightOrAppError
           
           -- Validate the new payment wallet info, and export the required keys.
-          verifiedPaymentWallet <- pairPaymentWallet network profile paymentId newWallet
+          verifiedPaymentWallet <- 
+            pairPaymentWallet network profile paymentId newWallet $ knownWallets ^. #paymentWallets
 
           -- Add the new payment wallet to the database.
           insertPaymentWallet databaseFile verifiedPaymentWallet >>= fromRightOrAppError
@@ -65,14 +68,14 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           return verifiedPaymentWallet
       ]
     AddResult verifiedPaymentWallet ->
-       [ Model $
-          model & #knownWallets % #paymentWallets %~ flip snoc verifiedPaymentWallet
-                & #waitingStatus % #waitingOnDevice .~ False
-                & #homeModel % #addingWallet .~ False
-                & #homeModel % #selectedWallet .~ verifiedPaymentWallet
-                & #scene .~ HomeScene
-       , Task $ return $ HomeEvent $ AddCorrespondingStakeWallet StartProcess
-       ]
+      [ Model $ model 
+          & #knownWallets % #paymentWallets %~ flip snoc verifiedPaymentWallet
+          & #waitingStatus % #waitingOnDevice .~ False
+          & #homeModel % #addingWallet .~ False
+          & #homeModel % #selectedWallet .~ verifiedPaymentWallet
+          & #scene .~ HomeScene
+      , Task $ return $ HomeEvent $ AddCorrespondingStakeWallet StartProcess
+      ]
 
   -----------------------------------------------
   -- Watching Wallets
@@ -81,13 +84,15 @@ handleHomeEvent model@AppModel{..} evt = case evt of
     StartAdding _ -> 
       -- Set `addingWallet` to `True` to display the widget for getting the new payment wallet info.
       -- Also reset the `newPaymentWallet` field so that the last information is cleared.
-      [ Model $ model & #homeModel % #addingWallet .~ True -- Show widget.
-                      & #homeModel % #newPaymentWallet .~ def -- Clear information.
+      [ Model $ model 
+          & #homeModel % #addingWallet .~ True -- Show widget.
+          & #homeModel % #newPaymentWallet .~ def -- Clear information.
       ]
     CancelAdding -> 
       -- Close the widget for getting the new payment wallet info.
-      [ Model $ model & #homeModel % #addingWallet .~ False 
-                      & #homeModel % #newPaymentWallet .~ def -- Clear information.
+      [ Model $ model 
+          & #homeModel % #addingWallet .~ False 
+          & #homeModel % #newPaymentWallet .~ def -- Clear information.
       ]
     ConfirmAdding -> 
       -- Validate the information and generate the stake address, if any.
@@ -97,10 +102,11 @@ handleHomeEvent model@AppModel{..} evt = case evt of
               newWallet = homeModel ^. #newPaymentWallet
 
           -- Get the new payment id for the new entry into the payment_wallet table.
-          paymentId <- getNextPaymentId databaseFile >>= fromRightOrAppError
+          paymentId <- getNextPaymentIdAcrossTables databaseFile >>= fromRightOrAppError
           
           -- Validate the new payment wallet info, and extract the stake address, if any.
-          verifiedPaymentWallet <- watchPaymentWallet network profile paymentId newWallet
+          verifiedPaymentWallet <- 
+            watchPaymentWallet network profile paymentId newWallet $ knownWallets ^. #paymentWallets
 
           -- Add the new payment wallet to the database.
           insertPaymentWallet databaseFile verifiedPaymentWallet >>= fromRightOrAppError
@@ -108,13 +114,13 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           return verifiedPaymentWallet
       ]
     AddResult verifiedPaymentWallet ->
-       [ Model $
-          model & #knownWallets % #paymentWallets %~ flip snoc verifiedPaymentWallet
-                & #homeModel % #addingWallet .~ False
-                & #homeModel % #selectedWallet .~ verifiedPaymentWallet
-                & #scene .~ HomeScene
-       , Task $ return $ HomeEvent $ AddCorrespondingStakeWallet StartProcess
-       ]
+      [ Model $ model 
+          & #knownWallets % #paymentWallets %~ flip snoc verifiedPaymentWallet
+          & #homeModel % #addingWallet .~ False
+          & #homeModel % #selectedWallet .~ verifiedPaymentWallet
+          & #scene .~ HomeScene
+      , Task $ return $ HomeEvent $ AddCorrespondingStakeWallet StartProcess
+      ]
 
   -----------------------------------------------
   -- Add the corresponding stake wallet when adding a payment wallet
@@ -154,9 +160,9 @@ handleHomeEvent model@AppModel{..} evt = case evt of
                 return $ SyncWallets StartProcess
           ]
     ProcessResults newStakeWallet ->
-      [ Model $
-          model & #knownWallets % #stakeWallets %~ flip snoc newStakeWallet
-                & #delegationModel % #selectedWallet .~ newStakeWallet
+      [ Model $ model 
+          & #knownWallets % #stakeWallets %~ flip snoc newStakeWallet
+          & #delegationModel % #selectedWallet .~ newStakeWallet
       , Task $ return $ SyncWallets StartProcess
       ]
 
@@ -166,24 +172,32 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   ChangePaymentWalletName modal -> case modal of
     -- Show the edit widget and set the extraTextField to the current alias.
     StartAdding _ -> 
-      [ Model $ model & #homeModel % #editingWallet .~ True
-                      & #homeModel % #showMorePopup .~ False
-                      & #extraTextField .~ (homeModel ^. #selectedWallet % #alias)
+      [ Model $ model 
+          & #homeModel % #editingWallet .~ True
+          & #homeModel % #showMorePopup .~ False
+          & #extraTextField .~ (homeModel ^. #selectedWallet % #alias)
       ]
     CancelAdding -> 
       -- Close the widget for getting the new info and reset the text field.
-      [ Model $ model & #homeModel % #editingWallet .~ False 
-                      & #extraTextField .~ ""
+      [ Model $ model 
+          & #homeModel % #editingWallet .~ False 
+          & #extraTextField .~ ""
       ]
     ConfirmAdding ->
       -- The state is deliberately not updated in case there is an error with any of these steps.
       -- The state will be updated after everything has successfully executed.
       [ Task $ runActionOrAlert (HomeEvent . ChangePaymentWalletName . AddResult) $ do
-          let currentWallet = model ^. #homeModel % #selectedWallet
+          let currentWallet@PaymentWallet{paymentId} = model ^. #homeModel % #selectedWallet
               newAlias = model ^. #extraTextField
               newWallet = currentWallet & #alias .~ newAlias
+              -- Filter out the selected profile from the list of known payment wallets.
+              otherWallets = filter (\p -> paymentId /= p ^. #paymentId) $
+                knownWallets ^. #paymentWallets
 
           when (newAlias == "") $ throwIO $ AppError "New name is empty."
+
+          when (any ((== newAlias) . view #alias) otherWallets) $ 
+            throwIO $ AppError "This name is already being used by another payment wallet."
 
           -- Overwrite the current payment wallet name.
           insertPaymentWallet databaseFile newWallet >>= fromRightOrAppError
@@ -196,12 +210,12 @@ handleHomeEvent model@AppModel{..} evt = case evt of
             knownWallets ^. #paymentWallets
           newWallets = sortOn (view #paymentId) $ newWallet : otherWallets
       -- Toggle the editingWallet flag.
-      in [ Model $ 
-             model & #knownWallets % #paymentWallets .~ newWallets
-                   & #homeModel % #editingWallet .~ False
-                   & #homeModel % #selectedWallet .~ newWallet
-                   & #extraTextField .~ ""
-         ]
+      in  [ Model $ model 
+              & #knownWallets % #paymentWallets .~ newWallets
+              & #homeModel % #editingWallet .~ False
+              & #homeModel % #selectedWallet .~ newWallet
+              & #extraTextField .~ ""
+          ]
 
   -----------------------------------------------
   -- Delete Payment Wallet
@@ -209,8 +223,9 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   DeletePaymentWallet modal -> case modal of
     -- Show the confirmation widget.
     GetDeleteConfirmation _ -> 
-      [ Model $ model & #homeModel % #deletingWallet .~ True
-                      & #homeModel % #showMorePopup .~ False
+      [ Model $ model 
+          & #homeModel % #deletingWallet .~ True
+          & #homeModel % #showMorePopup .~ False
       ]
     CancelDeletion -> 
       -- Close the widget for confirming deletion.
@@ -229,26 +244,30 @@ handleHomeEvent model@AppModel{..} evt = case evt of
       let currentId = homeModel ^. #selectedWallet % #paymentId
           newWallets = filter (\w -> w ^. #paymentId /= currentId) $
             knownWallets ^. #paymentWallets
-      in [ Model $ model & #homeModel % #deletingWallet .~ False
-                         & #knownWallets % #paymentWallets .~ newWallets
-                         & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead newWallets)
-         ]
+      in  [ Model $ model 
+              & #homeModel % #deletingWallet .~ False
+              & #knownWallets % #paymentWallets .~ newWallets
+              & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead newWallets)
+          ]
 
   -----------------------------------------------
   -- Reset Filters
   -----------------------------------------------
   ResetUTxOFilters -> 
-    [ Model $ model & #homeModel % #utxoFilterModel .~ def
-                    & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    [ Model $ model 
+        & #homeModel % #utxoFilterModel .~ def
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
   ResetAssetFilters -> 
-    [ Model $ model & #homeModel % #assetFilterModel .~ def
-                    & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    [ Model $ model 
+        & #homeModel % #assetFilterModel .~ def
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
   ResetTxFilters -> 
     let newDefault = def & #dateRange % _1 ?~ addDays (-30) (config ^. #currentDay) in
-    [ Model $ model & #homeModel % #txFilterModel .~ newDefault 
-                    & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    [ Model $ model 
+        & #homeModel % #txFilterModel .~ newDefault 
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
 
   -----------------------------------------------

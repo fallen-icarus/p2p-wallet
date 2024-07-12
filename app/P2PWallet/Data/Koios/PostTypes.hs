@@ -10,6 +10,7 @@ module P2PWallet.Data.Koios.PostTypes where
 import Data.Aeson
 
 import P2PWallet.Data.Core.Internal
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -123,3 +124,16 @@ instance FromJSON Pools where
 
 instance ToJSON Pools where
   toJSON (Pools pools) = object [ "_pool_bech32_ids" .= pools ]
+
+-------------------------------------------------
+-- Assets
+-------------------------------------------------
+-- | A list of assets that a UTxO must contain.
+newtype AssetList = AssetList [(CurrencySymbol,TokenName)]
+
+instance ToJSON AssetList where
+  toJSON (AssetList xs) = 
+    object [ "_asset_list" .= 
+             map (\(currSym,tokName) -> [display currSym, display tokName]) xs
+           , "_extended" .= True
+           ]

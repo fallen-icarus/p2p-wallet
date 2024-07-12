@@ -1,8 +1,19 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module P2PWallet.Plutus
   ( -- * Plutus Addresses
     PlutusAddress
+
+    -- * Plutus Rationals
+  , PlutusRational
+  , PlutusTx.fromGHC
+  , PlutusTx.toGHC
 
     -- * Re-exports
   , PV1.Address(..)
@@ -20,11 +31,14 @@ module P2PWallet.Plutus
   , PV1.SerialisedScript
   , PV1.RedeemerHash(..)
   , PV1.DatumHash(..)
+  , PV2.OutputDatum(..)
+  , _NoOutputDatum
+  , _OutputDatum
+  , _OutputDatumHash
 
     -- * Parsing
   , parseHex
   , parseTxOutRef
-  , parsePubKeyHash
 
     -- * Script Utils
   , hashScript
@@ -33,24 +47,31 @@ module P2PWallet.Plutus
   , toRedeemer
   , toDatum
   , scriptHashToPolicyId
+  , policyIdToScriptHash
   , hashRedeemer
   , hashDatum
+  , applyArguments
 
     -- * Serialization
   , decodeDatum
   , writeData
   , writeScript
+  , parseScriptFromCBOR
 
     -- * Misc
   , toHexidecimal
   , unBuiltinByteString
   , isPubKeyCredential
+  , unsafeFromData
+  , unsafeToBuiltinByteString
   ) where
 
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as E
 import Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Base16 as Base16
+import Control.Lens qualified as Lens
 
 import Database.SQLite.Simple (SQLData(SQLText))
 import Database.SQLite.Simple.FromField (FromField(..), returnError, ResultError(ConversionFailed))
@@ -59,17 +80,25 @@ import Database.SQLite.Simple.Ok (Ok(Ok))
 import Database.SQLite.Simple.Internal (Field(..))
 
 import PlutusLedgerApi.V1 qualified as PV1
+import PlutusLedgerApi.V2 qualified as PV2
 import PlutusLedgerApi.V1.Address qualified as PV1
 import PlutusTx.Builtins.Internal (BuiltinByteString(..))
 import PlutusLedgerApi.V1.Bytes (LedgerBytes(..),fromHex,encodeByteString)
-
+import qualified PlutusCore.MkPlc as PLC
+import qualified UntypedPlutusCore as UPLC
 import Plutus.Script.Utils.V2.Generators (alwaysSucceedPolicy)
 import Plutus.Script.Utils.Scripts qualified as PV2
 import Cardano.Api qualified as Api 
 import Cardano.Api.Shelley (toPlutusData,fromPlutusData,PlutusScript(..))
 import PlutusTx.Builtins qualified as Builtins
+import PlutusTx.Ratio qualified as PlutusTx
 
 import P2PWallet.Prelude
+
+-------------------------------------------------
+-- Optics
+-------------------------------------------------
+makePrisms ''PV2.OutputDatum
 
 -------------------------------------------------
 -- Plutus Addresses
@@ -77,6 +106,12 @@ import P2PWallet.Prelude
 -- | A type alias for the address type used as part of smart contracts.
 -- Helpful for making type signatures more clear.
 type PlutusAddress = PV1.Address
+
+-------------------------------------------------
+-- Plutus Rational
+-------------------------------------------------
+-- | A type alias for the plutus version of Rational Helpful for making type signatures more clear.
+type PlutusRational = PlutusTx.Rational
 
 -------------------------------------------------
 -- Parsing
@@ -95,10 +130,6 @@ parseTxOutRef s =
       <*> readMaybe (toString $ T.drop 1 index)
   where
     (txHash,index) = T.span (/='#') s
-
--- | Parse PubKeyHash from user supplied Text.
-parsePubKeyHash :: Text -> Maybe PV1.PubKeyHash
-parsePubKeyHash = fmap PV1.PubKeyHash . parseHex
 
 -------------------------------------------------
 -- Script Utils
@@ -134,6 +165,16 @@ toDatum = PV1.Datum . PV1.dataToBuiltinData . PV1.toData
 scriptHashToPolicyId :: PV1.ScriptHash -> PV1.CurrencySymbol
 scriptHashToPolicyId = PV1.CurrencySymbol . PV1.getScriptHash
 
+policyIdToScriptHash :: PV1.CurrencySymbol -> PV1.ScriptHash
+policyIdToScriptHash = PV1.ScriptHash . PV1.unCurrencySymbol
+
+-- | Apply extra parameters to a plutus script expecting some.
+applyArguments :: PV1.SerialisedScript -> [PV1.Data] -> PV1.SerialisedScript
+applyArguments p args =
+  let termArgs = fmap (PLC.mkConstant ()) args
+      applied t = PLC.mkIterAppNoAnn t termArgs
+  in PV1.serialiseUPLC $ Lens.over UPLC.progTerm applied $ PV1.uncheckedDeserialiseUPLC p
+
 ------------------------------------------------
 -- Serialization
 ------------------------------------------------
@@ -160,6 +201,12 @@ decodeDatum :: (PV1.FromData a) => Aeson.Value -> Maybe a
 decodeDatum = either (const Nothing) (PV1.fromBuiltinData . fromCardanoScriptData)
             . Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema
 
+parseScriptFromCBOR :: String -> PV1.SerialisedScript
+parseScriptFromCBOR script =
+  case Base16.decode $ encodeUtf8 script of
+    Left e -> error $ "Failed to decode validator: " <> show e
+    Right bytes' -> toShort bytes'
+
 -------------------------------------------------
 -- Miscellaneous
 -------------------------------------------------
@@ -174,6 +221,12 @@ unBuiltinByteString (BuiltinByteString bs) = bs
 isPubKeyCredential :: PV1.Credential -> Bool
 isPubKeyCredential (PV1.PubKeyCredential _) = True
 isPubKeyCredential _ = False
+
+unsafeFromData :: (PV1.UnsafeFromData a) => PV1.Data -> a
+unsafeFromData = PV1.unsafeFromBuiltinData . PV1.dataToBuiltinData
+
+unsafeToBuiltinByteString :: String -> Builtins.BuiltinByteString
+unsafeToBuiltinByteString = PV1.getLedgerBytes . fromRight "" . fromHex . fromString
 
 -------------------------------------------------
 -- Orphans

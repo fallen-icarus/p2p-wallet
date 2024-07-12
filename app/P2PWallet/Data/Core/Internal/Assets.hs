@@ -17,19 +17,11 @@ import Codec.Binary.Bech32.TH (humanReadablePart)
 import Crypto.Hash (hash)
 import Crypto.Hash.Algorithms (Blake2b_160)
 import Data.ByteArray (convert)
-import Data.Map.Strict qualified as StrictMap
+import Data.Map.Strict qualified as Map
+import Data.List (foldl1')
 
 import P2PWallet.Plutus
 import P2PWallet.Prelude
-
--------------------------------------------------
--- MergeWith Class
--------------------------------------------------
--- | Combine like units of type `a` in `[a]`. For example, native assets should have
--- their values summed, but leave the rest of the fields unchanged. How the values are merged
--- is configurable (addition, subtraction, etc). `b` is assumed to be a field inside of `a`.
-class MergeWith a where
-  mergeWith :: (a -> a -> Either Text a) -> [a] -> Either Text [a]
 
 -------------------------------------------------
 -- Lovelace
@@ -179,18 +171,14 @@ instance FromJSON NativeAsset where
         <*> o .: "fingerprint"
         <*> (o .: "quantity" >>= maybe mzero return . readMaybe)
 
-instance MergeWith NativeAsset where
-  mergeWith f = sequence 
-              . toList 
-              . StrictMap.fromListWith (\a b -> join $ liftA2 f a b)
-              . map (\asset@NativeAsset{..} -> ((policyId,tokenName), Right asset))
-
 -- | Merge a list of `NativeAsset` by summing the quantities for like tokens.
 sumNativeAssets :: [NativeAsset] -> [NativeAsset]
-sumNativeAssets xs = fromRight [] $ mergeWith sumAssets xs
+sumNativeAssets = toList 
+                . Map.fromListWith sumAssets
+                . map (\asset@NativeAsset{..} -> ((policyId,tokenName), asset))
   where
-    sumAssets :: NativeAsset -> NativeAsset -> Either Text NativeAsset
-    sumAssets NativeAsset{..} na2 = Right $ NativeAsset
+    sumAssets :: NativeAsset -> NativeAsset -> NativeAsset
+    sumAssets NativeAsset{..} na2 = NativeAsset
       { policyId = policyId
       , tokenName = tokenName
       , fingerprint = fingerprint
@@ -202,6 +190,9 @@ onChainName = to name
   where
     name :: NativeAsset -> Text
     name NativeAsset{policyId,tokenName} = display policyId <> "." <> display tokenName
+
+lovelaceAsNativeAsset :: NativeAsset
+lovelaceAsNativeAsset = NativeAsset "" "" (mkAssetFingerprint "" "") 0
 
 -- | Parse a native asset of either the form: "policy_id.token_name" or "# policy_id.token_name".
 parseNativeAsset :: Text -> Maybe NativeAsset
@@ -230,19 +221,14 @@ newtype TokenMint = TokenMint { unTokenMint :: (TokenName,Integer) }
 instance Display TokenMint where
   display (TokenMint (name,num)) = show num <> " " <> display name
 
-instance MergeWith TokenMint where
-  mergeWith f = sequence 
-              . toList 
-              . StrictMap.fromListWith (\a b -> join $ liftA2 f a b)
-              . map (\mint@(TokenMint (name,_)) -> (name, Right mint))
-
 -- | Merge a list of `TokenMint` by summing the quantities for like tokens.
 sumTokenMints :: [TokenMint] -> [TokenMint]
-sumTokenMints xs = fromRight [] $ mergeWith sumMints xs
+sumTokenMints = toList 
+              . Map.fromListWith sumMints
+              . map (\mint@(TokenMint (name,_)) -> (name, mint))
   where
-    sumMints :: TokenMint -> TokenMint -> Either Text TokenMint
-    sumMints (TokenMint (name,num1)) (TokenMint (_,num2)) = 
-      Right $ TokenMint (name, num1 + num2)
+    sumMints :: TokenMint -> TokenMint -> TokenMint
+    sumMints (TokenMint (name,num1)) (TokenMint (_,num2)) = TokenMint (name, num1 + num2)
 
 -- | Parse tokens that are assumed to be of the format: '# asset_name'. The `asset_name` is assumed
 -- to be in hexidecimal.
@@ -253,3 +239,23 @@ parseTokenMint t = case words t of
     n <- readMaybe @Integer $ toString num
     return $ TokenMint (tokenName, n)
   _ -> Nothing
+
+-------------------------------------------------
+-- AssetBalances Class
+-------------------------------------------------
+-- | Determine the total amount of assets in a list of actions. Optionally negate the quantities.
+class AssetBalances a where
+  assetBalances :: Bool -> [a] -> (Lovelace, [NativeAsset])
+
+sumAssetBalances :: [(Lovelace, [NativeAsset])] -> (Lovelace, [NativeAsset])
+sumAssetBalances xs = (allLoves, allAssets)
+  where
+    (loves, assets) = unzip xs
+
+    allLoves :: Lovelace
+    allLoves = foldl1' (+) loves
+
+    allAssets :: [NativeAsset]
+    allAssets = 
+      -- Filter out zero assets.
+      filter ((/= 0) . view #quantity) $ sumNativeAssets $ concat assets
