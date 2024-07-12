@@ -13,7 +13,6 @@ import P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps qualified as OneWay
 import P2PWallet.Data.DeFi.CardanoSwaps.TwoWaySwaps qualified as TwoWay
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
-import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 swapClosesList :: ReverseTickerMap -> [(Int,SwapClose)] -> [AppNode]
@@ -29,7 +28,7 @@ swapClosesList reverseTickerMap = map utxoRow
       Nothing -> spacer `nodeVisible` False
       
     limitOrderRow :: (Int,SwapClose) -> OneWay.SwapDatum -> AppNode
-    limitOrderRow (idx,s) OneWay.SwapDatum{..} = do
+    limitOrderRow (idx,s@SwapClose{utxoRef,walletAlias}) OneWay.SwapDatum{..} = do
       let offerAsset = updateQuantity s $ NativeAsset
             { policyId = offerId
             , tokenName = offerName
@@ -42,15 +41,11 @@ swapClosesList reverseTickerMap = map utxoRow
             , fingerprint = mkAssetFingerprint askId askName
             , quantity = 0
             }
-          offerAssetName = showAssetNameOnly reverseTickerMap offerAsset
-          askAssetName = showAssetNameOnly reverseTickerMap askAsset
           positionSize = showAssetBalance True reverseTickerMap offerAsset
-          price = showPriceFormatted reverseTickerMap askAsset offerAsset $ toGHC swapPrice
-          priceCaption = fromString $ printf "Price: %s %s / %s" price askAssetName offerAssetName
       hstack
         [ vstack
             [ hstack
-                [ label "Close Limit Order"
+                [ label ("Close Limit Order For " <> walletAlias)
                     `styleBasic` [textSize 10, textColor customBlue]
                 , filler
                 , label positionSize
@@ -58,7 +53,7 @@ swapClosesList reverseTickerMap = map utxoRow
                 ]
             , spacer_ [width 2]
             , hstack
-                [ label priceCaption
+                [ label (display utxoRef)
                     `styleBasic` [textSize 8, textColor lightGray]
                 , filler
                 , label ("Converted: " <> showAssetBalance True reverseTickerMap askAsset)
@@ -87,7 +82,7 @@ swapClosesList reverseTickerMap = map utxoRow
         ]
 
     liquiditySwapRow :: (Int,SwapClose) -> TwoWay.SwapDatum -> AppNode
-    liquiditySwapRow (idx,s) TwoWay.SwapDatum{..} = do
+    liquiditySwapRow (idx,s@SwapClose{utxoRef,walletAlias}) TwoWay.SwapDatum{..} = do
       let asset1 = updateQuantity s $ NativeAsset
             { policyId = asset1Id
             , tokenName = asset1Name
@@ -100,46 +95,24 @@ swapClosesList reverseTickerMap = map utxoRow
             , fingerprint = mkAssetFingerprint asset2Id asset2Name
             , quantity = 0
             }
-          asset1AssetName = showAssetNameOnly reverseTickerMap asset1
-          asset2AssetName = showAssetNameOnly reverseTickerMap asset2
-          asset1PriceAsDecimal = 
-            showPriceFormatted reverseTickerMap asset2 asset1 $ toGHC asset1Price
-          asset2PriceAsDecimal =
-            showPriceFormatted reverseTickerMap asset1 asset2 $ toGHC asset2Price
-          priceCaption w x y z = fromString $ printf "%s Conversion Price: %s %s / %s" w x y z
       hstack
         [ vstack
             [ hstack
-                [ label "Close Liquidity Swap"
-                    `styleBasic` [textSize 10, textColor customBlue]
-                , label ("( " <> asset1AssetName)
-                    `styleBasic` [textSize 10, textColor customBlue]
-                , spacer_ [width 3]
-                , label twoWayIcon
-                    `styleBasic` [textSize 12, textMiddle, textFont "Remix", textColor customBlue]
-                , spacer_ [width 3]
-                , label (asset2AssetName <> " )")
+                [ label ("Close Liquidity Swap For " <> walletAlias)
                     `styleBasic` [textSize 10, textColor customBlue]
                 , filler
                 , label (showAssetBalance True reverseTickerMap asset1)
-                    `styleBasic` [textSize 10, textColor customBlue]
+                    `styleBasic` [textSize 10, textColor white]
                 , spacer_ [width 3]
                 , label twoWayIcon
-                    `styleBasic` [textSize 12, textMiddle, textFont "Remix", textColor customBlue]
+                    `styleBasic` [textSize 12, textMiddle, textFont "Remix", textColor white]
                 , spacer_ [width 3]
                 , label (showAssetBalance True reverseTickerMap asset2)
-                    `styleBasic` [textSize 10, textColor customBlue]
+                    `styleBasic` [textSize 10, textColor white]
                 ]
             , spacer_ [width 2]
-            , hstack
-                [ label 
-                    (priceCaption asset1AssetName asset1PriceAsDecimal asset2AssetName asset1AssetName)
-                    `styleBasic` [textSize 8, textColor lightGray]
-                , filler
-                , label 
-                    (priceCaption asset2AssetName asset2PriceAsDecimal asset1AssetName asset2AssetName)
-                    `styleBasic` [textSize 8, textColor lightGray]
-                ]
+            , label (display utxoRef)
+                `styleBasic` [textSize 8, textColor lightGray]
             ] `styleBasic` 
                 [ padding 10
                 , bgColor customGray2

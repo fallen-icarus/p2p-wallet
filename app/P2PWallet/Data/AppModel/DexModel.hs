@@ -32,8 +32,8 @@ type CachedOrderBooks = Map.Map (OfferAsset,AskAsset) [SwapUTxO]
 data DexScene
   -- | Information about all open positions.
   = DexPositions
-  -- | Transaction history for the address.
-  | DexTransactions
+  -- | Trade history for the address.
+  | DexTradeHistory
   -- | The order-book market.
   | DexMarket
   deriving (Eq,Show)
@@ -70,6 +70,55 @@ data DexEvent
   | SyncOrderBook (ProcessEvent CachedOrderBooks)
   -- | Add the new swap close to the transaction builder.
   | AddSelectedSwapClose SwapUTxO
+  -- | Add the new swap update to the transaction builder.
+  | AddSelectedSwapUpdate SwapUTxO
+  -- | Reset the positions filter model.
+  | ResetPositionsFilters
+
+-------------------------------------------------
+-- Positions Filter Model
+-------------------------------------------------
+-- | Possible sortings.
+data PositionsSortMethod
+  -- | By utxo output reference.
+  = PositionsLexicographical
+  -- | By the quantity of the offer asset present in the swap.
+  | PositionsOfferQuantity
+  -- | By the quantity of the ask asset present in the swap.
+  | PositionsAskQuantity
+  -- | By the time the swap was last "touched".
+  | PositionsTime
+  -- | The limit price for the specified trading pair.
+  | PositionsPrice
+  deriving (Show,Eq,Enum)
+
+instance Display PositionsSortMethod where
+  display PositionsLexicographical = "Lexicographically"
+  display PositionsOfferQuantity = "Offer Asset Quantity"
+  display PositionsAskQuantity = "Ask Asset Quantity"
+  display PositionsTime = "Chronologically"
+  display PositionsPrice = "Limit Price"
+
+data PositionsFilterModel = PositionsFilterModel
+  -- | The swap must offer the specified asset. Leave it blank for any asset.
+  { offerAsset :: Text
+  -- | The swap must ask for the specified asset. Leave it blank for any asset.
+  , askAsset :: Text
+  -- | The current sorting method for the positions.
+  , sortingMethod :: PositionsSortMethod
+  -- | The current sorting direction for the positions.
+  , sortingDirection :: SortDirection
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''PositionsFilterModel
+
+instance Default PositionsFilterModel where
+  def = PositionsFilterModel
+    { offerAsset = ""
+    , askAsset = ""
+    , sortingMethod = PositionsTime
+    , sortingDirection = SortDescending
+    }
 
 -------------------------------------------------
 -- Dex State
@@ -101,14 +150,18 @@ data DexModel = DexModel
   , newSwapCreation :: NewSwapCreation
   -- | Cached order-books.
   , cachedOrderBooks :: CachedOrderBooks
-  -- | Whether to show the filter widget for positions.
-  , showPositionsFilter :: Bool
   -- | The current ask page for the order book.
   , currentAskPage :: Int
   -- | The current bid page for the order book.
   , currentBidPage :: Int
   -- | How many results to display per page in the order book.
   , orderBookSampleSize :: Int
+  -- | Whether to show the filter widget for positions.
+  , showPositionsFilter :: Bool
+  -- | The positions filter model.
+  , positionsFilterModel :: PositionsFilterModel
+  -- | Teh positions filter scene.
+  , positionsFilterScene :: FilterScene
   } deriving (Eq,Show)
 
 makeFieldLabelsNoPrefix ''DexModel
@@ -127,8 +180,10 @@ instance Default DexModel where
     , newTradingPair = ("","")
     , newSwapCreation = def
     , cachedOrderBooks = mempty
-    , showPositionsFilter = False
     , orderBookSampleSize = 8
     , currentAskPage = 0
     , currentBidPage = 0
+    , showPositionsFilter = False
+    , positionsFilterModel = def
+    , positionsFilterScene = def
     }

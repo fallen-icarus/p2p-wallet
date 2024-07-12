@@ -506,3 +506,46 @@ cardanoSwapsBugMsg a = unlines
   , ""
   , show a
   ]
+
+offerAssetFilterMsg :: Text
+offerAssetFilterMsg = unlines
+  [ "Filter open positions for those selling a specific asset."
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+askAssetFilterMsg :: Text
+askAssetFilterMsg = unlines
+  [ "Filter open positions for those buying a specific asset."
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+positionsSortMsg :: Text
+positionsSortMsg = unlines
+  [ "Open positions can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Chronologically based on the time the UTxO was created"
+  , "3. Based on the balance of Offer Asset in the UTxO"
+  , "4. Based on the balance of Ask Asset in the UTxO"
+  , "5. Based on the limit price"
+  , ""
+  , unwords
+      [ "Options 3 and 4 are only available when the offer asset and/or the ask asset are set in"
+      , "the filter settings."
+      ]
+  , ""
+  , unwords
+      [ "Option 5 is only available when both the offer asset and the ask asset are set in"
+      , "the filter settings. It will sort based on the limit price for that swap direction."
+      ]
+  ]
+

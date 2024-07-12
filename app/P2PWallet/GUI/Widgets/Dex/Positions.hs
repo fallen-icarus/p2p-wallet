@@ -4,6 +4,7 @@ module P2PWallet.GUI.Widgets.Dex.Positions
   ) where
 
 import Monomer
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
@@ -13,7 +14,9 @@ import P2PWallet.Data.DeFi.CardanoSwaps.Common
 import P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps qualified as OneWay
 import P2PWallet.Data.DeFi.CardanoSwaps.TwoWaySwaps qualified as TwoWay
 import P2PWallet.GUI.Colors
+import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
+import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -33,37 +36,40 @@ positionsWidget model@AppModel{dexModel} = do
         `styleBasic` [textFont "Italics"]
 
 mainWidget :: AppModel -> AppNode
-mainWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
-    cushionWidget $ vstack
-      [ -- A header widget saying how many positions match that search out of the total as well
-        -- as a filter button for opening the filter menu. 
-        hstack 
-          [ label ("Positions (" <> fractionShown <> ")")
-              `styleBasic` [textFont "Italics", textSize 14]
-          , spacer_ [width 5]
-          , tooltip_ "Sort/Filter/Search" [tooltipDelay 0] $
-              toggleButton_ menuSearchIcon
-                (toLensVL $ #dexModel % #showPositionsFilter)
-                [toggleButtonOffStyle toggleOffStyle]
-                `styleBasic`
-                  [ border 0 transparent
-                  , radius 20
-                  , paddingT 0
-                  , paddingB 0
-                  , paddingL 5
-                  , paddingR 5
-                  , bgColor transparent
-                  , textColor customBlue
-                  , textMiddle
-                  , textFont "Remix"
-                  ]
-                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-          , filler
+mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,config} = do
+    zstack
+      [ cushionWidget $ vstack
+          [ -- A header widget saying how many positions match that search out of the total as well
+            -- as a filter button for opening the filter menu. 
+            hstack 
+              [ label ("Positions (" <> fractionShown <> ")")
+                  `styleBasic` [textFont "Italics", textSize 14]
+              , spacer_ [width 5]
+              , tooltip_ "Sort/Filter/Search" [tooltipDelay 0] $
+                  toggleButton_ menuSearchIcon
+                    (toLensVL $ #dexModel % #showPositionsFilter)
+                    [toggleButtonOffStyle toggleOffStyle]
+                    `styleBasic`
+                      [ border 0 transparent
+                      , radius 20
+                      , paddingT 0
+                      , paddingB 0
+                      , paddingL 5
+                      , paddingR 5
+                      , bgColor transparent
+                      , textColor customBlue
+                      , textMiddle
+                      , textFont "Remix"
+                      ]
+                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              , filler
+              ]
+            -- These are the UTxOs that match those filter/search settings.
+          , box $ vscroll_ [wheelRate 50] $ 
+              vstack_ [childSpacing_ 5] (map utxoRow sample)
+                `styleBasic` [padding 10]
           ]
-        -- These are the UTxOs that match those filter/search settings.
-      , box $ vscroll_ [wheelRate 50] $ 
-          vstack_ [childSpacing_ 5] (map utxoRow sample)
-            `styleBasic` [padding 10]
+      , positionsFilterWidget model `nodeVisible` showPositionsFilter
       ]
   where
     toggleOffStyle :: Style
@@ -72,7 +78,10 @@ mainWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
           `styleHover` [ bgColor customGray1 ]
 
     sample :: [SwapUTxO]
-    sample = selectedWallet ^. #utxos
+    sample = orderer (positionsFilterModel ^. #sortingDirection)
+           . sorter reverseTickerMap tickerMap positionsFilterModel
+           . filterer reverseTickerMap positionsFilterModel
+           $ selectedWallet ^. #utxos
 
     fractionShown :: Text
     fractionShown = 
@@ -121,6 +130,10 @@ mainWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
             , "/"
             , offerAssetName
             ]
+          prettyLocalTime = unwords
+            [ showLocalDate (config ^. #timeZone) blockTime
+            , showLocalTime (config ^. #timeZone) blockTime
+            ]
       hstack
         [ vstack
             [ hstack 
@@ -137,7 +150,7 @@ mainWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
                     `styleBasic` [textSize 10, textColor customBlue]
                 , spacer_ [width 5]
                 , let prettyRef = display utxoRef in
-                  tooltip_ prettyRef [tooltipDelay 0] $
+                  flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
                     box_ [alignMiddle, onClick $ CopyText $ display utxoRef] $
                       label idCardIcon
                         `styleBasic` 
@@ -153,18 +166,27 @@ mainWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
                           , radius 5
                           ]
                         `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ prettyLocalTime [tooltipDelay 0] $
+                    label clockIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 10
+                        , textColor customBlue
+                        ]
                 , filler
                 , label (showAssetBalance True reverseTickerMap offerAsset)
                     `styleBasic` [textSize 10, textColor customBlue]
                 ]
             , spacer_ [width 2]
             , hstack
-                [ label buyPriceCaption
+                [ label sellPriceCaption
                     `styleBasic` [textSize 8, textColor lightGray]
                 , spacer_ [width 10]
                 , separatorLine
                 , spacer_ [width 10]
-                , label sellPriceCaption
+                , label buyPriceCaption
                     `styleBasic` [textSize 8, textColor lightGray]
                 , filler
                 , label ("Converted: " <> showAssetBalance True reverseTickerMap askAsset)
@@ -242,6 +264,10 @@ mainWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
             fromString $ printf "Buy %s @ %s %s / %s" w x y z
           sellPriceCaption w x y z = 
             fromString $ printf "Sell %s @ %s %s / %s" w x y z
+          prettyLocalTime = unwords
+            [ showLocalDate (config ^. #timeZone) blockTime
+            , showLocalTime (config ^. #timeZone) blockTime
+            ]
       hstack
         [ vstack
             [ hstack 
@@ -258,7 +284,7 @@ mainWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
                     `styleBasic` [textSize 10, textColor customBlue]
                 , spacer_ [width 5]
                 , let prettyRef = display utxoRef in
-                  tooltip_ prettyRef [tooltipDelay 0] $
+                  flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
                     box_ [alignMiddle, onClick $ CopyText $ display utxoRef] $
                       label idCardIcon
                         `styleBasic` 
@@ -274,6 +300,15 @@ mainWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
                           , radius 5
                           ]
                         `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ prettyLocalTime [tooltipDelay 0] $
+                    label clockIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 10
+                        , textColor customBlue
+                        ]
                 , filler
                 , label (showAssetBalance True reverseTickerMap asset1)
                     `styleBasic` [textSize 10, textColor customBlue]
@@ -348,42 +383,189 @@ mainWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
                 ]
         ]
 
--------------------------------------------------
--- Helper Widgets
--------------------------------------------------
--- | A label button that will copy itself.
-copyableLabelSelf :: Double -> Color -> Color -> Text -> WidgetNode s AppEvent
-copyableLabelSelf fontSize mainColor hoverColor caption = 
-  tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
-    `styleBasic`
-      [ padding 0
-      , radius 5
-      , textMiddle
-      , textSize fontSize
-      , border 0 transparent
-      , textColor mainColor
-      , bgColor transparent
-      ]
-    `styleHover` [textColor hoverColor, cursorIcon CursorHand]
+positionsFilterWidget:: AppModel -> AppNode
+positionsFilterWidget AppModel{dexModel=DexModel{..}} = do
+  let offStyle = def 
+        `styleBasic` [ bgColor customGray1 , textColor white ]
+        `styleHover` [ textColor lightGray, border 1 customBlue ]
+  vstack
+    [ centerWidget $ vstack
+        [ hstack
+            [ hgrid
+                [ optionButton_ "Filter" FilterScene (toLensVL $ #dexModel % #positionsFilterScene) 
+                    [optionButtonOffStyle offStyle]
+                    `styleBasic` 
+                      [ bgColor customGray3
+                      , textColor customBlue
+                      , radiusTL 10
+                      , radiusBL 0
+                      , radiusTR 0
+                      , radiusBR 0
+                      , border 1 black
+                      ]
+                , optionButton_ "Sort" SortScene (toLensVL $ #dexModel % #positionsFilterScene) 
+                    [optionButtonOffStyle offStyle]
+                    `styleBasic` 
+                      [ bgColor customGray3
+                      , textColor customBlue
+                      , radius 0
+                      , border 1 black
+                      ]
+                ]
+            , filler
+            ]
+        , vstack
+            [ vstack 
+                [ zstack
+                    [ widgetIf (positionsFilterScene == FilterScene) filterWidget
+                    , widgetIf (positionsFilterScene == SortScene) sortWidget
+                    ]
+                , spacer
+                , hstack 
+                    [ filler
+                    , button "Reset" $ DexEvent ResetPositionsFilters
+                    , spacer
+                    , toggleButton "Confirm" (toLensVL $ #dexModel % #showPositionsFilter)
+                    ] `styleBasic` [padding 10]
+                ] `styleBasic`
+                    [ bgColor customGray3
+                    , radiusTL 0
+                    , radiusTR 10
+                    , radiusBR 10
+                    , radiusBL 10
+                    , border 1 black
+                    ]
+            , filler
+            ]
+        ]
+    ] `styleBasic` 
+        [ bgColor $ black & #a .~ 0.4
+        , paddingT 50
+        , paddingB 50
+        , paddingL 30
+        , paddingR 30
+        , radius 10
+        ]
+  where
+    filterWidget :: AppNode
+    filterWidget = do
+      vstack
+        [ spacer
+        , box_ [alignMiddle] $
+            label "Filter Settings"
+              `styleBasic` [textSize 14, textFont "Italics"]
+        , spacer
+        , box_ [alignMiddle] $ hstack
+            [ box_ [alignMiddle, onClick $ Alert offerAssetFilterMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , textField_ (toLensVL $ #dexModel % #positionsFilterModel % #offerAsset)
+                  [placeholder "Offer Asset"]
+                `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            , spacer
+            , label remixArrowRightLine 
+                `styleBasic` [textMiddle, textFont "Remix", textColor customBlue, radius 5]
+            , spacer
+            , textField_ (toLensVL $ #dexModel % #positionsFilterModel % #askAsset)
+                  [placeholder "Ask Asset"]
+                `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            , spacer_ [width 3]
+            , box_ [alignMiddle, onClick $ Alert askAssetFilterMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            ]
+        ]
 
--- | A label button that will copy other data.
-copyableLabelFor :: Double -> Text -> Text -> WidgetNode s AppEvent
-copyableLabelFor fontSize caption info = 
-  hstack
-    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
-        `styleBasic`
-          [ padding 0
-          , radius 5
-          , textMiddle
-          , border 0 transparent
-          , textColor customBlue
-          , bgColor transparent
-          , textSize fontSize
-          ]
-        `styleHover` [textColor lightGray, cursorIcon CursorHand]
-    , spacer
-    , label_ info [ellipsis] `styleBasic` [textColor lightGray, textSize fontSize]
-    ]
+    sortWidget :: AppNode
+    sortWidget = do
+      let innerDormantStyle = 
+            def `styleBasic` [textSize 12, bgColor customGray2, border 1 black]
+                `styleHover` [textSize 12, bgColor customGray1, border 1 black]
+          innerFocusedStyle = 
+            def `styleFocus` [textSize 12, bgColor customGray2, border 1 customBlue]
+                `styleFocusHover` [textSize 12, bgColor customGray1, border 1 customBlue]
+          offerAsset = positionsFilterModel ^. #offerAsset
+          askAsset = positionsFilterModel ^. #askAsset
+          possibleSortingMethods = mconcat
+            [ [ PositionsTime, PositionsLexicographical ]
+            , if offerAsset /= "" then [PositionsOfferQuantity] else []
+            , if askAsset /= "" then [PositionsAskQuantity] else []
+            , if offerAsset /= "" && askAsset /= "" then [PositionsPrice] else []
+            ]
+      vstack
+        [ spacer
+        , box_ [alignMiddle] $
+            label "Sort Settings"
+              `styleBasic` [textSize 14, textFont "Italics"]
+        , spacer
+        , hstack
+            [ spacer_ [width 40]
+            , label "Method:" `styleBasic` [textSize 14]
+            , spacer
+            , textDropdown_
+                  (toLensVL $ #dexModel % #positionsFilterModel % #sortingMethod) 
+                  possibleSortingMethods
+                  display 
+                  [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+                `styleBasic` 
+                  [ bgColor customGray2
+                  , width 200
+                  , border 1 black
+                  , textSize 12
+                  ]
+                `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , box_ [onClick $ Alert positionsSortMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , padding 5
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            ]
+        , spacer
+        , hstack
+            [ spacer_ [width 40]
+            , label "Order:" `styleBasic` [textSize 14]
+            , spacer
+            , textDropdown_
+                  (toLensVL $ #dexModel % #positionsFilterModel % #sortingDirection) 
+                  sortingDirections
+                  display 
+                  [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+                `styleBasic` 
+                  [ bgColor customGray2
+                  , width 150
+                  , border 1 black
+                  , textSize 12
+                  ]
+                `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+            ]
+        ]
 
 -------------------------------------------------
 -- Helper Functions
@@ -394,3 +576,57 @@ updateQuantity SwapUTxO{nativeAssets,lovelace} asset@NativeAsset{policyId,finger
   | policyId == "" = asset & #quantity .~ unLovelace lovelace
   | otherwise = flip (set #quantity) asset $ maybe 0 (view #quantity) $ flip find nativeAssets $
       \a -> a ^. #fingerprint == fingerprint
+
+targetQuantity :: ReverseTickerMap -> Text -> SwapUTxO -> Maybe Integer
+targetQuantity reverseTickerMap target p =
+  fmap (view #quantity) $
+    flip find (p ^. #nativeAssets) $ \NativeAsset{..} -> or
+      [ display policyId <> "." <> display tokenName == target
+      , Just target == fmap (display . fst) (Map.lookup (policyId,tokenName) reverseTickerMap)
+      ]
+
+sorter :: ReverseTickerMap -> TickerMap -> PositionsFilterModel -> [SwapUTxO] -> [SwapUTxO]
+sorter reverseTickerMap tickerMap PositionsFilterModel{offerAsset,askAsset,sortingMethod} = 
+  case sortingMethod of
+    PositionsLexicographical -> sortOn (view #utxoRef)
+    PositionsTime -> sortOn (view #blockTime)
+    PositionsOfferQuantity -> sortOn (targetQuantity reverseTickerMap offerAsset)
+    PositionsAskQuantity -> sortOn (targetQuantity reverseTickerMap askAsset)
+    PositionsPrice -> 
+      let offerAsset' = OfferAsset $ fromMaybe def $ 
+            rightToMaybe $ parseNativeAssetName tickerMap offerAsset 
+          askAsset' = AskAsset $ fromMaybe def $ 
+            rightToMaybe $ parseNativeAssetName tickerMap askAsset
+      in sortOn (swapUTxOPrice offerAsset' askAsset')
+
+orderer :: SortDirection -> [SwapUTxO] -> [SwapUTxO]
+orderer = \case
+  SortAscending -> id
+  SortDescending -> reverse
+
+filterer :: ReverseTickerMap -> PositionsFilterModel -> [SwapUTxO] -> [SwapUTxO]
+filterer reverseTickerMap PositionsFilterModel{..} us = do
+    u <- us
+    let offerSample = catMaybes
+          [ swapUTxOOfferAsset u
+          , swapUTxOAsset1 u
+          , swapUTxOAsset2 u
+          ]
+        askSample = catMaybes
+          [ swapUTxOAskAsset u
+          , swapUTxOAsset1 u
+          , swapUTxOAsset2 u
+          ]
+    guard $ matchesAsset offerSample offerAsset
+    guard $ matchesAsset askSample askAsset
+    return u
+  where
+    matchesAsset :: [NativeAsset] -> Text -> Bool
+    matchesAsset xs searchTarget
+      | searchTarget == "" = True
+      | otherwise = flip any xs $ \NativeAsset{..} -> or
+          [ display policyId <> "." <> display tokenName == searchTarget
+          , Just searchTarget ==
+              fmap (display . fst) (Map.lookup (policyId,tokenName) reverseTickerMap) 
+          , policyId == "" && searchTarget == "ADA"
+          ]

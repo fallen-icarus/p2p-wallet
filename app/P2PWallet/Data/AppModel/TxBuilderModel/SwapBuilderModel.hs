@@ -20,6 +20,7 @@ import Data.Map.Strict qualified as Map
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
 import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
+import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapUpdate
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
 import P2PWallet.Data.Core.Wallets.DexWallet

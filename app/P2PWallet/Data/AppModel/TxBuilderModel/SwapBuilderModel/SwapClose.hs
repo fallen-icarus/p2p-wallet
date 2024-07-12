@@ -15,7 +15,7 @@ import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------
--- Swap Creation
+-- Swap Close
 -------------------------------------------------
 -- | Information for closing a swap. This is used for both one-way and two-way swaps.
 data SwapClose = SwapClose
