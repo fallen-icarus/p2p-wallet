@@ -5,6 +5,7 @@ module P2PWallet.GUI.EventHandler.AddressBookEvent
 
 import Monomer
 
+import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.Utils

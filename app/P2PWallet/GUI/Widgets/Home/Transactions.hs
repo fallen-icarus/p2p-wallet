@@ -249,7 +249,7 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
                   #referenceInputs 
                   referenceInputs
               , utxoField "Collateral Inputs:" 
-                  Nothing
+                  (Just senderSymbol)
                   #showCollateralInputs 
                   #collateralInputs 
                   collateralInputs

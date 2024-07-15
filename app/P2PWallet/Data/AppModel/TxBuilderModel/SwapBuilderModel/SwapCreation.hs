@@ -48,27 +48,23 @@ data SwapCreation = SwapCreation
 makeFieldLabelsNoPrefix ''SwapCreation
 
 -- This instance is used for the change calculation.
-instance AssetBalances (a,SwapCreation) where
-  assetBalances negateValues xs =
+instance AssetBalancesForChange (a,SwapCreation) where
+  assetBalancesForChange xs =
       -- Increase the quantity of lovelace for each output by the count. Account for ADA possibly
       -- being the offer or ask asset, and for the ada deposit required with each swap UTxO.
       ( sum $ for xs $ \(_,SwapCreation{count,offerAsset,askAsset,deposit}) -> 
-          fromIntegral (adjust count) * sum
+          fromIntegral (negate count) * sum
             [ lovelaceQuantity $ unOfferAsset offerAsset
             , lovelaceQuantity $ unAskAsset askAsset
             , deposit
             ]
-      -- Increase the quantity of each native asset by the count, possibly negate it so that it
-      -- can be subtracted from the inputs.
+      -- Increase the quantity of each native asset by the count.
       , flip concatMap xs $ \(_,SwapCreation{count,offerAsset,askAsset}) -> catMaybes
-          [ toNativeAssetQuantity (adjust count) $ unOfferAsset offerAsset
-          , toNativeAssetQuantity (adjust count) $ unAskAsset askAsset
+          [ toNativeAssetQuantity (negate count) $ unOfferAsset offerAsset
+          , toNativeAssetQuantity (negate count) $ unAskAsset askAsset
           ]
       )
     where
-      adjust :: Int -> Int
-      adjust = if negateValues then negate else id
-
       lovelaceQuantity :: NativeAsset -> Lovelace
       lovelaceQuantity NativeAsset{policyId,quantity}
         | policyId == "" = Lovelace quantity

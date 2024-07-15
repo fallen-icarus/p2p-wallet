@@ -13,6 +13,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
 
   , module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
   , module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
+  , module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapUpdate
   ) where
 
 import Data.Map.Strict qualified as Map
@@ -44,6 +45,10 @@ data SwapBuilderEvent
   | ChangeSwapCreationCount Int Int
   -- | Remove the selected swap close from the builder.
   | RemoveSelectedSwapClose Int
+  -- | Remove the selected swap update from the builder.
+  | RemoveSelectedSwapUpdate Int
+  -- | Edit selected swap update.
+  | EditSelectedSwapUpdate (AddEvent (Int,SwapUpdate) (Int,SwapCreation))
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -55,6 +60,9 @@ data SwapBuilderModel = SwapBuilderModel
   { swapCreations :: [(Int,SwapCreation)]
   , targetSwapCreation :: Maybe (Int,NewSwapCreation)
   , swapCloses :: [(Int,SwapClose)]
+  , swapUpdates :: [(Int,SwapUpdate)]
+  -- | The `Int` is the index into `swapUpdates`.
+  , targetSwapUpdate :: Maybe (Int,NewSwapCreation)
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''SwapBuilderModel
@@ -64,6 +72,8 @@ instance Default SwapBuilderModel where
     { swapCreations = []
     , targetSwapCreation = Nothing
     , swapCloses = []
+    , swapUpdates = []
+    , targetSwapUpdate = Nothing
     }
 
 -- | This is just an alias for `def`. The name is more clear what it is.
@@ -74,7 +84,9 @@ isEmptySwapBuilderModel :: SwapBuilderModel -> Bool
 isEmptySwapBuilderModel SwapBuilderModel{..} = and
   [ null swapCreations
   , null swapCloses
+  , null swapUpdates
   , isNothing targetSwapCreation
+  , isNothing targetSwapUpdate
   ]
 
 -------------------------------------------------
@@ -89,6 +101,8 @@ instance AddToTxBody SwapBuilderModel where
         & flip (foldl' addSwapCreationToBuilder) swapCreations
         -- Add the swap closes.
         & flip (foldl' addSwapCloseToBuilder) swapCloses
+        -- Add the swap updates.
+        & flip (foldl' addSwapUpdateToBuilder) swapUpdates
         -- Merge any beacon mints so that there is only one `TxBodyMint` per minting policy.
         -- Remove any mints that cancel out.
         & #mints %~ mergeBeaconMints
@@ -96,14 +110,29 @@ instance AddToTxBody SwapBuilderModel where
         & adjustSpendingRedeemers
     where
       mergeBeaconMints :: [TxBodyMint] -> [TxBodyMint]
-      mergeBeaconMints = filter ((/= []) . view #nativeAssets)
+      mergeBeaconMints = mapMaybe checkMint
                        . toList
                        . Map.fromListWith sumMints
                        . map (\mint@TxBodyMint{mintingPolicyHash} -> (mintingPolicyHash, mint))
 
+      -- Return nothing if the `TxBodyMint` should be removed from the `TxBody`. Also remove zero
+      -- native asset quantities.
+      checkMint :: TxBodyMint -> Maybe TxBodyMint
+      checkMint tm@TxBodyMint{nativeAssets}
+        | null filteredAssets = Nothing
+        | otherwise = Just $ tm & #nativeAssets .~ filteredAssets
+        where 
+          filteredAssets = filter ((/=0) . view #quantity) nativeAssets
+
       sumMints :: TxBodyMint -> TxBodyMint -> TxBodyMint
       sumMints main@TxBodyMint{nativeAssets} TxBodyMint{nativeAssets=otherAssets} =
         main & #nativeAssets .~ sumNativeAssets (nativeAssets <> otherAssets)
+
+addSwapUpdateToBuilder :: TxBody -> (Int,SwapUpdate) -> TxBody
+addSwapUpdateToBuilder txBody (idx,SwapUpdate{..}) =
+  txBody
+    & flip addSwapCreationToBuilder (idx,newSwap)
+    & flip addSwapCloseToBuilder (idx,oldSwap)
 
 addSwapCreationToBuilder :: TxBody -> (Int,SwapCreation) -> TxBody
 addSwapCreationToBuilder txBody (_,SwapCreation{..}) =

@@ -7,6 +7,7 @@ import Monomer
 import System.Directory qualified as Dir
 
 import P2PWallet.Actions.AssembleWitnesses
+import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.BuildTxBody
 import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.ExportTxBody

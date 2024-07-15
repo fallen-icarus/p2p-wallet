@@ -70,6 +70,7 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
                 `styleBasic` [padding 10]
           ]
       , positionsFilterWidget model `nodeVisible` showPositionsFilter
+      , updateSwapWidget model `nodeVisible` isJust newSwapUpdate
       ]
   where
     toggleOffStyle :: Style
@@ -201,7 +202,7 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
         , spacer_ [width 3]
         , flip styleBasic [padding 3] $ box_ [alignCenter,alignMiddle] $ vstack
             [ box_ [alignCenter,alignMiddle] $ tooltip_ "Edit" [tooltipDelay 0] $
-                button editIcon AppInit
+                button editIcon (DexEvent $ AddSelectedSwapUpdate $ StartAdding $ Just u)
                   `styleBasic` 
                     [ textSize 10
                     , textColor customBlue
@@ -348,7 +349,7 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
         , spacer_ [width 3]
         , flip styleBasic [padding 3] $ box_ [alignCenter,alignMiddle] $ vstack
             [ box_ [alignCenter,alignMiddle] $ tooltip_ "Edit" [tooltipDelay 0] $
-                button editIcon AppInit
+                button editIcon (DexEvent $ AddSelectedSwapUpdate $ StartAdding $ Just u)
                   `styleBasic` 
                     [ textSize 10
                     , textColor customBlue
@@ -507,9 +508,9 @@ positionsFilterWidget AppModel{dexModel=DexModel{..}} = do
           askAsset = positionsFilterModel ^. #askAsset
           possibleSortingMethods = mconcat
             [ [ PositionsTime, PositionsLexicographical ]
-            , if offerAsset /= "" then [PositionsOfferQuantity] else []
-            , if askAsset /= "" then [PositionsAskQuantity] else []
-            , if offerAsset /= "" && askAsset /= "" then [PositionsPrice] else []
+            , [ PositionsOfferQuantity | offerAsset /= "" ]
+            , [ PositionsAskQuantity | askAsset /= "" ]
+            , [ PositionsPrice | offerAsset /= "" && askAsset /= "" ]
             ]
       vstack
         [ spacer
@@ -566,6 +567,258 @@ positionsFilterWidget AppModel{dexModel=DexModel{..}} = do
                 `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             ]
         ]
+
+updateSwapWidget :: AppModel -> AppNode
+updateSwapWidget model@AppModel{dexModel=DexModel{newSwapUpdate}} = 
+  vstack
+    [ centerWidget $ vstack
+        [ case maybe LimitOrder (view #swapType . snd) newSwapUpdate of
+            LimitOrder -> updateLimitOrderWidget model
+            LiquiditySwap -> updateLiquiditySwapWidget model
+        ] `styleBasic`
+            [ bgColor customGray3
+            , padding 20
+            , radius 20
+            ]
+    ] `styleBasic` 
+        [ bgColor $ black & #a .~ 0.4
+        , paddingT 50
+        , paddingB 50
+        , paddingL 30
+        , paddingR 30
+        , radius 10
+        ]
+
+updateLimitOrderWidget :: AppModel -> AppNode
+updateLimitOrderWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
+  let NewSwapCreation{offerAsset,askAsset,tradingPairInverted} = maybe def snd newSwapUpdate
+      maybeLens' = maybeLens (def,def) $ #dexModel % #newSwapUpdate
+      offerAssetName = showAssetNameOnly reverseTickerMap $ unOfferAsset offerAsset
+      askAssetName = showAssetNameOnly reverseTickerMap $ unAskAsset askAsset
+      -- The price is always in units of the ask asset because that is what the rest of
+      -- the order book is in units of.
+      pricePlaceholder = offerAssetName <> " / " <> askAssetName
+      quantityPlaceholder
+        | tradingPairInverted = "# " <> askAssetName
+        | otherwise = "# " <> offerAssetName
+  vstack
+    [ spacer
+    , box_ [alignMiddle] $
+        label "Edit Limit Order"
+          `styleBasic` [textSize 12, textFont "Italics"]
+    , spacer
+    , box_ [alignMiddle] $ vstack
+        [ hstack 
+            [ box_ [alignMiddle, onClick $ Alert limitPositionSizeMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Position Size:"
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL $ maybeLens' % _2 % #offerQuantity) 
+                  [placeholder quantityPlaceholder] 
+                `styleBasic` [textSize 10, width 100, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            ]
+        , spacer
+        , hstack 
+            [ box_ [alignMiddle, onClick $ Alert limitPriceMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Limit Price:"
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL $ maybeLens' % _2 % #askPerOfferPrice) 
+                  [placeholder pricePlaceholder]
+                `styleBasic` [textSize 10, width 100, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            ]
+        , spacer
+        , hstack 
+            [ box_ [alignMiddle, onClick $ Alert swapArbitrageFeeMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Arbitrage Fee:"
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL $ maybeLens' % _2 % #arbitrageFee) 
+                  [placeholder "0.0"]
+                `styleBasic` 
+                  [ textSize 10
+                  , width 50
+                  , bgColor customGray1
+                  , sndColor darkGray
+                  , textRight
+                  ]
+                `styleFocus` [border 1 customBlue]
+            , spacer_ [width 3]
+            , label "%"
+                `styleBasic` [textColor lightGray, textMiddle, textFont "Bold", textSize 14]
+            ]
+        ]
+    , spacer
+    , box_ [alignRight] $ 
+        hstack
+          [ button "Cancel" (DexEvent $ AddSelectedSwapUpdate CancelAdding)
+              `styleBasic` [textSize 10]
+          , spacer
+          , mainButton "Update Limit Order" (DexEvent $ AddSelectedSwapUpdate ConfirmAdding)
+              `styleBasic` [textSize 10]
+          ]
+    ]
+          
+updateLiquiditySwapWidget :: AppModel -> AppNode
+updateLiquiditySwapWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
+  let NewSwapCreation{offerAsset,askAsset} = maybe def snd newSwapUpdate
+      maybeLens' = maybeLens (def,def) $ #dexModel % #newSwapUpdate
+      offerAssetName = showAssetNameOnly reverseTickerMap $ unOfferAsset offerAsset
+      askAssetName = showAssetNameOnly reverseTickerMap $ unAskAsset askAsset
+      pricePlaceholder = offerAssetName <> " / " <> askAssetName
+      quantityPlaceholder x = "# " <> x
+      buyPriceLabel = "Buy " <> askAssetName <> " Price:"
+      sellPriceLabel = "Sell " <> askAssetName <> " Price:"
+      depositLabel = fromString . printf "%s Deposit:"
+      askQuantityLens = maybeLens "" (maybeLens' % _2 % #askQuantity)
+      offerPerAskLens = maybeLens "" (maybeLens' % _2 % #offerPerAskPrice)
+  vstack
+    [ spacer
+    , box_ [alignMiddle] $ 
+        label "Edit Liquidity Swap"
+          `styleBasic` [textSize 12, textFont "Italics"]
+    , spacer
+    , box_ [alignMiddle] $ vstack
+        [ hstack 
+            [ box_ [alignMiddle, onClick $ Alert liquidityPositionSizeMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label (depositLabel offerAssetName)
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL $ maybeLens' % _2 % #offerQuantity) 
+                  [placeholder $ quantityPlaceholder offerAssetName] 
+                `styleBasic` [textSize 10, width 100, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            ]
+        , spacer
+        , hstack 
+            [ box_ [alignMiddle, onClick $ Alert liquidityPositionSizeMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label (depositLabel askAssetName)
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL askQuantityLens)
+                  [placeholder $ quantityPlaceholder askAssetName] 
+                `styleBasic` [textSize 10, width 100, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            ]
+        , spacer
+        , hstack 
+            [ box_ [alignMiddle, onClick $ Alert liquidityPriceMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label sellPriceLabel
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL offerPerAskLens) 
+                  [placeholder pricePlaceholder]
+                `styleBasic` [textSize 10, width 100, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            ]
+        , spacer
+        , hstack 
+            [ box_ [alignMiddle, onClick $ Alert liquidityPriceMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label buyPriceLabel
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL $ maybeLens' % _2 % #askPerOfferPrice) 
+                  [placeholder pricePlaceholder]
+                `styleBasic` [textSize 10, width 100, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            ]
+        ]
+    , spacer
+    , box_ [alignRight] $ 
+        hstack
+          [ button "Cancel" (DexEvent $ AddSelectedSwapUpdate CancelAdding)
+              `styleBasic` [textSize 10]
+          , spacer
+          , mainButton "Update Limit Order" (DexEvent $ AddSelectedSwapUpdate ConfirmAdding)
+              `styleBasic` [textSize 10]
+          ]
+    ]
 
 -------------------------------------------------
 -- Helper Functions

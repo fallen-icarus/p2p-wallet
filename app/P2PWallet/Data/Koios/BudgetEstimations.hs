@@ -15,11 +15,13 @@ import P2PWallet.Prelude
 data ValidatorIndex
   = Spending Int
   | Minting Int
+  | Withdrawing Int
   deriving (Show,Eq,Ord)
 
 instance ToJSON ValidatorIndex where
   toJSON (Spending idx) = toJSON $ "spend:" <> show @Text idx
   toJSON (Minting idx) = toJSON $ "mint:" <> show @Text idx
+  toJSON (Withdrawing idx) = toJSON $ "withdraw:" <> show @Text idx
 
 instance FromJSON ValidatorIndex where
   parseJSON = withObject "ValidatorIndex" $ \o -> do
@@ -29,6 +31,7 @@ instance FromJSON ValidatorIndex where
     case (purpose :: Text) of
       "mint" -> return $ Minting idx
       "spend" -> return $ Spending idx
+      "withdraw" -> return $ Withdrawing idx
       _ -> mzero
 
 -- | The estimated execution budget paired with the corresponding validator index.
