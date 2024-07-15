@@ -41,16 +41,12 @@ data SwapClose = SwapClose
 
 makeFieldLabelsNoPrefix ''SwapClose
 
--- This instance is used for the change calculation.
-instance AssetBalances (a,SwapClose) where
-  assetBalances negateValues xs =
-      ( sum $ map (over #unLovelace adjust . view #lovelace . snd) xs
-      , filterOutBeacons $ concatMap (map (over #quantity adjust) . view #nativeAssets . snd) xs
+instance AssetBalancesForChange (a,SwapClose) where
+  assetBalancesForChange xs =
+      ( sum $ map (view #lovelace . snd) xs
+      , filterOutBeacons $ concatMap (view #nativeAssets . snd) xs
       )
     where
-      adjust :: Integer -> Integer
-      adjust = if negateValues then negate else id
-
       filterOutBeacons :: [NativeAsset] -> [NativeAsset]
       filterOutBeacons = filter $ \NativeAsset{policyId} -> and
         [ policyId /= OneWay.beaconCurrencySymbol

@@ -5,6 +5,7 @@ module P2PWallet.GUI.EventHandler.TxBuilderEvent.SwapBuilderEvent
 
 import Monomer
 
+import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
@@ -28,6 +29,16 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
   RemoveSelectedSwapClose idx ->
     [ Model $ model 
         & #txBuilderModel % #swapBuilderModel % #swapCloses %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Remove Swap Update from Builder
+  -----------------------------------------------
+  RemoveSelectedSwapUpdate idx ->
+    [ Model $ model 
+        & #txBuilderModel % #swapBuilderModel % #swapUpdates %~ removeAction idx
         & #txBuilderModel %~ balanceTx
     , Task $ return $ Alert "Successfully removed from builder!"
     ]
@@ -80,5 +91,48 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
           [ "Successfully updated builder!"
           , ""
           , "The new swap requires a deposit of: " <> display (verifiedSwapCreation ^. #deposit)
+          ]
+      ]
+
+  -----------------------------------------------
+  -- Edit the Swap Update
+  -----------------------------------------------
+  EditSelectedSwapUpdate modal -> case modal of
+    StartAdding mTarget ->
+      [ Model $ model & #txBuilderModel % #swapBuilderModel % #targetSwapUpdate .~ 
+          fmap (fmap (toNewSwapCreation reverseTickerMap . view #newSwap)) mTarget
+      ]
+    CancelAdding ->
+      [ Model $ model & #txBuilderModel % #swapBuilderModel % #targetSwapUpdate .~ Nothing ]
+    ConfirmAdding -> 
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (swapBuilderEvent . EditSelectedSwapUpdate . AddResult) $ do
+          let (idx,newSwapCreation@NewSwapCreation{paymentAddress}) = 
+                fromMaybe (0,def) $ txBuilderModel ^. #swapBuilderModel % #targetSwapUpdate
+          verifiedSwap <- fromRightOrAppError $ 
+            processNewSwapCreation paymentAddress reverseTickerMap newSwapCreation
+
+          -- There should only be one output in the `TxBody` for this action.
+          minUTxOValue <-
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network) 
+                (txBuilderModel ^. #parameters) 
+                (emptySwapBuilderModel & #swapCreations .~ [(0,verifiedSwap)])
+
+          -- Return the `SwapCreation` with the updated deposit field.
+          return (idx, verifiedSwap & #deposit .~ minUTxOValue)
+      ]
+    AddResult (idx,verifiedSwap) ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          & #txBuilderModel % #swapBuilderModel % #swapUpdates % ix idx % _2 % #newSwap .~ 
+              verifiedSwap
+          & #txBuilderModel % #swapBuilderModel % #targetSwapUpdate .~ Nothing
+          & #txBuilderModel %~ balanceTx
+      , Task $ return $ Alert $ unlines
+          [ "Successfully updated builder!"
+          , ""
+          , "The new swap requires a deposit of: " <> display (verifiedSwap ^. #deposit)
           ]
       ]

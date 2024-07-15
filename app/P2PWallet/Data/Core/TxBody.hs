@@ -335,6 +335,15 @@ instance ToBuildCmdField TxBodyWithdrawal where
     , maybe "" (toBuildCmdField tmpDir) stakingScriptInfo
     ]
 
+instance ExportContractFiles TxBodyWithdrawal where
+  exportContractFiles TxBodyWithdrawal{stakingScriptInfo} =
+    whenJust stakingScriptInfo $ \StakingScriptInfo{..} -> do
+      -- | Export the spending script.
+      exportScriptWitness scriptWitness
+
+      -- | Export the redeemer file.
+      exportRedeemer redeemer
+
 -------------------------------------------------
 -- Mint/Burn
 -------------------------------------------------
@@ -504,6 +513,15 @@ instance ExportContractFiles TxBody where
     -- Export all files for the necessary minting policies.
     mapM_ exportContractFiles mints
 
+    -- Export all files for the necessary spending scripts.
+    mapM_ exportContractFiles inputs
+
+    -- Export all files for the necessary staking scritps.
+    mapM_ exportContractFiles withdrawals
+
+-------------------------------------------------
+-- `AddToTxBody` Class
+-------------------------------------------------
 class AddToTxBody a where
   -- Some highlevel actions impact multiple parts of the transaction.
   addToTxBody :: TxBody -> a -> TxBody

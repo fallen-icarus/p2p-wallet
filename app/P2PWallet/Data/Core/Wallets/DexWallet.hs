@@ -63,6 +63,18 @@ data SwapUTxO = SwapUTxO
 
 makeFieldLabelsNoPrefix ''SwapUTxO
 
+instance Default SwapUTxO where
+  def = SwapUTxO
+    { utxoRef = TxOutRef "" 0
+    , swapAddress = ""
+    , swapType = LimitOrder
+    , lovelace = 0
+    , swapDatum = Nothing
+    , nativeAssets = []
+    , blockTime = 0
+    , blockHeight = 0
+    }
+
 instance ToJSON SwapUTxO where
   toJSON SwapUTxO{..} =
     object [ "utxo_ref" .= utxoRef 

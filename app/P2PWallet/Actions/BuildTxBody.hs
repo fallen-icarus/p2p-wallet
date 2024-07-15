@@ -8,6 +8,7 @@ import Data.Aeson (encode,parseJSON)
 import Data.Aeson.Types (parseMaybe)
 
 import P2PWallet.Actions.Query.Koios
+import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
@@ -84,6 +85,7 @@ canBeBuilt TxBuilderModel{userInputs,changeOutput,collateralInput,requiresCollat
     hasInputs = or
       [ userInputs /= []
       , swapBuilderModel ^. #swapCloses /= []
+      , swapBuilderModel ^. #swapUpdates /= []
       ]
 
 -- | Check whether the change output has enough ada. This should always be called _after_ getting
@@ -348,3 +350,6 @@ updateBudgets (Just budgets) tx = foldl' updateBudget tx budgets
       Minting idx -> 
         -- Replace the old execution budgets with the newly calculated ones.
         oldTx & #mints % ix idx % #executionBudget .~ executionBudget
+      Withdrawing idx ->
+        -- Replace the old execution budgets with the newly calculated ones.
+        oldTx & #withdrawals % ix idx % #stakingScriptInfo % _Just % #executionBudget .~ executionBudget

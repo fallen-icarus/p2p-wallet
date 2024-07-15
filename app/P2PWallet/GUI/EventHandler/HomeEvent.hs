@@ -6,6 +6,7 @@ module P2PWallet.GUI.EventHandler.HomeEvent
 import Monomer
 
 import P2PWallet.Actions.AddWallet
+import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel

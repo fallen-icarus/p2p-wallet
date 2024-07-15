@@ -65,6 +65,7 @@ txBuilderWidget model@AppModel{..} = do
           ] `nodeVisible` and
               [ isNothing targetUserOutput
               , isNothing (swapBuilderModel ^. #targetSwapCreation)
+              , isNothing (swapBuilderModel ^. #targetSwapUpdate)
               , not addingChangeOutput
               , not addingTestMint
               , not importing
@@ -73,6 +74,8 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust targetUserOutput
       , editSwapCreationWidget model
           `nodeVisible` isJust (swapBuilderModel ^. #targetSwapCreation)
+      , editSwapUpdateWidget model
+          `nodeVisible` isJust (swapBuilderModel ^. #targetSwapUpdate)
       , addChangeOutputWidget
           `nodeVisible` addingChangeOutput
       , addTestMintWidget model
@@ -100,6 +103,7 @@ txBuilderWidget model@AppModel{..} = do
       -- At least one input must be specified.
       , or [ txBuilderModel ^. #userInputs /= []
            , txBuilderModel ^. #swapBuilderModel % #swapCloses /= []
+           , txBuilderModel ^. #swapBuilderModel % #swapUpdates /= []
            ]
       ]
 
@@ -208,6 +212,7 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
         [ userOutputsList reverseTickerMap userOutputs
         , swapCreationsList reverseTickerMap $ swapBuilderModel ^. #swapCreations
         , swapClosesList reverseTickerMap $ swapBuilderModel ^. #swapCloses
+        , swapUpdatesList reverseTickerMap $ swapBuilderModel ^. #swapUpdates
         , userCertificatesList userCertificates
         , userWithdrawalsList userWithdrawals
         , maybe [] (pure . testMintRow reverseTickerMap) testMint

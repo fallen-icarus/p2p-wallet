@@ -33,16 +33,14 @@ data UserOutput = UserOutput
 
 makeFieldLabelsNoPrefix ''UserOutput
 
--- This instance is used for the change calculation.
-instance AssetBalances (a,UserOutput) where
-  assetBalances negateValues xs =
-    let adjust = if negateValues then negate else id in
-    -- Increase the quantity of lovelace for each output by the count.
-    ( sum $ map (\(_,UserOutput{count,lovelace}) -> fromIntegral (adjust count) * lovelace) xs
+instance AssetBalancesForChange (a,UserOutput) where
+  assetBalancesForChange xs =
+    -- Increase the quantity of lovelace for each output by the count. Negate the quantity.
+    ( sum $ map (\(_,UserOutput{count,lovelace}) -> fromIntegral (negate count) * lovelace) xs
     -- Increase the quantity of each native asset by the count, then negate it so that it
     -- can be subtracted from the inputs.
     , flip concatMap xs $ \(_,UserOutput{count,nativeAssets}) -> 
-        for nativeAssets $ \asset -> asset & #quantity %~ (fromIntegral (adjust count) *)
+        for nativeAssets $ \asset -> asset & #quantity %~ (fromIntegral (negate count) *)
     )
 
 instance AddToTxBody UserOutput where

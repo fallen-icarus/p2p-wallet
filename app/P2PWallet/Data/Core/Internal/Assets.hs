@@ -244,8 +244,8 @@ parseTokenMint t = case words t of
 -- AssetBalances Class
 -------------------------------------------------
 -- | Determine the total amount of assets in a list of actions. Optionally negate the quantities.
-class AssetBalances a where
-  assetBalances :: Bool -> [a] -> (Lovelace, [NativeAsset])
+class AssetBalancesForChange a where
+  assetBalancesForChange :: [a] -> (Lovelace, [NativeAsset])
 
 sumAssetBalances :: [(Lovelace, [NativeAsset])] -> (Lovelace, [NativeAsset])
 sumAssetBalances xs = (allLoves, allAssets)

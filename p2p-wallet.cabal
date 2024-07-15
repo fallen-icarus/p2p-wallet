@@ -51,6 +51,7 @@ executable p2p-wallet
     other-modules:
       P2PWallet.Actions.AddWallet
       P2PWallet.Actions.AssembleWitnesses
+      P2PWallet.Actions.BalanceTx
       P2PWallet.Actions.BuildTxBody
       P2PWallet.Actions.CalculateMinUTxOValue
       P2PWallet.Actions.Database
@@ -77,6 +78,7 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
+      P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapUpdate
       P2PWallet.Data.AppModel.TxBuilderModel.TestMint
       P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
       P2PWallet.Data.AppModel.TxBuilderModel.UserInput
@@ -160,6 +162,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCloses
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCreations
+      P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapUpdates
       P2PWallet.GUI.Widgets.TxBuilder.TestMint
       P2PWallet.GUI.Widgets.TxBuilder.UserCertificates
       P2PWallet.GUI.Widgets.TxBuilder.UserInputs

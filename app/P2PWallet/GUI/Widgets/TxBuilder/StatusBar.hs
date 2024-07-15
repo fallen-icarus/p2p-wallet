@@ -39,6 +39,7 @@ statusBar AppModel{txBuilderModel=TxBuilderModel{..}} = do
       hasInputs = or
         [ userInputs /= []
         , swapBuilderModel ^. #swapCloses /= []
+        , swapBuilderModel ^. #swapUpdates /= []
         ]
   hstack_ [childSpacing]
     [ hstack

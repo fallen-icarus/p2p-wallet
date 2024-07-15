@@ -71,7 +71,7 @@ data DexEvent
   -- | Add the new swap close to the transaction builder.
   | AddSelectedSwapClose SwapUTxO
   -- | Add the new swap update to the transaction builder.
-  | AddSelectedSwapUpdate SwapUTxO
+  | AddSelectedSwapUpdate (AddEvent SwapUTxO SwapUpdate)
   -- | Reset the positions filter model.
   | ResetPositionsFilters
 
@@ -148,6 +148,8 @@ data DexModel = DexModel
   , newTradingPair :: (Text,Text)
   -- | The new swap creation. This is used for both limit orders and liquidity swaps.
   , newSwapCreation :: NewSwapCreation
+  -- | The new swap update. This is used for both limit order updates and liquidity swap updates.
+  , newSwapUpdate :: Maybe (SwapUTxO,NewSwapCreation)
   -- | Cached order-books.
   , cachedOrderBooks :: CachedOrderBooks
   -- | The current ask page for the order book.
@@ -179,6 +181,7 @@ instance Default DexModel where
     , selectedTradingPair = Nothing
     , newTradingPair = ("","")
     , newSwapCreation = def
+    , newSwapUpdate = Nothing
     , cachedOrderBooks = mempty
     , orderBookSampleSize = 8
     , currentAskPage = 0

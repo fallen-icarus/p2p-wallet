@@ -6,6 +6,7 @@ module P2PWallet.GUI.EventHandler.DelegationEvent
 import Monomer
 
 import P2PWallet.Actions.AddWallet
+import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.LookupPools
 import P2PWallet.Actions.Utils

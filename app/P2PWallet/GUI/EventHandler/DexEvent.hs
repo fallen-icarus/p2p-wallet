@@ -6,6 +6,7 @@ module P2PWallet.GUI.EventHandler.DexEvent
 import Monomer
 import Data.Map.Strict qualified as Map
 
+import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.SyncOrderBooks
@@ -295,6 +296,69 @@ handleDexEvent model@AppModel{..} evt = case evt of
             ]
 
   -----------------------------------------------
+  -- Add Selected Swap Update to Builder
+  -----------------------------------------------
+  AddSelectedSwapUpdate modal -> case modal of
+    StartAdding mTarget ->
+      let newSwapUpdate = 
+            (,) <$> mTarget
+                <*> (swapUTxOToNewSwapCreation (config ^. #network) reverseTickerMap <$> mTarget)
+      in  [ Model $ model
+              & #dexModel % #newSwapUpdate .~ newSwapUpdate
+          ]
+    CancelAdding ->
+      [ Model $ model
+          & #dexModel % #newSwapUpdate .~ Nothing
+      ]
+    ConfirmAdding ->
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (DexEvent . AddSelectedSwapUpdate . AddResult) $ do
+          let DexWallet{network,alias,stakeAddress,stakeKeyPath} = dexModel ^. #selectedWallet
+          (utxoToClose@SwapUTxO{utxoRef},newSwap@NewSwapCreation{paymentAddress}) <- 
+            fromJustOrAppError "Nothing set for `newSwapUpdate`" $ dexModel ^. #newSwapUpdate
+
+          -- Verify that the new utxo is not already being spent.
+          flip whenJust (const $ throwIO $ AppError "This swap is already being spent.") $
+            find (\i -> i ^. _2 % #utxoRef == utxoRef) $ concat
+              [ txBuilderModel ^. #swapBuilderModel % #swapCloses
+              , map (over _2 $ view #oldSwap) $ txBuilderModel ^. #swapBuilderModel % #swapUpdates
+              ]
+
+          verifiedSwapUpdate <- fromRightOrAppError $ 
+            processNewSwapCreation paymentAddress reverseTickerMap newSwap
+
+          -- There should only be one output in the `TxBody` for this action.
+          minUTxOValue <- 
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                network 
+                (txBuilderModel ^. #parameters) 
+                -- Use a blank swapBuilderModel to calculate the minUTxOValue for the new swap.
+                (emptySwapBuilderModel & #swapCreations .~ [(0,verifiedSwapUpdate)])
+
+          return $ SwapUpdate
+            { oldSwap = swapUTxOToSwapClose network alias stakeAddress stakeKeyPath utxoToClose
+            , newSwap = verifiedSwapUpdate & #deposit .~ minUTxOValue
+            }
+      ]
+    AddResult verifiedSwapUpdate ->
+      -- Get the index for the new swap creation.
+      let newIdx = length $ txBuilderModel ^. #swapBuilderModel % #swapUpdates
+      in  [ Model $ model
+              & #waitingStatus % #addingToBuilder .~ False
+              & #txBuilderModel % #swapBuilderModel % #swapUpdates %~ 
+                  flip snoc (newIdx,verifiedSwapUpdate)
+              & #dexModel % #newSwapUpdate .~ Nothing
+              & #txBuilderModel %~ balanceTx
+          , Task $ return $ Alert $ unlines
+              [ "Successfully added to builder!"
+              , ""
+              , "This swap requires a deposit of: " <> 
+                  display (verifiedSwapUpdate ^. #newSwap % #deposit)
+              ]
+          ]
+
+  -----------------------------------------------
   -- Reset Filters
   -----------------------------------------------
   ResetPositionsFilters -> 
@@ -334,7 +398,10 @@ processNewSwapClose :: SwapClose -> TxBuilderModel -> Either Text TxBuilderModel
 processNewSwapClose u@SwapClose{utxoRef} model@TxBuilderModel{swapBuilderModel=SwapBuilderModel{..}} = do
   -- Verify that the new utxo is not already being spent.
   maybeToLeft () $ "This swap is already being spent." <$
-    find (\i -> i ^. _2 % #utxoRef == utxoRef) swapCloses
+    find (\i -> i ^. _2 % #utxoRef == utxoRef) (concat
+      [ swapCloses
+      , map (over _2 $ view #oldSwap) swapUpdates
+      ])
 
   -- Get the input's new index.
   let newIdx = length swapCloses
