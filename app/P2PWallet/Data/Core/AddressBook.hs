@@ -76,14 +76,14 @@ instance Default NewAddressEntry where
     , paymentAddress = ""
     }
 
-processNewAddressEntry 
+verifyNewAddressEntry 
   :: NewAddressEntry 
   -> Network
   -> ProfileId 
   -> ContactId 
   -> [AddressEntry] 
   -> Either Text AddressEntry
-processNewAddressEntry NewAddressEntry{..} network profileId contactId book = do
+verifyNewAddressEntry NewAddressEntry{..} network profileId contactId book = do
   -- Verify that the alias is not already being used.
   maybeToLeft () $ "This alias is already being used for another address." <$
     find (\a -> a ^. #alias == alias) book

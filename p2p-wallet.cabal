@@ -78,6 +78,7 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
+      P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapExecution
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapUpdate
       P2PWallet.Data.AppModel.TxBuilderModel.TestMint
       P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
@@ -162,6 +163,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCloses
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCreations
+      P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapExecutions
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapUpdates
       P2PWallet.GUI.Widgets.TxBuilder.TestMint
       P2PWallet.GUI.Widgets.TxBuilder.UserCertificates

@@ -17,6 +17,7 @@ import P2PWallet.Prelude
 -------------------------------------------------
 -- | Information for a user input. These are non-defi spending inputs.
 data UserInput = UserInput
+  -- | The input's output reference.
   { utxoRef :: TxOutRef
   -- | The bech32 address for this input. This is used to get any required key hashes.
   , paymentAddress :: PaymentAddress

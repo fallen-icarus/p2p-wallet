@@ -42,7 +42,7 @@ handleAddressBookEvent model@AppModel{..} evt = case evt of
           
           -- Validate the new contact info.
           newVerifiedEntry <- fromRightOrAppError $
-            processNewAddressEntry newEntry network profileId entryId addressBook
+            verifyNewAddressEntry newEntry network profileId entryId addressBook
 
           -- Add the new entry to the database.
           insertAddressEntry databaseFile [newVerifiedEntry] >>= fromRightOrAppError
@@ -86,7 +86,7 @@ handleAddressBookEvent model@AppModel{..} evt = case evt of
 
           -- Validate the new contact info.
           newVerifiedEntry <- fromRightOrAppError $
-            processNewAddressEntry newEntry network profileId targetId restOfBook
+            verifyNewAddressEntry newEntry network profileId targetId restOfBook
 
           -- Add the new entry to the database.
           insertAddressEntry databaseFile [newVerifiedEntry] >>= fromRightOrAppError
@@ -166,7 +166,7 @@ handleAddressBookEvent model@AppModel{..} evt = case evt of
       , Task $ runActionOrAlert (AddressBookEvent . AddNewUserOutputToContact . AddResult) $ do
           verifiedOutput <- 
             fromRightOrAppError $ 
-              processNewUserOutput 
+              verifyNewUserOutput 
                 (config ^. #network) 
                 tickerMap
                 fingerprintMap

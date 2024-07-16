@@ -41,7 +41,7 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
 
           -- Validate the new ticker info.
           verifiedTickerInfo <- fromRightOrAppError $ 
-            processNewTickerInfo tickerInfo reverseTickerMap
+            verifyNewTickerInfo tickerInfo reverseTickerMap
 
           -- Add the new ticker to the database.
           insertTickerInfo databaseFile verifiedTickerInfo >>= fromRightOrAppError
@@ -77,7 +77,7 @@ handleTickerRegistryEvent model@AppModel{..} evt = case evt of
 
           -- Validate the new ticker info.
           verifiedTickerInfo <- fromRightOrAppError $ 
-            processNewTickerInfo tickerInfo reverseTickerMap
+            verifyNewTickerInfo tickerInfo reverseTickerMap
 
           -- Add the new ticker to the database.
           insertTickerInfo databaseFile verifiedTickerInfo >>= fromRightOrAppError

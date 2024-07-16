@@ -44,6 +44,16 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
     ]
 
   -----------------------------------------------
+  -- Remove Swap Execution from Builder
+  -----------------------------------------------
+  RemoveSelectedSwapExecution idx ->
+    [ Model $ model 
+        & #txBuilderModel % #swapBuilderModel % #swapExecutions %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
   -- Increment the number of copies of that Swap creation
   -----------------------------------------------
   ChangeSwapCreationCount idx newCount ->
@@ -68,7 +78,7 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
           let (idx,newSwapCreation@NewSwapCreation{paymentAddress}) = 
                 fromMaybe (0,def) $ txBuilderModel ^. #swapBuilderModel % #targetSwapCreation
           verifiedSwap <- fromRightOrAppError $ 
-            processNewSwapCreation paymentAddress reverseTickerMap newSwapCreation
+            verifyNewSwapCreation paymentAddress reverseTickerMap newSwapCreation
 
           -- There should only be one output in the `TxBody` for this action.
           minUTxOValue <-
@@ -110,7 +120,7 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
           let (idx,newSwapCreation@NewSwapCreation{paymentAddress}) = 
                 fromMaybe (0,def) $ txBuilderModel ^. #swapBuilderModel % #targetSwapUpdate
           verifiedSwap <- fromRightOrAppError $ 
-            processNewSwapCreation paymentAddress reverseTickerMap newSwapCreation
+            verifyNewSwapCreation paymentAddress reverseTickerMap newSwapCreation
 
           -- There should only be one output in the `TxBody` for this action.
           minUTxOValue <-
@@ -135,4 +145,55 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
           , ""
           , "The new swap requires a deposit of: " <> display (verifiedSwap ^. #deposit)
           ]
+      ]
+
+  -----------------------------------------------
+  -- Edit the Swap Execution
+  -----------------------------------------------
+  EditSelectedSwapExecution modal -> case modal of
+    StartAdding mTarget ->
+      [ Model $ model & #txBuilderModel % #swapBuilderModel % #targetSwapExecution .~ 
+          fmap (fmap (toNewSwapExecution reverseTickerMap)) mTarget
+      ]
+    CancelAdding ->
+      [ Model $ model & #txBuilderModel % #swapBuilderModel % #targetSwapExecution .~ Nothing ]
+    ConfirmAdding -> 
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (swapBuilderEvent . EditSelectedSwapExecution . AddResult) $ do
+          (idx,newSwap) <- fromJustOrAppError "Nothing set for `targetSwapExecution`" $
+            txBuilderModel ^. #swapBuilderModel % #targetSwapExecution
+
+          verifiedSwapExecution <- fromRightOrAppError $ 
+            verifyNewSwapExecution reverseTickerMap newSwap
+
+          -- There should only be one output in the `TxBody` for this action.
+          minUTxOValue <- 
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network)
+                (txBuilderModel ^. #parameters) 
+                -- Use a blank swapBuilderModel to calculate the minUTxOValue for the new swap.
+                (emptySwapBuilderModel & #swapExecutions .~ [(0,verifiedSwapExecution)])
+
+          -- Check if the swap output contains enough ADA. Also account for whether ada is the 
+          -- part of the trading pair.
+          (idx,) <$> fromRightOrAppError (updateMinUTxO verifiedSwapExecution minUTxOValue)
+      ]
+    AddResult (idx,verifiedSwap@SwapExecution{lovelace,deposit}) ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          & #txBuilderModel % #swapBuilderModel % #swapExecutions % ix idx % _2 .~ 
+              verifiedSwap
+          & #txBuilderModel % #swapBuilderModel % #targetSwapExecution .~ Nothing
+          & #txBuilderModel %~ balanceTx
+      , Task $ do
+          let successMsg
+                | lovelace >= deposit = "Successfully added to builder!"
+                | otherwise = unlines
+                    [ "Successfully added to builder!"
+                    , ""
+                    , "The swap minUTxOValue increased by: " <> display (deposit - lovelace)
+                    , "You will need to cover the increase to execute this swap."
+                    ]
+          return $ Alert successMsg
       ]

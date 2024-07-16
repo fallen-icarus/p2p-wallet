@@ -70,8 +70,8 @@ instance Default NewChangeOutput where
 -------------------------------------------------
 -- NewChangeOutput <--> ChangeOutput
 -------------------------------------------------
-processNewChangeOutput :: Network -> NewChangeOutput -> Either Text ChangeOutput
-processNewChangeOutput network NewChangeOutput{..} = do
+verifyNewChangeOutput :: Network -> NewChangeOutput -> Either Text ChangeOutput
+verifyNewChangeOutput network NewChangeOutput{..} = do
   addr <- parsePaymentAddress network paymentAddress
 
   return $ ChangeOutput

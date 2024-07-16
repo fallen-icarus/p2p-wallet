@@ -94,7 +94,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
 
           -- Verify the user supplied information.
           verifiedProfile <- fromRightOrAppError $
-            processNewProfile (config ^. #network) newProfileId newProfile knownProfiles
+            verifyNewProfile (config ^. #network) newProfileId newProfile knownProfiles
 
           -- Add the new profile.
           insertProfile databaseFile verifiedProfile >>= fromRightOrAppError
@@ -133,7 +133,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
 
           -- Verify the user supplied information.
           verifiedProfile <- fromRightOrAppError $
-            processNewProfile network profileId newProfile otherProfiles
+            verifyNewProfile network profileId newProfile otherProfiles
 
           -- Overwrite the current profile info.
           insertProfile databaseFile verifiedProfile >>= fromRightOrAppError

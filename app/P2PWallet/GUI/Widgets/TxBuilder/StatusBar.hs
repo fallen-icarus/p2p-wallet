@@ -23,7 +23,7 @@ import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.Prelude
 
 statusBar :: AppModel -> AppNode
-statusBar AppModel{txBuilderModel=TxBuilderModel{..}} = do
+statusBar AppModel{txBuilderModel=tx@TxBuilderModel{..}} = do
   let checkboxIcon b
         | isNothing b = indeterminateCheckboxIcon
         | b == Just True = checkedBoxIcon
@@ -36,11 +36,7 @@ statusBar AppModel{txBuilderModel=TxBuilderModel{..}} = do
         | requiresCollateral = Just $ isJust collateralInput
         | otherwise = Nothing
       changeAddressSet = maybe False (("" /=) . view #paymentAddress) changeOutput
-      hasInputs = or
-        [ userInputs /= []
-        , swapBuilderModel ^. #swapCloses /= []
-        , swapBuilderModel ^. #swapUpdates /= []
-        ]
+      inputsSet = hasInputs tx
   hstack_ [childSpacing]
     [ hstack
         [ label "Change Address"
@@ -61,10 +57,10 @@ statusBar AppModel{txBuilderModel=TxBuilderModel{..}} = do
             `styleBasic`
               [ textSize 12 ]
         , spacer_ [width 3]
-        , label (checkboxIcon $ Just hasInputs)
+        , label (checkboxIcon $ Just inputsSet)
             `styleBasic`
               [ textFont "Remix"
-              , textColor $ checkboxColor $ Just hasInputs
+              , textColor $ checkboxColor $ Just inputsSet
               , textMiddle
               , textSize 12
               ]

@@ -108,8 +108,8 @@ instance Default NewTickerInfo where
     }
 
 -- | Process the new ticker and check that the asset is not already linked to another ticker.
-processNewTickerInfo :: NewTickerInfo -> ReverseTickerMap -> Either Text TickerInfo
-processNewTickerInfo NewTickerInfo{..} reverseTickerMap = do
+verifyNewTickerInfo :: NewTickerInfo -> ReverseTickerMap -> Either Text TickerInfo
+verifyNewTickerInfo NewTickerInfo{..} reverseTickerMap = do
   -- Check the policy id is valid.
   policy <- maybeToRight "Not a valid policy id" $ CurrencySymbol <$> parseHex policyId
 

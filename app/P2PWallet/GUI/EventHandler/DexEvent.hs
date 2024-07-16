@@ -186,7 +186,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (DexEvent . AddNewLimitOrderCreation . ProcessResults) $ do
           let swapAddress = dexModel ^. #selectedWallet % #oneWaySwapAddress
-          verifiedSwap <- fromRightOrAppError $ processNewSwapCreation swapAddress reverseTickerMap $
+          verifiedSwap <- fromRightOrAppError $ verifyNewSwapCreation swapAddress reverseTickerMap $
             -- Remove any entries that are not needed for the limit order.
             (dexModel ^. #newSwapCreation)
               & #askQuantity .~ Nothing
@@ -229,7 +229,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (DexEvent . AddNewLimitOrderCreation . ProcessResults) $ do
           let swapAddress = dexModel ^. #selectedWallet % #twoWaySwapAddress
-          verifiedSwap <- fromRightOrAppError $ processNewSwapCreation swapAddress reverseTickerMap $
+          verifiedSwap <- fromRightOrAppError $ verifyNewSwapCreation swapAddress reverseTickerMap $
             -- Remove any entries that are not needed for the liquidity swap.
             (dexModel ^. #newSwapCreation)
               & #arbitrageFee .~ "0.0"
@@ -319,13 +319,17 @@ handleDexEvent model@AppModel{..} evt = case evt of
 
           -- Verify that the new utxo is not already being spent.
           flip whenJust (const $ throwIO $ AppError "This swap is already being spent.") $
-            find (\i -> i ^. _2 % #utxoRef == utxoRef) $ concat
-              [ txBuilderModel ^. #swapBuilderModel % #swapCloses
-              , map (over _2 $ view #oldSwap) $ txBuilderModel ^. #swapBuilderModel % #swapUpdates
-              ]
+            find (== utxoRef) (concat
+              [ map (view $ _2 % #utxoRef) $ 
+                  txBuilderModel ^. #swapBuilderModel % #swapCloses
+              , map (view $ _2 % #oldSwap % #utxoRef) $ 
+                  txBuilderModel ^. #swapBuilderModel % #swapUpdates
+              , map (view $ _2 % #utxoRef) $
+                  txBuilderModel ^. #swapBuilderModel % #swapExecutions
+              ])
 
           verifiedSwapUpdate <- fromRightOrAppError $ 
-            processNewSwapCreation paymentAddress reverseTickerMap newSwap
+            verifyNewSwapCreation paymentAddress reverseTickerMap newSwap
 
           -- There should only be one output in the `TxBody` for this action.
           minUTxOValue <- 
@@ -334,6 +338,8 @@ handleDexEvent model@AppModel{..} evt = case evt of
                 network 
                 (txBuilderModel ^. #parameters) 
                 -- Use a blank swapBuilderModel to calculate the minUTxOValue for the new swap.
+                -- This just uses `swapCreations` because the output only depends on the creation
+                -- part.
                 (emptySwapBuilderModel & #swapCreations .~ [(0,verifiedSwapUpdate)])
 
           return $ SwapUpdate
@@ -356,6 +362,79 @@ handleDexEvent model@AppModel{..} evt = case evt of
               , "This swap requires a deposit of: " <> 
                   display (verifiedSwapUpdate ^. #newSwap % #deposit)
               ]
+          ]
+
+  -----------------------------------------------
+  -- Add Selected Swap Execution to Builder
+  -----------------------------------------------
+  AddSelectedSwapExecution modal -> case modal of
+    StartAdding mTarget ->
+      let (offerAsset,askAsset,swapUTxO) = fromMaybe def mTarget
+          newSwapExecution = 
+            swapUTxOToNewSwapExecution 
+              (config ^. #network) 
+              offerAsset 
+              askAsset 
+              reverseTickerMap 
+              swapUTxO
+      in  [ Model $ model
+              & #dexModel % #newSwapExecution ?~ newSwapExecution
+          ]
+    CancelAdding ->
+      [ Model $ model
+          & #dexModel % #newSwapExecution .~ Nothing
+      ]
+    ConfirmAdding ->
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (DexEvent . AddSelectedSwapExecution . AddResult) $ do
+          newSwap@NewSwapExecution{utxoRef,network} <- 
+            fromJustOrAppError "Nothing set for `newSwapExecution`" $ dexModel ^. #newSwapExecution
+
+          -- Verify that the new utxo is not already being spent.
+          flip whenJust (const $ throwIO $ AppError "This swap is already being spent.") $
+            find (== utxoRef) (concat
+              [ map (view $ _2 % #utxoRef) $ 
+                  txBuilderModel ^. #swapBuilderModel % #swapCloses
+              , map (view $ _2 % #oldSwap % #utxoRef) $ 
+                  txBuilderModel ^. #swapBuilderModel % #swapUpdates
+              , map (view $ _2 % #utxoRef) $
+                  txBuilderModel ^. #swapBuilderModel % #swapExecutions
+              ])
+
+          verifiedSwapExecution <- fromRightOrAppError $ 
+            verifyNewSwapExecution reverseTickerMap newSwap
+
+          -- There should only be one output in the `TxBody` for this action.
+          minUTxOValue <- 
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                network 
+                (txBuilderModel ^. #parameters) 
+                -- Use a blank swapBuilderModel to calculate the minUTxOValue for the new swap.
+                (emptySwapBuilderModel & #swapExecutions .~ [(0,verifiedSwapExecution)])
+
+          -- Check if the swap output contains enough ADA. Also account for whether ada is the 
+          -- part of the trading pair.
+          fromRightOrAppError $ updateMinUTxO verifiedSwapExecution minUTxOValue
+      ]
+    AddResult verifiedSwapExecution@SwapExecution{lovelace,deposit} ->
+      -- Get the index for the new swap creation.
+      let newIdx = length $ txBuilderModel ^. #swapBuilderModel % #swapExecutions
+          successMsg
+            | lovelace >= deposit = "Successfully added to builder!"
+            | otherwise = unlines
+                [ "Successfully added to builder!"
+                , ""
+                , "The swap minUTxOValue increased by: " <> display (deposit - lovelace)
+                , "You will need to cover the increase to execute this swap."
+                ]
+      in  [ Model $ model
+              & #waitingStatus % #addingToBuilder .~ False
+              & #txBuilderModel % #swapBuilderModel % #swapExecutions %~ 
+                  flip snoc (newIdx,verifiedSwapExecution)
+              & #dexModel % #newSwapExecution .~ Nothing
+              & #txBuilderModel %~ balanceTx
+          , Task $ return $ Alert successMsg
           ]
 
   -----------------------------------------------
@@ -398,9 +477,10 @@ processNewSwapClose :: SwapClose -> TxBuilderModel -> Either Text TxBuilderModel
 processNewSwapClose u@SwapClose{utxoRef} model@TxBuilderModel{swapBuilderModel=SwapBuilderModel{..}} = do
   -- Verify that the new utxo is not already being spent.
   maybeToLeft () $ "This swap is already being spent." <$
-    find (\i -> i ^. _2 % #utxoRef == utxoRef) (concat
-      [ swapCloses
-      , map (over _2 $ view #oldSwap) swapUpdates
+    find (== utxoRef) (concat
+      [ map (view $ _2 % #utxoRef) swapCloses
+      , map (view $ _2 % #oldSwap % #utxoRef) swapUpdates
+      , map (view $ _2 % #utxoRef) swapExecutions
       ])
 
   -- Get the input's new index.

@@ -36,6 +36,7 @@ module P2PWallet.Prelude
   , formatQuantity
   , unFormatQuantity
   , for
+  , roundUp
 
     -- * Lens Helpers
   , boolLens
@@ -122,6 +123,12 @@ unFormatQuantity decimal quantity = round $ toRational quantity * mkScaleFactor 
 -- | A custom `for` function since the one in `Data.Traversable` does not work for some reason.
 for :: [a] -> (a -> b) -> [b]
 for = flip map
+
+-- | Rounding down will cause price ratios to fail so they must always be rounded up.
+roundUp :: Rational -> Integer
+roundUp rat
+  | fromIntegral @Integer @Rational (round rat) < rat = 1 + round rat
+  | otherwise = round rat
 
 -------------------------------------------------
 -- Time

@@ -14,6 +14,7 @@ import P2PWallet.Data.DeFi.CardanoSwaps.Common
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
+import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
@@ -28,11 +29,14 @@ tradeWidget model@AppModel{dexModel=DexModel{..}} = do
 
 mainWidget :: AppModel -> AppNode
 mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap} = do
-    hstack
-      [ orderBookWidget model
-      , filler
-      , entryWidget
-      ] `styleBasic` [padding 20]
+    zstack
+      [ hstack
+          [ orderBookWidget model
+          , filler
+          , entryWidget
+          ] `styleBasic` [padding 20]
+      , widgetIf (isJust newSwapExecution) $ getSwapQuantityWidget model
+      ]
   where
     (offerAsset,askAsset) = fromMaybe (def, def) selectedTradingPair
     offerAssetName = showAssetNameOnly reverseTickerMap $ unOfferAsset offerAsset
@@ -235,6 +239,10 @@ orderBookWidget AppModel{dexModel=DexModel{..}, reverseTickerMap} = do
       let offerAssetName = showAssetNameOnly reverseTickerMap offerAsset
           askAssetName = showAssetNameOnly reverseTickerMap askAsset
           mAskPerOffer = swapUTxOPrice (OfferAsset askAsset) (AskAsset offerAsset) u
+          swapEvent = DexEvent 
+                    $ AddSelectedSwapExecution 
+                    $ StartAdding 
+                    $ Just (OfferAsset askAsset, AskAsset offerAsset, u)
       case mAskPerOffer of
         -- If `Nothing` is ever returned, there is a bug in cardano-swaps; the beacons were stored
         -- with an invalid datum.
@@ -260,6 +268,12 @@ orderBookWidget AppModel{dexModel=DexModel{..}, reverseTickerMap} = do
             , filler
             , label (priceCaption prettyPrice)
                 `styleBasic` [textSize 8, textColor customRed]
+            , spacer_ [width 5]
+            , box_ [alignMiddle, onClick swapEvent] $
+                tooltip_ "Swap" [tooltipDelay 0] $
+                  label remixHandCoinLine
+                    `styleBasic` [textMiddle,textFont "Remix", textSize 8, textColor customBlue]
+                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             ] `styleBasic`
                 [ padding 5
                 , radius 5
@@ -676,3 +690,102 @@ getTradingPairWidget = do
         , mainButton "Confirm" $ DexEvent $ SetNewTradingPair ConfirmAdding
         ]
     ] `styleBasic` [bgColor customGray3, padding 20, radius 10]
+
+getSwapQuantityWidget :: AppModel -> AppNode
+getSwapQuantityWidget AppModel{dexModel=DexModel{..},reverseTickerMap}= do
+  let NewSwapExecution{..} = fromMaybe def newSwapExecution
+      maybeLens' = maybeLens def $ #dexModel % #newSwapExecution
+      offerAssetName = showAssetNameOnly reverseTickerMap $ unOfferAsset offerAsset
+      askAssetName = showAssetNameOnly reverseTickerMap $ unAskAsset askAsset
+      mQuantity = rightToMaybe $ view #quantity <$>
+        parseFormattedAssetQuantity reverseTickerMap (unOfferAsset offerAsset) offerQuantity
+      availableCaption = showAssetBalance True reverseTickerMap $
+        unOfferAsset offerAsset & #quantity .~ offerAvailable
+      askAssetCost = unAskAsset askAsset & #quantity .~ 
+        roundUp (fromIntegral (fromMaybe 0 mQuantity) * askPerOfferPrice)
+      priceCaption = unwords
+        [ showPriceFormatted 
+            reverseTickerMap 
+            (unAskAsset askAsset) 
+            (unOfferAsset offerAsset) 
+            askPerOfferPrice
+        , " "
+        , askAssetName <> " / " <> offerAssetName
+        ]
+  vstack
+    [ centerWidget $ vstack
+        [ spacer
+        , box_ [alignMiddle] $
+            label "Execute Swap"
+              `styleBasic` [textSize 16, textFont "Italics", textColor customBlue]
+        , spacer
+        , hstack
+            [ box_ [alignMiddle, onClick $ Alert $ purchaseAmountMsg offerAssetName] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Purchase Amount:"
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL $ maybeLens' % #offerQuantity) 
+                  [placeholder $ "# " <> offerAssetName] 
+                `styleBasic` [textSize 10, width 100, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            ]
+        , spacer_ [width 10]
+        , separatorLine
+        , spacer_ [width 10]
+        , hstack
+            [ label "Available: "
+                `styleBasic` [textSize 10]
+            , spacer
+            , label availableCaption
+                `styleBasic` [textSize 10]
+            ]
+        , spacer
+        , hstack
+            [ label "Price:"
+                `styleBasic` [textSize 10]
+            , spacer
+            , label priceCaption
+                `styleBasic` [textSize 10]
+            ]
+        , spacer
+        , hstack
+            [ label "Approximate Cost:"
+                `styleBasic` [textSize 10]
+            , spacer
+            , label (showAssetBalance True reverseTickerMap askAssetCost)
+                `styleBasic` [textSize 10]
+            ]
+        , spacer
+        , box_ [alignRight] $ 
+            hstack
+              [ button "Cancel" (DexEvent $ AddSelectedSwapExecution CancelAdding)
+                  `styleBasic` [textSize 10]
+              , spacer
+              , mainButton "Confirm" (DexEvent $ AddSelectedSwapExecution ConfirmAdding)
+                  `styleBasic` [textSize 10]
+              ]
+        ] `styleBasic`
+            [ bgColor customGray3
+            , padding 20
+            , radius 20
+            ]
+    ] `styleBasic` 
+        [ bgColor $ black & #a .~ 0.4
+        , paddingT 50
+        , paddingB 50
+        , paddingL 30
+        , paddingR 30
+        , radius 10
+        ]

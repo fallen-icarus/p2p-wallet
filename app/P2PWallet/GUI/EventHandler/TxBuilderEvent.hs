@@ -126,7 +126,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
           let (idx,newOutput) = fromMaybe (0,def) $ txBuilderModel ^. #targetUserOutput
           verifiedOutput <- 
             fromRightOrAppError $ 
-              processNewUserOutput (config ^. #network) tickerMap fingerprintMap newOutput
+              verifyNewUserOutput (config ^. #network) tickerMap fingerprintMap newOutput
 
           -- There should only be one output in the `TxBody` for this action.
           minUTxOValue <-
@@ -166,7 +166,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (TxBuilderEvent . AddNewChangeOutput . AddResult) $ do
           fromRightOrAppError $
-            processNewChangeOutput (config ^. #network) (txBuilderModel ^. #newChangeOutput)
+            verifyNewChangeOutput (config ^. #network) (txBuilderModel ^. #newChangeOutput)
       ]
     AddResult verifiedChangeOutput ->
       [ Model $ model 
@@ -196,7 +196,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (TxBuilderEvent . AddNewTestMint . AddResult) $ do
           fromRightOrAppError $
-            processNewTestMint $ txBuilderModel ^. #newTestMint
+            verifyNewTestMint $ txBuilderModel ^. #newTestMint
       ]
     AddResult verifiedTestMint ->
       [ Model $ model 
