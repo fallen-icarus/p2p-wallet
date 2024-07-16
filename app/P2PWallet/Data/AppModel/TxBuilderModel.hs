@@ -9,6 +9,8 @@ module P2PWallet.Data.AppModel.TxBuilderModel
   , TxBuilderModel(..)
   , isEmptyBuilder
   , convertToTxBody
+  , canBeBuilt
+  , hasInputs
 
   , module P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
   , module P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
@@ -223,3 +225,33 @@ convertToTxBody TxBuilderModel{..} =
     -- Overide the fee with the fee in the builder model.
     , mempty & #fee .~ fee
     ]
+
+-- | Since `cardano-cli transaction build-raw` can throw confusing error messages if certain pieces
+-- are missing from the transaction, this check validates those cases will not occur. 
+canBeBuilt :: TxBuilderModel -> Either Text ()
+canBeBuilt tx@TxBuilderModel{..}
+  | not $ hasInputs tx = Left "No inputs specified."
+  -- A change address must be specified.
+  | change ^. #paymentAddress == "" = Left "Change address missing."
+  -- The value of ADA must be balanced.
+  | change ^. #lovelace < 0 = Left "Ada is not balanced."
+  -- The value of the native assets must be balanced.
+  | nativeAssetsNotBalanced = Left "Native assets are not balanced."
+  -- If it requires collateral, then a collateral input must be set.
+  | requiresCollateral && isNothing collateralInput = Left "Transaction requires collateral."
+  | otherwise = return ()
+  where
+    change :: ChangeOutput
+    change = fromMaybe def changeOutput
+
+    nativeAssetsNotBalanced :: Bool
+    nativeAssetsNotBalanced = any ((<0) . view #quantity) $ change ^. #nativeAssets
+
+-- | This is used by the status bar for the tx builder.
+hasInputs :: TxBuilderModel -> Bool
+hasInputs TxBuilderModel{..} = or
+  [ userInputs /= []
+  , swapBuilderModel ^. #swapCloses /= []
+  , swapBuilderModel ^. #swapUpdates /= []
+  , swapBuilderModel ^. #swapExecutions /= []
+  ]

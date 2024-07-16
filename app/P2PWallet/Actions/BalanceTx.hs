@@ -60,6 +60,7 @@ balanceTx tx@TxBuilderModel{..} =
       [ inputValue
       , outputValue
       , assetBalancesForChange $ swapBuilderModel ^. #swapUpdates
+      , assetBalancesForChange $ swapBuilderModel ^. #swapExecutions
       ]
 
     newChange :: ChangeOutput
@@ -80,4 +81,5 @@ balanceTx tx@TxBuilderModel{..} =
       , swapBuilderModel ^. #swapCreations /= []
       , swapBuilderModel ^. #swapCloses /= []
       , swapBuilderModel ^. #swapUpdates /= []
+      , swapBuilderModel ^. #swapExecutions /= []
       ]

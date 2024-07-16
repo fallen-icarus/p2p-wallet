@@ -56,38 +56,6 @@ runBuildCmd builderLogFile cmd =
   let formattedCmd = toString $ prettyFormatCmd cmd in
   logBuilderStep builderLogFile (BuildCommandStep formattedCmd) >> runCmd formattedCmd
 
--- | Since `cardano-cli transaction build-raw` can throw confusing error messages if certain pieces
--- are missing from the transaction, this check validates those cases will not occur. It will throw
--- an `AppError` with a more user friendly error message if cardano-cli is likely to throw an error.
--- The UI should catch these errors sooner but the redundant checks can't hurt and enable building
--- to be tested without a UI.
-canBeBuilt :: TxBuilderModel -> IO ()
-canBeBuilt TxBuilderModel{userInputs,changeOutput,collateralInput,requiresCollateral,..}
-  | not hasInputs = throwIO $ AppError "No inputs specified."
-  -- A change address must be specified.
-  | change ^. #paymentAddress == "" = throwIO $ AppError "Change address missing."
-  -- The value of ADA must be balanced.
-  | change ^. #lovelace < 0 = throwIO $ AppError "Ada is not balanced."
-  -- The value of the native assets must be balanced.
-  | nativeAssetsNotBalanced = throwIO $ AppError "Native assets are not balanced."
-  -- If it requires collateral, then a collateral input must be set.
-  | requiresCollateral && isNothing collateralInput =
-      throwIO $ AppError "Transaction requires collateral."
-  | otherwise = return ()
-  where
-    change :: ChangeOutput
-    change = fromMaybe def changeOutput
-
-    nativeAssetsNotBalanced :: Bool
-    nativeAssetsNotBalanced = any ((<0) . view #quantity) $ change ^. #nativeAssets
-
-    hasInputs :: Bool
-    hasInputs = or
-      [ userInputs /= []
-      , swapBuilderModel ^. #swapCloses /= []
-      , swapBuilderModel ^. #swapUpdates /= []
-      ]
-
 -- | Check whether the change output has enough ada. This should always be called _after_ getting
 -- the parameters so there is no need to query for them again.
 changeAdaValueCheck :: Network -> ByteString -> ChangeOutput -> IO ()
@@ -104,7 +72,7 @@ changeAdaValueCheck network parameters changeOutput@ChangeOutput{lovelace} = do
 buildTxBody :: Network -> TxBuilderModel -> IO TxBuilderModel
 buildTxBody network tx = do
   -- Check if the transaction can be built without errors. 
-  canBeBuilt tx
+  whenLeft_ (canBeBuilt tx) (throwIO . AppError)
 
   -- Get the file names since cardano-cli works with files.
   tmpDir <- TmpDirectory <$> getTemporaryDirectory

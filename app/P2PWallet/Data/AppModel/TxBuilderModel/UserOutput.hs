@@ -90,13 +90,13 @@ instance Default NewUserOutput where
 -- NewUserOutput <--> UserOutput
 -------------------------------------------------
 -- | Verify the user info for the new output.
-processNewUserOutput 
+verifyNewUserOutput 
   :: Network 
   -> TickerMap 
   -> FingerprintMap 
   -> NewUserOutput 
   -> Either Text UserOutput
-processNewUserOutput network tickerMap fingerprintMap NewUserOutput{..} = do
+verifyNewUserOutput network tickerMap fingerprintMap NewUserOutput{..} = do
   -- Verify the address is a valid address.
   addr <- parsePaymentAddress network paymentAddress
 

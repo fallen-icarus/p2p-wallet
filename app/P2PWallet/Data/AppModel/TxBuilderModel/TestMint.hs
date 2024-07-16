@@ -82,8 +82,8 @@ instance Default NewTestMint where
 -- NewTestMint <--> TestMint
 -------------------------------------------------
 -- | Verify the user info for the new test token mint.
-processNewTestMint :: NewTestMint -> Either Text TestMint
-processNewTestMint NewTestMint{..} = do
+verifyNewTestMint :: NewTestMint -> Either Text TestMint
+verifyNewTestMint NewTestMint{..} = do
     verifiedMints <- mapM parseLine $ lines mint
 
     let simplifiedMint = filter (\(TokenMint (_,num)) -> num /= 0) 

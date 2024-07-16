@@ -13,6 +13,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
 
   , module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
   , module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
+  , module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapExecution
   , module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapUpdate
   ) where
 
@@ -21,6 +22,7 @@ import Data.Map.Strict qualified as Map
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
 import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
+import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapExecution
 import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapUpdate
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
@@ -49,6 +51,10 @@ data SwapBuilderEvent
   | RemoveSelectedSwapUpdate Int
   -- | Edit selected swap update.
   | EditSelectedSwapUpdate (AddEvent (Int,SwapUpdate) (Int,SwapCreation))
+  -- | Remove the selected swap execution from the builder.
+  | RemoveSelectedSwapExecution Int
+  -- | Edit selected swap execution.
+  | EditSelectedSwapExecution (AddEvent (Int,SwapExecution) (Int,SwapExecution))
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -63,6 +69,8 @@ data SwapBuilderModel = SwapBuilderModel
   , swapUpdates :: [(Int,SwapUpdate)]
   -- | The `Int` is the index into `swapUpdates`.
   , targetSwapUpdate :: Maybe (Int,NewSwapCreation)
+  , swapExecutions :: [(Int,SwapExecution)]
+  , targetSwapExecution :: Maybe (Int,NewSwapExecution)
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''SwapBuilderModel
@@ -74,6 +82,8 @@ instance Default SwapBuilderModel where
     , swapCloses = []
     , swapUpdates = []
     , targetSwapUpdate = Nothing
+    , swapExecutions = []
+    , targetSwapExecution = Nothing
     }
 
 -- | This is just an alias for `def`. The name is more clear what it is.
@@ -85,8 +95,10 @@ isEmptySwapBuilderModel SwapBuilderModel{..} = and
   [ null swapCreations
   , null swapCloses
   , null swapUpdates
+  , null swapExecutions
   , isNothing targetSwapCreation
   , isNothing targetSwapUpdate
+  , isNothing targetSwapExecution
   ]
 
 -------------------------------------------------
@@ -108,6 +120,9 @@ instance AddToTxBody SwapBuilderModel where
         & #mints %~ mergeBeaconMints
         -- Adjust any redeemers based on whether all mints canceled out.
         & adjustSpendingRedeemers
+        -- Add the swap executions. This is done after so that it does not mess with the beacon
+        -- adjustments.
+        & flip (foldl' addSwapExecutionToBuilder) swapExecutions
     where
       mergeBeaconMints :: [TxBodyMint] -> [TxBodyMint]
       mergeBeaconMints = mapMaybe checkMint
@@ -326,6 +341,93 @@ addSwapCloseToBuilder txBody (_,SwapClose{..}) =
       , redeemer = beaconRedeemer
       , scriptWitness = ReferenceWitness beaconReference
       , executionBudget = def -- These must be calculated during the build step.
+      }
+
+addSwapExecutionToBuilder :: TxBody -> (Int,SwapExecution) -> TxBody
+addSwapExecutionToBuilder txBody (_,SwapExecution{..}) =
+    txBody
+      -- Add the swap to be executed to the inputs.
+      & #inputs %~ flip snoc newInput
+      -- Add the required swap output to the list of outputs. Preserve ordering of the output list.
+      & #outputs %~ flip snoc newOutput
+  where
+    (spendingRedeemer :: Redeemer,spendingReference :: TxOutRef,spendingScriptHash :: ScriptHash) = 
+      case (network,swapType) of
+        (_, LimitOrder) -> 
+          ( toRedeemer OneWay.Swap
+          , OneWay.swapScriptTestnetRef
+          , OneWay.swapScriptHash
+          )
+        (_, LiquiditySwap) -> 
+          ( toRedeemer $ TwoWay.getRequiredSwapDirection offerAsset askAsset
+          , TwoWay.swapScriptTestnetRef
+          , TwoWay.swapScriptHash
+          )
+
+    newInput :: TxBodyInput
+    newInput = TxBodyInput
+      { utxoRef = utxoRef
+      , spendingScriptInfo = Just $ SpendingScriptInfo
+          { datum = InputDatum
+          , redeemer = spendingRedeemer
+          , scriptWitness = ReferenceWitness spendingReference
+          , executionBudget = def
+          , scriptHash = spendingScriptHash
+          }
+      }
+
+    lovelaceQuantity :: NativeAsset -> Lovelace
+    lovelaceQuantity NativeAsset{policyId,quantity}
+      | policyId == "" = Lovelace quantity
+      | otherwise = 0
+
+    toNativeAssetQuantity :: NativeAsset -> Maybe NativeAsset
+    toNativeAssetQuantity asset@NativeAsset{policyId}
+      | policyId == "" = Nothing
+      | otherwise = Just asset
+
+    -- Get the total amount assets required for the output. This does not have the beacons
+    -- yet.
+    (newLovelace, newNativeAssets) = 
+      let (OfferAsset offerAsset', AskAsset askAsset') = (offerAsset, askAsset) in
+      ( deposit + lovelaceQuantity offerAsset' + lovelaceQuantity askAsset'
+      , catMaybes [toNativeAssetQuantity offerAsset', toNativeAssetQuantity askAsset']
+      )
+
+    (newDatum :: Datum , beacons :: [NativeAsset]) =
+      case swapDatum of
+        Just (OneWay d@OneWay.SwapDatum{..}) -> 
+          let reqBeacons =
+                -- One trading pair beacon.
+                [ NativeAsset beaconId pairBeacon "" 1
+                -- One offer beacon.
+                , NativeAsset beaconId offerBeacon "" 1
+                -- One Ask beacon.
+                , NativeAsset beaconId askBeacon "" 1
+                ]
+          in (toDatum $ d & #prevInput ?~ utxoRef, reqBeacons)
+
+        Just (TwoWay d@TwoWay.SwapDatum{..}) -> 
+          let reqBeacons =
+                -- One trading pair beacon.
+                [ NativeAsset beaconId pairBeacon "" 1
+                -- One asset1 beacon.
+                , NativeAsset beaconId asset1Beacon "" 1
+                -- One asset2 beacon.
+                , NativeAsset beaconId asset2Beacon "" 1
+                ]
+          in (toDatum $ d & #prevInput ?~ utxoRef, reqBeacons)
+
+        -- This should never happen.
+        -- TODO: Find a better way to handle this.
+        _ -> error "Invalid swap added to TxBody"
+
+    newOutput :: TxBodyOutput
+    newOutput = TxBodyOutput
+      { paymentAddress = swapAddress
+      , lovelace = newLovelace
+      , nativeAssets = newNativeAssets <> beacons -- Add the beacons to the output.
+      , datum = OutputDatum newDatum
       }
 
 -- | All `add` functions assume `SpendWithMint` will be used with a minting execution. If no

@@ -48,10 +48,10 @@ txBuilderWidget model@AppModel{..} = do
               , box_ [alignMiddle] $ hstack
                   [ spacer_ [width 50]
                   , mainButton "Build" (TxBuilderEvent $ BuildTx StartProcess)
-                      `nodeVisible` canBeBuilt
+                      `nodeVisible` isBuildable
                   , button "Build" AppInit
                       `nodeEnabled` False -- This button is just for show.
-                      `nodeVisible` not canBeBuilt
+                      `nodeVisible` not isBuildable
                   , spacer_ [width 3]
                   , mainButton "Sign & Submit" (TxBuilderEvent $ WitnessTx StartProcess)
                       `nodeVisible` txBuilderModel ^. #isBuilt
@@ -66,6 +66,7 @@ txBuilderWidget model@AppModel{..} = do
               [ isNothing targetUserOutput
               , isNothing (swapBuilderModel ^. #targetSwapCreation)
               , isNothing (swapBuilderModel ^. #targetSwapUpdate)
+              , isNothing (swapBuilderModel ^. #targetSwapExecution)
               , not addingChangeOutput
               , not addingTestMint
               , not importing
@@ -76,6 +77,8 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (swapBuilderModel ^. #targetSwapCreation)
       , editSwapUpdateWidget model
           `nodeVisible` isJust (swapBuilderModel ^. #targetSwapUpdate)
+      , editSwapExecutionWidget model
+          `nodeVisible` isJust (swapBuilderModel ^. #targetSwapExecution)
       , addChangeOutputWidget
           `nodeVisible` addingChangeOutput
       , addTestMintWidget model
@@ -91,21 +94,7 @@ txBuilderWidget model@AppModel{..} = do
 
     TxBuilderModel{..} = txBuilderModel
 
-    canBeBuilt :: Bool
-    canBeBuilt = and
-      -- A change output must be set with a valid payment address.
-      [ maybe False (("" /=) . view #paymentAddress) $ txBuilderModel ^. #changeOutput
-      -- The transaction must be balanced.
-      , txBuilderModel ^. #isBalanced
-      -- If it requires collateral, then a colalteral input must be set.
-      , bool True (isJust $ txBuilderModel ^. #collateralInput) $ 
-          txBuilderModel ^. #requiresCollateral
-      -- At least one input must be specified.
-      , or [ txBuilderModel ^. #userInputs /= []
-           , txBuilderModel ^. #swapBuilderModel % #swapCloses /= []
-           , txBuilderModel ^. #swapBuilderModel % #swapUpdates /= []
-           ]
-      ]
+    isBuildable = isRight $ canBeBuilt txBuilderModel
 
     mainWidget :: AppNode
     mainWidget = do
@@ -213,6 +202,7 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
         , swapCreationsList reverseTickerMap $ swapBuilderModel ^. #swapCreations
         , swapClosesList reverseTickerMap $ swapBuilderModel ^. #swapCloses
         , swapUpdatesList reverseTickerMap $ swapBuilderModel ^. #swapUpdates
+        , swapExecutionsList reverseTickerMap $ swapBuilderModel ^. #swapExecutions
         , userCertificatesList userCertificates
         , userWithdrawalsList userWithdrawals
         , maybe [] (pure . testMintRow reverseTickerMap) testMint

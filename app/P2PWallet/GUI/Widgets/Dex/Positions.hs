@@ -92,6 +92,9 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
     utxoRow u@SwapUTxO{swapDatum} = case swapDatum of
       Just (OneWay datum) -> limitOrderRow u datum
       Just (TwoWay datum) -> liquiditySwapRow u datum
+      -- This path should never come about from a UTxO created by this wallet.
+      -- TODO: Figure out what to do for invalid datums. They are just hidden for now.
+      _ -> spacer `nodeVisible` False
 
     limitOrderRow :: SwapUTxO -> OneWay.SwapDatum -> AppNode
     limitOrderRow u@SwapUTxO{..} OneWay.SwapDatum{..} = do

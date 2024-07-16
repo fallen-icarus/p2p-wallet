@@ -549,3 +549,7 @@ positionsSortMsg = unlines
       ]
   ]
 
+purchaseAmountMsg :: Text -> Text
+purchaseAmountMsg assetName = unlines
+  [ "How many units of " <> assetName <> " would you like to purchase?"
+  ]

@@ -109,8 +109,8 @@ instance Default NewProfile where
 
 -- | Process the user's info for the profile. Check that the profile name is not already being
 -- used. `AccountIndex` must be >= 0.
-processNewProfile :: Network -> ProfileId -> NewProfile -> [Profile] -> Either Text Profile
-processNewProfile network newProfileId NewProfile{..} otherProfiles
+verifyNewProfile :: Network -> ProfileId -> NewProfile -> [Profile] -> Either Text Profile
+verifyNewProfile network newProfileId NewProfile{..} otherProfiles
   | alias == "" = Left "Profile name is empty."
   | any (\p -> p ^. #alias == alias) otherProfiles = Left "Another profile exists with that name."
   | accountIndex < 0 = Left "Account indices must be >= 0."

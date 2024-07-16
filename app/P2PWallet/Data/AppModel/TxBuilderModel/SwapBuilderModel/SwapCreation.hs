@@ -149,12 +149,12 @@ clearNewSwapCreation NewSwapCreation{offerAsset,askAsset,network,tradingPairInve
 -- NewSwapCreation <--> SwapCreation
 -------------------------------------------------
 -- | Verify the user info for the new swap creation.
-processNewSwapCreation 
+verifyNewSwapCreation 
   :: PaymentAddress 
   -> ReverseTickerMap 
   -> NewSwapCreation 
   -> Either Text SwapCreation
-processNewSwapCreation swapAddress reverseTickerMap NewSwapCreation{..} = do
+verifyNewSwapCreation swapAddress reverseTickerMap NewSwapCreation{..} = do
   -- Units are always in terms of the ask asset because that is what the order book always
   -- shows.
 
