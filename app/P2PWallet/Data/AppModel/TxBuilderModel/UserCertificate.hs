@@ -20,7 +20,7 @@ data UserCertificate = UserCertificate
   -- key hashes.
   { stakeAddress :: StakeAddress
   -- | The path to the required hw key for witnessing.
-  , stakeKeyPath :: Maybe DerivationPath 
+  , stakeKeyDerivation :: Maybe DerivationInfo
   -- | The certificate action.
   , certificateAction :: CertificateAction
   -- | The alias for this stake address.
@@ -32,7 +32,7 @@ data UserCertificate = UserCertificate
 makeFieldLabelsNoPrefix ''UserCertificate
 
 instance AddToTxBody UserCertificate where
-  addToTxBody txBody UserCertificate{stakeAddress,certificateAction,stakeKeyPath} = 
+  addToTxBody txBody UserCertificate{stakeAddress,certificateAction,stakeKeyDerivation} = 
       txBody 
         -- Add the new certificate. They will be sorted by the `Semigroup` instance of `TxBody`.
         & #certificates %~ (newCertificate:)
@@ -55,4 +55,4 @@ instance AddToTxBody UserCertificate where
       requiredWitness :: Maybe KeyWitness
       requiredWitness = case stakeCredential of
           ScriptCredential _ -> Nothing
-          PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyPath)
+          PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)

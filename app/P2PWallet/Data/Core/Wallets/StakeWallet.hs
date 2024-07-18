@@ -28,7 +28,7 @@ data StakeWallet = StakeWallet
   , stakeId :: StakeId
   , alias :: Text
   , stakeAddress :: StakeAddress
-  , stakeKeyPath :: Maybe DerivationPath
+  , stakeKeyDerivation :: Maybe DerivationInfo
   , registrationStatus :: RegistrationStatus
   , totalDelegation :: Lovelace
   , utxoBalance :: Lovelace
@@ -47,7 +47,7 @@ instance Default StakeWallet where
     , profileId = 0
     , stakeId = 0
     , stakeAddress = StakeAddress "" 
-    , stakeKeyPath = Just $ StakeKeyPath 0 0
+    , stakeKeyDerivation = Nothing
     , registrationStatus = NotRegistered
     , totalDelegation = 0
     , utxoBalance = 0
@@ -64,7 +64,7 @@ instance FromRow StakeWallet where
     stakeId <- field
     alias <- field
     stakeAddress <- field
-    stakeKeyPath <- field
+    stakeKeyDerivation <- field
     registrationStatus <- field
     totalDelegation <- field
     utxoBalance <- field
@@ -77,7 +77,7 @@ instance FromRow StakeWallet where
       , stakeId = stakeId
       , alias = alias
       , stakeAddress = stakeAddress
-      , stakeKeyPath = stakeKeyPath
+      , stakeKeyDerivation = stakeKeyDerivation
       , registrationStatus = registrationStatus
       , totalDelegation = totalDelegation
       , utxoBalance = utxoBalance
@@ -94,7 +94,7 @@ instance ToRow StakeWallet where
     , toField stakeId
     , toField alias
     , toField stakeAddress
-    , toField stakeKeyPath
+    , toField stakeKeyDerivation
     , toField registrationStatus
     , toField totalDelegation
     , toField utxoBalance
@@ -116,7 +116,7 @@ instance Creatable StakeWallet where
         , "stake_id INTEGER PRIMARY KEY"
         , "alias TEXT NOT NULL"
         , "stake_address TEXT"
-        , "stake_key_path TEXT"
+        , "stake_key_derivation TEXT"
         , "registration_status TEXT NOT NULL"
         , "total_delegation INTEGER NOT NULL"
         , "utxo_balance INTEGER NOT NULL"
@@ -138,7 +138,7 @@ instance Insertable StakeWallet where
         , "stake_id"
         , "alias"
         , "stake_address"
-        , "stake_key_path"
+        , "stake_key_derivation"
         , "registration_status"
         , "total_delegation"
         , "utxo_balance"

@@ -198,7 +198,7 @@ data DexWallet = DexWallet
   , oneWaySwapAddress :: PaymentAddress
   , twoWaySwapAddress :: PaymentAddress
   , stakeAddress :: StakeAddress
-  , stakeKeyPath :: Maybe DerivationPath
+  , stakeKeyDerivation :: Maybe DerivationInfo
   , utxos :: [SwapUTxO]
   , lovelace :: Lovelace
   , nativeAssets :: [NativeAsset]
@@ -220,7 +220,7 @@ instance Default DexWallet where
     , oneWaySwapAddress = "" 
     , twoWaySwapAddress = "" 
     , stakeAddress = "" 
-    , stakeKeyPath = Nothing 
+    , stakeKeyDerivation = Nothing 
     , utxos = []
     , lovelace = 0
     , nativeAssets = []
@@ -237,7 +237,7 @@ instance FromRow DexWallet where
     oneWaySwapAddress <- field
     twoWaySwapAddress <- field
     stakeAddress <- field
-    stakeKeyPath <- field
+    stakeKeyDerivation <- field
     utxos <- fromMaybe mzero . decode <$> field
     lovelace <- field
     nativeAssets <- fromMaybe mzero . decode <$> field
@@ -250,7 +250,7 @@ instance FromRow DexWallet where
       , oneWaySwapAddress = oneWaySwapAddress
       , twoWaySwapAddress = twoWaySwapAddress
       , stakeAddress = stakeAddress
-      , stakeKeyPath = stakeKeyPath
+      , stakeKeyDerivation = stakeKeyDerivation
       , utxos = utxos
       , lovelace = lovelace
       , nativeAssets = nativeAssets
@@ -267,7 +267,7 @@ instance ToRow DexWallet where
     , toField oneWaySwapAddress
     , toField twoWaySwapAddress
     , toField stakeAddress
-    , toField stakeKeyPath
+    , toField stakeKeyDerivation
     , toField $ encode utxos
     , toField lovelace
     , toField $ encode nativeAssets
@@ -289,7 +289,7 @@ instance Creatable DexWallet where
         , "one_way_swap_address TEXT NOT NULL"
         , "two_way_swap_address TEXT NOT NULL"
         , "stake_address TEXT NOT NULL"
-        , "stake_key_path TEXT"
+        , "stake_key_derivation TEXT"
         , "utxos BLOB"
         , "lovelace INTEGER NOT NULL"
         , "native_assets BLOB"
@@ -311,7 +311,7 @@ instance Insertable DexWallet where
         , "one_way_swap_address"
         , "two_way_swap_address"
         , "stake_address"
-        , "stake_key_path"
+        , "stake_key_derivation"
         , "utxos"
         , "lovelace"
         , "native_assets"

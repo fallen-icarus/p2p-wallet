@@ -22,7 +22,7 @@ data CollateralInput = CollateralInput
   -- | The bech32 address for this input. This is used to get any required key hashes.
   , paymentAddress :: PaymentAddress
   -- | The path to the required hw key for witnessing.
-  , paymentKeyPath :: Maybe DerivationPath 
+  , paymentKeyDerivation :: Maybe DerivationInfo
   -- | The amount of ada in this UTxO.
   , lovelace :: Lovelace
   -- | The native assets in this UTxO.
@@ -37,14 +37,14 @@ instance Default CollateralInput where
   def = CollateralInput
     { utxoRef = TxOutRef "" 0
     , paymentAddress = ""
-    , paymentKeyPath = Nothing
+    , paymentKeyDerivation = Nothing
     , lovelace = 0
     , nativeAssets = []
     , walletAlias = ""
     }
 
 instance AddToTxBody CollateralInput where
-  addToTxBody txBody CollateralInput{utxoRef,paymentAddress,paymentKeyPath,lovelace} = 
+  addToTxBody txBody CollateralInput{utxoRef,paymentAddress,paymentKeyDerivation,lovelace} = 
       txBody 
         -- Add the collateral input.
         & #collateralInput ?~ newCollateral
@@ -67,19 +67,19 @@ instance AddToTxBody CollateralInput where
       requiredWitness :: Maybe KeyWitness
       requiredWitness = case toPubKeyHash plutusAddress of
           Nothing -> Nothing
-          Just pkHash -> Just $ KeyWitness (pkHash, paymentKeyPath)
+          Just pkHash -> Just $ KeyWitness (pkHash, paymentKeyDerivation)
 
 personalUTxOToCollateralInput
   :: Text 
   -> PaymentAddress 
-  -> Maybe DerivationPath 
+  -> Maybe DerivationInfo
   -> PersonalUTxO 
   -> CollateralInput
-personalUTxOToCollateralInput alias paymentAddress mKeyPath PersonalUTxO{utxoRef,lovelace,nativeAssets} = 
+personalUTxOToCollateralInput alias paymentAddress mKeyInfo PersonalUTxO{utxoRef,lovelace,nativeAssets} = 
   CollateralInput
     { utxoRef = utxoRef
     , paymentAddress = paymentAddress
-    , paymentKeyPath = mKeyPath
+    , paymentKeyDerivation = mKeyInfo
     , lovelace = lovelace
     , nativeAssets = nativeAssets
     , walletAlias = alias

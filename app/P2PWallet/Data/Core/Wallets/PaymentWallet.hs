@@ -88,9 +88,9 @@ data PaymentWallet = PaymentWallet
   , paymentId :: PaymentId
   , alias :: Text
   , paymentAddress :: PaymentAddress
-  , paymentKeyPath :: Maybe DerivationPath
+  , paymentKeyDerivation :: Maybe DerivationInfo
   , stakeAddress :: Maybe StakeAddress
-  , stakeKeyPath :: Maybe DerivationPath
+  , stakeKeyDerivation :: Maybe DerivationInfo
   , utxos :: [PersonalUTxO]
   , lovelace :: Lovelace
   , nativeAssets :: [NativeAsset]
@@ -110,8 +110,8 @@ instance Default PaymentWallet where
     , alias = "dummy" 
     , paymentAddress = PaymentAddress "" 
     , stakeAddress = Nothing 
-    , paymentKeyPath = Just $ PaymentKeyPath 0 0
-    , stakeKeyPath = Nothing 
+    , paymentKeyDerivation = Just (Nothing, PaymentKeyPath 0 0)
+    , stakeKeyDerivation = Nothing 
     , utxos = []
     , lovelace = 0
     , nativeAssets = []
@@ -126,8 +126,8 @@ instance FromRow PaymentWallet where
     alias <- field
     paymentAddress <- field
     stakeAddress <- field
-    paymentKeyPath <- field
-    stakeKeyPath <- field
+    paymentKeyDerivation <- field
+    stakeKeyDerivation <- field
     utxos <- fromMaybe mzero . decode <$> field
     lovelace <- field
     nativeAssets <- fromMaybe mzero . decode <$> field
@@ -138,8 +138,8 @@ instance FromRow PaymentWallet where
       , alias = alias
       , paymentAddress = paymentAddress
       , stakeAddress = stakeAddress
-      , paymentKeyPath = paymentKeyPath
-      , stakeKeyPath = stakeKeyPath
+      , paymentKeyDerivation = paymentKeyDerivation
+      , stakeKeyDerivation = stakeKeyDerivation
       , utxos = utxos
       , lovelace = lovelace
       , nativeAssets = nativeAssets
@@ -154,8 +154,8 @@ instance ToRow PaymentWallet where
     , toField alias
     , toField paymentAddress
     , toField stakeAddress
-    , toField paymentKeyPath
-    , toField stakeKeyPath
+    , toField paymentKeyDerivation
+    , toField stakeKeyDerivation
     , toField $ encode utxos
     , toField lovelace
     , toField $ encode nativeAssets
@@ -174,9 +174,9 @@ instance Creatable PaymentWallet where
         , "payment_id INTEGER PRIMARY KEY"
         , "alias TEXT NOT NULL"
         , "payment_address TEXT NOT NULL"
-        , "payment_key_path TEXT"
+        , "payment_key_derivation TEXT"
         , "stake_address TEXT"
-        , "stake_key_path TEXT"
+        , "stake_key_derivation TEXT"
         , "utxos BLOB"
         , "lovelace INTEGER NOT NULL"
         , "native_assets BLOB"
@@ -195,9 +195,9 @@ instance Insertable PaymentWallet where
         , "payment_id"
         , "alias"
         , "payment_address"
-        , "payment_key_path"
+        , "payment_key_derivation"
         , "stake_address"
-        , "stake_key_path"
+        , "stake_key_derivation"
         , "utxos"
         , "lovelace"
         , "native_assets"

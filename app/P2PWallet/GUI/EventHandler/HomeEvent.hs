@@ -142,7 +142,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
                       , stakeId = stakeId
                       , alias = alias <> "_stake"
                       , stakeAddress = fromMaybe "" stakeAddress 
-                      , stakeKeyPath = stakeKeyPath 
+                      , stakeKeyDerivation = stakeKeyDerivation
                       , registrationStatus = NotRegistered
                       , totalDelegation = 0
                       , utxoBalance = 0
@@ -291,8 +291,8 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   -- Add Personal UTxO to Builder
   -----------------------------------------------
   AddSelectedUserInput personalUTxO ->
-    let PaymentWallet{alias,paymentAddress,paymentKeyPath} = homeModel ^. #selectedWallet
-        newInput = personalUTxOToUserInput alias paymentAddress paymentKeyPath personalUTxO
+    let PaymentWallet{alias,paymentAddress,paymentKeyDerivation} = homeModel ^. #selectedWallet
+        newInput = personalUTxOToUserInput alias paymentAddress paymentKeyDerivation personalUTxO
     in  case processNewUserInput newInput txBuilderModel of
           Left err -> [ Task $ return $ Alert err ]
           Right newTxModel ->
@@ -304,8 +304,9 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   -- Add Collateral UTxO to Builder
   -----------------------------------------------
   AddSelectedCollateralInput personalUTxO ->
-    let PaymentWallet{alias,paymentAddress,paymentKeyPath} = homeModel ^. #selectedWallet
-        newInput = personalUTxOToCollateralInput alias paymentAddress paymentKeyPath personalUTxO
+    let PaymentWallet{alias,paymentAddress,paymentKeyDerivation} = homeModel ^. #selectedWallet
+        newInput = 
+          personalUTxOToCollateralInput alias paymentAddress paymentKeyDerivation personalUTxO
     in  case processNewCollateralInput newInput txBuilderModel of
           Left err -> [ Task $ return $ Alert err ]
           Right newTxModel ->

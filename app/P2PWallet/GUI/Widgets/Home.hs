@@ -109,7 +109,7 @@ mainWidget model@AppModel{scene=_,..} =
       | otherwise = True
 
     (walletTypeTip,walletTypeIcon)
-      | isNothing $ homeModel ^. #selectedWallet % #paymentKeyPath = ("Watched", watchedIcon)
+      | isNothing $ homeModel ^. #selectedWallet % #paymentKeyDerivation = ("Watched", watchedIcon)
       | otherwise = ("Paired", pairedIcon)
 
     headerWidget :: AppNode

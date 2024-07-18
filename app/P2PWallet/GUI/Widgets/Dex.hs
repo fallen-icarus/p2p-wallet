@@ -93,7 +93,7 @@ mainWidget model@AppModel{scene=_,..} =
       | otherwise = True
 
     (walletTypeTip,walletTypeIcon)
-      | isNothing $ dexModel ^. #selectedWallet % #stakeKeyPath = ("Watched", watchedIcon)
+      | isNothing $ dexModel ^. #selectedWallet % #stakeKeyDerivation = ("Watched", watchedIcon)
       | otherwise = ("Paired", pairedIcon)
 
     sceneMenu :: AppNode
@@ -274,24 +274,25 @@ addDexWalletWidget AppModel{knownWallets,dexModel} = do
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
               ]
           , separatorLine `styleBasic` [paddingL 50, paddingR 50]
-          , widgetMaybe newSwapCredential $ \StakeWallet{stakeAddress,stakeKeyPath} -> vstack
-              [ spacer
-              , hstack
-                  [ label "Stake Address:"
-                      `styleBasic` [textSize 12]
-                  , spacer
-                  , label (toText stakeAddress)
-                      `styleBasic` [textSize 12]
-                  ]
-              , spacer
-              , widgetMaybe stakeKeyPath $ \keyPath -> hstack
-                  [ label "Derivation Path:"
-                      `styleBasic` [textSize 12]
-                  , spacer
-                  , label (display keyPath)
-                      `styleBasic` [textSize 12]
-                  ]
-              ]
+          , widgetMaybe newSwapCredential $ \StakeWallet{stakeAddress,stakeKeyDerivation} -> 
+              vstack
+                [ spacer
+                , hstack
+                    [ label "Stake Address:"
+                        `styleBasic` [textSize 12]
+                    , spacer
+                    , label (toText stakeAddress)
+                        `styleBasic` [textSize 12]
+                    ]
+                , spacer
+                , widgetMaybe stakeKeyDerivation $ \keyInfo -> hstack
+                    [ label "Derivation:"
+                        `styleBasic` [textSize 12]
+                    , spacer
+                    , label (display keyInfo)
+                        `styleBasic` [textSize 12]
+                    ]
+                ]
           ]
 
   centerWidget $ vstack 

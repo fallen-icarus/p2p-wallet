@@ -92,9 +92,9 @@ executable p2p-wallet
       P2PWallet.Data.Core.Internal.Assets
       P2PWallet.Data.Core.Internal.Bech32Address
       P2PWallet.Data.Core.Internal.Config
-      P2PWallet.Data.Core.Internal.DerivationPath
       P2PWallet.Data.Core.Internal.Files
       P2PWallet.Data.Core.Internal.HardwareDevice
+      P2PWallet.Data.Core.Internal.KeyDerivation
       P2PWallet.Data.Core.Internal.KeyWitness
       P2PWallet.Data.Core.Internal.Network
       P2PWallet.Data.Core.Internal.Notification

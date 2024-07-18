@@ -39,6 +39,7 @@ data Profile = Profile
   , accountIndex :: AccountIndex -- ^ The key family associated with this profile.
   , alias :: Text -- ^ The user friendly name for this profile.
   , device :: HardwareDevice -- ^ Which hardware wallet derivation the profile is dedicated to.
+  , derivationType :: Maybe DerivationType -- ^ The derivation type to use if Trezor.
   } deriving (Show,Eq,Ord,Generic,ToRow,FromRow)
 
 makeFieldLabelsNoPrefix ''Profile
@@ -50,6 +51,7 @@ instance Default Profile where
     , accountIndex = 0
     , alias = ""
     , device = Ledger
+    , derivationType = Nothing
     }
 
 instance TableName Profile where
@@ -65,6 +67,7 @@ instance Creatable Profile where
         , "account_index INTEGER NOT NULL"
         , "alias TEXT NOT NULL"
         , "device TEXT NOT NULL"
+        , "derivationt_type TEXT"
         , "UNIQUE(network,profile_id,alias)"
         ]
     , ");"
@@ -80,9 +83,10 @@ instance Insertable Profile where
         , "account_index"
         , "alias"
         , "device"
+        , "derivationt_type"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?);"
     ]
 
 -------------------------------------------------
@@ -96,6 +100,8 @@ data NewProfile = NewProfile
   , accountIndex :: Int 
   -- | Which hardware wallet device this profile is for.
   , device :: HardwareDevice
+  -- | Which derivation type to use if the device is Trezor.
+  , derivationType :: Maybe DerivationType
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''NewProfile
@@ -105,6 +111,7 @@ instance Default NewProfile where
     { alias = ""
     , accountIndex = 0
     , device = Ledger
+    , derivationType = Nothing
     }
 
 -- | Process the user's info for the profile. Check that the profile name is not already being
@@ -120,6 +127,7 @@ verifyNewProfile network newProfileId NewProfile{..} otherProfiles
       , alias = alias
       , accountIndex = AccountIndex accountIndex
       , device = device
+      , derivationType = if device == Ledger then Nothing else derivationType
       }
 
 toNewProfile :: Profile -> NewProfile
@@ -127,4 +135,5 @@ toNewProfile Profile{..} = NewProfile
   { alias = alias
   , accountIndex = unAccountIndex accountIndex
   , device = device
+  , derivationType = derivationType
   }

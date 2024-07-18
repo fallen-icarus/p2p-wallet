@@ -286,8 +286,8 @@ handleDexEvent model@AppModel{..} evt = case evt of
   -- Add Swap Close to Builder
   -----------------------------------------------
   AddSelectedSwapClose swapUTxO ->
-    let DexWallet{network,alias,stakeAddress,stakeKeyPath} = dexModel ^. #selectedWallet
-        newInput = swapUTxOToSwapClose network alias stakeAddress stakeKeyPath swapUTxO
+    let DexWallet{network,alias,stakeAddress,stakeKeyDerivation} = dexModel ^. #selectedWallet
+        newInput = swapUTxOToSwapClose network alias stakeAddress stakeKeyDerivation swapUTxO
     in  case processNewSwapClose newInput txBuilderModel of
           Left err -> [ Task $ return $ Alert err ]
           Right newTxModel ->
@@ -313,7 +313,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
     ConfirmAdding ->
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (DexEvent . AddSelectedSwapUpdate . AddResult) $ do
-          let DexWallet{network,alias,stakeAddress,stakeKeyPath} = dexModel ^. #selectedWallet
+          let DexWallet{network,alias,stakeAddress,stakeKeyDerivation} = dexModel ^. #selectedWallet
           (utxoToClose@SwapUTxO{utxoRef},newSwap@NewSwapCreation{paymentAddress}) <- 
             fromJustOrAppError "Nothing set for `newSwapUpdate`" $ dexModel ^. #newSwapUpdate
 
@@ -343,7 +343,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
                 (emptySwapBuilderModel & #swapCreations .~ [(0,verifiedSwapUpdate)])
 
           return $ SwapUpdate
-            { oldSwap = swapUTxOToSwapClose network alias stakeAddress stakeKeyPath utxoToClose
+            { oldSwap = swapUTxOToSwapClose network alias stakeAddress stakeKeyDerivation utxoToClose
             , newSwap = verifiedSwapUpdate & #deposit .~ minUTxOValue
             }
       ]
@@ -465,7 +465,7 @@ processNewDexWallet paymentId StakeWallet{..} = do
     , oneWaySwapAddress = oneWaySwapAddress
     , twoWaySwapAddress = twoWaySwapAddress
     , stakeAddress = stakeAddress
-    , stakeKeyPath = stakeKeyPath
+    , stakeKeyDerivation = stakeKeyDerivation
     , utxos = []
     , lovelace = 0
     , nativeAssets = []

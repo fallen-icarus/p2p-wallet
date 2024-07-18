@@ -13,7 +13,7 @@ Types to represent the derivation paths for hardware wallet keys:
 @
 
 -}
-module P2PWallet.Data.Core.Internal.DerivationPath where
+module P2PWallet.Data.Core.Internal.KeyDerivation where
 
 import Data.Aeson qualified as Aeson
 
@@ -26,12 +26,45 @@ import Database.SQLite.Simple (SQLData(SQLText))
 import P2PWallet.Prelude
 
 -------------------------------------------------
+-- Derivation Type
+-------------------------------------------------
+-- | The type of derivation to use for the hardware wallet. This currently only applies to trezor.
+data DerivationType
+  = IcarusDerivation
+  | LedgerDerivation
+  | TrezorIcarusDerivation
+  deriving (Show,Eq,Enum,Read,Ord,Generic,Aeson.ToJSON,Aeson.FromJSON)
+
+instance Display DerivationType where
+  display LedgerDerivation = "Ledger"
+  display IcarusDerivation = "Icarus"
+  display TrezorIcarusDerivation = "Trezor-Icarus"
+
+instance ToField DerivationType where
+  toField = toField @Text . show
+
+instance FromField DerivationType where
+  fromField f@(Field (SQLText t) _) = 
+    maybe (returnError ConversionFailed f "failed to parse DerivationType") Ok $ 
+      readMaybe $ toString t
+  fromField f = returnError ConversionFailed f "need a text"
+
+showDerivationTypeForCLI :: DerivationType -> String
+showDerivationTypeForCLI LedgerDerivation = "LEDGER"
+showDerivationTypeForCLI IcarusDerivation = "ICARUS"
+showDerivationTypeForCLI TrezorIcarusDerivation = "ICARUS_TREZOR"
+
+-- | Used for a dropdown menu.
+supportedDerivations :: [DerivationType]
+supportedDerivations = enumFrom IcarusDerivation
+
+-------------------------------------------------
 -- Account Index
 -------------------------------------------------
 -- | A type representing the account field in the derivaiton path.
 newtype AccountIndex = AccountIndex { unAccountIndex :: Int }
   deriving (Show)
-  deriving newtype (Eq,Ord,Num,ToField,FromField)
+  deriving newtype (Eq,Ord,Num,ToField,FromField,Read)
 
 makeFieldLabelsNoPrefix ''AccountIndex
 
@@ -46,7 +79,7 @@ toAccountIndex n
 -- | A type representing the address_index field in the derivaiton path.
 newtype AddressIndex = AddressIndex { unAddressIndex :: Int }
   deriving (Show)
-  deriving newtype (Eq,Ord,Num)
+  deriving newtype (Eq,Ord,Num,Read)
 
 makeFieldLabelsNoPrefix ''AddressIndex
 
@@ -66,7 +99,7 @@ data DerivationPath
   -- | Stake keys can increment either the account index or the address index.
   -- The chain index is fixed at `2`.
   | StakeKeyPath AccountIndex AddressIndex
-  deriving (Show,Eq,Ord)
+  deriving (Show,Eq,Ord,Read)
 
 makePrisms ''DerivationPath
 
@@ -111,3 +144,24 @@ parseDerivationPath t = case words $ replace "/" " " t of
 
     parseAddressIndex :: Text -> Maybe AddressIndex
     parseAddressIndex n = readMaybe @Int (toString n) >>= toAddressIndex
+
+-------------------------------------------------
+-- Derivation Info
+-------------------------------------------------
+-- | A type alias for the full derivation information.
+type DerivationInfo = (Maybe DerivationType, DerivationPath)
+
+instance ToField DerivationInfo where
+  toField = toField @Text . show . Aeson.encode
+
+instance FromField DerivationInfo where
+  fromField f@(Field (SQLText t) _) = 
+    maybe (returnError ConversionFailed f "failed to parse DerivationInfo") Ok
+      (readMaybe (toString t) >>= Aeson.decode)
+  fromField f = returnError ConversionFailed f "need a text"
+
+instance Display DerivationInfo where
+  display (mDerivationType, path) = unwords
+    [ display path
+    , "("<> display (fromMaybe LedgerDerivation mDerivationType) <> ")"
+    ]
