@@ -12,7 +12,6 @@ import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Dex.Positions
 import P2PWallet.GUI.Widgets.Dex.Trade
-import P2PWallet.GUI.Widgets.Dex.Transactions
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.Prelude
@@ -68,8 +67,6 @@ mainWidget model@AppModel{scene=_,..} =
           ]
       , box_ [mergeRequired reqUpdate] (positionsWidget model)
           `nodeVisible` (dexModel ^. #scene == DexPositions)
-      , box_ [mergeRequired reqUpdate] (transactionsWidget model)
-          `nodeVisible` (dexModel ^. #scene == DexTradeHistory)
       , box_ [mergeRequired reqUpdate] (tradeWidget model)
           `nodeVisible` (dexModel ^. #scene == DexMarket)
       ] 
@@ -102,11 +99,7 @@ mainWidget model@AppModel{scene=_,..} =
     sceneMenu :: AppNode
     sceneMenu = hstack 
       [ spacer
-      , dexSceneButton "Positions" DexPositions
-      , spacer
-      , separatorLine `styleBasic` [paddingT 5, paddingB 5]
-      , spacer
-      , dexSceneButton "History" DexTradeHistory
+      , dexSceneButton "Open Positions" DexPositions
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer

@@ -4,6 +4,7 @@ module P2PWallet.GUI.EventHandler
   ) where
 
 import Monomer
+import Data.Text qualified as Text
 
 import P2PWallet.Actions.SubmitTx
 import P2PWallet.Actions.SyncWallets
@@ -56,8 +57,12 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   Alert msg -> 
     -- Disable all overlays and display the message. The scene is not changed so users can 
     -- quickly try again if desired. 
-    [ Model $ model & #alertMessage ?~ msg 
-                    & #waitingStatus .~ def
+    [ Model $ model 
+        & #alertMessage ?~ msg 
+        & #waitingStatus .~ def
+        & #txBuilderModel %~
+            -- Clear the tx builder, but only if the submission was successfull.
+            if "Submission successfull!" `Text.isPrefixOf` msg then const def else id
     ]
   CloseAlertMessage -> 
     -- Close the alert widget and reset the alert message.
@@ -118,13 +123,22 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- Updating the current date
   -----------------------------------------------
+  -- This is always called after syncing so it will handle any new notifications.
   UpdateCurrentDate modal -> case modal of
     StartProcess -> 
       [ Task $ runActionOrAlert (UpdateCurrentDate . ProcessResults) $ 
           getCurrentDay (config ^. #timeZone)
       ]
     ProcessResults day ->
-      [ Model $ model & #config % #currentDay .~ day ]
+      [ Model $ model & #config % #currentDay .~ day
+      , Task $ 
+          if notifications /= [] then do
+            return $ Alert $ unlines
+              [ "You have new notifications!"
+              , "Go to the News page to check them out."
+              ]
+          else return AppInit
+      ]
 
   -----------------------------------------------
   -- Syncing Wallets
@@ -137,7 +151,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
           runActionOrAlert (SyncWallets . ProcessResults) $ 
             syncWallets databaseFile (config ^. #network) knownWallets
       ]
-    ProcessResults (resp@Wallets{..}, networkParams) ->
+    ProcessResults (resp@Wallets{..}, networkParams, newNotifications) ->
       -- Disable `syncing` and update the list of wallets. Also update the information for
       -- the `selectedWallet`.
       let paymentTarget = model ^. #homeModel % #selectedWallet % #paymentId
@@ -158,6 +172,8 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
               & #txBuilderModel % #parameters ?~ networkParams
               & #fingerprintMap .~ 
                   toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
+              & #notifications .~ zip [0..] newNotifications
+          -- `UpdateCurrentDate` will handle any new notifications alerts.
           , Task $ return $ UpdateCurrentDate StartProcess
           ]
 
@@ -168,3 +184,15 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
     [ Model $ model & #waitingStatus % #submitting .~ True
     , Task $ runActionOrAlert Alert $ submitTx (config ^. #network) signedFile
     ]
+
+  -----------------------------------------------
+  -- Toggle notification status
+  -----------------------------------------------
+  ToggleNotificationReadStatus idx ->
+    [ Model $ model & #notifications % ix idx % _2 % #markedAsRead %~ not ]
+
+  -----------------------------------------------
+  -- Mark all notifications as read
+  -----------------------------------------------
+  MarkAllNotificationsAsRead ->
+    [ Model $ model & #notifications %~ map (set (_2 % #markedAsRead) True) ]

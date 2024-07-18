@@ -44,6 +44,7 @@ import P2PWallet.Data.Core.AssetMaps
 import P2PWallet.Data.Core.Internal.Config
 import P2PWallet.Data.Core.Internal.Files
 import P2PWallet.Data.Core.Internal.Network
+import P2PWallet.Data.Core.Internal.Notification
 import P2PWallet.Data.Core.Profile
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
@@ -62,6 +63,7 @@ data MainScene
   | TickerRegistryScene
   | SettingsScene
   | DexScene
+  | NotificationsScene
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -125,7 +127,7 @@ data AppEvent
   -- | Sync the currently tracked wallets. This can be called from most scenes which is why it
   -- is a main event. This also gets the current network parameters so they are available for
   -- building transactions.
-  | SyncWallets (ProcessEvent (Wallets, ByteString))
+  | SyncWallets (ProcessEvent (Wallets, ByteString,[Notification]))
   -- | Update the current date.
   | UpdateCurrentDate (ProcessEvent Day)
   -- | An event for the Home page.
@@ -142,6 +144,10 @@ data AppEvent
   | TxBuilderEvent TxBuilderEvent 
   -- | Submit a signed transaction.
   | SubmitTx SignedTxFile 
+  -- | Toggle notification status.
+  | ToggleNotificationReadStatus Int
+  -- | Mark all notifications as read.
+  | MarkAllNotificationsAsRead
 
 -------------------------------------------------
 -- App State
@@ -162,6 +168,8 @@ data AppModel = AppModel
   , selectedProfile :: Maybe Profile
   -- | The known wallets for the selected profile.
   , knownWallets :: Wallets
+  -- | Notifications from the latest sync.
+  , notifications :: [(Int,Notification)]
   -- | The waiting status for the app.
   , waitingStatus :: WaitingStatus
   -- | The home model.
@@ -203,6 +211,7 @@ instance Default AppModel where
     , profileModel = def
     , selectedProfile = Nothing
     , knownWallets = def
+    , notifications = []
     , waitingStatus = def
     , homeModel = def
     , delegationModel = def

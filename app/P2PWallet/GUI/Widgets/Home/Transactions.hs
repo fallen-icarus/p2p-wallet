@@ -979,9 +979,7 @@ txValueFromWallet addr Transaction{inputs,outputs} =
         ( sum $ map (view #lovelace) addressOutputs
         , concatMap (view #nativeAssets) addressOutputs
         )
-      assetChange = filter ((/= 0) . view #quantity) -- filter out zero quantities
-                  $ sumNativeAssets 
-                  $ spentAssets <> receivedAssets
+      assetChange = sumNativeAssets $ spentAssets <> receivedAssets
   in (toAda $ receivedLoves - spentLoves, assetChange)
 
 applySearchFilter :: PaymentWallet -> ReverseTickerMap -> [Text] -> [Transaction] -> [Transaction]

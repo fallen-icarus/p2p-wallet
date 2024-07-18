@@ -50,6 +50,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
       [ Model $ model 
           & #knownWallets .~ wallets
           & #scene .~ HomeScene
+          & #notifications .~ []
           & #waitingStatus % #loadingProfile .~ False
           & #homeModel % #selectedWallet .~ fromMaybe def (maybeHead paymentWallets)
           -- Set the selected stake and DeFi wallets.
@@ -69,6 +70,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
         & #scene .~ ProfilesScene 
         & #selectedProfile .~ Nothing
         & #knownWallets .~ def
+        & #notifications .~ []
         & #addressBook .~ []
         & #txBuilderModel .~ def -- reset builder
     ]

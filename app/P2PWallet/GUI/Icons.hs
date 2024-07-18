@@ -113,8 +113,6 @@ largeAddIcon = toGlyph 0XF4B2
 
 spendUTxOIcon :: Text
 spendUTxOIcon = remixSendPlane2Fill
--- spendUTxOIcon = remixHandCoinLine
--- spendUTxOIcon = remixMailSendFill
 
 contactsBookIcon :: Text
 contactsBookIcon = remixContactsBook2Line
@@ -157,3 +155,12 @@ dexIcon = remixArrowLeftRightFill
 
 twoWayIcon :: Text
 twoWayIcon = remixArrowLeftLine <> remixArrowRightLine
+
+notificationBellIcon :: Text
+notificationBellIcon = toGlyph 0XEF94
+
+markReadIcon :: Text
+markReadIcon = remixMailOpenLine
+
+markUnreadIcon :: Text
+markUnreadIcon = remixMailUnreadLine

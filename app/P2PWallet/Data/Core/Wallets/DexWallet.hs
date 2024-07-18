@@ -170,6 +170,13 @@ swapUTxOAsset2 SwapUTxO{swapDatum} = case swapDatum of
     }
   _ -> Nothing
 
+-- | Get the swap input that was executed to produce this `SwapUTxO`.
+swapUTxOPreviousInput :: SwapUTxO -> Maybe TxOutRef
+swapUTxOPreviousInput SwapUTxO{swapDatum} = case swapDatum of
+  Just (OneWay OneWay.SwapDatum{prevInput}) -> prevInput
+  Just (TwoWay TwoWay.SwapDatum{prevInput}) -> prevInput
+  _ -> Nothing
+
 -------------------------------------------------
 -- Dex Wallet
 -------------------------------------------------
@@ -312,3 +319,51 @@ instance Insertable DexWallet where
     , ")"
     , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
+
+data SwapAction
+  = SwapUnchanged
+  | SwapClosed
+  | SwapExecuted
+  | SwapCreated
+  deriving (Eq,Ord)
+
+instance Notify DexWallet where
+  notify oldState@DexWallet{utxos=oldUTxOs} DexWallet{utxos=newUTxOs}
+    | null msg = Nothing
+    | otherwise = Just $ Notification
+        { notificationType = DexNotification
+        , alias = oldState ^. #alias
+        , message = mconcat $ intersperse "\n" msg
+        , markedAsRead = False
+        }
+    where
+      processInput :: TxOutRef -> SwapAction
+      processInput targetRef = fromMaybe SwapClosed $ asum
+        [ SwapUnchanged <$ find (\u -> u ^. #utxoRef == targetRef) newUTxOs
+        , SwapExecuted <$ find (\u -> swapUTxOPreviousInput u == Just targetRef) newUTxOs
+        ]
+
+      -- This should only ever notify when a swap is created.
+      processOutput :: SwapUTxO -> Maybe SwapAction
+      processOutput u@SwapUTxO{utxoRef}
+        | isJust $ find ((==utxoRef) . view #utxoRef) oldUTxOs = Nothing
+        | isJust $ find ((==swapUTxOPreviousInput u) . Just . view #utxoRef) oldUTxOs = Nothing
+        | otherwise = Just SwapCreated
+
+      -- All updates grouped into a list so the count for each action can be determined.
+      allUpdates :: [[SwapAction]]
+      allUpdates = group $ sort $ mconcat
+        [ map (processInput . view #utxoRef) oldUTxOs
+        , mapMaybe processOutput newUTxOs
+        ]
+
+      genMsg :: [SwapAction] -> Text
+      genMsg [] = ""
+      genMsg xs@(x:_) = case x of
+        SwapUnchanged -> ""
+        SwapClosed -> show (length xs) <> " swap(s) were closed."
+        SwapCreated -> show (length xs) <> " swap(s) were created."
+        SwapExecuted -> show (length xs) <> " swap(s) were (at least partially) executed."
+
+      msg :: [Text]
+      msg = filter (/= "") $ map genMsg allUpdates

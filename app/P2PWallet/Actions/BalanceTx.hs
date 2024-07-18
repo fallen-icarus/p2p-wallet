@@ -52,7 +52,7 @@ balanceTx tx@TxBuilderModel{..} =
     outputValue = sumAssetBalances
       [ assetBalancesForChange userOutputs
       , assetBalancesForChange $ swapBuilderModel ^. #swapCreations
-      , (requiredDeposits, [])
+      , (-requiredDeposits, [])
       , (-fee, [])
       ]
 

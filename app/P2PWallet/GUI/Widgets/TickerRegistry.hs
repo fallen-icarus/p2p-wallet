@@ -58,11 +58,13 @@ tickerRegistryWidget AppModel{..} = do
       , box_ [mergeRequired reqUpdate] $ zstack
           [ widgetMaybe result resultWidget
               `nodeVisible` not isChanging
+          , adaProhibitedWidget `nodeVisible` searchIsADA
           , unknownTickerWidget
               `nodeVisible` and
                 [ isNothing result
                 , searchTarget /= ""
                 , not isChanging
+                , not searchIsADA
                 ]
           , addingTickerWidget `nodeVisible` isAdding
           , editingTickerWidget `nodeVisible` isEditing
@@ -110,6 +112,9 @@ tickerRegistryWidget AppModel{..} = do
 
     searchTarget :: Text
     searchTarget = tickerRegistryModel ^. #search
+
+    searchIsADA :: Bool
+    searchIsADA = searchTarget == "ADA"
 
     result :: Maybe (CurrencySymbol,TokenName,Word8)
     result = Map.lookup (Ticker searchTarget) tickerMap
@@ -164,6 +169,11 @@ tickerRegistryWidget AppModel{..} = do
             , copyableLabelFor "Decimals:" $ show decimal
             ]
         ]
+
+    adaProhibitedWidget :: AppNode
+    adaProhibitedWidget = 
+      centerWidgetH $ 
+        label "'ADA' cannot be used as a ticker." `styleBasic` [textColor lightGray]
 
     unknownTickerWidget :: AppNode
     unknownTickerWidget = do

@@ -15,6 +15,7 @@ module P2PWallet.Data.Core.Internal
   , module P2PWallet.Data.Core.Internal.HardwareDevice
   , module P2PWallet.Data.Core.Internal.KeyWitness
   , module P2PWallet.Data.Core.Internal.Network
+  , module P2PWallet.Data.Core.Internal.Notification
   , module P2PWallet.Data.Core.Internal.PoolID
   , module P2PWallet.Data.Core.Internal.PrimaryKeys
   , module P2PWallet.Data.Core.Internal.RegistrationStatus
@@ -30,6 +31,7 @@ import P2PWallet.Data.Core.Internal.Files
 import P2PWallet.Data.Core.Internal.HardwareDevice
 import P2PWallet.Data.Core.Internal.KeyWitness
 import P2PWallet.Data.Core.Internal.Network
+import P2PWallet.Data.Core.Internal.Notification
 import P2PWallet.Data.Core.Internal.PoolID
 import P2PWallet.Data.Core.Internal.PrimaryKeys
 import P2PWallet.Data.Core.Internal.RegistrationStatus
