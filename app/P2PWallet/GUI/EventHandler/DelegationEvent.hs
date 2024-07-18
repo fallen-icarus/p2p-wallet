@@ -250,10 +250,10 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
   -- Add User Certificate to Builder
   -----------------------------------------------
   AddSelectedUserCertificate (mNameAndTicker,certificateAction) ->
-    let StakeWallet{alias,stakeAddress,stakeKeyPath} = delegationModel ^. #selectedWallet 
+    let StakeWallet{alias,stakeAddress,stakeKeyDerivation} = delegationModel ^. #selectedWallet 
         userCertificate = UserCertificate
           { stakeAddress = stakeAddress
-          , stakeKeyPath = stakeKeyPath
+          , stakeKeyDerivation = stakeKeyDerivation
           , certificateAction = certificateAction
           , walletAlias = alias
           , poolName = mNameAndTicker
@@ -268,10 +268,10 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- Add User Withdrawal to Builder
   -----------------------------------------------
-  AddSelectedUserWithdrawal StakeWallet{alias,stakeAddress,stakeKeyPath,availableRewards} ->
+  AddSelectedUserWithdrawal StakeWallet{alias,stakeAddress,stakeKeyDerivation,availableRewards} ->
     let userWithdrawal = UserWithdrawal
           { stakeAddress = stakeAddress
-          , stakeKeyPath = stakeKeyPath
+          , stakeKeyDerivation = stakeKeyDerivation
           , lovelace = availableRewards
           , walletAlias = alias
           }

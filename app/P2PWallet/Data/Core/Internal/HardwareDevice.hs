@@ -15,12 +15,11 @@ import Database.SQLite.Simple (SQLData(SQLText))
 import P2PWallet.Prelude
 
 -------------------------------------------------
--- Supported Device Derivations
+-- Supported Devices
 -------------------------------------------------
 data HardwareDevice
   = Ledger
   | Trezor
-  | TrezorLegacy
   deriving (Show,Eq,Ord,Enum,Read)
 
 makePrisms ''HardwareDevice
@@ -28,7 +27,6 @@ makePrisms ''HardwareDevice
 instance Display HardwareDevice where
   display Ledger = "Ledger"
   display Trezor = "Trezor"
-  display TrezorLegacy = "Legacy Trezor"
 
 instance ToField HardwareDevice where
   toField = toField @Text . show

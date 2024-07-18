@@ -25,23 +25,23 @@ pairPaymentWallet
   -> NewPaymentWallet 
   -> [PaymentWallet] -- ^ The currently tracked payment wallets.
   -> IO PaymentWallet
-pairPaymentWallet network Profile{profileId,accountIndex} paymentId NewPaymentWallet{..} known = do
+pairPaymentWallet network Profile{alias=_,network=_,..} paymentId NewPaymentWallet{..} known = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
 
     when (any ((== alias) . view #alias) known) $ 
       throwIO $ AppError "This name is already being used by another payment wallet."
 
-    pKeyPath <- 
+    pKeyInfo <- 
       fromJustOrAppError "Invalid payment address index." $ 
-        PaymentKeyPath accountIndex <$> toAddressIndex paymentAddressIndex
+        (derivationType,) . PaymentKeyPath accountIndex <$> toAddressIndex paymentAddressIndex
 
-    msKeyPath <- case fmap toAddressIndex stakeAddressIndex of
+    msKeyInfo <- case fmap toAddressIndex stakeAddressIndex of
       Nothing -> return Nothing -- No stake key present.
       Just Nothing -> throwIO $ AppError "Invalid stake address index."
       Just (Just addrIx) -> -- Successfully converted address index.
-        return $ Just $ StakeKeyPath accountIndex addrIx
+        return $ Just (derivationType, StakeKeyPath accountIndex addrIx)
 
-    (payAddr,mStakeAddr) <- genAddresses pKeyPath msKeyPath
+    (payAddr,mStakeAddr) <- genAddresses pKeyInfo msKeyInfo
 
     return $ PaymentWallet 
       { network = network
@@ -50,8 +50,8 @@ pairPaymentWallet network Profile{profileId,accountIndex} paymentId NewPaymentWa
       , alias = alias
       , paymentAddress = payAddr 
       , stakeAddress = mStakeAddr 
-      , paymentKeyPath = Just pKeyPath 
-      , stakeKeyPath = msKeyPath 
+      , paymentKeyDerivation = Just pKeyInfo
+      , stakeKeyDerivation = msKeyInfo
       , utxos = []
       , lovelace = 0
       , nativeAssets = []
@@ -60,16 +60,16 @@ pairPaymentWallet network Profile{profileId,accountIndex} paymentId NewPaymentWa
 
   where
     genAddresses 
-      :: DerivationPath 
-      -> Maybe DerivationPath 
+      :: DerivationInfo
+      -> Maybe DerivationInfo
       -> IO (PaymentAddress, Maybe StakeAddress)
-    genAddresses paymentKey mStakingKey = do
-      paymentKeyHash <- PubKeyCredential <$> exportHwPubKeyHash paymentKey
+    genAddresses paymentKeyInfo mStakingKeyInfo = do
+      paymentKeyHash <- PubKeyCredential <$> exportHwPubKeyHash paymentKeyInfo
       mStakingKeyHash <- 
         maybe 
           (return Nothing) 
           (fmap (Just . StakingHash . PubKeyCredential) . exportHwPubKeyHash) 
-          mStakingKey
+          mStakingKeyInfo
 
       fromRightOrAppError $ plutusToBech32 network $ Address paymentKeyHash mStakingKeyHash
 
@@ -81,17 +81,17 @@ pairStakeWallet
   -> NewStakeWallet 
   -> [StakeWallet] -- ^ Currently tracked stake wallets.
   -> IO StakeWallet
-pairStakeWallet network Profile{profileId,accountIndex} stakeId NewStakeWallet{..} known = do
+pairStakeWallet network Profile{alias=_,network=_,..} stakeId NewStakeWallet{..} known = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
 
     when (any ((== alias) . view #alias) known) $ 
       throwIO $ AppError "This name is already being used by another stake wallet."
 
-    sKeyPath <- 
+    sKeyInfo <- 
       fromJustOrAppError "Invalid stake address index." $ 
-        StakeKeyPath accountIndex <$> toAddressIndex stakeAddressIndex
+        (derivationType,) . StakeKeyPath accountIndex <$> toAddressIndex stakeAddressIndex
 
-    stakeAddr <- genStakeAddress sKeyPath
+    stakeAddr <- genStakeAddress sKeyInfo
 
     return $ StakeWallet 
       { network = network
@@ -99,7 +99,7 @@ pairStakeWallet network Profile{profileId,accountIndex} stakeId NewStakeWallet{.
       , stakeId = stakeId
       , alias = alias
       , stakeAddress = stakeAddr 
-      , stakeKeyPath = Just sKeyPath 
+      , stakeKeyDerivation = Just sKeyInfo
       , registrationStatus = NotRegistered
       , totalDelegation = 0
       , utxoBalance = 0
@@ -111,10 +111,10 @@ pairStakeWallet network Profile{profileId,accountIndex} stakeId NewStakeWallet{.
 
   where
     genStakeAddress
-      :: DerivationPath 
+      :: DerivationInfo 
       -> IO StakeAddress
-    genStakeAddress stakeKey = do
-      stakeKeyCred <- PubKeyCredential <$> exportHwPubKeyHash stakeKey
+    genStakeAddress stakeKeyInfo = do
+      stakeKeyCred <- PubKeyCredential <$> exportHwPubKeyHash stakeKeyInfo
 
       -- Get the stake address. The payment credential does not matter so the stake key
       -- is used for both.
@@ -153,8 +153,8 @@ watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} kno
       , alias = alias
       , paymentAddress = payAddr 
       , stakeAddress = mStakeAddr 
-      , paymentKeyPath = Nothing
-      , stakeKeyPath = Nothing 
+      , paymentKeyDerivation = Nothing
+      , stakeKeyDerivation = Nothing 
       , utxos = [] 
       , lovelace = 0
       , nativeAssets = []
@@ -189,7 +189,7 @@ watchStakeWallet network Profile {profileId} stakeId NewStakeWallet{..} known = 
       , stakeId = stakeId
       , alias = alias
       , stakeAddress = stakeAddr 
-      , stakeKeyPath = Nothing 
+      , stakeKeyDerivation = Nothing 
       , registrationStatus = NotRegistered
       , totalDelegation = 0
       , utxoBalance = 0

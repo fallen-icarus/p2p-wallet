@@ -25,6 +25,9 @@ witnessTxBody network TxBuilderModel{keyWitnesses,isBuilt} = do
   let txBodyFile = TxBodyFile $ tmpDir </> "tx" <.> "body"
       transformedTxFile = TransformedTxFile $ tmpDir </> "tx" <.> "transformed"
 
+  -- All key witnesses must use the same derivation type.
+  let mDerType = maybeHead keyWitnesses >>= (snd . unKeyWitness >=> fst)
+
   -- Convert the tx.body file to the proper CBOR format for using the hardware wallet.
   -- This step may not be necessary anymore but it is still part of the cardano-hw-cli
   -- documentation.
@@ -40,7 +43,7 @@ witnessTxBody network TxBuilderModel{keyWitnesses,isBuilt} = do
         return $ Just (hwsFile, KeyWitnessFile $ tmpDir </> hash <.> "witness")
   
   -- Create the required witness files.
-  runCmd_ $ witnessTxCmd network transformedTxFile hwsFiles witnessFiles
+  runCmd_ $ witnessTxCmd network transformedTxFile hwsFiles witnessFiles mDerType
 
   -- Return the filepaths for the new witness files.
   return witnessFiles
@@ -53,9 +56,16 @@ transformTxBodyCmd txBodyFile transformedTxFile =
     cmdTemplate = "cardano-hw-cli transaction transform --tx-file %s --out-file %s" 
 
 -- | The command to witness a transaction using the hardware wallet. It can be used to witness for
--- multiple hardware wallet keys as long as all keys are for the same `account_index`.
-witnessTxCmd :: Network -> TransformedTxFile -> [HwSigningFile] -> [KeyWitnessFile] -> String
-witnessTxCmd network transformedTxFile hwsFiles witnessFiles = 
+-- multiple hardware wallet keys as long as all keys are for the same `account_index` and derivation
+-- type.
+witnessTxCmd 
+  :: Network 
+  -> TransformedTxFile 
+  -> [HwSigningFile] 
+  -> [KeyWitnessFile] 
+  -> Maybe DerivationType
+  -> String
+witnessTxCmd network transformedTxFile hwsFiles witnessFiles mDerType = 
   String.unwords
     [ "cardano-hw-cli transaction witness"
     , "--tx-file " <> toString transformedTxFile
@@ -64,4 +74,5 @@ witnessTxCmd network transformedTxFile hwsFiles witnessFiles =
     , toString $ toNetworkFlag network
     , String.unwords $ for witnessFiles $ \witnessFile ->
         "--out-file " <> toString witnessFile
+    , maybe "" (printf "--derivation-type %s" . showDerivationTypeForCLI) mDerType
     ]

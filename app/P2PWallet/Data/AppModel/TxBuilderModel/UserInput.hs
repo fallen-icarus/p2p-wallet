@@ -22,7 +22,7 @@ data UserInput = UserInput
   -- | The bech32 address for this input. This is used to get any required key hashes.
   , paymentAddress :: PaymentAddress
   -- | The path to the required hw key for witnessing.
-  , paymentKeyPath :: Maybe DerivationPath 
+  , paymentKeyDerivation :: Maybe DerivationInfo
   -- | The amount of ada in this UTxO.
   , lovelace :: Lovelace
   -- | The native assets in this UTxO.
@@ -42,7 +42,7 @@ instance AssetBalancesForChange (a,UserInput) where
     )
 
 instance AddToTxBody UserInput where
-  addToTxBody txBody UserInput{utxoRef,paymentAddress,paymentKeyPath} = 
+  addToTxBody txBody UserInput{utxoRef,paymentAddress,paymentKeyDerivation} = 
       txBody 
         -- Add the input while preserving ordering.
         & #inputs %~ flip snoc newInput
@@ -64,19 +64,19 @@ instance AddToTxBody UserInput where
       requiredWitness :: Maybe KeyWitness
       requiredWitness = case toPubKeyHash plutusAddress of
           Nothing -> Nothing
-          Just pkHash -> Just $ KeyWitness (pkHash, paymentKeyPath)
+          Just pkHash -> Just $ KeyWitness (pkHash, paymentKeyDerivation)
 
 personalUTxOToUserInput 
   :: Text 
   -> PaymentAddress 
-  -> Maybe DerivationPath 
+  -> Maybe DerivationInfo
   -> PersonalUTxO 
   -> UserInput
-personalUTxOToUserInput alias paymentAddress mKeyPath PersonalUTxO{utxoRef,lovelace,nativeAssets} = 
+personalUTxOToUserInput alias paymentAddress mKeyInfo PersonalUTxO{utxoRef,lovelace,nativeAssets} = 
   UserInput
     { utxoRef = utxoRef
     , paymentAddress = paymentAddress
-    , paymentKeyPath = mKeyPath
+    , paymentKeyDerivation = mKeyInfo
     , lovelace = lovelace
     , nativeAssets = nativeAssets
     , showDetails = False

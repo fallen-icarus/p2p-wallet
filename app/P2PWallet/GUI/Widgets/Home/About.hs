@@ -37,7 +37,8 @@ aboutWidget model = do
 addressInfoWidget :: AppModel -> AppNode
 addressInfoWidget AppModel{homeModel=HomeModel{selectedWallet},..} = do
   let -- Payment info
-      PaymentWallet{paymentAddress,paymentKeyPath,stakeAddress,stakeKeyPath} = selectedWallet
+      PaymentWallet{paymentAddress,paymentKeyDerivation,stakeAddress,stakeKeyDerivation} = 
+        selectedWallet
       addrInfo = inspectBech32Address $ unPaymentAddress paymentAddress
       spendingKeyHash = fromMaybe "" $ either (const Nothing) infoSpendingKeyHash addrInfo
 
@@ -82,9 +83,9 @@ addressInfoWidget AppModel{homeModel=HomeModel{selectedWallet},..} = do
             ] `styleBasic` [padding 5]
         , hstack
             [ spacer_ [width 20]
-            , copyableLabelFor "Derivation Path:" $ maybe "none" display paymentKeyPath
+            , copyableLabelFor "Derivation:" $ maybe "none" display paymentKeyDerivation
             ] `styleBasic` [padding 5]
-              `nodeVisible` isJust paymentKeyPath
+              `nodeVisible` isJust paymentKeyDerivation
         ]
     , spacer
     , separatorLine `styleBasic` [paddingL 20, paddingR 20]
@@ -117,9 +118,9 @@ addressInfoWidget AppModel{homeModel=HomeModel{selectedWallet},..} = do
                 maybe "" (show . PubKeyHash . BuiltinByteString) stakeKeyHash
             ] `styleBasic` [padding 5]
               `nodeVisible` hasStaking
-        , widgetMaybe stakeKeyPath $ \keyPath -> hstack
+        , widgetMaybe stakeKeyDerivation $ \keyInfo -> hstack
             [ spacer_ [width 20]
-            , copyableLabelFor "Derivation Path:" $ display keyPath
+            , copyableLabelFor "Derivation:" $ display keyInfo
             ] `styleBasic` [padding 5]
               `nodeVisible` hasStaking
         ]

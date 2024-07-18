@@ -152,7 +152,7 @@ mainWidget AppModel{..} =
 
     -- Shows an icon representing where the address is paired or watched.
     (walletTypeIcon,walletTypeTip)
-      | isNothing stakeKeyPath = (watchedIcon,"Watched")
+      | isNothing stakeKeyDerivation = (watchedIcon,"Watched")
       | otherwise = (pairedIcon,"Paired")
 
     headerWidget :: AppNode
@@ -168,15 +168,15 @@ mainWidget AppModel{..} =
             [ tooltip_ walletTypeTip [tooltipDelay 0] $ label walletTypeIcon
                 `styleBasic` [textSize 12, textColor white, textMiddle, textFont "Remix"]
             , spacer_ [width 5]
-            , widgetMaybe stakeKeyPath $ \path ->
+            , widgetMaybe stakeKeyDerivation $ \keyInfo ->
                 vstack
                   [ copyableLabelSelf 10 white $ display stakeAddress
-                  , copyableLabelSelf 8 lightGray $ display path
+                  , copyableLabelSelf 8 lightGray $ display keyInfo
                   ]
-            , widgetIf (isNothing stakeKeyPath) $
+            , widgetIf (isNothing stakeKeyDerivation) $
                 copyableLabelSelf 10 white $ display stakeAddress
             , spacer_ [width 1]
-            , morePopup `styleBasic` [styleIf (isJust stakeKeyPath) $ paddingT 2]
+            , morePopup `styleBasic` [styleIf (isJust stakeKeyDerivation) $ paddingT 2]
             ] `styleBasic`
                 [ bgColor customGray3
                 , padding 10

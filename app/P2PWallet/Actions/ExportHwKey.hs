@@ -13,7 +13,10 @@ import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -- | Export the pubkey files with an optional name.
-exportHwKeyFiles :: Maybe FilePath -> DerivationPath -> IO (PubKeyFile,HwSigningFile)
+exportHwKeyFiles 
+  :: Maybe FilePath 
+  -> DerivationInfo
+  -> IO (PubKeyFile,HwSigningFile)
 exportHwKeyFiles prefix key = do
   tmpDir <- getTemporaryDirectory
   let pubKeyFile = 
@@ -24,9 +27,9 @@ exportHwKeyFiles prefix key = do
   runCmd_ $ exportPubKeyCmd key pubKeyFile hwsKeyFile
   return (pubKeyFile,hwsKeyFile)
 
-exportHwPubKeyHash :: DerivationPath -> IO PubKeyHash
-exportHwPubKeyHash key = do
-    (pubKeyFile,_) <- exportHwKeyFiles Nothing key
+exportHwPubKeyHash :: DerivationInfo -> IO PubKeyHash
+exportHwPubKeyHash keyInfo@(_, key) = do
+    (pubKeyFile,_) <- exportHwKeyFiles Nothing keyInfo
 
     hash <- toText <$> runCmd (printf hashPubKeyFileCmd $ toString pubKeyFile)
     
@@ -38,11 +41,12 @@ exportHwPubKeyHash key = do
       PaymentKeyPath _ _ -> "cardano-cli address key-hash --payment-verification-key-file %s"
       StakeKeyPath _ _ -> "cardano-cli stake-address key-hash --stake-verification-key-file %s"
 
-exportPubKeyCmd :: DerivationPath -> PubKeyFile -> HwSigningFile -> String
-exportPubKeyCmd key pubKeyFile hwsKeyFile =
-  String.unwords
+exportPubKeyCmd :: (Maybe DerivationType, DerivationPath) -> PubKeyFile -> HwSigningFile -> String
+exportPubKeyCmd (mDerType, key) pubKeyFile hwsKeyFile =
+  String.unwords $ filter (/= "")
     [ "cardano-hw-cli address key-gen"
     , printf "--path %s" $ display key
     , printf "--verification-key-file %s" $ toString pubKeyFile
     , printf "--hw-signing-file %s" $ toString hwsKeyFile
+    , maybe "" (printf "--derivation-type %s" . showDerivationTypeForCLI) mDerType
     ]

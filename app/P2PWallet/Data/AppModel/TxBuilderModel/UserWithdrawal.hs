@@ -20,7 +20,7 @@ data UserWithdrawal = UserWithdrawal
   -- key hashes.
   { stakeAddress :: StakeAddress
   -- | The path to the required hw key for witnessing.
-  , stakeKeyPath :: Maybe DerivationPath 
+  , stakeKeyDerivation :: Maybe DerivationInfo
   -- | The amount withdrawn.
   , lovelace :: Lovelace
   -- | The alias for this stake address.
@@ -30,7 +30,7 @@ data UserWithdrawal = UserWithdrawal
 makeFieldLabelsNoPrefix ''UserWithdrawal
 
 instance AddToTxBody UserWithdrawal where
-  addToTxBody txBody UserWithdrawal{stakeAddress,lovelace,stakeKeyPath} =
+  addToTxBody txBody UserWithdrawal{stakeAddress,lovelace,stakeKeyDerivation} =
       txBody 
         -- Add the new withdrawal. They will be reordered by the node.
         & #withdrawals %~ (newWithdrawal:)
@@ -54,4 +54,4 @@ instance AddToTxBody UserWithdrawal where
       requiredWitness :: Maybe KeyWitness
       requiredWitness = case stakeCredential of
           ScriptCredential _ -> Nothing
-          PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyPath)
+          PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)

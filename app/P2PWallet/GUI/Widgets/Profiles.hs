@@ -8,6 +8,7 @@ import Prettyprinter (tupled)
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal.HardwareDevice
+import P2PWallet.Data.Core.Internal.KeyDerivation
 import P2PWallet.Data.Core.Profile
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
@@ -27,12 +28,15 @@ profilesWidget model@AppModel{..} = do
     isAdding = profileModel ^. #addingProfile
 
     profileColumn :: Profile -> AppNode
-    profileColumn p =
-      let accMsg = fromString $ printf "Account ID: %d" $ p ^. #accountIndex % #unAccountIndex
+    profileColumn p@Profile{derivationType,accountIndex} =
+      let accMsg = 
+            fromString $ printf "%s: %d" 
+              (display $ fromMaybe LedgerDerivation derivationType) -- Nothing implies ledger
+              (unAccountIndex accountIndex)
           content =
             vstack 
               [ centerWidgetH $ label (p ^. #alias) 
-                  `styleBasic` [textFont "Medium", textSize 24, paddingT 10]
+                  `styleBasic` [textFont "Medium", textSize 18, paddingT 10]
               , centerWidgetH $ label (show $ tupled [accMsg])
                   `styleBasic` [textSize 14]
               ] `styleBasic` [width 200, padding 20, radius 5]
@@ -45,7 +49,7 @@ profilesWidget model@AppModel{..} = do
       let content =
             vstack
               [ centerWidgetH $ label newUserIcon
-                  `styleBasic` [textFont "Remix", textSize 24, paddingT 10]
+                  `styleBasic` [textFont "Remix", textSize 18, paddingT 10]
               , centerWidgetH $ label "New Profile" `styleBasic` [textFont "Medium", textSize 20]
               ] `styleBasic` [width 200, padding 20, radius 5]
                 `styleHover` [bgColor customBlue, cursorIcon CursorHand]
@@ -82,13 +86,14 @@ profilesWidget model@AppModel{..} = do
         ]
 
 addProfileWidget :: AppModel -> AppNode
-addProfileWidget _ = do
+addProfileWidget AppModel{profileModel=ProfileModel{newProfile}} = do
   let innerDormantStyle = 
         def `styleBasic` [textSize 10, bgColor customGray3, border 1 black]
             `styleHover` [textSize 10, bgColor customGray2, border 1 black]
       innerFocusedStyle = 
         def `styleFocus` [textSize 10, bgColor customGray3, border 1 customBlue]
             `styleFocusHover` [textSize 10, bgColor customGray2, border 1 customBlue]
+      maybeLens' = maybeLens IcarusDerivation $ #profileModel % #newProfile % #derivationType
       editFields = 
         vstack_ [childSpacing]
           [ hstack 
@@ -98,14 +103,23 @@ addProfileWidget _ = do
                   `styleBasic` [width 300, bgColor customGray1, sndColor darkGray]
                   `styleFocus` [border 1 customBlue]
               ]
-        , hstack
-            [ label "Hardware Wallet:"
-            , spacer
-            , textDropdown_ (toLensVL $ #profileModel % #newProfile % #device) supportedDevices display
-                [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
-                `styleBasic` [width 200, bgColor customGray1]
-                `styleFocus` [border 1 customBlue]
-            ]
+          , hstack
+              [ label "Hardware Wallet:"
+              , spacer
+              , textDropdown_ (toLensVL $ #profileModel % #newProfile % #device) supportedDevices display
+                  [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+                  `styleBasic` [width 200, bgColor customGray1]
+                  `styleFocus` [border 1 customBlue]
+              ]
+          , widgetIf (newProfile ^. #device == Trezor) $
+              hstack
+                [ label "Derivation Type:"
+                , spacer
+                , textDropdown_ (toLensVL maybeLens') supportedDerivations display
+                    [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+                    `styleBasic` [width 200, bgColor customGray1]
+                    `styleFocus` [border 1 customBlue]
+                ]
           , hstack 
               [ label "Account ID:"
               , spacer

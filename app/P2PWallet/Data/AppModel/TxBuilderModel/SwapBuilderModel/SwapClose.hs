@@ -23,7 +23,7 @@ data SwapClose = SwapClose
   -- | The stake bech32 address for this input. This is used to get any required key hashes.
   , stakeAddress :: StakeAddress
   -- | The path to the required hw key for witnessing.
-  , stakeKeyPath :: Maybe DerivationPath 
+  , stakeKeyDerivation :: Maybe DerivationInfo
   -- | The amount of ada in this UTxO.
   , lovelace :: Lovelace
   -- | The native assets in this UTxO.
@@ -57,15 +57,15 @@ swapUTxOToSwapClose
   :: Network
   -> Text 
   -> StakeAddress 
-  -> Maybe DerivationPath 
+  -> Maybe DerivationInfo
   -> SwapUTxO 
   -> SwapClose
-swapUTxOToSwapClose network alias stakeAddress mKeyPath SwapUTxO{..} = 
+swapUTxOToSwapClose network alias stakeAddress mKeyInfo SwapUTxO{..} = 
   SwapClose
     { utxoRef = utxoRef
     , swapType = swapType
     , stakeAddress = stakeAddress
-    , stakeKeyPath = mKeyPath
+    , stakeKeyDerivation = mKeyInfo
     , lovelace = lovelace
     , nativeAssets = nativeAssets
     , swapDatum = swapDatum
