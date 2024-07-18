@@ -21,6 +21,7 @@ mainMenuWidget model@AppModel{txBuilderModel} = do
       , changeSceneButton "Contacts" contactsBookIcon AddressBookScene
       , changeSceneButton "Tickers" tickersIcon TickerRegistryScene
       , txBuilderButton
+      , notificationsButton
       , changeSceneButton "Settings" settingsIcon SettingsScene
       , filler
       , logOutButton
@@ -28,7 +29,6 @@ mainMenuWidget model@AppModel{txBuilderModel} = do
       ] `styleBasic` [bgColor customGray3, width 40] 
 
   where
-    -- | A button with an icon, a label, and a transparent background.
     changeSceneButton :: Text -> Text -> MainScene -> AppNode
     changeSceneButton name remixIcon newScene = do
       let dormantColor
@@ -62,7 +62,7 @@ mainMenuWidget model@AppModel{txBuilderModel} = do
         `styleBasic` [bgColor transparent , paddingB 5 , radius 5]
         `styleHover` [bgColor customGray2, cursorIcon CursorHand]
 
-    -- | A button with an icon, a label, and a transparent background.
+    -- Shows an icon whenever the builder has items in it.
     txBuilderButton :: AppNode
     txBuilderButton = do
       let dormantColor
@@ -98,6 +98,53 @@ mainMenuWidget model@AppModel{txBuilderModel} = do
                     `styleBasic` [textFont "Remix", padding 5, textSize 8, textColor customRed]
               ]
       box_ [onClick $ ChangeMainScene TxBuilderScene] btn
+        `styleBasic` [bgColor transparent , paddingB 5 , radius 5]
+        `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+
+    -- Shows a count of the number of new notifications.
+    notificationsButton :: AppNode
+    notificationsButton = do
+      let numNotes = length $ filter (not . view #markedAsRead . snd) $ model ^. #notifications
+          dormantColor
+            | model ^. #scene == NotificationsScene = customBlue
+            | numNotes /= 0 = customRed
+            | otherwise = white
+          btn = 
+            zstack
+              [ vstack 
+                  [ centerWidgetH $ label notificationBellIcon
+                      `styleBasic`
+                          [ textFont "Remix"
+                          , paddingT 8
+                          , paddingL 10
+                          , paddingR 10
+                          , paddingB 0
+                          , textMiddle
+                          , textSize 12
+                          , textColor dormantColor
+                          , border 0 transparent
+                          ]
+                  , centerWidgetH $ label "News"
+                      `styleBasic` 
+                          [ paddingT 0
+                          , paddingL 0
+                          , paddingR 0
+                          , paddingB 2
+                          , textSize 8
+                          , textColor dormantColor
+                          ]
+                  ]
+              , flip nodeVisible (numNotes /= 0) $ box_ [alignTop,alignRight] $ 
+                  label (show numNotes) 
+                    `styleBasic` 
+                      [ textFont "Bold"
+                      , padding 5
+                      , paddingR 7
+                      , textSize 10
+                      , textColor customRed
+                      ]
+              ]
+      box_ [onClick $ ChangeMainScene NotificationsScene] btn
         `styleBasic` [bgColor transparent , paddingB 5 , radius 5]
         `styleHover` [bgColor customGray2, cursorIcon CursorHand]
 

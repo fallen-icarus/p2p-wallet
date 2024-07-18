@@ -32,8 +32,6 @@ type CachedOrderBooks = Map.Map (OfferAsset,AskAsset) [SwapUTxO]
 data DexScene
   -- | Information about all open positions.
   = DexPositions
-  -- | Trade history for the address.
-  | DexTradeHistory
   -- | The order-book market.
   | DexMarket
   deriving (Eq,Show)

@@ -121,7 +121,7 @@ instance Creatable StakeWallet where
         , "total_delegation INTEGER NOT NULL"
         , "utxo_balance INTEGER NOT NULL"
         , "available_rewards INTEGER NOT NULL"
-        , "delegate_pool BLOB"
+        , "delegated_pool BLOB"
         , "linked_addresses BLOB"
         , "UNIQUE(network,profile_id,stake_id,alias)"
         ]
@@ -143,12 +143,71 @@ instance Insertable StakeWallet where
         , "total_delegation"
         , "utxo_balance"
         , "available_rewards"
-        , "delegate_pool"
+        , "delegated_pool"
         , "linked_addresses"
         ]
     , ")"
     , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
+
+instance Notify StakeWallet where
+  notify oldState@StakeWallet{delegatedPool=oldPool} newState@StakeWallet{delegatedPool=newPool}
+    | null msg = Nothing
+    | otherwise = Just $ Notification
+        { notificationType = StakeNotification
+        , alias = oldState ^. #alias
+        , message = mconcat $ intersperse "\n" msg
+        , markedAsRead = False
+        }
+    where
+      isDeregistered :: Bool
+      isDeregistered = oldState ^. #registrationStatus == Registered 
+                    && newState ^. #registrationStatus == NotRegistered
+  
+      isRegistered :: Bool
+      isRegistered = oldState ^. #registrationStatus == NotRegistered 
+                    && newState ^. #registrationStatus == Registered
+
+      delegationChanged :: Bool
+      delegationChanged = isJust oldPool && isJust newPool 
+                        && oldPool ^? _Just % #poolId /= newPool ^? _Just % #poolId
+
+      firstDelegation :: Bool
+      firstDelegation = isNothing oldPool && isJust newPool
+
+      newPoolId :: PoolID
+      newPoolId = fromMaybe "" $ newPool ^? _Just % #poolId
+
+      rewardsDiff = newState ^. #availableRewards - oldState ^. #availableRewards
+
+      rewardMsg
+        | rewardsDiff > 0 = display rewardsDiff <> " was added to rewards."
+        | rewardsDiff < 0 = display (abs rewardsDiff) <> " was withdrawn from rewards."
+        | otherwise = ""
+
+      deregisteredMsg
+        | isDeregistered = "Stake credential deregistered."
+        | otherwise = ""
+
+      registeredMsg
+        | isRegistered && firstDelegation = 
+            "Stake credential registered and delegated to " <> display newPoolId <> "."
+        | isRegistered =
+            "Stake credential registered."
+        | otherwise = ""
+
+      delegationMsg
+        | registeredMsg /= "" = "" -- It will cover delegation as well.
+        | firstDelegation = "Delegated to " <> display newPoolId <> "."
+        | delegationChanged = "Delegation changed to " <> display newPoolId <> "."
+        | otherwise = ""
+
+      msg = filter (/= "")
+        [ deregisteredMsg
+        , registeredMsg
+        , delegationMsg
+        , rewardMsg
+        ]
 
 -------------------------------------------------
 -- New Stake Wallet

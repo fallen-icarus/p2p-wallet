@@ -206,6 +206,36 @@ instance Insertable PaymentWallet where
     , "VALUES (?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
+instance Notify PaymentWallet where
+  notify oldState newState
+    | null msg = Nothing
+    | otherwise = Just $ Notification
+        { notificationType = PaymentNotification
+        , alias = oldState ^. #alias
+        , message = mconcat $ intersperse "\n" msg
+        , markedAsRead = False
+        }
+    where
+      lovelaceDiff = newState ^. #lovelace - oldState ^. #lovelace
+      nativeAssetDiff = sumNativeAssets $ mconcat
+        [ newState ^. #nativeAssets
+        , map (over #quantity negate) $ oldState ^. #nativeAssets
+        ]
+
+      lovelaceMsg
+        | lovelaceDiff > 0 = display lovelaceDiff <> " was deposited."
+        | lovelaceDiff < 0 = display (abs lovelaceDiff) <> " was spent."
+        | otherwise = ""
+
+      nativeAssetMsg
+        | null nativeAssetDiff = ""
+        | otherwise = "Native asset balances have changed."
+
+      msg = filter (/= "")
+        [ lovelaceMsg
+        , nativeAssetMsg
+        ]
+
 -------------------------------------------------
 -- New Payment Wallet
 -------------------------------------------------

@@ -171,9 +171,11 @@ instance FromJSON NativeAsset where
         <*> o .: "fingerprint"
         <*> (o .: "quantity" >>= maybe mzero return . readMaybe)
 
--- | Merge a list of `NativeAsset` by summing the quantities for like tokens.
+-- | Merge a list of `NativeAsset` by summing the quantities for like tokens. Remove `NativeAsset`s
+-- that have a balance of 0.
 sumNativeAssets :: [NativeAsset] -> [NativeAsset]
-sumNativeAssets = toList 
+sumNativeAssets = filter ((/= 0) . view #quantity)
+                . toList 
                 . Map.fromListWith sumAssets
                 . map (\asset@NativeAsset{..} -> ((policyId,tokenName), asset))
   where
@@ -256,6 +258,4 @@ sumAssetBalances xs = (allLoves, allAssets)
     allLoves = foldl1' (+) loves
 
     allAssets :: [NativeAsset]
-    allAssets = 
-      -- Filter out zero assets.
-      filter ((/= 0) . view #quantity) $ sumNativeAssets $ concat assets
+    allAssets = sumNativeAssets $ concat assets

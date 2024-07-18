@@ -61,12 +61,12 @@ handleTimeoutError query = query >>= \case
     isTimeoutError err =
       "ResponseTimeout)" == Text.takeEnd 16 (show err)
 
--- | Koios instances occasionally take too long to respond. If they take longer than 10 seconds,
+-- | Koios instances occasionally take too long to respond. If they take longer than 5 seconds,
 -- odds are, they won't reply by 30 seconds either (the default timeout). These settings just change
--- the default timeout to 10 seconds.
+-- the default timeout to 5 seconds.
 customTlsSettings :: HTTP.ManagerSettings
 customTlsSettings = HTTPS.tlsManagerSettings
-  { HTTP.managerResponseTimeout = HTTP.responseTimeoutMicro 10_000_000
+  { HTTP.managerResponseTimeout = HTTP.responseTimeoutMicro 5_000_000
   }
 
 -------------------------------------------------
@@ -298,8 +298,10 @@ runQueryDexWallet dexWallet@DexWallet{network,oneWaySwapAddress,twoWaySwapAddres
 
     case (,) <$> oneWayRes <*> twoWayRes of
       Right (oneWayUTxOs,twoWayUTxOs) -> do
+        let allUTxOs = oneWayUTxOs <> twoWayUTxOs
         return $ Right $ dexWallet
-          & #utxos .~ map toSwapUTxO (oneWayUTxOs <> twoWayUTxOs)
+          & #lovelace .~ sum (map (view #lovelace) allUTxOs)
+          & #utxos .~ map toSwapUTxO allUTxOs
           & populateNativeAssets
       Left err -> return $ Left err
   where

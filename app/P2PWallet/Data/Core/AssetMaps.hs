@@ -116,6 +116,9 @@ verifyNewTickerInfo NewTickerInfo{..} reverseTickerMap = do
   -- Check the asset name is valid.
   tokenName <- maybeToRight "Not a valid asset name" $ TokenName <$> parseHex assetName
 
+  -- 'ADA' cannot be used as a ticker.
+  when (ticker == "ADA") $ Left "'ADA' cannot be used as a ticker."
+
   -- Check the on-chain name is not already linked to another ticker.
   whenJust (Map.lookup (policy,tokenName) reverseTickerMap) $ \(tckr,_) ->
     -- If they match, that means this ticker info is about to be replaced while keeping the

@@ -9,13 +9,14 @@ import P2PWallet.Actions.Database
 import P2PWallet.Actions.Query.Koios
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.Core.Internal.Network
+import P2PWallet.Data.Core.Internal.Notification
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
 
 -- | This function gets the latest wallet states, and then backs up the states into the database.
 -- It will also get the current network parameters so they are available for transaction
 -- building.
-syncWallets :: FilePath -> Network -> Wallets -> IO (Wallets,ByteString)
+syncWallets :: FilePath -> Network -> Wallets -> IO (Wallets,ByteString,[Notification])
 syncWallets databaseFile network ws@Wallets{..} = do
     -- The information is fetched concurrently.
     (updatedPaymentWallets,(updatedStakeWallets,(updatedDexWallets,networkParameters))) <- 
@@ -38,8 +39,14 @@ syncWallets databaseFile network ws@Wallets{..} = do
       insertDexWallet databaseFile dexWallet >>= fromRightOrAppError
       insertTransactions databaseFile (dexWallet ^. #transactions) >>= fromRightOrAppError
 
+    let newNotifications = catMaybes $ mconcat
+          [ zipWith notify paymentWallets updatedPaymentWallets
+          , zipWith notify stakeWallets updatedStakeWallets
+          , zipWith notify dexWallets updatedDexWallets
+          ]
+
     -- Return the updated wallets and network parameters.
-    return $ (,networkParameters) $ ws
+    return $ (,networkParameters,newNotifications) $ ws
       & #paymentWallets .~ updatedPaymentWallets
       & #stakeWallets .~ updatedStakeWallets
       & #dexWallets .~ updatedDexWallets
