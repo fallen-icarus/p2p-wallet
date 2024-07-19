@@ -56,7 +56,7 @@ notificationsWidget AppModel{notifications} = do
 noNotificationsMessage :: AppNode
 noNotificationsMessage =
   centerWidgetH $ flip styleBasic [radius 5, padding 5, bgColor customGray2] $ box $
-    label "Nothing to report."
+    label "Nothing to report"
       `styleBasic` [textFont "Italics"]
 
 notificationsList :: [(Int,Notification)] -> AppNode

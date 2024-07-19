@@ -320,50 +320,12 @@ instance Insertable DexWallet where
     , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
-data SwapAction
-  = SwapUnchanged
-  | SwapClosed
-  | SwapExecuted
-  | SwapCreated
-  deriving (Eq,Ord)
-
 instance Notify DexWallet where
   notify oldState@DexWallet{utxos=oldUTxOs} DexWallet{utxos=newUTxOs}
-    | null msg = Nothing
+    | oldUTxOs == newUTxOs = Nothing
     | otherwise = Just $ Notification
         { notificationType = DexNotification
         , alias = oldState ^. #alias
-        , message = mconcat $ intersperse "\n" msg
+        , message = "Swap statuses have changed."
         , markedAsRead = False
         }
-    where
-      processInput :: TxOutRef -> SwapAction
-      processInput targetRef = fromMaybe SwapClosed $ asum
-        [ SwapUnchanged <$ find (\u -> u ^. #utxoRef == targetRef) newUTxOs
-        , SwapExecuted <$ find (\u -> swapUTxOPreviousInput u == Just targetRef) newUTxOs
-        ]
-
-      -- This should only ever notify when a swap is created.
-      processOutput :: SwapUTxO -> Maybe SwapAction
-      processOutput u@SwapUTxO{utxoRef}
-        | isJust $ find ((==utxoRef) . view #utxoRef) oldUTxOs = Nothing
-        | isJust $ find ((==swapUTxOPreviousInput u) . Just . view #utxoRef) oldUTxOs = Nothing
-        | otherwise = Just SwapCreated
-
-      -- All updates grouped into a list so the count for each action can be determined.
-      allUpdates :: [[SwapAction]]
-      allUpdates = group $ sort $ mconcat
-        [ map (processInput . view #utxoRef) oldUTxOs
-        , mapMaybe processOutput newUTxOs
-        ]
-
-      genMsg :: [SwapAction] -> Text
-      genMsg [] = ""
-      genMsg xs@(x:_) = case x of
-        SwapUnchanged -> ""
-        SwapClosed -> show (length xs) <> " swap(s) were closed."
-        SwapCreated -> show (length xs) <> " swap(s) were created."
-        SwapExecuted -> show (length xs) <> " swap(s) were (at least partially) executed."
-
-      msg :: [Text]
-      msg = filter (/= "") $ map genMsg allUpdates
