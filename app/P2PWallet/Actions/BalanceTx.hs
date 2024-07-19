@@ -3,6 +3,8 @@ module P2PWallet.Actions.BalanceTx
     balanceTx
   ) where
 
+import Data.List (foldl1')
+
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
@@ -19,6 +21,7 @@ balanceTx tx@TxBuilderModel{..} =
           (if newChange == def then Nothing else Just newChange)
        & #isBalanced .~ balanced
        & #requiresCollateral .~ txNeedsCollateral
+       & #txType .~ determinedTxType
        & #isBuilt .~ False
   where
     totalWithdrawn :: Lovelace
@@ -42,8 +45,6 @@ balanceTx tx@TxBuilderModel{..} =
       , (totalWithdrawn, [])
       , (0, testTokensMinted)
       , assetBalancesForChange $ swapBuilderModel ^. #swapCloses
-      -- -- The output is already subtracted from the input.
-      -- , assetBalancesForChange $ swapBuilderModel ^. #swapUpdates
       ]
 
     -- The amount of ADA and native assets from the output sources. All quantities in this list must
@@ -82,4 +83,20 @@ balanceTx tx@TxBuilderModel{..} =
       , swapBuilderModel ^. #swapCloses /= []
       , swapBuilderModel ^. #swapUpdates /= []
       , swapBuilderModel ^. #swapExecutions /= []
+      ]
+
+    -- What kind of transaction this is.
+    determinedTxType :: TxType
+    determinedTxType
+      | null keyInfos = PairedTx
+      | otherwise = foldl1' (<>) $ map (maybe WatchedTx $ const PairedTx) keyInfos
+
+    -- All required DerivationInfo for the transaction.
+    keyInfos :: [Maybe DerivationInfo]
+    keyInfos = concat
+      [ map (view $ _2 % #stakeKeyDerivation) userWithdrawals
+      , map (view $ _2 % #paymentKeyDerivation) userInputs
+      , maybe [] (pure . view #paymentKeyDerivation) collateralInput
+      , map (view $ _2 % #stakeKeyDerivation) $ swapBuilderModel ^. #swapCloses
+      , map (view $ _2 % #oldSwap % #stakeKeyDerivation) $ swapBuilderModel ^. #swapUpdates
       ]

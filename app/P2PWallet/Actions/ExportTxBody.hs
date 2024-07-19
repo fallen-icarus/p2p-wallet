@@ -9,8 +9,7 @@ import System.Directory (getHomeDirectory,copyFile,createDirectoryIfMissing)
 import P2PWallet.Data.Core.Internal.Files
 import P2PWallet.Prelude
 
--- | Export the transaction body file and any witness files to either the user's configured 
--- export directory or the user's home directory.
+-- | Export the transaction body file and any witness files to the user's home directory.
 exportTxBody :: [KeyWitnessFile] -> IO FilePath
 exportTxBody witnessFiles = do
   destinationDir <- getHomeDirectory
