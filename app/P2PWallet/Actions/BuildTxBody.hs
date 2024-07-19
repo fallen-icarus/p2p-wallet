@@ -142,8 +142,6 @@ buildTxBody network tx = do
           & #fee .~ fee
           -- Tell the app which key witnesses are required.
           & #keyWitnesses .~ keyWitnesses
-          -- Determine whether the app knows all of the required keys.
-          & #allKeyWitnessesKnown .~ all (isJust . snd . unKeyWitness) keyWitnesses
           -- If the parameters were synced during this build, they should be saved for next
           -- time.
           & #parameters ?~ parameters

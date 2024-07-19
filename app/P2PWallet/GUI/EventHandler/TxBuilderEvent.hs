@@ -258,11 +258,11 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
           -- The waitingOnDevice flag is left active. It will be disabled by whatever gets called
           -- next.
           & #txBuilderModel % #keyWitnessFiles .~ witnessFiles
-      , Task $ 
-          if txBuilderModel ^. #allKeyWitnessesKnown then
+      , Task $ case txBuilderModel ^. #txType of
+          PairedTx -> 
             -- The witnesses can be assembled and then submitted to the blockchain.
             return $ TxBuilderEvent $ AssembleWitnesses StartProcess
-          else
+          _ ->
             -- Export the tx.body file so it can be signed externally. The witnesses will also be
             -- exported.
             return $ TxBuilderEvent $ ExportTxBody StartProcess

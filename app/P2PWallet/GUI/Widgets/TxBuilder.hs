@@ -54,10 +54,38 @@ txBuilderWidget model@AppModel{..} = do
                       `nodeVisible` not isBuildable
                   , spacer_ [width 3]
                   , mainButton "Sign & Submit" (TxBuilderEvent $ WitnessTx StartProcess)
-                      `nodeVisible` txBuilderModel ^. #isBuilt
+                      `nodeVisible` and
+                        [ txBuilderModel ^. #isBuilt
+                        , txBuilderModel ^. #txType == PairedTx
+                        ]
                   , button "Sign & Submit" AppInit
                       `nodeEnabled` False -- This button is just for show.
-                      `nodeVisible` not (txBuilderModel ^. #isBuilt)
+                      `nodeVisible` and
+                        [ not $ txBuilderModel ^. #isBuilt
+                        , txBuilderModel ^. #txType == PairedTx
+                        ]
+                  , mainButton "Witness & Export" (TxBuilderEvent $ WitnessTx StartProcess)
+                      `nodeVisible` and
+                        [ txBuilderModel ^. #isBuilt
+                        , txBuilderModel ^. #txType == HybridTx
+                        ]
+                  , button "Witness & Export" AppInit
+                      `nodeEnabled` False -- This button is just for show.
+                      `nodeVisible` and
+                        [ not $ txBuilderModel ^. #isBuilt
+                        , txBuilderModel ^. #txType == HybridTx
+                        ]
+                  , mainButton "Export" (TxBuilderEvent $ ExportTxBody StartProcess)
+                      `nodeVisible` and
+                        [ txBuilderModel ^. #isBuilt
+                        , txBuilderModel ^. #txType == WatchedTx
+                        ]
+                  , button "Export" AppInit
+                      `nodeEnabled` False -- This button is just for show.
+                      `nodeVisible` and
+                        [ not $ txBuilderModel ^. #isBuilt
+                        , txBuilderModel ^. #txType == WatchedTx
+                        ]
                   ] `nodeVisible` not isEmpty
               , filler
               , box_ [alignBottom,alignRight] addPopup

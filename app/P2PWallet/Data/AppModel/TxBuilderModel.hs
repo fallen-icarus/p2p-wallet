@@ -6,6 +6,7 @@
 
 module P2PWallet.Data.AppModel.TxBuilderModel
   ( TxBuilderEvent(..)
+  , TxType(..)
   , TxBuilderModel(..)
   , isEmptyBuilder
   , convertToTxBody
@@ -88,6 +89,28 @@ data TxBuilderEvent
   deriving (Show,Eq)
 
 -------------------------------------------------
+-- Tx Type
+-------------------------------------------------
+-- | Whether the transaction involves only linked wallets or watched wallets, or if it is a hybrid
+-- transaction. What can happen to the built tx.body file depends on the transaction type.
+data TxType
+  -- | All required keys are known hardware wallet keys.
+  = PairedTx
+  -- | All required keys are unknown keys.
+  | WatchedTx
+  -- | Some required keys are known while others are unknown.
+  | HybridTx
+  deriving (Show,Eq)
+
+instance Semigroup TxType where
+  PairedTx <> WatchedTx = HybridTx
+  WatchedTx <> PairedTx = HybridTx
+  HybridTx <> _ = HybridTx
+  _ <> HybridTx = HybridTx
+  PairedTx <> PairedTx = PairedTx
+  WatchedTx <> WatchedTx = WatchedTx
+
+-------------------------------------------------
 -- Builder State
 -------------------------------------------------
 data TxBuilderModel = TxBuilderModel
@@ -127,7 +150,7 @@ data TxBuilderModel = TxBuilderModel
   -- | Whether all witnesses are known hardware wallet keys. If they are, the witness files can be
   -- directly assembled and the final transaction submitted. If not, then the transaction file and
   -- known witnesses must be exported for assembling externally.
-  , allKeyWitnessesKnown :: Bool
+  , txType :: TxType
   -- | The key witness files for this transaction.
   , keyWitnessFiles :: [KeyWitnessFile]
   -- | Whether the model is the correct mirror for the tx.body file located in the tmp directory.
@@ -171,7 +194,7 @@ instance Default TxBuilderModel where
     , swapBuilderModel = def
     , fee = 0
     , keyWitnesses = []
-    , allKeyWitnessesKnown = True -- This is set to true so the default GUI button is to submit.
+    , txType = PairedTx -- This is set so the default GUI button is to submit.
     , keyWitnessFiles = []
     , isBuilt = False
     , isBalanced = False
