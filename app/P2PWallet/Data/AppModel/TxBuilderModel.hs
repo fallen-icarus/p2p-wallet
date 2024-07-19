@@ -65,6 +65,8 @@ data TxBuilderEvent
   | ChangeUserOutputCount Int Int
   -- | Edit selected user output.
   | EditSelectedUserOutput (AddEvent (Int,UserOutput) (Int,UserOutput))
+  -- | Add the new external user output.
+  | AddNewExternalUserOutput (AddEvent NewUserOutput UserOutput)
   -- | Add the new change output.
   | AddNewChangeOutput (AddEvent NewChangeOutput ChangeOutput)
   -- | Add the new test mint.
@@ -122,6 +124,10 @@ data TxBuilderModel = TxBuilderModel
   , userOutputs :: [(Int,UserOutput)]
   -- | The target user output being edited.
   , targetUserOutput :: Maybe (Int,NewUserOutput)
+  -- | The new external user output information.
+  , newExternalUserOutput :: NewUserOutput
+  -- | Whether the add external output widget should be open.
+  , addingExternalUserOutput :: Bool
   -- | The change output.
   , changeOutput :: Maybe ChangeOutput
   -- | The new change output information.
@@ -183,6 +189,8 @@ instance Default TxBuilderModel where
     { userInputs = []
     , userOutputs = []
     , targetUserOutput = Nothing
+    , newExternalUserOutput = def
+    , addingExternalUserOutput = False
     , changeOutput = Nothing
     , newChangeOutput = def
     , addingChangeOutput = False

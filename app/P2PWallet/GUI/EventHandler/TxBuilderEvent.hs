@@ -150,12 +150,64 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
       ]
 
   -----------------------------------------------
+  -- Add the new external user output
+  -----------------------------------------------
+  AddNewExternalUserOutput modal -> case modal of
+    StartAdding _ ->
+      [ Model $ model 
+          & #txBuilderModel % #newExternalUserOutput .~ def
+          & #txBuilderModel % #addingExternalUserOutput .~ True
+      ]
+    CancelAdding ->
+      [ Model $ model 
+          & #txBuilderModel % #newExternalUserOutput .~ def 
+          & #txBuilderModel % #addingExternalUserOutput .~ False
+      ]
+    ConfirmAdding -> 
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (TxBuilderEvent . AddNewExternalUserOutput . AddResult) $ do
+          verifiedOutput <- 
+            fromRightOrAppError $ 
+              verifyNewUserOutput 
+                (config ^. #network) 
+                tickerMap
+                fingerprintMap
+                (txBuilderModel ^. #newExternalUserOutput)
+
+          -- There should only be one output in the `TxBody` for this action.
+          minUTxOValue <- 
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
+                verifiedOutput
+
+          when (minUTxOValue > verifiedOutput ^. #lovelace) $
+            throwIO $ AppError $ minUTxOErrorMessage minUTxOValue
+
+          return verifiedOutput
+      ]
+    AddResult verifiedOutput ->
+      -- Get the index for the new output.
+      let newIdx = length $ model ^. #txBuilderModel % #userOutputs in
+        [ Model $ model 
+            & #waitingStatus % #addingToBuilder .~ False
+            & #txBuilderModel % #addingExternalUserOutput .~ False
+            & #txBuilderModel % #newExternalUserOutput .~ def 
+            & #txBuilderModel % #userOutputs %~ flip snoc (newIdx,verifiedOutput)
+            & #txBuilderModel %~ balanceTx
+        , Task $ return $ Alert "Successfully added to builder!"
+        ]
+
+  -----------------------------------------------
   -- Add the new change output
   -----------------------------------------------
   AddNewChangeOutput modal -> case modal of
     StartAdding _ ->
       [ Model $ model 
-          & #txBuilderModel % #newChangeOutput .~ def
+          & #txBuilderModel % #newChangeOutput .~ 
+              -- Populate the fields with the currently set change output.
+              maybe def toNewChangeOutput (txBuilderModel ^. #changeOutput)
           & #txBuilderModel % #addingChangeOutput .~ True
       ]
     CancelAdding ->
