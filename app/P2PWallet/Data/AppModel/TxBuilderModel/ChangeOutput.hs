@@ -79,3 +79,10 @@ verifyNewChangeOutput network NewChangeOutput{..} = do
     , lovelace = 0
     , nativeAssets = []
     }
+
+toNewChangeOutput :: ChangeOutput -> NewChangeOutput
+toNewChangeOutput ChangeOutput{..} = NewChangeOutput
+  { paymentAddress = toText paymentAddress
+  , lovelace = lovelace
+  , nativeAssets = nativeAssets
+  }

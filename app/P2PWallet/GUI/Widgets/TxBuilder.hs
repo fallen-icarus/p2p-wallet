@@ -17,6 +17,7 @@ import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal.Network
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
+import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.GUI.Widgets.TxBuilder.StatusBar
@@ -107,6 +108,8 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (swapBuilderModel ^. #targetSwapUpdate)
       , editSwapExecutionWidget model
           `nodeVisible` isJust (swapBuilderModel ^. #targetSwapExecution)
+      , addExternalUserOutputWidget
+          `nodeVisible` addingExternalUserOutput
       , addChangeOutputWidget
           `nodeVisible` addingChangeOutput
       , addTestMintWidget model
@@ -169,7 +172,18 @@ txBuilderWidget model@AppModel{..} = do
         [ customPopup_ (toLensVL $ #txBuilderModel % #showAddPopup) 
             [popupAnchor anchor, alignTop, alignLeft, popupAlignToOuterV] $
             vstack
-              [ button "Change Output" (TxBuilderEvent $ AddNewChangeOutput $ StartAdding Nothing)
+              [ button "External Output" 
+                    (TxBuilderEvent $ AddNewExternalUserOutput $ StartAdding Nothing)
+                  `styleBasic`
+                    [ border 0 transparent
+                    , textSize 12
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              , button "Change Output" 
+                    (TxBuilderEvent $ AddNewChangeOutput $ StartAdding Nothing)
                   `styleBasic`
                     [ border 0 transparent
                     , textSize 12
@@ -253,6 +267,60 @@ addChangeOutputWidget = do
         , button "Cancel" $ TxBuilderEvent $ AddNewChangeOutput CancelAdding
         , spacer
         , mainButton "Confirm" $ TxBuilderEvent $ AddNewChangeOutput ConfirmAdding
+        ]
+    ] `styleBasic` [bgColor customGray3, padding 20]
+
+addExternalUserOutputWidget :: AppNode
+addExternalUserOutputWidget = do
+  centerWidget $ vstack 
+    [ hstack 
+        [ label "Recipient:"
+        , spacer
+        , textField_ (toLensVL $ #txBuilderModel % #newExternalUserOutput % #alias)
+              [placeholder "Bob"]
+            `styleBasic` [textSize 16, bgColor customGray1]
+            `styleFocus` [border 1 customBlue]
+        ]
+    , spacer
+    , hstack 
+        [ label "Payment Address:"
+        , spacer
+        , textField (toLensVL $ #txBuilderModel % #newExternalUserOutput % #paymentAddress)
+            `styleBasic` [textSize 10, bgColor customGray1]
+            `styleFocus` [border 1 customBlue]
+        ]
+    , spacer
+    , hstack
+        [ label "ADA:"
+        , spacer
+        , textField_ (toLensVL $ #txBuilderModel % #newExternalUserOutput % #ada)
+              [placeholder "1.234567"]
+            `styleBasic` [width 200, bgColor customGray1, sndColor darkGray]
+            `styleFocus` [border 1 customBlue]
+        ]
+    , spacer
+    , hstack
+        [ label "Native Assets (separated with newlines)"
+        , mainButton helpIcon (Alert nativeAssetAreaEntryMsg)
+            `styleBasic`
+              [ border 0 transparent
+              , radius 20
+              , bgColor transparent
+              , textColor customBlue
+              , textMiddle
+              , textFont "Remix"
+              ]
+            `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+        ]
+    , textArea (toLensVL $ #txBuilderModel % #newExternalUserOutput % #nativeAssets)
+        `styleBasic` [height 180, textSize 10, bgColor customGray1]
+        `styleFocus` [border 1 customBlue]
+    , spacer
+    , hstack 
+        [ filler
+        , button "Cancel" $ TxBuilderEvent $ AddNewExternalUserOutput CancelAdding
+        , spacer
+        , mainButton "Confirm" $ TxBuilderEvent $ AddNewExternalUserOutput ConfirmAdding
         ]
     ] `styleBasic` [bgColor customGray3, padding 20]
 

@@ -68,6 +68,9 @@ mainMenuWidget model@AppModel{txBuilderModel} = do
       let dormantColor
             | model ^. #scene == TxBuilderScene = customBlue
             | otherwise = white
+          noteColor
+            | isRight $ canBeBuilt (model ^. #txBuilderModel) = customBlue
+            | otherwise = customRed
           btn = 
             zstack
               [ vstack 
@@ -95,7 +98,7 @@ mainMenuWidget model@AppModel{txBuilderModel} = do
                   ]
               , flip nodeVisible (not $ isEmptyBuilder txBuilderModel) $ box_ [alignTop,alignRight] $ 
                   label notificationCircleIcon 
-                    `styleBasic` [textFont "Remix", padding 5, textSize 8, textColor customRed]
+                    `styleBasic` [textFont "Remix", padding 5, textSize 8, textColor noteColor]
               ]
       box_ [onClick $ ChangeMainScene TxBuilderScene] btn
         `styleBasic` [bgColor transparent , paddingB 5 , radius 5]
