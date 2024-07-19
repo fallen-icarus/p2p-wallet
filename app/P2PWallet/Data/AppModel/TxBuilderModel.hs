@@ -172,8 +172,8 @@ data TxBuilderModel = TxBuilderModel
   , showChangePopup :: Bool
   -- | Whether to show the collateral popup widget.
   , showCollateralPopup :: Bool
-  -- | The current network parameters.
-  , parameters :: Maybe ByteString
+  -- | The current network parameters and the current collateralPercentage.
+  , parameters :: Maybe (ByteString, Decimal)
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''TxBuilderModel
@@ -243,10 +243,10 @@ convertToTxBody TxBuilderModel{..} =
     , maybe mempty (addToTxBody mempty) testMint
     -- Add any swap actions.
     , addToTxBody mempty swapBuilderModel
-    -- Add the collateral to the transaction.
-    , maybe mempty (addToTxBody mempty) collateralInput
-    -- Overide the fee with the fee in the builder model.
-    , mempty & #fee .~ fee
+    -- Add the collateral and the fee to the transaction. This is done together because
+    -- the amount of collateral required depends on the fee.
+    , let txWithFee = mempty & #fee .~ fee in
+      maybe txWithFee (addToTxBody txWithFee) collateralInput
     ]
 
 -- | Since `cardano-cli transaction build-raw` can throw confusing error messages if certain pieces

@@ -29,6 +29,8 @@ data CollateralInput = CollateralInput
   , nativeAssets :: [NativeAsset]
   -- | Wallet this UTxO is from.
   , walletAlias :: Text
+  -- | The required collateral percentage of the fee.
+  , collateralPercentage :: Decimal
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''CollateralInput
@@ -41,10 +43,11 @@ instance Default CollateralInput where
     , lovelace = 0
     , nativeAssets = []
     , walletAlias = ""
+    , collateralPercentage = 0
     }
 
 instance AddToTxBody CollateralInput where
-  addToTxBody txBody CollateralInput{utxoRef,paymentAddress,paymentKeyDerivation,lovelace} = 
+  addToTxBody txBody CollateralInput{..} = 
       txBody 
         -- Add the collateral input.
         & #collateralInput ?~ newCollateral
@@ -57,6 +60,7 @@ instance AddToTxBody CollateralInput where
         { utxoRef = utxoRef
         , lovelace = lovelace
         , paymentAddress = paymentAddress
+        , requiredCollateral = calculateRequiredCollateral (txBody ^. #fee) collateralPercentage
         }
 
       plutusAddress :: PlutusAddress
@@ -68,6 +72,13 @@ instance AddToTxBody CollateralInput where
       requiredWitness = case toPubKeyHash plutusAddress of
           Nothing -> Nothing
           Just pkHash -> Just $ KeyWitness (pkHash, paymentKeyDerivation)
+
+-- | Multiply the transaction fee by the collateralPercentage. Add one lovelace to
+-- account for potential rounding issues.
+calculateRequiredCollateral :: Lovelace -> Decimal -> Lovelace
+calculateRequiredCollateral fee collateralPercentage
+  | fee == 0 = fee
+  | otherwise = (+1) $ toLovelace $ Ada $ unAda (toAda fee) * collateralPercentage
 
 personalUTxOToCollateralInput
   :: Text 
@@ -83,4 +94,5 @@ personalUTxOToCollateralInput alias paymentAddress mKeyInfo PersonalUTxO{utxoRef
     , lovelace = lovelace
     , nativeAssets = nativeAssets
     , walletAlias = alias
+    , collateralPercentage = 0
     }

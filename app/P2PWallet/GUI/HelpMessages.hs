@@ -353,6 +353,15 @@ aboutCollateralMsg = unlines
       [ "Collateral UTxOs must contain at least 5 ADA and not have any native assets present."
       , "Only one collateral UTxO is required per transaction with smart contract executions."
       ]
+  , ""
+  , unwords 
+      [ "The actual amount of ada required for collateral will be calculated while building"
+      , "the transaction. After subtracting the required collateral amount from the 5 ADA,"
+      , "the remainder will be returned to the address the collateral input belongs to. This"
+      , "collateral change output will only be created if the collateral is actually taken!"
+      , "If no collateral is taken (due to the smart contracts successfully executing), the"
+      , "collateral input UTxO will remain un-touched."
+      ]
   ]
 
 defiStakeCredentialMsg :: Text

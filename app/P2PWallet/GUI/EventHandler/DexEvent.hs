@@ -198,7 +198,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
             fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
               calculateMinUTxOValue 
                 (config ^. #network) 
-                (txBuilderModel ^. #parameters) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
                 -- Use a blank swapBuilderModel to calculate the minUTxOValue for the new swap.
                 (emptySwapBuilderModel & #swapCreations .~ [(0,verifiedSwap)])
 
@@ -241,7 +241,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
             fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
               calculateMinUTxOValue 
                 (config ^. #network) 
-                (txBuilderModel ^. #parameters) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
                 -- Use a blank swapBuilderModel to calculate the minUTxOValue for the new swap.
                 (emptySwapBuilderModel & #swapCreations .~ [(0,verifiedSwap)])
 
@@ -336,7 +336,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
             fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
               calculateMinUTxOValue 
                 network 
-                (txBuilderModel ^. #parameters) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
                 -- Use a blank swapBuilderModel to calculate the minUTxOValue for the new swap.
                 -- This just uses `swapCreations` because the output only depends on the creation
                 -- part.
@@ -409,7 +409,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
             fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
               calculateMinUTxOValue 
                 network 
-                (txBuilderModel ^. #parameters) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
                 -- Use a blank swapBuilderModel to calculate the minUTxOValue for the new swap.
                 (emptySwapBuilderModel & #swapExecutions .~ [(0,verifiedSwapExecution)])
 

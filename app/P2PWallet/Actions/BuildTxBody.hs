@@ -86,8 +86,13 @@ buildTxBody network tx = do
   -- Get the current parameters if necessary, and write them to a file for cardano-cli to use.
   -- If wallets have already been synced since starting the app, the parameters should already be
   -- saved in the `TxBuilderModel`.
-  parameters <- maybe (runGetParams network >>= fromRightOrAppError) return $ tx ^. #parameters
-  writeFileBS (toString paramsFile) parameters
+  parameters@(allParameters, collateralPercentage) <- 
+    maybe (runGetParams network >>= fromRightOrAppError) return $ tx ^. #parameters
+  writeFileBS (toString paramsFile) allParameters
+
+  -- Create the template tx that all intermediate transactions will be derived from. The original
+  -- tx cannot be used because the collateral input does not have the collateralPercentage set yet.
+  let templateTx = tx & #collateralInput % _Just % #collateralPercentage .~ collateralPercentage
 
   -- Convert the model to `TxBody` and extract out the required witnesses for returning
   -- with the finalized `TxBuilderModel`.
@@ -97,14 +102,14 @@ buildTxBody network tx = do
         -- impacted by the fee amount. 5 ADA should be an over-estimate in every case and when
         -- the actual fee is calculated, setting it to the new fee should not impact the execution
         -- budgets.
-        tx & #fee .~ 5_000_000
+        templateTx & #fee .~ 5_000_000
 
   -- Build the certificate files so they are available in the tmp directory. Registrations must
   -- appear first in the transaction. 
   certificateFiles <- mapM (buildCertificate tmpDir builderLogFile) certificates
 
   -- Calculate the budgets if necessary.
-  budgets <- if not (tx ^. #requiresCollateral) then return Nothing else do
+  budgets <- if not (templateTx ^. #requiresCollateral) then return Nothing else do
       -- Any plutus scripts that are used locally must be exported.  The redeemers and datums used
       -- must also be exported. All files will be located in the tmp directory and will have their
       -- hashes as the file names.
@@ -133,11 +138,11 @@ buildTxBody network tx = do
         -- added again.
         updateBudgets budgets $ 
           -- Replace the fee and rebalance.
-          convertToTxBody $ balanceTx $ tx & #fee .~ feeCalc1
+          convertToTxBody $ balanceTx $ templateTx & #fee .~ feeCalc1
 
   -- Update the `TxBuilderModel` with the results.
   let finalizedTx = 
-        balanceTx $ tx 
+        balanceTx $ templateTx 
           -- Set the fee.
           & #fee .~ fee
           -- Tell the app which key witnesses are required.
@@ -147,7 +152,7 @@ buildTxBody network tx = do
           & #parameters ?~ parameters
 
   -- Check that the change output has enough ada now that the fee has been subtracted.
-  changeAdaValueCheck network parameters $ fromMaybe def $ finalizedTx ^. #changeOutput
+  changeAdaValueCheck network allParameters $ fromMaybe def $ finalizedTx ^. #changeOutput
 
   -- Build the transaction one more time so that the tx.body file has the finalized transaction.
   -- Also set the witnesses since the app will need them to determine what actions can be taken

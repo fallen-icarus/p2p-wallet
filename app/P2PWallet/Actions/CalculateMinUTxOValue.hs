@@ -33,7 +33,11 @@ changeHasTooLittleAdaMsg reqLovelace = unlines
   ]
 
 -- | Calculate the required minUTxOValue for the new output. The order of the returned
--- list matches the order of the outputs generated in the `AddToTxBody` class.
+-- list matches the order of the outputs generated in the `AddToTxBody` class. This function
+-- will fetch the current network parameters if they have not been fetched yet. Unfortunately, this
+-- function is unable to return the results in a manner that can save them so it is strongly adviced
+-- to fetch the parameters _before_ this function is ever called. In other words, the wallets should
+-- be synced at least once after the app launches.
 calculateMinUTxOValue :: (AddToTxBody a) => Network -> Maybe ByteString -> a -> IO [Lovelace]
 calculateMinUTxOValue network mParameters newOutputAction = do
   -- Get the file names since cardano-cli works with files.
@@ -43,7 +47,7 @@ calculateMinUTxOValue network mParameters newOutputAction = do
   -- Get the current parameters if necessary, and write them to a file for cardano-cli to use.
   -- If wallets have already been synced since starting the app, the parameters should already be
   -- saved in the `TxBuilderModel`.
-  parameters <- maybe (runGetParams network >>= fromRightOrAppError) return mParameters
+  parameters <- maybe (runGetParams network >>= fromRightOrAppError . fmap fst) return mParameters
   writeFileBS (toString paramsFile) parameters
 
   -- Extract out the new outputs for the this action..

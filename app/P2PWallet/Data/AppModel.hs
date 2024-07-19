@@ -127,7 +127,7 @@ data AppEvent
   -- | Sync the currently tracked wallets. This can be called from most scenes which is why it
   -- is a main event. This also gets the current network parameters so they are available for
   -- building transactions.
-  | SyncWallets (ProcessEvent (Wallets, ByteString,[Notification]))
+  | SyncWallets (ProcessEvent (Wallets, (ByteString,Decimal) ,[Notification]))
   -- | Update the current date.
   | UpdateCurrentDate (ProcessEvent Day)
   -- | An event for the Home page.
