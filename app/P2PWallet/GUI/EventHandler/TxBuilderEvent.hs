@@ -133,7 +133,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
             fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
               calculateMinUTxOValue 
                 (config ^. #network) 
-                (txBuilderModel ^. #parameters) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
                 verifiedOutput
 
           when (minUTxOValue > verifiedOutput ^. #lovelace) $

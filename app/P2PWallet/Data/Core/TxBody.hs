@@ -420,22 +420,21 @@ data TxBodyCollateral = TxBodyCollateral
   -- | The address where the collateral input is from. The collateral change will be returned to
   -- this address.
   , paymentAddress :: PaymentAddress
+  -- | The required amount of collateral based on the transaction fee.
+  , requiredCollateral :: Lovelace
   } deriving (Show,Eq)
 
 instance ToBuildCmdField TxBodyCollateral where
   toBuildCmdField _ TxBodyCollateral{..} =
-    -- The hard-coded collateral amount. I have never seen a transaction require 4 ADA
-    -- as collateral.
-    let actualCollateral = Lovelace 4_000_000 in
     unwords
       [ "--tx-in-collateral " <> display utxoRef
-      , "--tx-total-collateral " <> show (unLovelace actualCollateral)
+      , "--tx-total-collateral " <> show (unLovelace requiredCollateral)
       , unwords 
           [ "--tx-out-return-collateral"
           -- The collateral change output amount surrounded by quotes.
           , show $ unwords
               [ toText paymentAddress
-              , show (unLovelace $ lovelace - actualCollateral) <> " lovelace"
+              , show (unLovelace $ lovelace - requiredCollateral) <> " lovelace"
               ] 
           ]
       ]

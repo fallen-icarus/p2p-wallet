@@ -16,7 +16,7 @@ import P2PWallet.Prelude
 -- | This function gets the latest wallet states, and then backs up the states into the database.
 -- It will also get the current network parameters so they are available for transaction
 -- building.
-syncWallets :: FilePath -> Network -> Wallets -> IO (Wallets,ByteString,[Notification])
+syncWallets :: FilePath -> Network -> Wallets -> IO (Wallets,(ByteString,Decimal),[Notification])
 syncWallets databaseFile network ws@Wallets{..} = do
     -- The information is fetched concurrently.
     (updatedPaymentWallets,(updatedStakeWallets,(updatedDexWallets,networkParameters))) <- 
@@ -69,5 +69,5 @@ syncWallets databaseFile network ws@Wallets{..} = do
         -- Throw an error if syncing failed.
         mapM fromRightOrAppError
 
-    fetchParameters :: IO ByteString
+    fetchParameters :: IO (ByteString, Decimal)
     fetchParameters = runGetParams network >>= fromRightOrAppError

@@ -24,6 +24,7 @@ import Network.HTTP.Client qualified as HTTP
 import Network.HTTP.Client.TLS qualified as HTTPS
 import Network.HTTP.Client (newManager)
 import Data.Aeson
+import Data.Aeson.Types qualified as Aeson
 import Data.Text qualified as Text
 import UnliftIO.Async (mapConcurrently,concurrently)
 
@@ -81,7 +82,7 @@ runSubmitTx network txFile = do
     Just tx -> do
       manager <- newManager customTlsSettings
       res <-
-        runClientM (submitApi $ SubmitTxCBOR tx) $
+        handleTimeoutError $ runClientM (submitApi $ SubmitTxCBOR tx) $
           mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1/ogmios")
       case res of
         Right r -> return $ Right r
@@ -99,7 +100,7 @@ runEvaluateTx network txFile = do
     Just tx -> do
       manager <- newManager customTlsSettings
       res <-
-        runClientM (evaluateApi $ EvaluateTxCBOR tx) $
+        handleTimeoutError $ runClientM (evaluateApi $ EvaluateTxCBOR tx) $
           mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1/ogmios")
       case res of
         Right r -> return $ Right r
@@ -108,12 +109,24 @@ runEvaluateTx network txFile = do
           Nothing -> return $ Left $ show e
         Left err -> return $ Left $ show err
 
--- | Get the current parameters for use with cardano-cli.
-runGetParams :: Network -> IO (Either Text ByteString)
+-- | Get the current parameters for use with cardano-cli. Also extract out the collateral percentage
+-- which is required for determining how much collateral to take from a collateral uxo.
+runGetParams :: Network -> IO (Either Text (ByteString,Decimal))
 runGetParams network = do
-  manager' <- newManager customTlsSettings
-  let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network) 443 "api/v1")
-  bimap show valueAsByteString <$> runClientM paramsApi env
+    manager' <- newManager customTlsSettings
+    let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+    handleTimeoutError (runClientM paramsApi env) >>= 
+      either (return . Left . show) (return . processResults)
+  where
+    processResults :: Value -> Either Text (ByteString,Decimal)
+    processResults val = (,) <$> pure (valueAsByteString val) <*> parseCollateralPercentage val
+
+    parseCollateralPercentage :: Value -> Either Text Decimal
+    parseCollateralPercentage (Object o) = 
+      maybe (Left "Could not parse Koios parameters.") (Right . (/100) . fromIntegral @_ @Decimal) $
+        Aeson.parseMaybe (\x -> Aeson.parseField @Integer x "collateralPercentage") o
+    parseCollateralPercentage val = 
+      Left $ "Could not parse Koios parameters: " <> showValue val
 
 -- | Sync the latest information for the payment wallet. Try to do as much concurrently as possible.
 -- There are redundant queries built-in since Koios can occassionally return incorrect information

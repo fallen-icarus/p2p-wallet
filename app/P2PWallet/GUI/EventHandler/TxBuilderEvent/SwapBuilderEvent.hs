@@ -85,7 +85,7 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
             fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
               calculateMinUTxOValue 
                 (config ^. #network) 
-                (txBuilderModel ^. #parameters) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
                 (emptySwapBuilderModel & #swapCreations .~ [(0,verifiedSwap)])
 
           -- Return the `SwapCreation` with the updated deposit field.
@@ -127,7 +127,7 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
             fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
               calculateMinUTxOValue 
                 (config ^. #network) 
-                (txBuilderModel ^. #parameters) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
                 (emptySwapBuilderModel & #swapCreations .~ [(0,verifiedSwap)])
 
           -- Return the `SwapCreation` with the updated deposit field.
@@ -171,7 +171,7 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
             fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
               calculateMinUTxOValue 
                 (config ^. #network)
-                (txBuilderModel ^. #parameters) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
                 -- Use a blank swapBuilderModel to calculate the minUTxOValue for the new swap.
                 (emptySwapBuilderModel & #swapExecutions .~ [(0,verifiedSwapExecution)])
 

@@ -177,7 +177,7 @@ changeInfoPopup AppModel{txBuilderModel,reverseTickerMap} = do
           ]
 
 collateralInfoPopup :: AppModel -> AppNode
-collateralInfoPopup AppModel{txBuilderModel} = do
+collateralInfoPopup AppModel{txBuilderModel=txBuilderModel@TxBuilderModel{fee}} = do
   let CollateralInput{..} = fromMaybe def $ txBuilderModel ^. #collateralInput
       anchor = 
         box_ [alignMiddle] $ tooltip_ "Collateral Info" [tooltipDelay 0] $
@@ -221,11 +221,23 @@ collateralInfoPopup AppModel{txBuilderModel} = do
           ]
       , spacer_ [width 5]
       , hstack 
-          [ label "Value:"
+          [ label "Input Value:"
               `styleBasic` [textSize 8]
           , spacer
           , label (display lovelace)
               `styleBasic` [textSize 8]
+          ]
+      , spacer_ [width 5]
+      , hstack 
+          [ label "Required Collateral:"
+              `styleBasic` [textSize 8]
+          , spacer
+          , label (display $ calculateRequiredCollateral fee collateralPercentage)
+              `styleBasic` [textSize 8]
+              `nodeVisible` txBuilderModel ^. #isBuilt
+          , label "build to calculate"
+              `styleBasic` [textSize 8, textColor customRed]
+              `nodeVisible` not (txBuilderModel ^. #isBuilt)
           ]
       ] `styleBasic`
           [ bgColor customGray3
