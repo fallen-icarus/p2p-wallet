@@ -434,10 +434,16 @@ instance ToBuildCmdField TxBodyCollateral where
           -- The collateral change output amount surrounded by quotes.
           , show $ unwords
               [ toText paymentAddress
-              , show (unLovelace $ lovelace - requiredCollateral) <> " lovelace"
+              , show (unLovelace collateralChange) <> " lovelace"
               ] 
           ]
       ]
+    where
+      -- This is required due to the dummy fee being 5 ADA. It is easy for the difference to be
+      -- negative.
+      collateralChange
+        | lovelace - requiredCollateral < 0 = 0
+        | otherwise = lovelace - requiredCollateral
 
 -------------------------------------------------
 -- Tx Body

@@ -67,6 +67,22 @@ changeAdaValueCheck network parameters changeOutput@ChangeOutput{lovelace} = do
   when (minUTxOValue > lovelace) $ 
     throwIO $ AppError $ changeHasTooLittleAdaMsg minUTxOValue
   
+-- | Check whether there is enough collateral for the transaction.
+collateralValueCheck :: TxBuilderModel -> IO ()
+collateralValueCheck tx = 
+  whenJust (convertToTxBody tx ^. #collateralInput) $ 
+    \TxBodyCollateral{lovelace,requiredCollateral} -> 
+      when (lovelace - requiredCollateral < 0) $
+        throwIO $ AppError $ unlines
+          [ "There is not enough collateral for this transaction."
+          , unwords
+              [ display requiredCollateral
+              , "is required, but only"
+              , display lovelace
+              , "is available."
+              ]
+          , "Choose a different collateral input with at least " <> display requiredCollateral <> "."
+          ]
 
 -- | Build the transaction and generate the tx.body file.
 buildTxBody :: Network -> TxBuilderModel -> IO TxBuilderModel
@@ -153,6 +169,9 @@ buildTxBody network tx = do
 
   -- Check that the change output has enough ada now that the fee has been subtracted.
   changeAdaValueCheck network allParameters $ fromMaybe def $ finalizedTx ^. #changeOutput
+
+  -- Verify that the transaction has enough collateral.
+  collateralValueCheck finalizedTx
 
   -- Build the transaction one more time so that the tx.body file has the finalized transaction.
   -- Also set the witnesses since the app will need them to determine what actions can be taken
