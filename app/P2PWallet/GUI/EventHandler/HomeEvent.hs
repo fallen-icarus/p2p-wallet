@@ -176,20 +176,20 @@ handleHomeEvent model@AppModel{..} evt = case evt of
       [ Model $ model 
           & #homeModel % #editingWallet .~ True
           & #homeModel % #showMorePopup .~ False
-          & #extraTextField .~ (homeModel ^. #selectedWallet % #alias)
+          & #homeModel % #newAliasField .~ (homeModel ^. #selectedWallet % #alias)
       ]
     CancelAdding -> 
       -- Close the widget for getting the new info and reset the text field.
       [ Model $ model 
           & #homeModel % #editingWallet .~ False 
-          & #extraTextField .~ ""
+          & #homeModel % #newAliasField .~ ""
       ]
     ConfirmAdding ->
       -- The state is deliberately not updated in case there is an error with any of these steps.
       -- The state will be updated after everything has successfully executed.
       [ Task $ runActionOrAlert (HomeEvent . ChangePaymentWalletName . AddResult) $ do
           let currentWallet@PaymentWallet{paymentId} = model ^. #homeModel % #selectedWallet
-              newAlias = model ^. #extraTextField
+              newAlias = model ^. #homeModel ^. #newAliasField
               newWallet = currentWallet & #alias .~ newAlias
               -- Filter out the selected profile from the list of known payment wallets.
               otherWallets = filter (\p -> paymentId /= p ^. #paymentId) $
@@ -215,7 +215,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
               & #knownWallets % #paymentWallets .~ newWallets
               & #homeModel % #editingWallet .~ False
               & #homeModel % #selectedWallet .~ newWallet
-              & #extraTextField .~ ""
+              & #homeModel % #newAliasField .~ ""
           ]
 
   -----------------------------------------------

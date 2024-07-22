@@ -114,6 +114,8 @@ data DelegationModel = DelegationModel
   , poolFilterModel :: PoolFilterModel
   -- | Whether to show the pool filter widget.
   , showPoolFilter :: Bool
+  -- | The text field where new aliases are entered.
+  , newAliasField :: Text
   } deriving (Eq,Show)
 
 makeFieldLabelsNoPrefix ''DelegationModel
@@ -130,4 +132,5 @@ instance Default DelegationModel where
     , registeredPools = []
     , poolFilterModel = def
     , showPoolFilter = False
+    , newAliasField = ""
     }

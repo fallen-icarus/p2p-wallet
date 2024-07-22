@@ -119,6 +119,16 @@ addProfileWidget AppModel{profileModel=ProfileModel{newProfile}} = do
                     [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
                     `styleBasic` [width 200, bgColor customGray1]
                     `styleFocus` [border 1 customBlue]
+                , mainButton helpIcon (Alert trezorDerivationMsg)
+                    `styleBasic`
+                      [ border 0 transparent
+                      , radius 20
+                      , bgColor transparent
+                      , textColor customBlue
+                      , textMiddle
+                      , textFont "Remix"
+                      ]
+                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
                 ]
           , hstack 
               [ label "Account ID:"

@@ -4,18 +4,21 @@ module P2PWallet.Actions.ExportTxBody
   ) where
 
 import System.FilePath ((</>), (<.>), takeFileName)
-import System.Directory (getHomeDirectory,copyFile,createDirectoryIfMissing)
+import System.Directory (getModificationTime,copyFile,createDirectoryIfMissing)
 
 import P2PWallet.Data.Core.Internal.Files
 import P2PWallet.Prelude
 
--- | Export the transaction body file and any witness files to the user's home directory.
-exportTxBody :: [KeyWitnessFile] -> IO FilePath
-exportTxBody witnessFiles = do
-  destinationDir <- getHomeDirectory
+-- | Export the transaction body file and any witness files to the specified directory. A subfolder
+-- is created in case other files already exist in that directory.
+exportTxBody :: TimeZone -> Text -> [KeyWitnessFile] -> IO FilePath
+exportTxBody zone destinationDir witnessFiles = do
   tmpDir <- getTemporaryDirectory
-  let appDir = destinationDir </> "tx_files"
-      tmpTxBody = tmpDir </> "tx" <.> "body"
+  let tmpTxBody = tmpDir </> "tx" <.> "body"
+
+  timestamp <- timeStampToFilePath zone <$> getModificationTime tmpTxBody
+      
+  let appDir = toString destinationDir </> timestamp
       txBodyDestination = appDir </> "tx" <.> "body"
 
   -- Create the app directory if missing.

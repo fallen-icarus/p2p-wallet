@@ -189,6 +189,8 @@ data HomeModel = HomeModel
   , showTransactionFilter :: Bool
   -- | The active scene for the tx filter widget.
   , txFilterScene :: FilterScene
+  -- | The text field where new aliases are entered.
+  , newAliasField :: Text
   } deriving (Eq,Show)
 
 instance Default HomeModel where
@@ -209,6 +211,7 @@ instance Default HomeModel where
     , txFilterModel = def
     , showTransactionFilter = False
     , txFilterScene = FilterScene
+    , newAliasField = ""
     }
 
 makeFieldLabelsNoPrefix ''HomeModel

@@ -144,20 +144,20 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
       [ Model $ model 
           & #delegationModel % #editingWallet .~ True
           & #delegationModel % #showMorePopup .~ False
-          & #extraTextField .~ (delegationModel ^. #selectedWallet % #alias)
+          & #delegationModel % #newAliasField .~ (delegationModel ^. #selectedWallet % #alias)
       ]
     CancelAdding -> 
       -- Close the widget for getting the new info and reset the text field.
       [ Model $ model 
           & #delegationModel % #editingWallet .~ False 
-          & #extraTextField .~ ""
+          & #delegationModel % #newAliasField .~ ""
       ]
     ConfirmAdding ->
       -- The state is deliberately not updated in case there is an error with any of these steps.
       -- The state will be updated after everything has successfully executed.
       [ Task $ runActionOrAlert (DelegationEvent . ChangeStakeWalletName . AddResult) $ do
           let currentWallet@StakeWallet{stakeId} = delegationModel ^. #selectedWallet
-              newAlias = model ^. #extraTextField
+              newAlias = model ^. #delegationModel % #newAliasField
               newWallet = currentWallet & #alias .~ newAlias
               -- Filter out the selected wallet from the list of known wallets.
               otherWallets = filter (\p -> stakeId /= p ^. #stakeId) $
@@ -185,7 +185,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           -- override the selected wallet set by `configureSelectedDeFiWallets` for
           -- the `delegationModel`.
           & #delegationModel % #selectedWallet .~ newWallet
-          & #extraTextField .~ ""
+          & #delegationModel % #newAliasField .~ ""
       ]
 
   -----------------------------------------------

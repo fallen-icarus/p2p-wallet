@@ -194,8 +194,6 @@ data AppModel = AppModel
   , reverseTickerMap :: ReverseTickerMap
   -- | A mapping from fingerprints to their associated on-chain name.
   , fingerprintMap :: FingerprintMap
-  -- | Useful when the user must specify a one-time use input such as a filepath or new alias.
-  , extraTextField :: Text
   -- | This is useful for forcing the redraw of the UI when a text field is changed.
   , forceRedraw :: Bool
   } deriving (Show,Eq)
@@ -223,7 +221,6 @@ instance Default AppModel where
     , tickerMap = mempty
     , reverseTickerMap = mempty
     , fingerprintMap = mempty
-    , extraTextField = ""
     , forceRedraw = False
     }
 

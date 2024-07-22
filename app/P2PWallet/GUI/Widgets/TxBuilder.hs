@@ -65,7 +65,8 @@ txBuilderWidget model@AppModel{..} = do
                         [ not $ txBuilderModel ^. #isBuilt
                         , txBuilderModel ^. #txType == PairedTx
                         ]
-                  , mainButton "Witness & Export" (TxBuilderEvent $ WitnessTx StartProcess)
+                  , mainButton "Witness & Export" 
+                        (TxBuilderEvent $ GetTxFileExportDirectory $ StartAdding Nothing)
                       `nodeVisible` and
                         [ txBuilderModel ^. #isBuilt
                         , txBuilderModel ^. #txType == HybridTx
@@ -76,7 +77,8 @@ txBuilderWidget model@AppModel{..} = do
                         [ not $ txBuilderModel ^. #isBuilt
                         , txBuilderModel ^. #txType == HybridTx
                         ]
-                  , mainButton "Export" (TxBuilderEvent $ ExportTxBody StartProcess)
+                  , mainButton "Export"
+                        (TxBuilderEvent $ GetTxFileExportDirectory $ StartAdding Nothing)
                       `nodeVisible` and
                         [ txBuilderModel ^. #isBuilt
                         , txBuilderModel ^. #txType == WatchedTx
@@ -99,6 +101,7 @@ txBuilderWidget model@AppModel{..} = do
               , not addingChangeOutput
               , not addingTestMint
               , not importing
+              , not exporting
               ]
       , editUserOutputWidget (maybe "" (view (_2 % #alias)) targetUserOutput)
           `nodeVisible` isJust targetUserOutput
@@ -116,6 +119,8 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` addingTestMint
       , importSignedTxWidget
           `nodeVisible` importing
+      , exportDestinationWidget
+          `nodeVisible` exporting
       ] `styleBasic`
           [ padding 20
           ]
@@ -330,9 +335,19 @@ importSignedTxWidget = do
     [ hstack 
         [ label "Absolute FilePath:"
         , spacer
-        , textField (toLensVL $ #txBuilderModel % #importedSignedTxFile)
+        , textField (toLensVL $ #txBuilderModel % #targetPath)
             `styleBasic` [textSize 10, bgColor customGray1]
             `styleFocus` [border 1 customBlue]
+        , mainButton helpIcon (Alert filePathMsg)
+            `styleBasic`
+              [ border 0 transparent
+              , radius 20
+              , bgColor transparent
+              , textColor customBlue
+              , textMiddle
+              , textFont "Remix"
+              ]
+            `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         ]
     , spacer
     , hstack 
@@ -343,3 +358,31 @@ importSignedTxWidget = do
         ]
     ] `styleBasic` [bgColor customGray3, padding 20]
 
+exportDestinationWidget :: AppNode
+exportDestinationWidget = do
+  centerWidget $ vstack 
+    [ hstack 
+        [ label "Absolute Directory Path:"
+        , spacer
+        , textField (toLensVL $ #txBuilderModel % #targetPath)
+            `styleBasic` [textSize 10, bgColor customGray1]
+            `styleFocus` [border 1 customBlue]
+        , mainButton helpIcon (Alert directoryPathMsg)
+            `styleBasic`
+              [ border 0 transparent
+              , radius 20
+              , bgColor transparent
+              , textColor customBlue
+              , textMiddle
+              , textFont "Remix"
+              ]
+            `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+        ]
+    , spacer
+    , hstack 
+        [ filler
+        , button "Cancel" $ TxBuilderEvent $ GetTxFileExportDirectory CancelAdding
+        , spacer
+        , mainButton "Confirm" $ TxBuilderEvent $ GetTxFileExportDirectory ConfirmAdding
+        ]
+    ] `styleBasic` [bgColor customGray3, padding 20]

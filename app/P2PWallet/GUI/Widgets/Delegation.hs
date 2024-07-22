@@ -501,7 +501,7 @@ editStakeWalletWidget _ = do
         [ hstack 
             [ label "Wallet Name:"
             , spacer
-            , textField (toLensVL #extraTextField) 
+            , textField (toLensVL $ #delegationModel % #newAliasField) 
                 `styleBasic` [width 300, bgColor customGray1]
                 `styleFocus` [border 1 customBlue]
             ]

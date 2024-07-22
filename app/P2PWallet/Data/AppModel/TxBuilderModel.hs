@@ -88,6 +88,8 @@ data TxBuilderEvent
   | ExportTxBody (ProcessEvent FilePath)
   -- | Import an externally signed transaction to submit it through the wallet.
   | ImportSignedTxFile (AddEvent FilePath FilePath)
+  -- | Get the export destination for the transaction files.
+  | GetTxFileExportDirectory (AddEvent FilePath FilePath)
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -166,8 +168,10 @@ data TxBuilderModel = TxBuilderModel
   , isBalanced :: Bool
   -- | Whether the import signed tx widget should be open.
   , importing :: Bool
-  -- | The file path to the imported tx.signed.
-  , importedSignedTxFile :: Text
+  -- | Whether the export directory widget should be open.
+  , exporting :: Bool
+  -- | User supplied filepath.
+  , targetPath :: Text
   -- | Whether the transaction requires collateral.
   , requiresCollateral :: Bool
   -- | The chosen collateral input.
@@ -207,7 +211,8 @@ instance Default TxBuilderModel where
     , isBuilt = False
     , isBalanced = False
     , importing = False
-    , importedSignedTxFile = ""
+    , exporting = False
+    , targetPath = ""
     , requiresCollateral = False
     , collateralInput = Nothing
     , showAddPopup = False
