@@ -20,8 +20,8 @@ swapClosesList reverseTickerMap = map utxoRow
   where
     utxoRow :: (Int,SwapClose) -> AppNode
     utxoRow s@(_,SwapClose{swapDatum}) = case swapDatum of
-      Just (OneWay datum) -> limitOrderRow s datum
-      Just (TwoWay datum) -> liquiditySwapRow s datum
+      Just (OneWayDatum datum) -> limitOrderRow s datum
+      Just (TwoWayDatum datum) -> liquiditySwapRow s datum
 
       -- It shouldn't be possible to create a `SwapClose` for a UTxO with an invalid datum.
       Just (SwapDatumError _) -> spacer `nodeVisible` False

@@ -56,7 +56,7 @@ data HomeEvent
   -- | Reset Asset Filters.
   | ResetAssetFilters
   -- | Reset Tx Filters.
-  | ResetTxFilters
+  | ResetHomeTxFilters
   -- | Show all UTxO detials.
   | ShowAllUTxODetails
   -- | Hide all UTxO detials.
@@ -138,17 +138,17 @@ instance Default AssetFilterModel where
 -------------------------------------------------
 -- Transaction Filter Model
 -------------------------------------------------
-data TxFilterModel = TxFilterModel
+data HomeTxFilterModel = HomeTxFilterModel
   -- | The targets to search for.
   { search :: Text
   -- | The date range for displaying transactions.
   , dateRange :: (Maybe Day, Maybe Day)
   } deriving (Show,Eq)
 
-makeFieldLabelsNoPrefix ''TxFilterModel
+makeFieldLabelsNoPrefix ''HomeTxFilterModel
 
-instance Default TxFilterModel where
-  def = TxFilterModel
+instance Default HomeTxFilterModel where
+  def = HomeTxFilterModel
     { search = ""
     , dateRange = (Nothing,Nothing)
     }
@@ -184,7 +184,7 @@ data HomeModel = HomeModel
   -- | Focused transaction details.
   , inspectedTransaction :: Maybe Transaction
   -- | The current filter settings for the Home Transactions.
-  , txFilterModel :: TxFilterModel
+  , txFilterModel :: HomeTxFilterModel
   -- | Whether to show the widget for filtering transactions.
   , showTransactionFilter :: Bool
   -- | The active scene for the tx filter widget.

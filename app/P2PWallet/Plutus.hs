@@ -53,7 +53,8 @@ module P2PWallet.Plutus
   , applyArguments
 
     -- * Serialization
-  , decodeDatum
+  , decodeData
+  , encodeData
   , writeData
   , writeScript
   , parseScriptFromCBOR
@@ -197,9 +198,12 @@ writeData file = LBS.writeFile file . Aeson.encode . toJSONValue
 fromCardanoScriptData :: Api.HashableScriptData -> PV1.BuiltinData
 fromCardanoScriptData = PV1.dataToBuiltinData . toPlutusData . Api.getScriptData
 
-decodeDatum :: (PV1.FromData a) => Aeson.Value -> Maybe a
-decodeDatum = either (const Nothing) (PV1.fromBuiltinData . fromCardanoScriptData)
+decodeData :: (PV1.FromData a) => Aeson.Value -> Maybe a
+decodeData = either (const Nothing) (PV1.fromBuiltinData . fromCardanoScriptData)
             . Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema
+
+encodeData :: (PV1.ToData a) => a -> Value
+encodeData = toJSONValue
 
 parseScriptFromCBOR :: String -> PV1.SerialisedScript
 parseScriptFromCBOR script =

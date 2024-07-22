@@ -185,6 +185,67 @@ instance ToJSON TransactionWithdrawal where
            ]
 
 -------------------------------------------------
+-- TransactionPlutusContract
+-------------------------------------------------
+-- | The purpose for the contract execution.
+data ContractPurpose
+  = SpendPurpose
+  | MintPurpose
+  | RewardPurpose
+  | OtherPurpose Text
+  deriving (Show,Eq)
+
+instance FromJSON ContractPurpose where
+  parseJSON = withText "ContractPurpose" $ \case
+    "spend" -> return SpendPurpose
+    "mint" -> return MintPurpose
+    "reward" -> return RewardPurpose
+    x -> return $ OtherPurpose x
+
+instance ToJSON ContractPurpose where
+  toJSON SpendPurpose = toJSON @Text "spend"
+  toJSON MintPurpose = toJSON @Text "mint"
+  toJSON RewardPurpose = toJSON @Text "reward"
+  toJSON (OtherPurpose x) = toJSON x
+
+instance Display ContractPurpose where
+  display SpendPurpose = "Spending"
+  display MintPurpose = "Minting/Burning"
+  display RewardPurpose = "Rewards Withdrawal"
+  display (OtherPurpose x) = "Other Purpose: " <> x
+
+-- | The type representing plutus contract execution information.
+data TransactionPlutusContract = TransactionPlutusContract
+  { paymentAddress :: Maybe PaymentAddress
+  , spendsInput :: Maybe TxOutRef
+  , scriptHash :: Text
+  , datum :: Maybe Value
+  , redeemer :: Value
+  , purpose :: ContractPurpose
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TransactionPlutusContract
+
+instance FromJSON TransactionPlutusContract where
+  parseJSON = withObject "TransactionPlutusContract" $ \o ->
+      TransactionPlutusContract
+        <$> o .: "address"
+        <*> (o .:? "spends_input" >>= parseInputRef)
+        <*> o .: "script_hash"
+        <*> (o .: "input" >>= (.: "datum") >>= maybe (return Nothing) (.: "value"))
+        <*> (o .: "input" >>= (.: "redeemer") >>= (.: "datum") >>= (.: "value"))
+        <*> (o .: "input" >>= (.: "redeemer") >>= (.: "purpose"))
+    where
+      concatRef :: Text -> Integer -> Text
+      concatRef hash idx = hash <> "#" <> show idx
+
+      parseInputRef :: Maybe Value -> Parser (Maybe TxOutRef)
+      parseInputRef Nothing = return Nothing
+      parseInputRef (Just val) = flip (withObject "spends_input") val $ \o -> do
+        res <- concatRef <$> o .: "tx_hash" <*> o .: "tx_index"
+        maybe mzero (return . Just) $ parseTxOutRef res
+
+-------------------------------------------------
 -- Transaction
 -------------------------------------------------
 -- | The type respesenting the overall information returned with the tx_info query.
@@ -204,8 +265,7 @@ data Transaction = Transaction
   , certificates :: [TransactionCertificate]
   , withdrawals :: [TransactionWithdrawal]
   , mints :: [NativeAsset]
-  -- , nativeScripts :: Value
-  -- , plutusContracts :: Value
+  , plutusContracts :: [TransactionPlutusContract]
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''Transaction
@@ -229,5 +289,4 @@ instance FromJSON Transaction where
         <*> o .: "certificates"
         <*> o .: "withdrawals"
         <*> o .: "assets_minted"
-        -- <*> o .: "native_scripts"
-        -- <*> o .: "plutus_contracts"
+        <*> o .: "plutus_contracts"

@@ -131,10 +131,21 @@ orderBookWidget AppModel{dexModel=DexModel{..}, reverseTickerMap} = do
       ] 
   where
     (OfferAsset offerAsset,AskAsset askAsset) = fromMaybe (def, def) selectedTradingPair
+
+    -- Swaps must contain at least 5 ADA so that there is something for swappers to take. While
+    -- the minimum UTxO value is technically about 3 ADA, this leaves nothing for people to take
+    -- while still taking up space in the order book.
+    filterHasMinimumADAForTrade :: NativeAsset -> [SwapUTxO] -> [SwapUTxO]
+    filterHasMinimumADAForTrade targetAsset xs
+      | targetAsset ^. #policyId /= "" = xs
+      | otherwise = filter ((> 5_000_000) . quantityOf targetAsset) xs
+
     -- Saving the intermediate lists so that the spread can use the first element.
-    tmpBuySwaps = fromMaybe [] 
+    tmpBuySwaps = filterHasMinimumADAForTrade offerAsset
+                $ fromMaybe [] 
                 $ Map.lookup (OfferAsset offerAsset, AskAsset askAsset) cachedOrderBooks
-    tmpSellSwaps = fromMaybe [] 
+    tmpSellSwaps = filterHasMinimumADAForTrade askAsset
+                 $ fromMaybe [] 
                  $ Map.lookup (OfferAsset askAsset, AskAsset offerAsset) cachedOrderBooks
     buySwaps = take orderBookSampleSize 
               $ drop (currentBidPage * orderBookSampleSize) tmpBuySwaps
@@ -149,9 +160,15 @@ orderBookWidget AppModel{dexModel=DexModel{..}, reverseTickerMap} = do
 
     emptySellSide :: AppNode
     emptySellSide = 
-      centerWidget $ flip styleBasic [radius 5, padding 5, bgColor customGray4] $ box $ 
-        label "No open asks. Be the first!"
-          `styleBasic` [textSize 12, textFont "Italics"]
+      box_ [alignMiddle,alignCenter] $ flip styleBasic [radius 5, padding 5, bgColor customGray4] $ vstack
+        [ box_ [alignMiddle] $ 
+            label "No open asks. Be the first!"
+              `styleBasic` [textSize 12, textFont "Italics"]
+        , spacer_ [width 5]
+        , widgetIf (askAsset ^. #policyId == "") $ box_ [alignMiddle] $
+            label "Swaps selling ada must contain at least 5 ADA to appear in the order book."
+              `styleBasic` [textSize 8, textFont "Italics", textColor customRed]
+        ]
       
     buySide :: AppNode
     buySide = do
@@ -193,7 +210,7 @@ orderBookWidget AppModel{dexModel=DexModel{..}, reverseTickerMap} = do
 
     emptyBuySide :: AppNode
     emptyBuySide = 
-      centerWidget $ flip styleBasic [radius 5, padding 5, bgColor customGray4] $ box $ 
+      flip styleBasic [radius 5, padding 5, bgColor customGray4] $ box_ [alignMiddle,alignCenter] $ 
         label "No open bids. Be the first!"
           `styleBasic` [textSize 12, textFont "Italics"]
       

@@ -60,7 +60,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
           & #reverseTickerMap .~ toReverseTickerMap tickers
           & #fingerprintMap .~ 
               toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
-      -- , Task $ return $ SyncWallets StartSync
+      , Task $ return $ SyncWallets StartProcess
       ]
 
   -- Log the user out of the currently selected profile, and return the user to the profile 
@@ -69,10 +69,15 @@ handleProfileEvent model@AppModel{..} evt = case evt of
     [ Model $ model 
         & #scene .~ ProfilesScene 
         & #selectedProfile .~ Nothing
+        & #homeModel .~ def
+        & #homeModel % #txFilterModel % #dateRange % _1 ?~ addDays (-30) (config ^. #currentDay)
+        & #delegationModel .~ def
+        & #dexModel .~ def
+        & #dexModel % #txFilterModel % #dateRange % _1 ?~ addDays (-30) (config ^. #currentDay)
         & #knownWallets .~ def
+        & #txBuilderModel .~ def
         & #notifications .~ []
         & #addressBook .~ []
-        & #txBuilderModel .~ def -- reset builder
     ]
 
   -----------------------------------------------

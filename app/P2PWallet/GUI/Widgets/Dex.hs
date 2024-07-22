@@ -12,6 +12,7 @@ import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Dex.Positions
 import P2PWallet.GUI.Widgets.Dex.Trade
+import P2PWallet.GUI.Widgets.Dex.Transactions
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.Prelude
@@ -38,6 +39,12 @@ dexWidget model@AppModel{..} = do
           ]
       , widgetIf isAdding $ addDexWalletWidget model
       , widgetIf isDeleting $ confirmDeleteWidget model
+      , widgetMaybe (model ^. #dexModel % #inspectedTransaction) $ \tx -> 
+          inspectionWidget 
+            reverseTickerMap 
+            (dexModel ^. #selectedWallet % #oneWaySwapAddress) 
+            (dexModel ^. #selectedWallet % #twoWaySwapAddress) 
+            tx
       ]
   where
     hasDexWallets :: Bool
@@ -67,6 +74,8 @@ mainWidget model@AppModel{scene=_,..} =
           ]
       , box_ [mergeRequired reqUpdate] (positionsWidget model)
           `nodeVisible` (dexModel ^. #scene == DexPositions)
+      , box_ [mergeRequired reqUpdate] (transactionsWidget model)
+          `nodeVisible` (dexModel ^. #scene == DexTransactions)
       , box_ [mergeRequired reqUpdate] (tradeWidget model)
           `nodeVisible` (dexModel ^. #scene == DexMarket)
       ] 
@@ -80,7 +89,7 @@ mainWidget model@AppModel{scene=_,..} =
             | dexModel ^. #scene == scene = customBlue
             | otherwise = lightGray
       button caption (DexEvent $ ChangeDexScene scene)
-        `styleBasic` [textSize 14, bgColor transparent, textColor dormantColor, border 0 transparent]
+        `styleBasic` [textSize 12, bgColor transparent, textColor dormantColor, border 0 transparent]
         `styleHover` [bgColor transparent, textColor hoverColor]
 
     reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
@@ -90,6 +99,7 @@ mainWidget model@AppModel{scene=_,..} =
           newDex ^. #positionsFilterModel % #offerAsset = False
       | oldDex ^. #positionsFilterModel % #askAsset /= 
           newDex ^. #positionsFilterModel % #askAsset = False
+      | oldDex ^. #txFilterModel /= newDex ^. #txFilterModel = False
       | otherwise = True
 
     (walletTypeTip,walletTypeIcon)
@@ -100,6 +110,10 @@ mainWidget model@AppModel{scene=_,..} =
     sceneMenu = hstack 
       [ spacer
       , dexSceneButton "Open Positions" DexPositions
+      , spacer
+      , separatorLine `styleBasic` [paddingT 5, paddingB 5]
+      , spacer
+      , dexSceneButton "Position History" DexTransactions
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer
@@ -129,11 +143,11 @@ mainWidget model@AppModel{scene=_,..} =
     walletMenu :: AppNode
     walletMenu = do
       let innerDormantStyle = 
-            def `styleBasic` [textSize 14, bgColor customGray2, border 1 black]
-                `styleHover` [textSize 14, bgColor customGray1, border 1 black]
+            def `styleBasic` [textSize 12, bgColor customGray2, border 1 black]
+                `styleHover` [textSize 12, bgColor customGray1, border 1 black]
           innerFocusedStyle = 
-            def `styleFocus` [textSize 14, bgColor customGray2, border 1 customBlue]
-                `styleFocusHover` [textSize 14, bgColor customGray1, border 1 customBlue]
+            def `styleFocus` [textSize 12, bgColor customGray2, border 1 customBlue]
+                `styleFocusHover` [textSize 12, bgColor customGray1, border 1 customBlue]
       hstack
         [ box_ [alignMiddle] $ tooltip_ walletTypeTip [tooltipDelay 0] $ label walletTypeIcon
             `styleBasic` [textFont "Remix", textMiddle]
@@ -147,7 +161,7 @@ mainWidget model@AppModel{scene=_,..} =
               [ bgColor customGray2
               , width 150
               , border 1 black
-              , textSize 14
+              , textSize 12
               ]
             `styleHover` [bgColor customGray1, cursorIcon CursorHand]
         , spacer_ [width 5]

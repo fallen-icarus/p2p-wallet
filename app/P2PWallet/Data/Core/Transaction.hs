@@ -26,6 +26,10 @@ module P2PWallet.Data.Core.Transaction
     -- * Withdrawals
   , Koios.TransactionWithdrawal(..)
 
+    -- * Plutus Contracts
+  , TransactionPlutusContract(..)
+  , Koios.ContractPurpose(..)
+
    -- * Transactions
   , Transaction(..)
   , toTransaction
@@ -99,6 +103,54 @@ toTransactionUTxO Koios.TransactionUTxO{..} = TransactionUTxO
   }
 
 -------------------------------------------------
+-- TransactionPlutusContract
+-------------------------------------------------
+-- | A custom PlutusContract type since the Koios version uses different json encoding.
+data TransactionPlutusContract = TransactionPlutusContract
+  { paymentAddress :: Maybe PaymentAddress
+  , spendsInput :: Maybe TxOutRef
+  , scriptHash :: Text
+  , datum :: Maybe Value
+  , redeemer :: Value
+  , purpose :: Koios.ContractPurpose
+  , showDetails :: Bool
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TransactionPlutusContract
+
+instance ToJSON TransactionPlutusContract where
+  toJSON TransactionPlutusContract{..} =
+    object [ "payment_address" .= paymentAddress
+           , "spends_input" .= spendsInput
+           , "script_hash" .= scriptHash
+           , "datum" .= datum
+           , "redeemer" .= redeemer
+           , "purpose" .= purpose
+           ]
+
+instance FromJSON TransactionPlutusContract where
+  parseJSON = withObject "TransactionPlutusContract" $ \o ->
+    TransactionPlutusContract
+      <$> o .: "payment_address"
+      <*> o .: "spends_input"
+      <*> o .: "script_hash"
+      <*> o .: "datum"
+      <*> o .: "redeemer"
+      <*> o .: "purpose"
+      <*> pure False
+
+toTransactionPlutusContract :: Koios.TransactionPlutusContract -> TransactionPlutusContract
+toTransactionPlutusContract Koios.TransactionPlutusContract{..} = TransactionPlutusContract
+  { paymentAddress = paymentAddress
+  , spendsInput = spendsInput
+  , scriptHash = scriptHash
+  , datum = datum
+  , redeemer = redeemer
+  , purpose = purpose
+  , showDetails = False
+  }
+
+-------------------------------------------------
 -- Transaction
 -------------------------------------------------
 -- | The transaction type used by the GUI.
@@ -127,8 +179,8 @@ data Transaction = Transaction
   , showWithdrawals :: Bool
   , mints :: [NativeAsset]
   , showMints :: Bool
-  -- , nativeScripts :: Value
-  -- , plutusContracts :: Value
+  , plutusContracts :: [TransactionPlutusContract]
+  , showPlutusContracts :: Bool
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''Transaction
@@ -152,6 +204,7 @@ instance FromRow Transaction where
     certificates <- fromMaybe mzero . decode <$> field
     withdrawals <- fromMaybe mzero . decode <$> field
     mints <- fromMaybe mzero . decode <$> field
+    plutusContracts <- fromMaybe mzero . decode <$> field
     return $ Transaction
       { txHash = txHash
       , profileId = profileId
@@ -170,6 +223,7 @@ instance FromRow Transaction where
       , certificates = certificates
       , withdrawals = withdrawals
       , mints = mints
+      , plutusContracts = plutusContracts
       , showCollateralInputs = False
       , showReferenceInputs = False
       , showInputs = False
@@ -177,6 +231,7 @@ instance FromRow Transaction where
       , showCertificates = False
       , showWithdrawals = False
       , showMints = False
+      , showPlutusContracts = False
       }
 
 instance ToRow Transaction where
@@ -198,6 +253,7 @@ instance ToRow Transaction where
     , toField $ encode certificates
     , toField $ encode withdrawals
     , toField $ encode mints
+    , toField $ encode plutusContracts
     ]
 
 instance TableName Transaction where
@@ -225,6 +281,7 @@ instance Creatable Transaction where
         , "certificates BLOB"
         , "withdrawals BLOB"
         , "mints BLOB"
+        , "plutus_contracts BLOB"
         , "PRIMARY KEY (tx_hash,payment_id)"
         ]
     , ");"
@@ -252,9 +309,10 @@ instance Insertable Transaction where
         , "certificates"
         , "withdrawals"
         , "mints"
+        , "plutus_contracts"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 -- | Convert a Koios Transaction to a P2PWallet Transaction.
@@ -277,6 +335,7 @@ toTransaction profileId paymentId Koios.Transaction{..} = Transaction
   , certificates = certificates
   , withdrawals = withdrawals
   , mints = mints
+  , plutusContracts = map toTransactionPlutusContract plutusContracts
   , showCollateralInputs = False
   , showReferenceInputs = False
   , showInputs = False
@@ -284,4 +343,5 @@ toTransaction profileId paymentId Koios.Transaction{..} = Transaction
   , showCertificates = False
   , showWithdrawals = False
   , showMints = False
+  , showPlutusContracts = False
   }

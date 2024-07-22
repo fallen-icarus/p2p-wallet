@@ -32,7 +32,7 @@ positionsWidget model@AppModel{dexModel} = do
 
     noCurrentPositions :: AppNode
     noCurrentPositions = centerWidget $
-      label "No currrent positions."
+      label "No open positions"
         `styleBasic` [textFont "Italics"]
 
 mainWidget :: AppModel -> AppNode
@@ -90,8 +90,8 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
 
     utxoRow :: SwapUTxO -> AppNode
     utxoRow u@SwapUTxO{swapDatum} = case swapDatum of
-      Just (OneWay datum) -> limitOrderRow u datum
-      Just (TwoWay datum) -> liquiditySwapRow u datum
+      Just (OneWayDatum datum) -> limitOrderRow u datum
+      Just (TwoWayDatum datum) -> liquiditySwapRow u datum
       -- This path should never come about from a UTxO created by this wallet.
       -- TODO: Figure out what to do for invalid datums. They are just hidden for now.
       _ -> spacer `nodeVisible` False
@@ -453,6 +453,24 @@ positionsFilterWidget AppModel{dexModel=DexModel{..}} = do
   where
     filterWidget :: AppNode
     filterWidget = do
+      let rootLens = #dexModel % #positionsFilterModel
+          offStyle = def 
+            `styleBasic` [ bgColor customGray1 , textColor white ]
+            `styleHover` [ bgColor customBlue ]
+          choiceButton caption field targetLens =
+            centerWidgetV $ optionButton_ caption field targetLens
+              [optionButtonOffStyle offStyle]
+              `styleBasic` 
+                [ bgColor customBlue
+                , textColor white
+                , radius 10
+                , border 1 black
+                , paddingT 2
+                , paddingB 2
+                , paddingL 7
+                , paddingR 7
+                , textSize 12
+                ]
       vstack
         [ spacer
         , box_ [alignMiddle] $
@@ -460,7 +478,7 @@ positionsFilterWidget AppModel{dexModel=DexModel{..}} = do
               `styleBasic` [textSize 14, textFont "Italics"]
         , spacer
         , box_ [alignMiddle] $ hstack
-            [ box_ [alignMiddle, onClick $ Alert offerAssetFilterMsg] $
+            [ box_ [alignMiddle, onClick $ Alert offerAssetPositionFilterMsg] $
                 label helpIcon
                   `styleBasic`
                     [ border 0 transparent
@@ -485,7 +503,7 @@ positionsFilterWidget AppModel{dexModel=DexModel{..}} = do
                 `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
                 `styleFocus` [border 1 customBlue]
             , spacer_ [width 3]
-            , box_ [alignMiddle, onClick $ Alert askAssetFilterMsg] $
+            , box_ [alignMiddle, onClick $ Alert askAssetPositionFilterMsg] $
                 label helpIcon
                   `styleBasic`
                     [ border 0 transparent
@@ -497,6 +515,24 @@ positionsFilterWidget AppModel{dexModel=DexModel{..}} = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             ]
+        , spacer
+        , centerWidgetH $ hstack_ [childSpacing]
+            [ label "Fully Converted:" `styleBasic` [textSize 12]
+            , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #mustBeFullyConverted)
+            , choiceButton "No" (Just False) (toLensVL $ rootLens % #mustBeFullyConverted)
+            , choiceButton "Either" Nothing (toLensVL $ rootLens % #mustBeFullyConverted)
+            , mainButton helpIcon (Alert fullyConvertedSwapMsg)
+                `styleBasic`
+                  [ border 0 transparent
+                  , radius 20
+                  , bgColor transparent
+                  , textColor customBlue
+                  , textMiddle
+                  , textFont "Remix"
+                  , padding 0
+                  ]
+                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            ] `styleBasic` [height 30]
         ]
 
     sortWidget :: AppNode
@@ -875,6 +911,7 @@ filterer reverseTickerMap PositionsFilterModel{..} us = do
           ]
     guard $ matchesAsset offerSample offerAsset
     guard $ matchesAsset askSample askAsset
+    guard $ maybe True (swapIsFullyConverted u ==) mustBeFullyConverted
     return u
   where
     matchesAsset :: [NativeAsset] -> Text -> Bool

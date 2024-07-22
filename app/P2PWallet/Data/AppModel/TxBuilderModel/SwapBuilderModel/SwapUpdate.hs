@@ -64,5 +64,5 @@ swapUTxOToNewSwapCreation network reverseTickerMap u@SwapUTxO{..} = NewSwapCreat
     targetQuantity :: NativeAsset -> NativeAsset
     targetQuantity asset@NativeAsset{policyId=policy, tokenName=name}
       | policy == "" = asset & #quantity .~ unLovelace lovelace
-      | otherwise = fromMaybe def $
+      | otherwise = fromMaybe asset $
           find (\NativeAsset{policyId,tokenName} -> policy == policyId && tokenName == name) nativeAssets
