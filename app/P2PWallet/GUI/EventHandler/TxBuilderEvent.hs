@@ -340,7 +340,10 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   ExportTxBody modal -> case modal of
     StartProcess ->
       [ Task $ runActionOrAlert (TxBuilderEvent . ExportTxBody . ProcessResults) $
-          exportTxBody (txBuilderModel ^. #keyWitnessFiles)
+          exportTxBody 
+            (config ^. #timeZone) 
+            (txBuilderModel ^. #targetPath) 
+            (txBuilderModel ^. #keyWitnessFiles)
       ]
     ProcessResults exportDestination -> 
       [ Model $ model 
@@ -357,25 +360,68 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   ImportSignedTxFile modal -> case modal of
     StartAdding _ ->
       [ Model $ model 
-          & #txBuilderModel % #importedSignedTxFile .~ ""
+          & #txBuilderModel % #targetPath .~ ""
           & #txBuilderModel % #importing .~ True
       ]
     CancelAdding ->
       [ Model $ model 
-          & #txBuilderModel % #importedSignedTxFile .~ ""
+          & #txBuilderModel % #targetPath .~ ""
           & #txBuilderModel % #importing .~ False
       ]
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (TxBuilderEvent . ImportSignedTxFile . AddResult) $ do
-          let importedFile = toString $ txBuilderModel ^. #importedSignedTxFile
+          let rawPath = toString $ txBuilderModel ^. #targetPath
+
+          -- Expand the filepath.
+          expandedPath <- expandFilePath rawPath >>= 
+            fromJustOrAppError ("Not a valid file path: " <> toText rawPath)
 
           -- Verify the file exists and is not a directory.
-          unlessM (Dir.doesFileExist importedFile) $ throwIO $ AppError "File does not exist."
+          unlessM (Dir.doesFileExist expandedPath) $ 
+            throwIO $ AppError $ "File does not exist: " <> toText expandedPath
 
           -- Return the filepath.
-          return importedFile
+          return expandedPath
       ]
     AddResult importedFile ->
-      [ Model $ model & #txBuilderModel % #importedSignedTxFile .~ ""
+      [ Model $ model 
+          & #txBuilderModel % #targetPath .~ ""
+          & #txBuilderModel % #importing .~ False
       , Task $ return $ SubmitTx $ SignedTxFile importedFile
+      ]
+
+  -----------------------------------------------
+  -- Get export directory
+  -----------------------------------------------
+  GetTxFileExportDirectory modal -> case modal of
+    StartAdding _ ->
+      [ Model $ model 
+          & #txBuilderModel % #targetPath .~ ""
+          & #txBuilderModel % #exporting .~ True
+      ]
+    CancelAdding ->
+      [ Model $ model 
+          & #txBuilderModel % #targetPath .~ ""
+          & #txBuilderModel % #exporting .~ False
+      ]
+    ConfirmAdding -> 
+      [ Task $ runActionOrAlert (TxBuilderEvent . GetTxFileExportDirectory . AddResult) $ do
+          let rawPath = toString $ txBuilderModel ^. #targetPath
+
+          -- Expand the filepath.
+          expandedPath <- expandFilePath rawPath >>= 
+            fromJustOrAppError ("Not a valid path: " <> toText rawPath)
+
+          -- Return the filepath.
+          return expandedPath
+      ]
+    AddResult fullPath ->
+      [ Model $ model 
+          & #txBuilderModel % #targetPath .~ toText fullPath
+          & #txBuilderModel % #exporting .~ False
+      , Task $ return $ do
+          if txBuilderModel ^. #txType == WatchedTx then
+            TxBuilderEvent $ ExportTxBody StartProcess
+          else
+            TxBuilderEvent $ WitnessTx StartProcess
       ]

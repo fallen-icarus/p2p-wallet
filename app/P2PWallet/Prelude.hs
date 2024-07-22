@@ -16,6 +16,7 @@ module P2PWallet.Prelude
   , Time.getCurrentTimeZone
   , getCurrentDay
   , Time.addDays
+  , timeStampToFilePath
 
     -- * Defaults
   , Default.Default(..)
@@ -24,8 +25,9 @@ module P2PWallet.Prelude
   , Decimal
   , realFracToDecimal
   
-    -- * Directories
+    -- * File Paths and Directories
   , getTemporaryDirectory
+  , expandFilePath
 
     -- * Miscelleneous Functions
   , showValue
@@ -64,6 +66,8 @@ module P2PWallet.Prelude
 import Relude hiding (uncons)
 import Relude.Unsafe qualified as Unsafe
 import System.Directory qualified as Dir
+import System.Environment qualified as Env
+import System.FilePath qualified as Path
 import Data.Text qualified as T
 import Data.Time qualified as Time
 import Data.Time.Clock.POSIX qualified as Time
@@ -90,14 +94,6 @@ valueAsByteString = toStrict . Aeson.encodingToLazyByteString . Aeson.value
 maybeHead :: [a] -> Maybe a
 maybeHead [] = Nothing
 maybeHead (x:_) = Just x
-
--- | A custom version of `Dir.getTemporaryDirectory` so that all temporary files are organized
--- within a subfolder.
-getTemporaryDirectory :: IO FilePath
-getTemporaryDirectory = do
-  tmpDir <- (<> "/p2p-wallet") <$> Dir.getTemporaryDirectory
-  Dir.createDirectoryIfMissing True tmpDir -- Create the subfolder if it doesn't exist yet.
-  return tmpDir
 
 -- | Break a list into sublists of the specified length.
 groupInto :: Int -> [a] -> [[a]]
@@ -129,6 +125,36 @@ roundUp :: Rational -> Integer
 roundUp rat
   | fromIntegral @Integer @Rational (round rat) < rat = 1 + round rat
   | otherwise = round rat
+
+-------------------------------------------------
+-- File Paths and Directories
+-------------------------------------------------
+-- | Expand a user provided file path into an absolute path. The file can contain environment
+-- variables and the '~' for a shorthand of the home directory.
+expandFilePath :: FilePath -> IO (Maybe FilePath)
+expandFilePath path = do
+    expandedPath <- Path.joinPath <$> mapM processPath (Path.splitDirectories path)
+    return $ if Path.isValid expandedPath then Just expandedPath else Nothing
+  where
+    processPath :: FilePath -> IO FilePath
+    processPath subPath = case subPath of
+      -- The home shorthand.
+      ['~'] -> Dir.getHomeDirectory
+      -- The prefix for an environment variable on unix.
+      ('$':xs) -> fromMaybe subPath <$> Env.lookupEnv xs
+      -- The prefix for an environment variable on windows. It is assumed the windows environment
+      -- variable is also followed by a '%'.
+      ('%':xs) -> fromMaybe subPath <$> Env.lookupEnv (fromMaybe subPath $ viaNonEmpty init xs)
+      -- This is not a shorthand for anything.
+      _ -> return subPath
+    
+-- | A custom version of `Dir.getTemporaryDirectory` so that all temporary files are organized
+-- within a subfolder.
+getTemporaryDirectory :: IO FilePath
+getTemporaryDirectory = do
+  tmpDir <- (<> "/p2p-wallet") <$> Dir.getTemporaryDirectory
+  Dir.createDirectoryIfMissing True tmpDir -- Create the subfolder if it doesn't exist yet.
+  return tmpDir
 
 -------------------------------------------------
 -- Time
@@ -164,6 +190,12 @@ localTimeToPosixTime timeZone localTime =
 getCurrentDay :: Time.TimeZone -> IO Time.Day
 getCurrentDay timeZone = 
   Time.localDay . Time.utcToLocalTime timeZone <$> Time.getCurrentTime
+
+timeStampToFilePath :: Time.TimeZone -> Time.UTCTime -> FilePath
+timeStampToFilePath zone t = Time.formatTime Time.defaultTimeLocale formatter localTime
+  where
+    localTime = Time.utcToLocalTime zone t
+    formatter = "%b-%d-%0Y-%H-%M-%S"
 
 -------------------------------------------------
 -- Lens Helpers

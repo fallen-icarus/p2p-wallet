@@ -601,3 +601,50 @@ fullyConvertedSwapMsg = unlines
       ]
   ]
 
+trezorDerivationMsg :: Text
+trezorDerivationMsg = unlines
+  [ "Which derivation method would you like to use?"
+  , ""
+  , unwords
+      [ "WARNING: It is not recommended to create new wallets using the 'Trezor-Icarus' method."
+      , "It is only included to enable recovery of old wallets. If you are still using this"
+      , "derivation method for your trezor wallet, it is advised that you migrate your funds"
+      , "to a wallet using the 'Icarus' derivation method."
+      ]
+  ]
+
+directoryPathMsg :: Text
+directoryPathMsg = unlines
+  [ unwords
+      [ "The absolute path to the target directory. Environment variables and '~' (for the home"
+      , "directory) are supported."
+      ]
+  , ""
+  , "On POSIX systems, environment variables must begin with '$'. Example entries:"
+  , "1. $HOME/Documents/"
+  , "2. $CARDANO_NODE_SOCKET_PATH/"
+  , "3. ~/$PERSONAL_FILES/"
+  , ""
+  , "On Windows systems, environment variables must be surrounded by '%'. Example entries:"
+  , "1. %APPDATA%\\Documents\\"
+  , "2. %HOMEPATH%\\"
+  , "3. ~\\Documents\\"
+  ]
+
+filePathMsg :: Text
+filePathMsg = unlines
+  [ unwords
+      [ "The absolute path to the target file. Environment variables and '~' (for the home"
+      , "directory) are supported."
+      ]
+  , ""
+  , "On POSIX systems, environment variables must begin with '$'. Example entries:"
+  , "1. $HOME/Documents/tx.signed"
+  , "2. $CARDANO_NODE_SOCKET_PATH/tx.signed"
+  , "3. ~/$PERSONAL_FILES/tx.signed"
+  , ""
+  , "On Windows systems, environment variables must be surrounded by '%'. Example entries:"
+  , "1. %APPDATA%\\Documents\\tx.signed"
+  , "2. %HOMEPATH%\\tx.signed"
+  , "3. ~\\Documents\\tx.signed"
+  ]

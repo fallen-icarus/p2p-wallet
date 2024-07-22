@@ -100,7 +100,7 @@ mainWidget model@AppModel{scene=_,..} =
     reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
     reqUpdate _ old@AppModel{homeModel=oldHome} new@AppModel{homeModel=newHome} 
       | old ^. #forceRedraw /= new ^. #forceRedraw = True
-      | old ^. #extraTextField /= new ^. #extraTextField = False
+      | old ^. #homeModel % #newAliasField /= new ^. #homeModel % #newAliasField = False
       | oldHome ^. #utxoFilterModel /= def && newHome ^. #utxoFilterModel == def = True
       | oldHome ^. #utxoFilterModel % #search /= newHome ^. #utxoFilterModel % #search = False
       | oldHome ^. #assetFilterModel % #search /= newHome ^. #assetFilterModel % #search = False
@@ -239,7 +239,7 @@ editPaymentWalletWidget = do
         [ hstack 
             [ label "Wallet Name:"
             , spacer
-            , textField (toLensVL #extraTextField) 
+            , textField (toLensVL $ #homeModel % #newAliasField) 
                 `styleBasic` [width 400, bgColor customGray1]
                 `styleFocus` [border 1 customBlue]
             ]
