@@ -282,7 +282,7 @@ addSwapCloseToBuilder txBody (_,SwapClose{..}) =
 
     (beacons :: [NativeAsset], beaconSym :: CurrencySymbol) = 
       case swapDatum of
-        Just (OneWay OneWay.SwapDatum{..}) -> 
+        Just (OneWayDatum OneWay.SwapDatum{..}) -> 
             -- This is a one-way swap.
             let bs =
                   -- One trading pair beacon.
@@ -294,7 +294,7 @@ addSwapCloseToBuilder txBody (_,SwapClose{..}) =
                   ]
             in (bs, beaconId)
 
-        Just (TwoWay TwoWay.SwapDatum{..}) -> 
+        Just (TwoWayDatum TwoWay.SwapDatum{..}) -> 
             -- This is a two-way swap.
             let bs =
                   -- One trading pair beacon.
@@ -396,7 +396,7 @@ addSwapExecutionToBuilder txBody (_,SwapExecution{..}) =
 
     (newDatum :: Datum , beacons :: [NativeAsset]) =
       case swapDatum of
-        Just (OneWay d@OneWay.SwapDatum{..}) -> 
+        Just (OneWayDatum d@OneWay.SwapDatum{..}) -> 
           let reqBeacons =
                 -- One trading pair beacon.
                 [ NativeAsset beaconId pairBeacon "" 1
@@ -407,7 +407,7 @@ addSwapExecutionToBuilder txBody (_,SwapExecution{..}) =
                 ]
           in (toDatum $ d & #prevInput ?~ utxoRef, reqBeacons)
 
-        Just (TwoWay d@TwoWay.SwapDatum{..}) -> 
+        Just (TwoWayDatum d@TwoWay.SwapDatum{..}) -> 
           let reqBeacons =
                 -- One trading pair beacon.
                 [ NativeAsset beaconId pairBeacon "" 1
@@ -434,17 +434,27 @@ addSwapExecutionToBuilder txBody (_,SwapExecution{..}) =
 -- minting is required, then the spending redeemers must be changed to `SpendWithStake` and
 -- a staking execution must be added for the beacon script.
 adjustSpendingRedeemers :: TxBody -> TxBody
-adjustSpendingRedeemers txBody@TxBody{mints,inputs}
-    | hasOneWayInput && isNothing oneWayMint = 
-        txBody
-          & #inputs %~ map (changeRedeemer OneWay.swapScriptHash (toRedeemer OneWay.SpendWithStake))
-          & #withdrawals %~ (oneWayStakeWithdrawal:)
-    | hasTwoWayInput && isNothing twoWayMint =
-        txBody
-          & #inputs %~ map (changeRedeemer TwoWay.swapScriptHash (toRedeemer TwoWay.SpendWithStake))
-          & #withdrawals %~ (twoWayStakeWithdrawal:)
-    | otherwise = txBody
+adjustSpendingRedeemers txBody@TxBody{mints,inputs} = 
+    txBody
+      & adjustOneWaySpendingRedeemers
+      & adjustTwoWaySpendingRedeemers
   where
+    adjustOneWaySpendingRedeemers :: TxBody -> TxBody
+    adjustOneWaySpendingRedeemers body
+      | hasOneWayInput && isNothing oneWayMint = 
+          body
+            & #inputs %~ map (changeRedeemer OneWay.swapScriptHash (toRedeemer OneWay.SpendWithStake))
+            & #withdrawals %~ (oneWayStakeWithdrawal:)
+      | otherwise = body
+
+    adjustTwoWaySpendingRedeemers :: TxBody -> TxBody
+    adjustTwoWaySpendingRedeemers body
+      | hasTwoWayInput && isNothing twoWayMint =
+          body
+            & #inputs %~ map (changeRedeemer TwoWay.swapScriptHash (toRedeemer TwoWay.SpendWithStake))
+            & #withdrawals %~ (twoWayStakeWithdrawal:)
+      | otherwise = body
+
     hasOneWayInput :: Bool
     hasOneWayInput = flip any inputs $ \TxBodyInput{..} ->
       maybe False ((==OneWay.swapScriptHash) . view #scriptHash) spendingScriptInfo

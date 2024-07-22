@@ -508,7 +508,7 @@ utxoFilterWidget AppModel{homeModel=HomeModel{..}} = do
             , textField_ 
                   (toLensVL $ #homeModel % #utxoFilterModel % #search) 
                   [placeholder "many of: native token, reference script hash, datum hash, tx hash"] 
-                `styleBasic` [bgColor customGray1, sndColor darkGray]
+                `styleBasic` [textSize 12, bgColor customGray1, sndColor darkGray]
                 `styleFocus` [border 1 customBlue]
             , mainButton helpIcon (Alert utxoSearchMsg)
                 `styleBasic`

@@ -19,10 +19,11 @@ import P2PWallet.Prelude
 syncWallets :: FilePath -> Network -> Wallets -> IO (Wallets,(ByteString,Decimal),[Notification])
 syncWallets databaseFile network ws@Wallets{..} = do
     -- The information is fetched concurrently.
-    (updatedPaymentWallets,(updatedStakeWallets,(updatedDexWallets,networkParameters))) <- 
-      concurrently fetchPaymentWallets $ 
-        concurrently fetchStakeWallets $
-          concurrently fetchDexWallets fetchParameters
+    (updatedPaymentWallets,(updatedStakeWallets,networkParameters)) <- 
+      concurrently fetchPaymentWallets $ concurrently fetchStakeWallets fetchParameters
+      
+    -- These are queried separately to minimize the chance of exceeding Koios' burst limit.
+    updatedDexWallets <- fetchDexWallets
     
     -- Save the new payment wallet states and throw an error if there is an issue saving.
     forM_ updatedPaymentWallets $ \paymentWallet -> do

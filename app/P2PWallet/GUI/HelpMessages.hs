@@ -196,8 +196,8 @@ depositSignMsg = unlines
       ]
   ]
 
-txSearchMsg :: Text
-txSearchMsg = unlines
+homeTxSearchMsg :: Text
+homeTxSearchMsg = unlines
   [ "You can search through all of the transactions for any of the following criteria:"
   , "1. Native assets"
   , "2. Payment addresses"
@@ -516,24 +516,26 @@ cardanoSwapsBugMsg a = unlines
   , show a
   ]
 
-offerAssetFilterMsg :: Text
-offerAssetFilterMsg = unlines
+offerAssetPositionFilterMsg :: Text
+offerAssetPositionFilterMsg = unlines
   [ "Filter open positions for those selling a specific asset."
   , ""
   , "The asset name must be in one of the following formats:"
   , "1. 'policy_id.asset_name'"
   , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
   , ""
   , "Fingerprints are not supported."
   ]
 
-askAssetFilterMsg :: Text
-askAssetFilterMsg = unlines
+askAssetPositionFilterMsg :: Text
+askAssetPositionFilterMsg = unlines
   [ "Filter open positions for those buying a specific asset."
   , ""
   , "The asset name must be in one of the following formats:"
   , "1. 'policy_id.asset_name'"
   , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
   , ""
   , "Fingerprints are not supported."
   ]
@@ -562,3 +564,40 @@ purchaseAmountMsg :: Text -> Text
 purchaseAmountMsg assetName = unlines
   [ "How many units of " <> assetName <> " would you like to purchase?"
   ]
+
+offerAssetTxFilterMsg :: Text
+offerAssetTxFilterMsg = unlines
+  [ "Filter transactions for those involving swaps that are selling a specific asset."
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+askAssetTxFilterMsg :: Text
+askAssetTxFilterMsg = unlines
+  [ "Filter transactions for those involving swaps that are buying a specific asset."
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+fullyConvertedSwapMsg :: Text
+fullyConvertedSwapMsg = unlines
+  [ "Does the swap have any of the offer asset left to trade?"
+  , ""
+  , unwords
+      [ "When ada is being sold, the swap will be considered fully converted if there is less"
+      , "than 5 ADA left in the swap. Since all swaps must contain at least some ada, a swap"
+      , "with less than 5 ADA available to purchase may not have enough to satisfy the purchase"
+      , "AND still leave ada left over to satisfy the blockchain's minUTxOValue requirement."
+      ]
+  ]
+

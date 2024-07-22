@@ -212,6 +212,16 @@ parseNativeAsset t = case words $ replace "." " " t of
     return $ NativeAsset policyId tokenName fingerprint n
   _ -> Nothing
 
+quantityOf 
+  :: ( LabelOptic "nativeAssets" A_Lens a a [NativeAsset] [NativeAsset]
+     , LabelOptic "lovelace" A_Lens a a Lovelace Lovelace
+     ) 
+  => NativeAsset -> a -> Integer
+quantityOf NativeAsset{policyId,fingerprint} a
+  | policyId == "" = a ^. #lovelace % #unLovelace
+  | otherwise = maybe 0 (view #quantity) 
+              $ find (\na -> na ^. #fingerprint == fingerprint) $ a ^. #nativeAssets
+
 -------------------------------------------------
 -- Token Mints
 -------------------------------------------------

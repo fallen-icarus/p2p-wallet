@@ -108,7 +108,7 @@ mainWidget AppModel{..} =
                   , widgetIf (null rewardHistory) $ centerWidget $ 
                       flip styleBasic [padding 10, bgColor customGray4, radius 10] $ box $ 
                         label "This staking address has not earned any rewards yet."
-                          `styleBasic` [textSize 12]
+                          `styleBasic` [textSize 8]
                   ] `styleBasic` 
                       [ bgColor customGray2, radius 15
                       , height 353

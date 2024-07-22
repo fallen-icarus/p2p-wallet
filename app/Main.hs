@@ -37,6 +37,7 @@ main = do
               & #config % #timeZone .~ timeZone
               & #config % #currentDay .~ currentDate
               & #homeModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
+              & #dexModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
     startApp initModel handleEvent buildUI $ appCfg AppInit
 
   where

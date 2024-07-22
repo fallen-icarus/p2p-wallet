@@ -215,11 +215,15 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
                 [ textFont "Italics"
                 , paddingB 10
                 ]
-          , cushionWidget $ vscroll_ [wheelRate 100] $ vstack_ [childSpacing_ 5]
+          , cushionWidget $ vscroll_ [wheelRate 100] $ vstack
               [ copyableLabelFor 10 "Tx Hash:" txHash
+              , spacer_ [width 8]
               , copyableLabelFor 10 "Block Time:" $ show blockTime
+              , spacer_ [width 8]
               , copyableLabelFor 10 "Block Height:" $ show blockHeight
+              , spacer_ [width 8]
               , copyableLabelFor 10 "Fee:" $ fromString $ printf "%D ADA" $ toAda fee
+              , spacer_ [width 8]
               , hstack
                   [ copyableLabelFor 10 "Deposit:" $ fromString $ printf "%D ADA" $ toAda deposit
                   , mainButton helpIcon (Alert depositSignMsg)
@@ -236,28 +240,39 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
                         ]
                       `styleHover` [bgColor customGray2, cursorIcon CursorHand]
                   ]
+              , spacer_ [width 8]
               , copyableLabelFor 10 "Invalid Before:" $ 
                   maybe "none" (fromString . printf "slot %s") invalidBefore
+              , spacer_ [width 8]
               , copyableLabelFor 10 "Invalid After:" $ 
                   maybe "none" (fromString . printf "slot %s") invalidAfter
+              , spacer_ [width 8]
               , certificateField inspectedTransaction
+              , spacer_ [width 5]
               , withdrawalField inspectedTransaction
+              , spacer_ [width 5]
               , mintField reverseTickerMap inspectedTransaction
+              , spacer_ [width 5]
+              , plutusContractsField inspectedTransaction
+              , spacer_ [width 5]
               , utxoField "Reference Inputs:" 
                   Nothing
                   #showReferenceInputs 
                   #referenceInputs 
                   referenceInputs
+              , spacer_ [width 5]
               , utxoField "Collateral Inputs:" 
                   (Just senderSymbol)
                   #showCollateralInputs 
                   #collateralInputs 
                   collateralInputs
+              , spacer_ [width 5]
               , utxoField "Inputs:" 
                   (Just senderSymbol)
                   #showInputs 
                   #inputs 
                   inputs
+              , spacer_ [width 5]
               , utxoField "Outputs:" 
                   (Just receiverSymbol)
                   #showOutputs 
@@ -280,33 +295,6 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
           , radius 10
           ]
   where
-    senderSymbol :: AppNode
-    senderSymbol = tooltip_ "From this wallet" [tooltipDelay 0] $ label userSharedIcon
-      `styleBasic` [textSize 10, padding 0, textMiddle, textColor customRed, textFont "Remix"]
-
-    receiverSymbol :: AppNode
-    receiverSymbol = tooltip_ "To this wallet" [tooltipDelay 0] $ label userReceivedIcon
-      `styleBasic` [textSize 10, padding 0, textMiddle, textColor customBlue, textFont "Remix"]
-
-    moreIcon :: Bool -> Text
-    moreIcon detailsOpen
-      | detailsOpen = closeCircleIcon
-      | otherwise = horizontalMoreIcon
-
-    moreTip :: Bool -> Text
-    moreTip detailsOpen
-      | detailsOpen = "Close Details"
-      | otherwise = "Show Details"
-
-    specificUtxoMoreOffStyle :: Style
-    specificUtxoMoreOffStyle = 
-      def `styleBasic` 
-            [ bgColor transparent
-            , textColor customBlue
-            ]
-          `styleHover`
-            [ bgColor customGray1]
-
     utxoField 
       :: Text
       -> Maybe AppNode
@@ -372,16 +360,16 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
       vstack
         [ vstack
             [ hstack 
-                [ copyableLabelSelf (display utxoRef) 9 white
+                [ copyableLabelSelf (display utxoRef) 8 white
                 , filler
                 , label (fromString $ printf "%D ADA" $ toAda lovelace) 
-                    `styleBasic` [textSize 9]
+                    `styleBasic` [textSize 8]
                 ]
             , hstack
                 [ widgetIf (not $ null nativeAssets) $ vstack
                     [ tooltip_ "Native Assets" [tooltipDelay 0] $ label coinsIcon
                         `styleBasic` 
-                          [ textSize 9
+                          [ textSize 8
                           , textColor customBlue
                           , textFont "Remix"
                           , textMiddle
@@ -391,7 +379,7 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
                 , widgetIf (isJust datumHash) $ vstack
                     [ tooltip_ "Datum" [tooltipDelay 0] $ label datumIcon
                         `styleBasic` 
-                          [ textSize 9
+                          [ textSize 8
                           , textColor customBlue
                           , textFont "Remix"
                           , textMiddle
@@ -401,7 +389,7 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
                 , widgetIf (isJust referenceScriptHash) $ 
                     tooltip_ "Reference Script" [tooltipDelay 0] $ label scriptIcon
                       `styleBasic` 
-                        [ textSize 9
+                        [ textSize 8
                         , textColor customBlue
                         , textFont "Remix"
                         , textMiddle
@@ -416,9 +404,9 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
                       (toLensVL $ #homeModel 
                                 % #inspectedTransaction 
                                 % toggleShow (finalLens % toggleDetails utxoRef))
-                      [toggleButtonOffStyle specificUtxoMoreOffStyle]
+                      [toggleButtonOffStyle specificMoreOffStyle]
                       `styleBasic` 
-                        [ textSize 9
+                        [ textSize 8
                         , textColor customBlue
                         , textFont "Remix"
                         , textMiddle
@@ -435,6 +423,123 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
                 , border 1 black
                 ]
         , widgetIf showDetails $ utxoDetails reverseTickerMap u
+        ]
+
+plutusContractsField :: Maybe Transaction -> AppNode
+plutusContractsField inspectedTransaction =
+  if null contracts then
+    hstack
+      [ label "Smart Contracts:"
+          `styleBasic`
+            [ padding 0
+            , radius 5
+            , textMiddle
+            , textSize 10
+            , border 0 transparent
+            , textColor customBlue
+            , bgColor transparent
+            ]
+      , spacer
+      , label "none" `styleBasic` [textColor lightGray, textSize 10]
+      ]
+  else
+    vstack
+      [ hstack
+          [ label "Smart Contracts:"
+              `styleBasic`
+                [ padding 0
+                , radius 5
+                , textMiddle
+                , textSize 10
+                , border 0 transparent
+                , textColor customBlue
+                , bgColor transparent
+                ]
+          , spacer
+          , toggleButton_ horizontalMoreIcon 
+              (toLensVL $ #homeModel % #inspectedTransaction % toggleShow #showPlutusContracts)
+              [toggleButtonOffStyle txMoreOffStyle]
+              `styleBasic` 
+                [ textSize 10
+                , textColor customRed
+                , textFont "Remix"
+                , textMiddle
+                , radius 20
+                , paddingT 2
+                , paddingB 2
+                , paddingR 5
+                , paddingL 5
+                , bgColor black
+                , border 0 transparent
+                ]
+              `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+          ]
+      , widgetIf (inspectedTransaction ^. toggleShow #showPlutusContracts) $
+          vstack_ [childSpacing] (map contractRow contracts)
+            `styleBasic` [padding 10]
+      ]
+  where
+    contracts :: [(Int,TransactionPlutusContract)]
+    contracts = maybe [] (zip [0..]) $ inspectedTransaction ^? _Just % #plutusContracts
+
+    contractRow :: (Int,TransactionPlutusContract) -> AppNode
+    contractRow (idx,c@TransactionPlutusContract{..}) =
+      vstack
+        [ vstack
+            [ hstack
+                [ label (display purpose)
+                    `styleBasic` [textSize 8, textColor white]
+                , spacer_ [width 5]
+                , label "("
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , copyableLabelSelf scriptHash 8 lightGray
+                , label ")"
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , filler
+                , tooltip_ (moreTip showDetails) [tooltipDelay 0] $
+                    toggleButton_ (moreIcon showDetails)
+                      (toLensVL $ #homeModel 
+                                % #inspectedTransaction 
+                                % toggleShow (#plutusContracts % toggleDetailsIndexed idx))
+                      [toggleButtonOffStyle specificMoreOffStyle]
+                      `styleBasic` 
+                        [ textSize 9
+                        , textColor customBlue
+                        , textFont "Remix"
+                        , textMiddle
+                        , padding 0
+                        , bgColor transparent
+                        , border 0 transparent
+                        ]
+                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                ]
+            ] `styleBasic` 
+                [ padding 10
+                , bgColor customGray2
+                , radius 5
+                , border 1 black
+                ]
+        , widgetIf showDetails $ contractDetails c
+        ]
+
+    contractDetails :: TransactionPlutusContract -> AppNode
+    contractDetails TransactionPlutusContract{..} = do
+      hstack
+        [ filler
+        , vstack
+            [ widgetMaybe paymentAddress $ \addr -> 
+                copyableLabelFor 8 "Payment Address:" (toText addr) 
+                  `styleBasic` [padding 2]
+            , widgetMaybe datum $ \x ->
+                copyableLabelFor 8 "Datum:" (showValue x)
+                  `styleBasic` [padding 2]
+            , copyableLabelFor 8 "Redeemer:" (showValue redeemer)
+                `styleBasic` [padding 2]
+            ] `styleBasic`
+                [ bgColor black
+                , padding 10
+                , border 1 black
+                ]
         ]
 
 certificateField :: Maybe Transaction -> AppNode
@@ -499,7 +604,7 @@ certificateField inspectedTransaction =
       vstack
         [ hstack
             [ label (display certificateType)
-                `styleBasic` [textSize 10, textColor white]
+                `styleBasic` [textSize 8, textColor white]
             ]
         , spacer_ [width 2]
         , widgetMaybe (info ^? _DelegationInfo) $ \(poolId,stakeAddress) ->
@@ -579,9 +684,9 @@ withdrawalField inspectedTransaction =
     withdrawalRow :: TransactionWithdrawal -> AppNode
     withdrawalRow TransactionWithdrawal{..} =
       hstack
-        [ copyableLabelSelf (display stakeAddress) 10 white
+        [ copyableLabelSelf (display stakeAddress) 8 white
         , filler
-        , label (display lovelace) `styleBasic` [textSize 10]
+        , label (display lovelace) `styleBasic` [textSize 8]
         ] `styleBasic` 
             [ padding 10
             , bgColor customGray2
@@ -760,7 +865,7 @@ txFilterWidget model = do
                 , spacer
                 , hstack 
                     [ filler
-                    , button "Reset" $ HomeEvent ResetTxFilters
+                    , button "Reset" $ HomeEvent ResetHomeTxFilters
                     , spacer
                     , toggleButton "Confirm" (toLensVL $ #homeModel % #showTransactionFilter)
                     ] `styleBasic` [padding 10]
@@ -841,9 +946,9 @@ txFilterWidget model = do
             , textField_ 
                   (toLensVL $ #homeModel % #txFilterModel % #search) 
                   [placeholder "many of: address, native asset, script hash, datum hash"] 
-                `styleBasic` [bgColor customGray1, sndColor darkGray]
+                `styleBasic` [textSize 12, bgColor customGray1, sndColor darkGray]
                 `styleFocus` [border 1 customBlue]
-            , mainButton helpIcon (Alert txSearchMsg)
+            , mainButton helpIcon (Alert homeTxSearchMsg)
                 `styleBasic`
                   [ border 0 transparent
                   , radius 20
@@ -867,6 +972,33 @@ txMoreOffStyle =
         , paddingB 2
         , paddingR 5
         , paddingL 5
+        ]
+      `styleHover`
+        [ bgColor customGray1]
+
+moreIcon :: Bool -> Text
+moreIcon detailsOpen
+  | detailsOpen = closeCircleIcon
+  | otherwise = horizontalMoreIcon
+
+moreTip :: Bool -> Text
+moreTip detailsOpen
+  | detailsOpen = "Close Details"
+  | otherwise = "Show Details"
+
+senderSymbol :: AppNode
+senderSymbol = tooltip_ "From this wallet" [tooltipDelay 0] $ label userSharedIcon
+  `styleBasic` [textSize 8, padding 0, textMiddle, textColor customRed, textFont "Remix"]
+
+receiverSymbol :: AppNode
+receiverSymbol = tooltip_ "To this wallet" [tooltipDelay 0] $ label userReceivedIcon
+  `styleBasic` [textSize 8, padding 0, textMiddle, textColor customBlue, textFont "Remix"]
+
+specificMoreOffStyle :: Style
+specificMoreOffStyle = 
+  def `styleBasic` 
+        [ bgColor transparent
+        , textColor customBlue
         ]
       `styleHover`
         [ bgColor customGray1]
@@ -906,7 +1038,8 @@ copyableLabelFor fontSize caption info =
           ]
         `styleHover` [textColor lightGray, cursorIcon CursorHand]
     , spacer_ [width 5]
-    , label_ info [ellipsis,resizeFactor 2] `styleBasic` [padding 0, textColor lightGray, textSize fontSize]
+    , label_ info [ellipsis,resizeFactor 2] 
+        `styleBasic` [padding 0, textColor lightGray, textSize fontSize]
     ]
 
 -------------------------------------------------
@@ -930,6 +1063,16 @@ toggleDetails ref = lens (getToggleDetails ref) (setToggleDetails ref)
       then (u & #showDetails .~ b) : us
       else u : setToggleDetails targetRef us b
 
+-- | A lens to toggle the `showDetails` field of the `TransactionPlutusContract`.
+toggleDetailsIndexed :: Int -> Lens' [TransactionPlutusContract] Bool
+toggleDetailsIndexed idx = lens getToggleDetails setToggleDetails
+  where
+    getToggleDetails :: [TransactionPlutusContract] -> Bool
+    getToggleDetails us = fromMaybe False $ us ^? ix idx % #showDetails
+
+    setToggleDetails :: [TransactionPlutusContract] -> Bool -> [TransactionPlutusContract]
+    setToggleDetails us b = us & ix idx % #showDetails .~ b
+
 -- | A lens to toggle the `show` field of the `Transaction`.
 toggleShow :: Lens' Transaction Bool -> Lens' (Maybe Transaction) Bool
 toggleShow finalLens = lens getToggleShow setToggleShow
@@ -940,25 +1083,25 @@ toggleShow finalLens = lens getToggleShow setToggleShow
     setToggleShow :: Maybe Transaction -> Bool -> Maybe Transaction
     setToggleShow maybeTx b = fmap (set finalLens b) maybeTx
 
-lowerBoundText :: Lens' TxFilterModel Text
+lowerBoundText :: Lens' HomeTxFilterModel Text
 lowerBoundText = lens getLowerBoundText setLowerBoundText
   where
-    getLowerBoundText :: TxFilterModel -> Text
+    getLowerBoundText :: HomeTxFilterModel -> Text
     getLowerBoundText tx = 
       maybe "" (toText . Time.formatTime Time.defaultTimeLocale "%m-%d-%Y") $ tx ^. #dateRange % _1
 
-    setLowerBoundText :: TxFilterModel -> Text -> TxFilterModel
+    setLowerBoundText :: HomeTxFilterModel -> Text -> HomeTxFilterModel
     setLowerBoundText tx date = 
       tx & #dateRange % _1 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
 
-upperBoundText :: Lens' TxFilterModel Text
+upperBoundText :: Lens' HomeTxFilterModel Text
 upperBoundText = lens getLowerBoundText setLowerBoundText
   where
-    getLowerBoundText :: TxFilterModel -> Text
+    getLowerBoundText :: HomeTxFilterModel -> Text
     getLowerBoundText tx = 
       maybe "" (toText . Time.formatTime Time.defaultTimeLocale "%m-%d-%Y") $ tx ^. #dateRange % _2
 
-    setLowerBoundText :: TxFilterModel -> Text -> TxFilterModel
+    setLowerBoundText :: HomeTxFilterModel -> Text -> HomeTxFilterModel
     setLowerBoundText tx date = 
       tx & #dateRange % _2 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
 

@@ -86,13 +86,18 @@ beaconCurrencySymbol = scriptHashToPolicyId beaconScriptHash
 -------------------------------------------------
 -- Reference Script UTxOs
 -------------------------------------------------
+-- The reference scripts are locked at the swap address without any staking credential.
+-- For testnet, that address is: addr_test1wqql5djxthlrdcnvy87m7uswf0d0es9cdw6nvl72gcqj74s38ksy4.
+--
+-- The scripts are deliberately stored with an invalid datum so that they are locked forever.
+
 swapScriptTestnetRef :: TxOutRef
 swapScriptTestnetRef = 
-  fromJust $ parseTxOutRef "66424509bc0984f645db32b18a8a93a651d82015f43b2406c4aa4a40fe5753f8#0"
+  fromJust $ parseTxOutRef "9fecc1d2cf99088facad02aeccbedb6a4f783965dc6c02bd04dc8b348e9a0858#0"
 
 beaconScriptTestnetRef :: TxOutRef
 beaconScriptTestnetRef = 
-  fromJust $ parseTxOutRef "66424509bc0984f645db32b18a8a93a651d82015f43b2406c4aa4a40fe5753f8#1"
+  fromJust $ parseTxOutRef "9fecc1d2cf99088facad02aeccbedb6a4f783965dc6c02bd04dc8b348e9a0858#1"
 
 -------------------------------------------------
 -- Swap Datum
@@ -177,7 +182,7 @@ data SwapRedeemer
   | SpendWithStake
   -- | Take the offer asset and deposit the ask asset.
   | Swap
-  deriving (Generic,Show)
+  deriving (Eq,Generic,Show)
 
 data BeaconRedeemer
   -- | Execute the beacon script as a minting policy. Used anytime beacons must be minted or burned.
@@ -185,7 +190,7 @@ data BeaconRedeemer
   -- | Execute the beacon script as a staking validtor. Used anytime beacons do not need to be
   -- minted or burned.
   | UpdateSwaps
-  deriving (Generic,Show)
+  deriving (Eq,Generic,Show)
 
 PlutusTx.unstableMakeIsData ''SwapDatum
 PlutusTx.unstableMakeIsData ''SwapRedeemer

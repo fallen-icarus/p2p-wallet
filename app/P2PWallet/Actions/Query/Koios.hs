@@ -119,7 +119,7 @@ runGetParams network = do
       either (return . Left . show) (return . processResults)
   where
     processResults :: Value -> Either Text (ByteString,Decimal)
-    processResults val = (,) <$> pure (valueAsByteString val) <*> parseCollateralPercentage val
+    processResults val = (valueAsByteString val,) <$> parseCollateralPercentage val
 
     parseCollateralPercentage :: Value -> Either Text Decimal
     parseCollateralPercentage (Object o) = 
@@ -168,7 +168,7 @@ runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
         (_, Right True) -> return $ first show res2
         (Left err, _) -> return $ Left $ show err
         (_, Left err) -> return $ Left $ show err
-        _ -> return $ Left "There was an error syncing UTxOs. Wait a few seconds and try again."
+        _ -> return $ Left "There was an error syncing UTxOs. Wait a minute and try again."
 
     -- Try to query the UTxOs. If a timeout error occurs, just try again.
     fetchUTxOs :: IO (Either Text [AddressUTxO])
@@ -287,7 +287,7 @@ runQuerySwaps network offerAsset askAsset = do
     case (,) <$> oneWayRes <*> twoWayRes of
       Right (oneWayUTxOs,twoWayUTxOs) -> do
         return $ Right $ sortOn (swapUTxOPrice offerAsset askAsset) $ 
-          map toSwapUTxO $ oneWayUTxOs <> twoWayUTxOs
+          map fromAddressUTxO $ oneWayUTxOs <> twoWayUTxOs
       Left err -> return $ Left err
   where
     -- Try to query the one-way swaps.
@@ -306,22 +306,30 @@ runQuerySwaps network offerAsset askAsset = do
 
 -- | Get all information for a particular dex wallet.
 runQueryDexWallet :: DexWallet -> IO (Either Text DexWallet)
-runQueryDexWallet dexWallet@DexWallet{network,oneWaySwapAddress,twoWaySwapAddress} = do
-    (oneWayRes,twoWayRes) <- concurrently fetchOneWaySwaps fetchTwoWaySwaps
+runQueryDexWallet dexWallet@DexWallet{..} = do
+    (txRes,(oneWayRes,twoWayRes)) <- 
+      concurrently queryTxsConcurrently $
+        concurrently queryOneWaySwapsWithRedundancies queryTwoWaySwapsWithRedundancies
 
-    case (,) <$> oneWayRes <*> twoWayRes of
-      Right (oneWayUTxOs,twoWayUTxOs) -> do
+    case (,,) <$> txRes <*> oneWayRes <*> twoWayRes of
+      Right (txs,oneWayUTxOs,twoWayUTxOs) -> do
         let allUTxOs = oneWayUTxOs <> twoWayUTxOs
         return $ Right $ dexWallet
           & #lovelace .~ sum (map (view #lovelace) allUTxOs)
-          & #utxos .~ map toSwapUTxO allUTxOs
+          & #utxos .~ map fromAddressUTxO allUTxOs
           & populateNativeAssets
+          & #transactions %~ mappend (map (P2P.toTransaction profileId paymentId) txs)
       Left err -> return $ Left err
   where
     -- | Aggregate all native assets located at the wallet.
     populateNativeAssets :: DexWallet -> DexWallet
     populateNativeAssets s@DexWallet{utxos=us} =
       s & #nativeAssets .~ sumNativeAssets (concatMap (view #nativeAssets) us)
+
+    -- Add one to the blockHeight for the most recently recorded transaction for this wallet.
+    -- Koios will return any transactions for that block or later.
+    afterBlock :: Integer
+    afterBlock = (+1) $ maybe 0 (view #blockHeight) $ maybeHead transactions
 
     -- Try to query the one-way swaps.
     fetchOneWaySwaps :: IO (Either Text [AddressUTxO])
@@ -336,6 +344,65 @@ runQueryDexWallet dexWallet@DexWallet{network,oneWaySwapAddress,twoWaySwapAddres
       manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
       first show <$> handleTimeoutError (runClientM (queryAddressUTxOs [twoWaySwapAddress]) env)
+
+    -- Since Koios instances may occassionally return incorrect UTxOs if they are not
+    -- close enough to the chain tip, this would mess with the wallet's notifications.
+    -- To account for this, the UTxOs are queried three times and compared. At least
+    -- two responses must match to move on. The redundant queries occur concurrently.
+    queryOneWaySwapsWithRedundancies :: IO (Either Text [AddressUTxO])
+    queryOneWaySwapsWithRedundancies = do
+      (res1,(res2,res3)) <- 
+        concurrently fetchOneWaySwaps (concurrently fetchOneWaySwaps fetchOneWaySwaps)
+      let path1 = liftA3 (\a b c -> a == b || a == c) res1 res2 res3
+          path2 = liftA2 (==) res2 res3
+      case (path1,path2) of
+        (Right True ,_) -> return $ first show res1
+        (_, Right True) -> return $ first show res2
+        (Left err, _) -> return $ Left $ show err
+        (_, Left err) -> return $ Left $ show err
+        _ -> return $ Left "There was an error syncing UTxOs. Wait a minute and try again."
+
+    -- Since Koios instances may occassionally return incorrect UTxOs if they are not
+    -- close enough to the chain tip, this would mess with the wallet's notifications.
+    -- To account for this, the UTxOs are queried three times and compared. At least
+    -- two responses must match to move on. The redundant queries occur concurrently.
+    queryTwoWaySwapsWithRedundancies :: IO (Either Text [AddressUTxO])
+    queryTwoWaySwapsWithRedundancies = do
+      (res1,(res2,res3)) <- 
+        concurrently fetchTwoWaySwaps (concurrently fetchTwoWaySwaps fetchTwoWaySwaps)
+      let path1 = liftA3 (\a b c -> a == b || a == c) res1 res2 res3
+          path2 = liftA2 (==) res2 res3
+      case (path1,path2) of
+        (Right True ,_) -> return $ first show res1
+        (_, Right True) -> return $ first show res2
+        (Left err, _) -> return $ Left $ show err
+        (_, Left err) -> return $ Left $ show err
+        _ -> return $ Left "There was an error syncing UTxOs. Wait a minute and try again."
+
+    -- Try to query the tx hashes since last time. If a timeout error occurs, just try again.
+    fetchTxHashes :: IO (Either Text [Text])
+    fetchTxHashes = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      -- Since this is querying the addresses for both swap addresses, it is possible for a
+      -- transaction to be for both of them. These duplicates should be removed.
+      bimap show ordNub <$> 
+        handleTimeoutError 
+          (runClientM (queryAddressTxHashes [oneWaySwapAddress,twoWaySwapAddress] afterBlock) env)
+
+    -- Try to query the transaction info concurrently. The transactions are grouped together,
+    -- 50 per response, since some transactions can be quite large.
+    queryTxsConcurrently :: IO (Either Text [Transaction])
+    queryTxsConcurrently = do
+      fetchTxHashes >>= \case
+        Left err -> return $ Left $ show err
+        Right hashes -> do
+          manager <- newManager customTlsSettings
+          let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+          bimap show concat . sequence <$> 
+            mapConcurrently 
+              (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
+              (groupInto 50 hashes)
 
 -------------------------------------------------
 -- Low-Level API
@@ -494,7 +561,6 @@ queryAddressTransactions = txInfoApi select "block_height.desc" . TxHashes
         , "invalid_before"
         , "invalid_after"
         , "collateral_inputs"
-        -- , "collateral_output"
         , "reference_inputs"
         , "inputs"
         , "outputs"
@@ -502,7 +568,7 @@ queryAddressTransactions = txInfoApi select "block_height.desc" . TxHashes
         , "withdrawals"
         , "assets_minted"
         -- , "native_scripts"
-        -- , "plutus_contracts" 
+        , "plutus_contracts" 
         ]
 
 queryStakeAccounts :: [StakeAddress] -> ClientM [StakeAccount]

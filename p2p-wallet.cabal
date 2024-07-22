@@ -144,6 +144,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Dex
       P2PWallet.GUI.Widgets.Dex.Positions
       P2PWallet.GUI.Widgets.Dex.Trade
+      P2PWallet.GUI.Widgets.Dex.Transactions
       P2PWallet.GUI.Widgets.Internal.Custom
       P2PWallet.GUI.Widgets.Internal.Popup
       P2PWallet.GUI.Widgets.Home

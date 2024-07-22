@@ -27,8 +27,8 @@ import P2PWallet.Prelude
 -------------------------------------------------
 -- | The swap datum used for the UTxO.
 data SwapDatum
-  = OneWay OneWay.SwapDatum
-  | TwoWay TwoWay.SwapDatum
+  = OneWayDatum OneWay.SwapDatum
+  | TwoWayDatum TwoWay.SwapDatum
   -- | This is included in case a bug is found in the protocols.
   | SwapDatumError Value
   deriving (Eq,Show)
@@ -37,14 +37,48 @@ makePrisms ''SwapDatum
 
 instance FromJSON SwapDatum where
   parseJSON value = pure $ fromMaybe (SwapDatumError value) $ asum
-    [ OneWay <$> parseMaybe (parseJSON @OneWay.SwapDatum) value
-    , TwoWay <$> parseMaybe (parseJSON @TwoWay.SwapDatum) value
+    [ OneWayDatum <$> parseMaybe (parseJSON @OneWay.SwapDatum) value
+    , TwoWayDatum <$> parseMaybe (parseJSON @TwoWay.SwapDatum) value
     ]
 
 instance ToJSON SwapDatum where
-  toJSON (OneWay datum) = toJSON datum
-  toJSON (TwoWay datum) = toJSON datum
+  toJSON (OneWayDatum datum) = toJSON datum
+  toJSON (TwoWayDatum datum) = toJSON datum
   toJSON (SwapDatumError value) = toJSON value
+
+parseInlineSwapDatum :: Value -> SwapDatum
+parseInlineSwapDatum value =
+  fromMaybe (SwapDatumError value) $ asum
+    [ OneWayDatum <$> decodeData @OneWay.SwapDatum value
+    , TwoWayDatum <$> decodeData @TwoWay.SwapDatum value
+    ]
+
+-- | Get the swap input that was executed to produce this datum.
+prevSwapInput :: SwapDatum -> Maybe TxOutRef
+prevSwapInput swapDatum = case swapDatum of
+  OneWayDatum OneWay.SwapDatum{prevInput} -> prevInput
+  TwoWayDatum TwoWay.SwapDatum{prevInput} -> prevInput
+  _ -> Nothing
+
+-------------------------------------------------
+-- Swap Redeemer
+-------------------------------------------------
+-- | The swap redeemer used for the UTxO.
+data SwapRedeemer
+  = OneWayRedeemer OneWay.SwapRedeemer
+  | TwoWayRedeemer TwoWay.SwapRedeemer
+  -- | This is included in case a bug is found in the protocols.
+  | SwapRedeemerError Value
+  deriving (Eq,Show)
+
+makePrisms ''SwapRedeemer
+
+parseSwapRedeemer :: Value -> SwapRedeemer
+parseSwapRedeemer value =
+  fromMaybe (SwapRedeemerError value) $ asum
+    [ OneWayRedeemer <$> decodeData @OneWay.SwapRedeemer value
+    , TwoWayRedeemer <$> decodeData @TwoWay.SwapRedeemer value
+    ]
 
 -------------------------------------------------
 -- Swap UTxO
@@ -99,37 +133,30 @@ instance FromJSON SwapUTxO where
       <*> o .: "block_time"
       <*> o .: "block_height"
 
-toSwapUTxO :: AddressUTxO -> SwapUTxO
-toSwapUTxO AddressUTxO{..} = SwapUTxO
-    { utxoRef = utxoRef
-    , swapAddress = paymentAddress
-    , swapType = if OneWay.isSwapAddress paymentAddress then LimitOrder else LiquiditySwap
-    , lovelace = lovelace
-    , swapDatum = parseInlineDatum <$> inlineDatum
-    , nativeAssets = nativeAssets
-    , blockTime = blockTime
-    , blockHeight = blockHeight
-    }
-  where
-    parseInlineDatum :: Value -> SwapDatum
-    parseInlineDatum value =
-      fromMaybe (SwapDatumError value) $ asum
-        [ OneWay <$> decodeDatum @OneWay.SwapDatum value
-        , TwoWay <$> decodeDatum @TwoWay.SwapDatum value
-        ]
+instance FromAddressUTxO SwapUTxO where
+  fromAddressUTxO AddressUTxO{..} = SwapUTxO
+      { utxoRef = utxoRef
+      , swapAddress = paymentAddress
+      , swapType = if OneWay.isSwapAddress paymentAddress then LimitOrder else LiquiditySwap
+      , lovelace = lovelace
+      , swapDatum = parseInlineSwapDatum <$> inlineDatum
+      , nativeAssets = nativeAssets
+      , blockTime = blockTime
+      , blockHeight = blockHeight
+      }
 
 -- | Get the prices from a SwapUTxO based on the swap direction. 
 swapUTxOPrice :: OfferAsset -> AskAsset -> SwapUTxO -> Maybe Rational
 swapUTxOPrice (OfferAsset offerAsset) (AskAsset askAsset) SwapUTxO{swapDatum} = case swapDatum of
-  Just (OneWay OneWay.SwapDatum{swapPrice=price}) -> Just $ toGHC price
-  Just (TwoWay TwoWay.SwapDatum{..}) ->
+  Just (OneWayDatum OneWay.SwapDatum{swapPrice=price}) -> Just $ toGHC price
+  Just (TwoWayDatum TwoWay.SwapDatum{..}) ->
     Just $ toGHC $ if offerAsset < askAsset then asset1Price else asset2Price
   _ -> Nothing
 
 -- | Get the offer asset if it is a one-way swap.
 swapUTxOOfferAsset :: SwapUTxO -> Maybe NativeAsset
 swapUTxOOfferAsset SwapUTxO{swapDatum} = case swapDatum of
-  Just (OneWay OneWay.SwapDatum{offerId,offerName}) -> Just NativeAsset
+  Just (OneWayDatum OneWay.SwapDatum{offerId,offerName}) -> Just NativeAsset
     { policyId = offerId
     , tokenName = offerName
     , fingerprint = mkAssetFingerprint offerId offerName
@@ -140,7 +167,7 @@ swapUTxOOfferAsset SwapUTxO{swapDatum} = case swapDatum of
 -- | Get the ask asset if it is a one-way swap.
 swapUTxOAskAsset :: SwapUTxO -> Maybe NativeAsset
 swapUTxOAskAsset SwapUTxO{swapDatum} = case swapDatum of
-  Just (OneWay OneWay.SwapDatum{askId,askName}) -> Just NativeAsset
+  Just (OneWayDatum OneWay.SwapDatum{askId,askName}) -> Just NativeAsset
     { policyId = askId
     , tokenName = askName
     , fingerprint = mkAssetFingerprint askId askName
@@ -151,7 +178,7 @@ swapUTxOAskAsset SwapUTxO{swapDatum} = case swapDatum of
 -- | Get the asset1 if it is a two-way swap.
 swapUTxOAsset1 :: SwapUTxO -> Maybe NativeAsset
 swapUTxOAsset1 SwapUTxO{swapDatum} = case swapDatum of
-  Just (TwoWay TwoWay.SwapDatum{asset1Id,asset1Name}) -> Just NativeAsset
+  Just (TwoWayDatum TwoWay.SwapDatum{asset1Id,asset1Name}) -> Just NativeAsset
     { policyId = asset1Id
     , tokenName = asset1Name
     , fingerprint = mkAssetFingerprint asset1Id asset1Name
@@ -162,7 +189,7 @@ swapUTxOAsset1 SwapUTxO{swapDatum} = case swapDatum of
 -- | Get the asset2 if it is a two-way swap.
 swapUTxOAsset2 :: SwapUTxO -> Maybe NativeAsset
 swapUTxOAsset2 SwapUTxO{swapDatum} = case swapDatum of
-  Just (TwoWay TwoWay.SwapDatum{asset2Id,asset2Name}) -> Just NativeAsset
+  Just (TwoWayDatum TwoWay.SwapDatum{asset2Id,asset2Name}) -> Just NativeAsset
     { policyId = asset2Id
     , tokenName = asset2Name
     , fingerprint = mkAssetFingerprint asset2Id asset2Name
@@ -170,12 +197,17 @@ swapUTxOAsset2 SwapUTxO{swapDatum} = case swapDatum of
     }
   _ -> Nothing
 
--- | Get the swap input that was executed to produce this `SwapUTxO`.
-swapUTxOPreviousInput :: SwapUTxO -> Maybe TxOutRef
-swapUTxOPreviousInput SwapUTxO{swapDatum} = case swapDatum of
-  Just (OneWay OneWay.SwapDatum{prevInput}) -> prevInput
-  Just (TwoWay TwoWay.SwapDatum{prevInput}) -> prevInput
-  _ -> Nothing
+swapIsFullyConverted :: SwapUTxO -> Bool
+swapIsFullyConverted u = flip any offerSample $ \x@NativeAsset{policyId} ->
+    if policyId == "" 
+    then quantityOf x u < 5_000_000 
+    else quantityOf x u == 0
+  where
+    offerSample = catMaybes
+      [ swapUTxOOfferAsset u
+      , swapUTxOAsset1 u
+      , swapUTxOAsset2 u
+      ]
 
 -------------------------------------------------
 -- Dex Wallet
@@ -321,11 +353,20 @@ instance Insertable DexWallet where
     ]
 
 instance Notify DexWallet where
-  notify oldState@DexWallet{utxos=oldUTxOs} DexWallet{utxos=newUTxOs}
-    | oldUTxOs == newUTxOs = Nothing
+  notify oldState newState
+    | oldState ^. #lovelace == newState ^. #lovelace && 
+      oldState ^. #nativeAssets == newState ^. #nativeAssets = Nothing
     | otherwise = Just $ Notification
         { notificationType = DexNotification
         , alias = oldState ^. #alias
-        , message = "Swap statuses have changed."
+        , message = msg
         , markedAsRead = False
         }
+    where
+      msg :: Text
+      msg = unlines $ filter (/= "")
+        [ "Swap statuses have changed."
+        , if any swapIsFullyConverted $ newState ^. #utxos
+          then "Some swaps have been fully converted!"
+          else ""
+        ]

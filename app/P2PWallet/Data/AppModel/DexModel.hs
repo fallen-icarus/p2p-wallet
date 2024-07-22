@@ -15,6 +15,7 @@ import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
+import P2PWallet.Data.Core.Transaction
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoSwaps.Common
 import P2PWallet.Prelude
@@ -32,6 +33,8 @@ type CachedOrderBooks = Map.Map (OfferAsset,AskAsset) [SwapUTxO]
 data DexScene
   -- | Information about all open positions.
   = DexPositions
+  -- | Transactions involving the Dex Wallet.
+  | DexTransactions
   -- | The order-book market.
   | DexMarket
   deriving (Eq,Show)
@@ -74,6 +77,12 @@ data DexEvent
   | AddSelectedSwapExecution (AddEvent (OfferAsset,AskAsset,SwapUTxO) SwapExecution)
   -- | Reset the positions filter model.
   | ResetPositionsFilters
+  -- | Reset Tx Filters.
+  | ResetDexTxFilters
+  -- | Inspect a Dex Transaction.
+  | InspectDexTransaction Transaction
+  -- | Stop inspecting the transaction.
+  | CloseInspectedDexTransaction
 
 -------------------------------------------------
 -- Positions Filter Model
@@ -104,6 +113,9 @@ data PositionsFilterModel = PositionsFilterModel
   { offerAsset :: Text
   -- | The swap must ask for the specified asset. Leave it blank for any asset.
   , askAsset :: Text
+  -- | Whether the swap should be fully converted or not. Swaps offering ADA must contain at least 5
+  -- ADA.
+  , mustBeFullyConverted :: Maybe Bool
   -- | The current sorting method for the positions.
   , sortingMethod :: PositionsSortMethod
   -- | The current sorting direction for the positions.
@@ -116,8 +128,30 @@ instance Default PositionsFilterModel where
   def = PositionsFilterModel
     { offerAsset = ""
     , askAsset = ""
+    , mustBeFullyConverted = Nothing
     , sortingMethod = PositionsTime
     , sortingDirection = SortDescending
+    }
+
+-------------------------------------------------
+-- Transaction Filter Model
+-------------------------------------------------
+data DexTxFilterModel = DexTxFilterModel
+  -- | The swap must offer the specified asset. Leave it blank for any asset.
+  { offerAsset :: Text
+  -- | The swap must ask for the specified asset. Leave it blank for any asset.
+  , askAsset :: Text
+  -- | The date range for displaying transactions.
+  , dateRange :: (Maybe Day, Maybe Day)
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''DexTxFilterModel
+
+instance Default DexTxFilterModel where
+  def = DexTxFilterModel
+    { offerAsset = ""
+    , askAsset = ""
+    , dateRange = (Nothing,Nothing)
     }
 
 -------------------------------------------------
@@ -166,6 +200,14 @@ data DexModel = DexModel
   , positionsFilterModel :: PositionsFilterModel
   -- | Teh positions filter scene.
   , positionsFilterScene :: FilterScene
+  -- | Whether to show the filter widget for transactions.
+  , showTransactionFilter :: Bool
+  -- | The transactions filter model.
+  , txFilterModel :: DexTxFilterModel
+  -- | Teh transactions filter scene.
+  , txFilterScene :: FilterScene
+  -- | Focused transaction details.
+  , inspectedTransaction :: Maybe Transaction
   } deriving (Eq,Show)
 
 makeFieldLabelsNoPrefix ''DexModel
@@ -192,4 +234,8 @@ instance Default DexModel where
     , showPositionsFilter = False
     , positionsFilterModel = def
     , positionsFilterScene = def
+    , showTransactionFilter = False
+    , txFilterModel = def
+    , txFilterScene = FilterScene
+    , inspectedTransaction = Nothing
     }

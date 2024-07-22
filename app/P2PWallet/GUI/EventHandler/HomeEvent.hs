@@ -264,7 +264,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
         & #homeModel % #assetFilterModel .~ def
         & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
-  ResetTxFilters -> 
+  ResetHomeTxFilters -> 
     let newDefault = def & #dateRange % _1 ?~ addDays (-30) (config ^. #currentDay) in
     [ Model $ model 
         & #homeModel % #txFilterModel .~ newDefault 

@@ -445,6 +445,20 @@ handleDexEvent model@AppModel{..} evt = case evt of
         & #dexModel % #positionsFilterModel .~ def
         & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
+  ResetDexTxFilters -> 
+    let newDefault = def & #dateRange % _1 ?~ addDays (-30) (config ^. #currentDay) in
+    [ Model $ model 
+        & #dexModel % #txFilterModel .~ newDefault 
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
+
+  -----------------------------------------------
+  -- Inspecting Transactions
+  -----------------------------------------------
+  InspectDexTransaction tx -> 
+    [ Model $ model & #dexModel % #inspectedTransaction ?~ tx ]
+  CloseInspectedDexTransaction -> 
+    [ Model $ model & #dexModel % #inspectedTransaction .~ Nothing ]
 
 -------------------------------------------------
 -- Helper Functions

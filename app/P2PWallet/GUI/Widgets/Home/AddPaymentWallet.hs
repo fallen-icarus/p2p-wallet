@@ -166,7 +166,7 @@ watchPaymentWidget _ = do
               [ label "Payment Address:"
               , spacer
               , textField (toLensVL $ #homeModel % #newPaymentWallet % #paymentAddress)
-                  `styleBasic` [bgColor customGray1]
+                  `styleBasic` [textSize 12, bgColor customGray1]
                   `styleFocus` [border 1 customBlue]
               ]
           ]

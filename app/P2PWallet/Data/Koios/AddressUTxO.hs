@@ -54,3 +54,9 @@ instance FromJSON AddressUTxO where
     where
       concatRef :: Text -> Integer -> Text
       concatRef hash idx = hash <> "#" <> show idx
+
+-------------------------------------------------
+-- Converting to another UTxO type
+-------------------------------------------------
+class FromAddressUTxO a where
+  fromAddressUTxO :: AddressUTxO -> a
