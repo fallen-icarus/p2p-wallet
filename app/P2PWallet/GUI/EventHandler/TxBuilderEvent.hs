@@ -408,12 +408,8 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
       [ Task $ runActionOrAlert (TxBuilderEvent . GetTxFileExportDirectory . AddResult) $ do
           let rawPath = toString $ txBuilderModel ^. #targetPath
 
-          -- Expand the filepath.
-          expandedPath <- expandFilePath rawPath >>= 
-            fromJustOrAppError ("Not a valid path: " <> toText rawPath)
-
-          -- Return the filepath.
-          return expandedPath
+          -- Expand the filepath and return it.
+          expandFilePath rawPath >>= fromJustOrAppError ("Not a valid path: " <> toText rawPath)
       ]
     AddResult fullPath ->
       [ Model $ model 
