@@ -164,3 +164,12 @@ markReadIcon = remixMailOpenLine
 
 markUnreadIcon :: Text
 markUnreadIcon = remixMailUnreadLine
+
+loansIcon :: Text
+loansIcon = remixBankLine
+
+optionsIcon :: Text
+optionsIcon = toGlyph 0XF3F3
+
+aftermarketIcon :: Text
+aftermarketIcon = remixStore3Line
