@@ -21,6 +21,8 @@ data TickerRegistryEvent
   | ChangeTickerInfo (AddEvent NewTickerInfo TickerInfo)
   -- | Delete the selected ticker info.
   | DeleteTickerInfo (DeleteWithConfirmationEvent NewTickerInfo)
+  -- | Switch registry view between list view and search view.
+  | SwitchTickerRegistryView
 
 -------------------------------------------------
 -- Ticker Registry Model
@@ -36,6 +38,8 @@ data TickerRegistryModel = TickerRegistryModel
   , editingTicker :: Bool
   -- | Whether the delete ticker widget should be open.
   , deletingTicker :: Bool
+  -- | Whether to show the ticker registry as a list.
+  , listView :: Bool
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''TickerRegistryModel
@@ -47,4 +51,5 @@ instance Default TickerRegistryModel where
     , addingTicker = False
     , editingTicker = False
     , deletingTicker = False
+    , listView = False -- The default is search view.
     }

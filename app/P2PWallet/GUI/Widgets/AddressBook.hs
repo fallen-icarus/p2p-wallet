@@ -53,11 +53,11 @@ addressBookWidget AppModel{..} = do
                   ]
           , widgetIf (null sample && addressBook /= []) $ 
               centerWidget $
-                label "No contacts match that search."
+                label "No contacts match that search"
                  `styleBasic` [textFont "Italics"]
           , widgetIf (null addressBook) $
               centerWidget $
-                label "This profile does not have any saved contacts."
+                label "This profile does not have any saved contacts"
                  `styleBasic` [textFont "Italics"]
           ] `styleBasic`
               [ padding 20

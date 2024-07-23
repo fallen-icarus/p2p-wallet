@@ -19,6 +19,12 @@ handleTickerRegistryEvent
   -> [AppEventResponse AppModel AppEvent]
 handleTickerRegistryEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
+  -- Switch the view
+  -----------------------------------------------
+  SwitchTickerRegistryView ->
+    [ Model $ model & #tickerRegistryModel % #listView %~ not ]
+
+  -----------------------------------------------
   -- Add new ticker
   -----------------------------------------------
   AddNewTickerInfo modal -> case modal of

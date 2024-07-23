@@ -75,10 +75,21 @@ instance Insertable TickerInfo where
     ]
 
 -------------------------------------------------
--- List --> Map
+-- List <--> Map
 -------------------------------------------------
 toTickerMap :: [TickerInfo] -> TickerMap
 toTickerMap = fromList . map (\TickerInfo{..} -> (ticker,(policyId,assetName,decimals)))
+
+fromTickerMap :: TickerMap -> [TickerInfo]
+fromTickerMap = map toTickerInfo . Map.toList
+  where
+    toTickerInfo :: (Ticker, (CurrencySymbol,TokenName,Word8)) -> TickerInfo
+    toTickerInfo (ticker,(policyId,assetName,decimals)) = TickerInfo
+      { ticker = ticker
+      , policyId = policyId
+      , assetName = assetName
+      , decimals = decimals
+      }
 
 toReverseTickerMap :: [TickerInfo] -> ReverseTickerMap
 toReverseTickerMap = fromList . map (\TickerInfo{..} -> ((policyId,assetName), (ticker,decimals)))
