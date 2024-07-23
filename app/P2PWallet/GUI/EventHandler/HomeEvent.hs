@@ -189,7 +189,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
       -- The state will be updated after everything has successfully executed.
       [ Task $ runActionOrAlert (HomeEvent . ChangePaymentWalletName . AddResult) $ do
           let currentWallet@PaymentWallet{paymentId} = model ^. #homeModel % #selectedWallet
-              newAlias = model ^. #homeModel ^. #newAliasField
+              newAlias = model ^. #homeModel % #newAliasField
               newWallet = currentWallet & #alias .~ newAlias
               -- Filter out the selected profile from the list of known payment wallets.
               otherWallets = filter (\p -> paymentId /= p ^. #paymentId) $

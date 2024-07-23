@@ -21,7 +21,7 @@ tickerRegistryWidget model
   | isListView = tickerRegistryListWidget model
   | otherwise = tickerRegistrySearchWidget model
   where
-    isListView = model ^. #tickerRegistryModel ^. #listView
+    isListView = model ^. #tickerRegistryModel % #listView
 
 tickerRegistrySearchWidget :: AppModel -> AppNode
 tickerRegistrySearchWidget AppModel{..} = do
