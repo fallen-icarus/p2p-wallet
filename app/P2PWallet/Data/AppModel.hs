@@ -64,6 +64,9 @@ data MainScene
   | SettingsScene
   | DexScene
   | NotificationsScene
+  | LoansScene
+  | OptionsScene
+  | AftermarketScene
   deriving (Show,Eq)
 
 -------------------------------------------------
