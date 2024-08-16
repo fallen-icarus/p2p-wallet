@@ -108,8 +108,7 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
       let Loans.OfferDatum{..} = fromMaybe def $ loanUTxOOfferDatum u
           loanAmount = toNativeAsset loanAsset & #quantity .~ loanPrincipal
           duration = calcDaysInPosixPeriod $ fromPlutusTime loanTerm
-          collateralPrices = map (over _1 toNativeAsset) 
-                           $ map (over _2 toRational) 
+          collateralPrices = map (over _1 toNativeAsset . over _2 toRational) 
                            $ collateralization ^. #unCollateralization
           prettyInterest = unwords
             [ "Interest:"
@@ -243,7 +242,7 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
         , spacer_ [width 3]
         , flip styleBasic [padding 3] $ box_ [alignCenter,alignMiddle] $ vstack
             [ box_ [alignCenter,alignMiddle] $ tooltip_ "Accept Offer" [tooltipDelay 0] $
-                button acceptIcon (AppInit)
+                button acceptIcon AppInit
                   `styleBasic` 
                     [ textSize 10
                     , textColor customBlue

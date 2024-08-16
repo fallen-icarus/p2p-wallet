@@ -16,7 +16,7 @@ import Data.Aeson
 
 import P2PWallet.Prelude
 
-data AssetTransaction = AssetTransaction
+newtype AssetTransaction = AssetTransaction
   { txHash :: Text 
   } deriving (Show,Eq)
 

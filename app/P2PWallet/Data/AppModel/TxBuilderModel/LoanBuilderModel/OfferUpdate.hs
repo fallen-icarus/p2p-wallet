@@ -78,8 +78,7 @@ loanUTxOToNewOfferCreation
         }
   where
     Loans.OfferDatum{..} = fromMaybe def $ loanUTxOOfferDatum u
-    offeredCollateral = map (over _1 toNativeAsset) 
-                      $ map (over _2 toRational)
+    offeredCollateral = map (over _1 toNativeAsset . over _2 toRational)
                       $ collateralization ^. #unCollateralization
     loanAmount = toNativeAsset loanAsset & #quantity .~ loanPrincipal
 

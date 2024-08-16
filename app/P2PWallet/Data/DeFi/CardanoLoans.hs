@@ -576,7 +576,7 @@ negotiationBeaconCurrencySymbol = scriptHashToPolicyId negotiationBeaconScriptHa
 -------------------------------------------------
 -- | Create the Asset beacon name for the loan asset.
 genLoanAssetBeaconName :: Asset -> AssetBeaconId
-genLoanAssetBeaconName (Asset ((CurrencySymbol sym),(TokenName name))) =
+genLoanAssetBeaconName (Asset (CurrencySymbol sym, TokenName name)) =
   AssetBeaconId $ TokenName $ PlutusTx.sha2_256 $ "Asset" <> sym <> name
 
 -- | Create the loan id from the offer's output reference.
@@ -721,7 +721,7 @@ createOfferDatum LenderTerms{..} = OfferDatum
   , offerDeposit = offerDeposit
   , offerExpiration = offerExpiration
   , collateralization = 
-      Collateralization $ map (over _2 fromRational) $ map (over _1 fromNativeAsset) collateralization
+      Collateralization $ map (over _2 fromRational . over _1 fromNativeAsset) collateralization
   }
 
 -- | Create an ActiveDatum from an OfferDatum, offer output reference, BorrowerId, and loan 
@@ -777,7 +777,7 @@ createPostInterestActiveDatum numberOfTimes activeDatum@ActiveDatum{..} =
 
 -- | Update the ActiveDatum to reflect the lender address update.
 createPostAddressUpdateActiveDatum :: PlutusAddress -> ActiveDatum -> ActiveDatum
-createPostAddressUpdateActiveDatum newAddress = set #lenderAddress newAddress
+createPostAddressUpdateActiveDatum = set #lenderAddress
 
 -------------------------------------------------
 -- Protocol Addresses

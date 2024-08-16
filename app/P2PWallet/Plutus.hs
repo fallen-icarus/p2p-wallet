@@ -370,7 +370,7 @@ instance FromJSON PV1.Address where
     stakeScript <- fmap PV1.ScriptCredential <$> o .:? "stake_script_hash"
 
     paymentCred <- maybe mzero return $ paymentKey <|> paymentScript
-    mStakeCred <- return $ maybe Nothing (Just . PV1.StakingHash) $ stakeKey <|> stakeScript
+    let mStakeCred = fmap PV1.StakingHash $ stakeKey <|> stakeScript
 
     return $ PV1.Address paymentCred mStakeCred
 
