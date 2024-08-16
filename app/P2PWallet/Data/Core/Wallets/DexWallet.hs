@@ -9,8 +9,7 @@ module P2PWallet.Data.Core.Wallets.DexWallet where
 import Data.Aeson
 import Data.Aeson.Types (parseMaybe)
 
-import Database.SQLite.Simple (field,ToRow(..),FromRow(..))
-import Database.SQLite.Simple.ToField (toField)
+import Database.SQLite.Simple (ToRow,FromRow)
 
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Transaction
@@ -156,45 +155,27 @@ swapUTxOPrice (OfferAsset offerAsset) (AskAsset askAsset) SwapUTxO{swapDatum} = 
 -- | Get the offer asset if it is a one-way swap.
 swapUTxOOfferAsset :: SwapUTxO -> Maybe NativeAsset
 swapUTxOOfferAsset SwapUTxO{swapDatum} = case swapDatum of
-  Just (OneWayDatum OneWay.SwapDatum{offerId,offerName}) -> Just NativeAsset
-    { policyId = offerId
-    , tokenName = offerName
-    , fingerprint = mkAssetFingerprint offerId offerName
-    , quantity = 0
-    }
+  Just (OneWayDatum OneWay.SwapDatum{offerId,offerName}) -> Just $ mkNativeAsset offerId offerName
   _ -> Nothing
   
 -- | Get the ask asset if it is a one-way swap.
 swapUTxOAskAsset :: SwapUTxO -> Maybe NativeAsset
 swapUTxOAskAsset SwapUTxO{swapDatum} = case swapDatum of
-  Just (OneWayDatum OneWay.SwapDatum{askId,askName}) -> Just NativeAsset
-    { policyId = askId
-    , tokenName = askName
-    , fingerprint = mkAssetFingerprint askId askName
-    , quantity = 0
-    }
+  Just (OneWayDatum OneWay.SwapDatum{askId,askName}) -> Just $ mkNativeAsset askId askName
   _ -> Nothing
   
 -- | Get the asset1 if it is a two-way swap.
 swapUTxOAsset1 :: SwapUTxO -> Maybe NativeAsset
 swapUTxOAsset1 SwapUTxO{swapDatum} = case swapDatum of
-  Just (TwoWayDatum TwoWay.SwapDatum{asset1Id,asset1Name}) -> Just NativeAsset
-    { policyId = asset1Id
-    , tokenName = asset1Name
-    , fingerprint = mkAssetFingerprint asset1Id asset1Name
-    , quantity = 0
-    }
+  Just (TwoWayDatum TwoWay.SwapDatum{asset1Id,asset1Name}) -> 
+    Just $ mkNativeAsset asset1Id asset1Name
   _ -> Nothing
   
 -- | Get the asset2 if it is a two-way swap.
 swapUTxOAsset2 :: SwapUTxO -> Maybe NativeAsset
 swapUTxOAsset2 SwapUTxO{swapDatum} = case swapDatum of
-  Just (TwoWayDatum TwoWay.SwapDatum{asset2Id,asset2Name}) -> Just NativeAsset
-    { policyId = asset2Id
-    , tokenName = asset2Name
-    , fingerprint = mkAssetFingerprint asset2Id asset2Name
-    , quantity = 0
-    }
+  Just (TwoWayDatum TwoWay.SwapDatum{asset2Id,asset2Name}) -> 
+    Just $ mkNativeAsset asset2Id asset2Name
   _ -> Nothing
 
 swapIsFullyConverted :: SwapUTxO -> Bool
@@ -220,12 +201,11 @@ swapIsFullyConverted u = flip any offerSample $ \x@NativeAsset{policyId} ->
 data DexWallet = DexWallet
   { network :: Network
   , profileId :: ProfileId
-  -- | The payment id used for the dex wallet. The payment id is used as the row id for multiple
-  -- tables.
-  , paymentId :: PaymentId
+  -- | The wallet id used for the dex wallet. 
+  , dexWalletId :: DexWalletId
   -- | The stake id for the stake credential used.
-  , stakeId :: StakeId
-  -- | Alias for the stake credential. This will also be used as the alias for this swap wallet.
+  , stakeWalletId :: StakeWalletId
+  -- | Alias for the stake credential. This will also be used as the alias for this dex wallet.
   , alias :: Text
   , oneWaySwapAddress :: PaymentAddress
   , twoWaySwapAddress :: PaymentAddress
@@ -234,20 +214,20 @@ data DexWallet = DexWallet
   , utxos :: [SwapUTxO]
   , lovelace :: Lovelace
   , nativeAssets :: [NativeAsset]
-  , transactions :: [Transaction] -- These are stored separately.
-  } deriving (Show,Eq)
+  , transactions :: [Transaction]
+  } deriving (Show,Eq,Generic,FromRow,ToRow)
 
 makeFieldLabelsNoPrefix ''DexWallet
 
 instance Ord DexWallet where
-  p1 <= p2 = p1 ^. #paymentId <= p2 ^. #paymentId
+  p1 <= p2 = p1 ^. #dexWalletId <= p2 ^. #dexWalletId
 
 instance Default DexWallet where
   def = DexWallet
     { network = def
     , profileId = 0
-    , paymentId = 0
-    , stakeId = 0
+    , dexWalletId = 0
+    , stakeWalletId = 0
     , alias = "dummy" 
     , oneWaySwapAddress = "" 
     , twoWaySwapAddress = "" 
@@ -259,52 +239,6 @@ instance Default DexWallet where
     , transactions = []
     }
 
-instance FromRow DexWallet where
-  fromRow = do
-    network <- field
-    profileId <- field
-    paymentId <- field
-    stakeId <- field
-    alias <- field
-    oneWaySwapAddress <- field
-    twoWaySwapAddress <- field
-    stakeAddress <- field
-    stakeKeyDerivation <- field
-    utxos <- fromMaybe mzero . decode <$> field
-    lovelace <- field
-    nativeAssets <- fromMaybe mzero . decode <$> field
-    return $ DexWallet
-      { network = network
-      , profileId = profileId
-      , paymentId = paymentId
-      , stakeId = stakeId
-      , alias = alias
-      , oneWaySwapAddress = oneWaySwapAddress
-      , twoWaySwapAddress = twoWaySwapAddress
-      , stakeAddress = stakeAddress
-      , stakeKeyDerivation = stakeKeyDerivation
-      , utxos = utxos
-      , lovelace = lovelace
-      , nativeAssets = nativeAssets
-      , transactions = []
-      }
-
-instance ToRow DexWallet where
-  toRow DexWallet{..} =
-    [ toField network
-    , toField profileId
-    , toField paymentId
-    , toField stakeId
-    , toField alias
-    , toField oneWaySwapAddress
-    , toField twoWaySwapAddress
-    , toField stakeAddress
-    , toField stakeKeyDerivation
-    , toField $ encode utxos
-    , toField lovelace
-    , toField $ encode nativeAssets
-    ]
-
 instance TableName DexWallet where
   tableName = "dex_wallets"
 
@@ -315,8 +249,8 @@ instance Creatable DexWallet where
     , unwords $ intersperse ","
         [ "network TEXT NOT NULL"
         , "profile_id INTEGER REFERENCES profiles (profile_id)"
-        , "payment_id INTEGER PRIMARY KEY"
-        , "stake_id INTEGER REFERENCES stake_wallets (stake_id)"
+        , "dex_wallet_id INTEGER PRIMARY KEY"
+        , "stake_wallet_id INTEGER REFERENCES stake_wallets (stake_wallet_id)"
         , "alias TEXT NOT NULL"
         , "one_way_swap_address TEXT NOT NULL"
         , "two_way_swap_address TEXT NOT NULL"
@@ -325,7 +259,8 @@ instance Creatable DexWallet where
         , "utxos BLOB"
         , "lovelace INTEGER NOT NULL"
         , "native_assets BLOB"
-        , "UNIQUE(network,profile_id,payment_id,alias)"
+        , "transactions BLOB"
+        , "UNIQUE(network,profile_id,dex_wallet_id,alias)"
         ]
     , ");"
     ]
@@ -337,8 +272,8 @@ instance Insertable DexWallet where
     , unwords $ intersperse ","
         [ "network"
         , "profile_id"
-        , "payment_id"
-        , "stake_id"
+        , "dex_wallet_id"
+        , "stake_wallet_id"
         , "alias"
         , "one_way_swap_address"
         , "two_way_swap_address"
@@ -347,9 +282,10 @@ instance Insertable DexWallet where
         , "utxos"
         , "lovelace"
         , "native_assets"
+        , "transactions"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 instance Notify DexWallet where

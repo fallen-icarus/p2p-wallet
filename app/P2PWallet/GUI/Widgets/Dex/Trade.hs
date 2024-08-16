@@ -21,7 +21,7 @@ import P2PWallet.Prelude
 tradeWidget :: AppModel -> AppNode
 tradeWidget model@AppModel{dexModel=DexModel{..}} = do
     zstack 
-      [ getTradingPairWidget 
+      [ getTradingPairWidget model
           `nodeVisible` (isNothing selectedTradingPair || choosingTradingPair)
       , mainWidget model
           `nodeVisible` (isJust selectedTradingPair && not choosingTradingPair)
@@ -164,10 +164,11 @@ orderBookWidget AppModel{dexModel=DexModel{..}, reverseTickerMap} = do
         [ box_ [alignMiddle] $ 
             label "No open asks. Be the first!"
               `styleBasic` [textSize 12, textFont "Italics"]
-        , spacer_ [width 5]
-        , widgetIf (askAsset ^. #policyId == "") $ box_ [alignMiddle] $
-            label "Swaps selling ada must contain at least 5 ADA to appear in the order book."
-              `styleBasic` [textSize 8, textFont "Italics", textColor customRed]
+        , widgetIf (askAsset ^. #policyId == "") $ box_ [alignMiddle] $ vstack
+            [ spacer_ [width 5]
+            , label "Swaps selling ada must contain at least 5 ADA to appear in the order book."
+                `styleBasic` [textSize 8, textFont "Italics", textColor customRed]
+            ]
         ]
       
     buySide :: AppNode
@@ -656,8 +657,8 @@ createLiquiditySwapWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
             [textSize 10]
     ]
 
-getTradingPairWidget :: AppNode
-getTradingPairWidget = do
+getTradingPairWidget :: AppModel -> AppNode
+getTradingPairWidget model = do
   centerWidget $ vstack
     [ centerWidgetH $ label "Which trading pair would you like to lookup?"
     , spacer_ [width 20]
@@ -702,7 +703,8 @@ getTradingPairWidget = do
     , spacer
     , hstack 
         [ filler
-        , button "Cancel" $ DexEvent $ SetNewTradingPair CancelAdding
+        , button "Cancel" (DexEvent $ SetNewTradingPair CancelAdding)
+            `nodeVisible` isJust (model ^. #dexModel % #selectedTradingPair)
         , spacer
         , mainButton "Confirm" $ DexEvent $ SetNewTradingPair ConfirmAdding
         ]

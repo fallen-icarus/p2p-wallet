@@ -69,11 +69,11 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
               newWallet = delegationModel ^. #newStakeWallet
 
           -- Get the new stake id for the new entry into the stake_wallet table.
-          stakeId <- getNextStakeId databaseFile >>= fromRightOrAppError
+          stakeWalletId <- getNextStakeWalletId databaseFile >>= fromRightOrAppError
           
           -- Validate the new stake wallet info, and export the required key.
           verifiedStakeWallet <- 
-            pairStakeWallet network profile stakeId newWallet $ knownWallets ^. #stakeWallets
+            pairStakeWallet network profile stakeWalletId newWallet $ knownWallets ^. #stakeWallets
 
           -- Add the new stake wallet to the database.
           insertStakeWallet databaseFile verifiedStakeWallet >>= fromRightOrAppError
@@ -115,11 +115,11 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
               newWallet = delegationModel ^. #newStakeWallet
 
           -- Get the new stake id for the new entry into the stake_wallet table.
-          stakeId <- getNextStakeId databaseFile >>= fromRightOrAppError
+          stakeWalletId <- getNextStakeWalletId databaseFile >>= fromRightOrAppError
           
           -- Validate the new wallet info.
           verifiedStakeWallet <- 
-            watchStakeWallet network profile stakeId newWallet $ knownWallets ^. #stakeWallets
+            watchStakeWallet network profile stakeWalletId newWallet $ knownWallets ^. #stakeWallets
 
           -- Add the new wallet to the database.
           insertStakeWallet databaseFile verifiedStakeWallet >>= fromRightOrAppError
@@ -156,11 +156,11 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
       -- The state is deliberately not updated in case there is an error with any of these steps.
       -- The state will be updated after everything has successfully executed.
       [ Task $ runActionOrAlert (DelegationEvent . ChangeStakeWalletName . AddResult) $ do
-          let currentWallet@StakeWallet{stakeId} = delegationModel ^. #selectedWallet
+          let currentWallet@StakeWallet{stakeWalletId} = delegationModel ^. #selectedWallet
               newAlias = model ^. #delegationModel % #newAliasField
               newWallet = currentWallet & #alias .~ newAlias
               -- Filter out the selected wallet from the list of known wallets.
-              otherWallets = filter (\p -> stakeId /= p ^. #stakeId) $
+              otherWallets = filter (\p -> stakeWalletId /= p ^. #stakeWalletId) $
                 knownWallets ^. #stakeWallets
 
           when (newAlias == "") $ throwIO $ AppError "New name is empty."
@@ -172,13 +172,13 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           insertStakeWallet databaseFile newWallet >>= fromRightOrAppError
 
           -- Overwrite the current aliases for all DeFi wallets using this stake credential.
-          changeDeFiWalletAliases databaseFile stakeId newAlias >>= fromRightOrAppError
+          changeDeFiWalletAliases databaseFile stakeWalletId newAlias >>= fromRightOrAppError
 
           return newWallet
       ] 
-    AddResult newWallet@StakeWallet{alias,stakeId} ->
+    AddResult newWallet@StakeWallet{alias,stakeWalletId} ->
       [ Model $ model 
-          & #knownWallets %~ updateStakeIdAliases stakeId alias
+          & #knownWallets %~ updateStakeIdAliases stakeWalletId alias
           & #delegationModel % #editingWallet .~ False
           -- update all selected wallets so the new aliases take effect.
           & configureSelectedDeFiWallets
@@ -205,14 +205,14 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
       -- Delete the wallet from the database.
       [ Task $ runActionOrAlert (const $ DelegationEvent $ DeleteStakeWallet PostDeletionAction) $ do
           -- Get the stake id for the stake wallet to delete.
-          let currentId = delegationModel ^. #selectedWallet % #stakeId
+          let currentId = delegationModel ^. #selectedWallet % #stakeWalletId
 
           -- Delete the stake wallet.
           deleteStakeWallet databaseFile currentId >>= fromRightOrAppError
       ]
     PostDeletionAction ->
       -- Delete the wallet from the cache.
-      let currentId = delegationModel ^. #selectedWallet % #stakeId
+      let currentId = delegationModel ^. #selectedWallet % #stakeWalletId
       in [ Model $ model 
             & #delegationModel % #deletingWallet .~ False
             & #knownWallets %~ deleteStakeIdWallets currentId

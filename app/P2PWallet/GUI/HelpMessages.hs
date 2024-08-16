@@ -290,6 +290,7 @@ activeLinkedAddressesMsg :: Text
 activeLinkedAddressesMsg = unlines
   [ unwords
       [ "Payment addresses with non-zero balances that are using this staking credential."
+      , "This includes any DeFi addresses using this staking credential."
       ]
   ]
 
@@ -647,4 +648,246 @@ filePathMsg = unlines
   , "1. %APPDATA%\\Documents\\tx.signed"
   , "2. %HOMEPATH%\\tx.signed"
   , "3. ~\\Documents\\tx.signed"
+  ]
+
+askCollateralMsg :: Text
+askCollateralMsg = unlines
+  [ unwords
+      [ "Which assets are you willing to use for collateral? Not all assets you list here must be"
+      , "used when you actually accept an offer."
+      ]
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  , ""
+  , "The Ask UTxO must be stored with at least one unit of each asset you list here."
+  ]
+
+askLoanAmountMsg :: Text
+askLoanAmountMsg = unlines
+  [ "Which asset, and how, much are you looking to borrow?"
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. '# policy_id.asset_name'"
+  , "2. '# ticker' - if in Ticker Registry"
+  , "3. '# ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+askDurationMsg :: Text
+askDurationMsg = unlines
+  [ unwords
+      [ "How long would you like the loan to last for? This must be specified as a number of days."
+      , "The total time will be 86400000 milliseconds * number of days."
+      ]
+  ]
+
+askCfgLoanAmountMsg :: Text
+askCfgLoanAmountMsg = unlines
+  [ "Which asset are you interested in for the loan asset?"
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+askCfgMinDurationMsg :: Text
+askCfgMinDurationMsg = unlines
+  [ "What is the minimum loan duration (in whole number of days) you are interested in?"
+  ]
+
+askCfgMaxDurationMsg :: Text
+askCfgMaxDurationMsg = unlines
+  [ "What is the maximum loan duration (in whole number of days) you are interested in?"
+  ]
+
+askCfgCollateralMsg :: Text
+askCfgCollateralMsg = unlines
+  [ "Which assets are you interested in being used as collateral?"
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  , ""
+  , unwords
+      [ "Only the loan requests offering to using ALL of the specified collaterall assets will"
+      , "be shown."
+      ]
+  ]
+
+openAsksSortMsg :: Text
+openAsksSortMsg = unlines
+  [ "Open asks can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Chronologically based on the time the UTxO was created"
+  , "3. Based on the loan amount"
+  , "4. Based on the duration of the requested loan"
+  ]
+
+offerBorrowerIdMsg :: Text
+offerBorrowerIdMsg = unwords
+  [ "The borrower id is the borrower's staking credential. The credit history for this borrower is"
+  , "tied to this identifier."
+  ]
+
+offerLoanAmountMsg :: Text
+offerLoanAmountMsg = unwords
+  [ "The amount to be loaned out."
+  ]
+
+offerPaymentAddressMsg :: Text
+offerPaymentAddressMsg = unlines
+  [ "The address the borrower will make loan payments to."
+  , ""
+  , unwords
+      [ "When the offer is accepted, the borrower will deposit the Key NFT for the new loan to"
+      , "this address. This Key NFT can be used to update the payment address during the loan,"
+      , "and it can be freely traded on a secondary market."
+      ]
+  ]
+
+offerInterestMsg :: Text
+offerInterestMsg = unlines
+  [ "The interest that will be applied at the end of each compound period."
+  , ""
+  , "The first interest application is applied immediately upon accepting the offer."
+  , ""
+  , "To offer a non-compounding interest loan, leave the compound frequency field blank."
+  ]
+
+
+offerCompoundFrequencyMsg :: Text
+offerCompoundFrequencyMsg = unlines
+  [ unwords
+      [ "How often the interest will be applied, and how long the borrower has to satisfy the"
+      , "minimum payment requirement."
+      ]
+  , ""
+  , "It must be specified in # of days. Leave the field blank to not set a compounding frequency."
+  , ""
+  , unwords
+      [ "If you do not set a compounding period, you will not be able to set a minimum payment and"
+      , "penalty."
+      ]
+  ]
+
+offerMinimumPaymentMsg :: Text
+offerMinimumPaymentMsg = unlines
+  [ unwords
+      [ "How much the borrower must pay back each compounding period. This is similar to the"
+      , "required monthly payment of TradFi loans."
+      ]
+  , ""
+  , "It must be in units of the loan asset."
+  ]
+
+offerPenaltyMsg :: Text
+offerPenaltyMsg = unlines
+  [ "Penalties can only be set when there is a required minimum payment greater than 0."
+  , ""
+  , unwords
+      [ "The penalty is used to incentivize the borrower to make regular loan payments."
+      , "There are three possible penalties:"
+      ]
+  , "1. No Penalty"
+  , unwords
+      [ "2. Fixed Fee Penalty - the outstanding loan balance will increase by a fixed amount every time"
+      , "the minimum payment is not met in a given compounding period."
+      ]
+  , unwords
+      [ "3. Percent Penalty - the outstanding loan balance will increase by a percentage every time"
+      , "the minimum payment is not met in a given compounding period."
+      ]
+  ]
+
+offerCollateralIsSwappableMsg :: Text
+offerCollateralIsSwappableMsg = unlines
+  [ "Whether the borrower can swap out collateral for other approved collateral during the loan."
+  , ""
+  , unwords
+      [ "For example, if the loan allows for ADA and AGIX to be used as collateral, but the loan"
+      , "is currently only backed by ADA, the borrower can withdraw some ADA during a loan payment"
+      , "as long as they also deposit enough AGIX so that the relative value of the collateral"
+      , "matches the required amount."
+      ]
+  , ""
+  , unwords
+      [ "The borrower cannot do this without consent from you (the lender). This option can be used"
+      , "to make your offer more competitive than offers from other lenders. This setting cannot be"
+      , "changed during the loan."
+      ]
+  ]
+
+offerClaimPeriodMsg :: Text
+offerClaimPeriodMsg = unlines
+  [ "How long do you need to claim the collateral after the borrower defaults?"
+  , ""
+  , unwords
+      [ "In order to prevent permanently locked collateral, the DApp will consider the collateral"
+      , "\"Lost\" after the specified amount of time has passed. After which, the borrower can"
+      , "reclaim the collateral themselves (this will still count as a default)."
+      ]
+  , ""
+  , "The time must be specified in number of days."
+  ]
+
+offerLoanTermMsg :: Text
+offerLoanTermMsg = unlines
+  [ "How long will the loan be active for?"
+  , ""
+  , unwords
+      [ "You can create an offer for a different duration than what the borrower asked for."
+      , "This can be considered a counter-offer and is a natural part of negotiations."
+      ]
+  , ""
+  , "The time must be specified in number of days."
+  ]
+
+offerExpirationMsg :: Text
+offerExpirationMsg = unlines
+  [ "How long do you want this offer to be valid for?"
+  , ""
+  , unwords
+      [ "Once the specified amount of time has passed, the borrower will not be able to accept"
+      , "the offer."
+      ]
+  , ""
+  , "You can leave this field blank to not set an expiration."
+  ]
+
+offerCollateralMsg :: Text
+offerCollateralMsg = unlines
+  [ "What are the relative values of each collateral asset?"
+  , ""
+  , unwords
+      [ "The pairings must be separated with newlines and each pairing must be in the"
+      , "format of 'collateral, price'. The prices must be in units of:"
+      ]
+  , "collateral_asset / loan_asset"
+  , ""
+  , unwords
+      [ "The DApp will use these prices to determine if the borrower has put up enough collateral"
+      , "for the loan. If you do not want a particular asset used as collateral, you can either"
+      , "remove the asset from the list or set the price to 0. You can also add an alternative"
+      , "collateral asset as a suggestion to the borrower; the borrower can choose whether to"
+      , "use the new collateral asset instead of their own suggestions."
+      ]
+  , ""
+  , unwords
+      [ "These prices cannot be changed during the loan!!! If you think the value of the collateral"
+      , "will change during the life of the loan, make sure to have your prices reflect this"
+      , "possiblity! If the loan ever becomes under-collateralized, this is your fault! The borrower"
+      , "will not be required to put up more collateral after the fact."
+      ]
   ]

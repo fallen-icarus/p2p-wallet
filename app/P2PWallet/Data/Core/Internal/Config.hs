@@ -23,6 +23,8 @@ data Config = Config
   , timeZone :: TimeZone
   -- | The current date.
   , currentDay :: Day
+  -- | The current time.
+  , currentTime :: POSIXTime
   } deriving (Show,Eq)
 
 instance Default Config where
@@ -30,6 +32,7 @@ instance Default Config where
     { network = def
     , timeZone = utc
     , currentDay = def
+    , currentTime = 0
     }
 
 makeFieldLabelsNoPrefix ''Config

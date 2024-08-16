@@ -17,6 +17,7 @@ module P2PWallet.Data.AppModel
     -- * Helper Functions
   , configureSelectedDeFiWallets
   , swapBuilderEvent
+  , loanBuilderEvent
 
     -- * Re-exports
   , module P2PWallet.Data.AppModel.AddressBookModel
@@ -24,6 +25,7 @@ module P2PWallet.Data.AppModel
   , module P2PWallet.Data.AppModel.DelegationModel
   , module P2PWallet.Data.AppModel.DexModel
   , module P2PWallet.Data.AppModel.HomeModel
+  , module P2PWallet.Data.AppModel.LendingModel
   , module P2PWallet.Data.AppModel.ProfileModel
   , module P2PWallet.Data.AppModel.TickerRegistryModel
   , module P2PWallet.Data.AppModel.TxBuilderModel
@@ -36,6 +38,7 @@ import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.DelegationModel
 import P2PWallet.Data.AppModel.DexModel
 import P2PWallet.Data.AppModel.HomeModel
+import P2PWallet.Data.AppModel.LendingModel
 import P2PWallet.Data.AppModel.ProfileModel
 import P2PWallet.Data.AppModel.TickerRegistryModel
 import P2PWallet.Data.AppModel.TxBuilderModel
@@ -64,7 +67,7 @@ data MainScene
   | SettingsScene
   | DexScene
   | NotificationsScene
-  | LoansScene
+  | LendingScene
   | OptionsScene
   | AftermarketScene
   deriving (Show,Eq)
@@ -83,6 +86,8 @@ data WaitingStatus = WaitingStatus
   , syncingPools :: Bool
   -- | The app is syncing the order-book for the selected trading pair.
   , syncingOrderBook :: Bool
+  -- | The app is syncing the loan asks for the selected ask configuration.
+  , syncingLoanAsks :: Bool
   -- | The app is building the transaction.
   , building :: Bool
   -- | The app is loading the profile.
@@ -102,6 +107,7 @@ instance Default WaitingStatus where
     , syncingWallets = False
     , syncingPools = False
     , syncingOrderBook = False
+    , syncingLoanAsks = False
     , building = False
     , loadingProfile = False
     , submitting = False
@@ -132,7 +138,7 @@ data AppEvent
   -- building transactions.
   | SyncWallets (ProcessEvent (Wallets, (ByteString,Decimal) ,[Notification]))
   -- | Update the current date.
-  | UpdateCurrentDate (ProcessEvent Day)
+  | UpdateCurrentDate (ProcessEvent (Day, POSIXTime))
   -- | An event for the Home page.
   | HomeEvent HomeEvent 
   -- | An event for the Delegation page.
@@ -143,6 +149,8 @@ data AppEvent
   | TickerRegistryEvent TickerRegistryEvent 
   -- | An event for the Dex page.
   | DexEvent DexEvent 
+  -- | An event for the Loans page.
+  | LendingEvent LendingEvent 
   -- | An event for the Tx Builder page.
   | TxBuilderEvent TxBuilderEvent 
   -- | Submit a signed transaction.
@@ -185,6 +193,8 @@ data AppModel = AppModel
   , tickerRegistryModel :: TickerRegistryModel
   -- | The dex model.
   , dexModel :: DexModel
+  -- | The lending model.
+  , lendingModel :: LendingModel
   -- | The model for the tx builder scene.
   , txBuilderModel :: TxBuilderModel
   -- | The address book for this profile.
@@ -219,6 +229,7 @@ instance Default AppModel where
     , addressBookModel = def
     , tickerRegistryModel = def
     , dexModel = def
+    , lendingModel = def
     , txBuilderModel = def
     , addressBook = []
     , tickerMap = mempty
@@ -243,7 +254,12 @@ configureSelectedDeFiWallets model@AppModel{..} =
   model 
     & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #stakeWallets)
     & #dexModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #dexWallets)
+    & #lendingModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #loanWallets)
 
 -- | This is a useful alias for conciseness.
 swapBuilderEvent :: SwapBuilderEvent -> AppEvent
 swapBuilderEvent = TxBuilderEvent . SwapBuilderEvent
+
+-- | This is a useful alias for conciseness.
+loanBuilderEvent :: LoanBuilderEvent -> AppEvent
+loanBuilderEvent = TxBuilderEvent . LoanBuilderEvent

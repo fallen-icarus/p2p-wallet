@@ -554,19 +554,19 @@ matchesUTxO DexWallet{..} reverseTickerMap DexTxFilterModel{..} TransactionUTxO{
 
     offerSample = catMaybes
       [ inlineDatum >>= decodeData @OneWay.SwapDatum >>= \OneWay.SwapDatum{..} ->
-          return $ NativeAsset offerId offerName (mkAssetFingerprint offerId offerName) 0
+          return $ mkNativeAsset offerId offerName 
       , inlineDatum >>= decodeData @TwoWay.SwapDatum >>= \TwoWay.SwapDatum{..} ->
-          return $ NativeAsset asset1Id asset1Name (mkAssetFingerprint asset1Id asset1Name) 0
+          return $ mkNativeAsset asset1Id asset1Name
       , inlineDatum >>= decodeData @TwoWay.SwapDatum >>= \TwoWay.SwapDatum{..} ->
-          return $ NativeAsset asset2Id asset2Name (mkAssetFingerprint asset2Id asset2Name) 0
+          return $ mkNativeAsset asset2Id asset2Name
       ]
     askSample = catMaybes
       [ inlineDatum >>= decodeData @OneWay.SwapDatum >>= \OneWay.SwapDatum{..} ->
-          return $ NativeAsset askId askName (mkAssetFingerprint askId askName) 0
+          return $ mkNativeAsset askId askName
       , inlineDatum >>= decodeData @TwoWay.SwapDatum >>= \TwoWay.SwapDatum{..} ->
-          return $ NativeAsset asset1Id asset1Name (mkAssetFingerprint asset1Id asset1Name) 0
+          return $ mkNativeAsset asset1Id asset1Name
       , inlineDatum >>= decodeData @TwoWay.SwapDatum >>= \TwoWay.SwapDatum{..} ->
-          return $ NativeAsset asset2Id asset2Name (mkAssetFingerprint asset2Id asset2Name) 0
+          return $ mkNativeAsset asset2Id asset2Name
       ]
 
 applySearchFilter 

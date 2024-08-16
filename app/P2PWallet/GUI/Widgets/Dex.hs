@@ -59,7 +59,7 @@ dexWidget model@AppModel{..} = do
     isDeleting :: Bool
     isDeleting = dexModel ^. #deletingWallet
 
--- The main widget that should only be shown if there are currently tracked swap wallets
+-- The main widget that should only be shown if there are currently tracked dex wallets
 -- AND no details need to be shown.
 mainWidget :: AppModel -> AppNode
 mainWidget model@AppModel{scene=_,..} =
@@ -233,7 +233,7 @@ addFirstWalletWidget =
         ]
     ]
 
--- A notice that stake wallets must be added before swap wallets.
+-- A notice that stake wallets must be added before dex wallets.
 requiresFirstStakeWallet :: AppNode
 requiresFirstStakeWallet =
   centerWidget $ vstack
@@ -256,10 +256,10 @@ addDexWalletWidget AppModel{knownWallets,dexModel} = do
       innerFocusedStyle = 
         def `styleFocus` [textSize 12, bgColor customGray3, border 1 customBlue]
             `styleFocusHover` [textSize 12, bgColor customGray2, border 1 customBlue]
-      maybeLens' = maybeLens def (#dexModel % #newSwapCredential)
-      newSwapCredential = dexModel ^. #newSwapCredential
-      currentDexWalletIds = map (view #stakeId) $ knownWallets ^. #dexWallets
-      availWallets = filter ((`notElem` currentDexWalletIds) . view #stakeId) $ 
+      maybeLens' = maybeLens def (#dexModel % #targetStakeCredential)
+      targetStakeCredential = dexModel ^. #targetStakeCredential
+      currentDexWalletIds = map (view #stakeWalletId) $ knownWallets ^. #dexWallets
+      availWallets = filter ((`notElem` currentDexWalletIds) . view #stakeWalletId) $ 
         knownWallets ^. #stakeWallets
       editFields = 
         vstack_ [childSpacing]
@@ -288,7 +288,7 @@ addDexWalletWidget AppModel{knownWallets,dexModel} = do
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
               ]
           , separatorLine `styleBasic` [paddingL 50, paddingR 50]
-          , widgetMaybe newSwapCredential $ \StakeWallet{stakeAddress,stakeKeyDerivation} -> 
+          , widgetMaybe targetStakeCredential $ \StakeWallet{stakeAddress,stakeKeyDerivation} -> 
               vstack
                 [ spacer
                 , hstack
@@ -310,10 +310,10 @@ addDexWalletWidget AppModel{knownWallets,dexModel} = do
           ]
 
   centerWidget $ vstack 
-    [ widgetIf (isJust newSwapCredential) editFields
-    -- This should only appear when there are tracked swap wallets but no stake wallets; all of the
+    [ widgetIf (isJust targetStakeCredential) editFields
+    -- This should only appear when there are tracked dex wallets but no stake wallets; all of the
     -- stake wallets would have been deleted.
-    , widgetIf (isNothing newSwapCredential) $ centerWidgetH $ 
+    , widgetIf (isNothing targetStakeCredential) $ centerWidgetH $ 
         label
           "You must first add the staking credential you wish to use from the `Staking` page."
           `styleBasic` [textSize 14]
@@ -323,7 +323,7 @@ addDexWalletWidget AppModel{knownWallets,dexModel} = do
         , button "Cancel" $ DexEvent $ AddNewDexWallet CancelAdding
         , spacer
         , mainButton "Confirm" (DexEvent $ AddNewDexWallet ConfirmAdding)
-            `nodeEnabled` isJust newSwapCredential
+            `nodeEnabled` isJust targetStakeCredential
         ]
     ] `styleBasic` [bgColor customGray3, padding 20]
 

@@ -14,7 +14,7 @@ import P2PWallet.Prelude
 
 -- | Witness a transaction using the hardware wallet. Witnesssing assumes the same hardware wallet
 -- seed phrase manages all relevant keys for the transaction. It returns the filepath to the new
--- witness files.
+-- witness files. The tx.body file is assumed to have been already transformed.
 witnessTxBody :: Network -> TxBuilderModel -> IO [KeyWitnessFile]
 witnessTxBody network TxBuilderModel{keyWitnesses,isBuilt} = do
   -- The transaction must be built.
@@ -22,16 +22,10 @@ witnessTxBody network TxBuilderModel{keyWitnesses,isBuilt} = do
 
   -- Get the absolute filepaths.
   tmpDir <- getTemporaryDirectory
-  let txBodyFile = TxBodyFile $ tmpDir </> "tx" <.> "body"
-      transformedTxFile = TransformedTxFile $ tmpDir </> "tx" <.> "transformed"
+  let transformedTxFile = TransformedTxFile $ tmpDir </> "tx" <.> "body"
 
   -- All key witnesses must use the same derivation type.
   let mDerType = maybeHead keyWitnesses >>= (snd . unKeyWitness >=> fst)
-
-  -- Convert the tx.body file to the proper CBOR format for using the hardware wallet.
-  -- This step may not be necessary anymore but it is still part of the cardano-hw-cli
-  -- documentation.
-  runCmd_ $ transformTxBodyCmd txBodyFile transformedTxFile
 
   -- Export all required pubkeys. Return the file names used for the hwsKeyFile. The file names
   -- will be prefixed by the respective key hashes. Skip witnesses for unknown derivation paths
@@ -47,13 +41,6 @@ witnessTxBody network TxBuilderModel{keyWitnesses,isBuilt} = do
 
   -- Return the filepaths for the new witness files.
   return witnessFiles
-
--- | The command to convert the transaction to the proper cbor format.
-transformTxBodyCmd :: TxBodyFile -> TransformedTxFile -> String
-transformTxBodyCmd txBodyFile transformedTxFile = 
-    printf cmdTemplate (toString txBodyFile) (toString transformedTxFile)
-  where
-    cmdTemplate = "cardano-hw-cli transaction transform --tx-file %s --out-file %s" 
 
 -- | The command to witness a transaction using the hardware wallet. It can be used to witness for
 -- multiple hardware wallet keys as long as all keys are for the same `account_index` and derivation

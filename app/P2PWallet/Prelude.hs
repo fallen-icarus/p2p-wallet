@@ -17,6 +17,8 @@ module P2PWallet.Prelude
   , getCurrentDay
   , Time.addDays
   , timeStampToFilePath
+  , calcDaysInPosixPeriod
+  , convertDaysToPosixPeriod
 
     -- * Defaults
   , Default.Default(..)
@@ -58,6 +60,7 @@ module P2PWallet.Prelude
   , Display(..)
 
     -- * Other useful re-exports
+  , is
   , module Relude
   , module Optics
   , Printf.printf
@@ -73,12 +76,14 @@ import Data.Time qualified as Time
 import Data.Time.Clock.POSIX qualified as Time
 import Data.Default qualified as Default
 import Data.Decimal (Decimal,realFracToDecimal)
+import Data.ByteString.Lazy qualified as LBS
 import Text.Printf qualified as Printf
 import Data.Aeson.Encoding qualified as Aeson
 import Data.Aeson qualified as Aeson
 import Monomer.Core.FromFractional(FromFractional(..))
 import Control.Exception (throwIO,catch,handle)
 import Optics
+import Optics.Core.Extras
 import Database.SQLite.Simple (SQLData(SQLText))
 import Database.SQLite.Simple.FromField (FromField(..), returnError, ResultError(ConversionFailed))
 import Database.SQLite.Simple.ToField (ToField(..))
@@ -197,6 +202,15 @@ timeStampToFilePath zone t = Time.formatTime Time.defaultTimeLocale formatter lo
     localTime = Time.utcToLocalTime zone t
     formatter = "%b-%d-%0Y-%H-%M-%S"
 
+calcDaysInPosixPeriod :: Time.POSIXTime -> Integer
+calcDaysInPosixPeriod = (`div` secondsPerDay) . round
+
+convertDaysToPosixPeriod :: Integer -> Time.POSIXTime
+convertDaysToPosixPeriod = fromInteger . (* secondsPerDay)
+
+secondsPerDay :: Integer
+secondsPerDay = 86_400
+
 -------------------------------------------------
 -- Lens Helpers
 -------------------------------------------------
@@ -242,6 +256,14 @@ class Display a where
 -------------------------------------------------
 -- Orphans
 -------------------------------------------------
+-- Lists are stored as JSON Blobs in the database.
+instance (Aeson.ToJSON a) => ToField [a] where
+  toField = toField . Aeson.encode
+
+-- Lists are stored as JSON Blobs in the database.
+instance (Aeson.FromJSON a) => FromField [a] where
+  fromField = fmap (fromMaybe mzero . Aeson.decode @[a]) . fromField @LBS.ByteString
+
 instance FromFractional Decimal where
   fromFractional = realToFrac
 

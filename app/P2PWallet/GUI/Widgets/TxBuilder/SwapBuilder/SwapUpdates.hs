@@ -59,7 +59,7 @@ swapUpdatesList reverseTickerMap = map utxoRow
                 , let prettyRef = display (oldSwap ^. #utxoRef) in
                   flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
                     box_ [alignMiddle, onClick $ CopyText prettyRef] $
-                      label idCardIcon
+                      label targetUTxOIcon
                         `styleBasic` 
                           [ bgColor black
                           , textMiddle
@@ -157,7 +157,7 @@ swapUpdatesList reverseTickerMap = map utxoRow
                 , let prettyRef = display (oldSwap ^. #utxoRef) in
                   flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
                     box_ [alignMiddle, onClick $ CopyText prettyRef] $
-                      label idCardIcon
+                      label targetUTxOIcon
                         `styleBasic` 
                           [ bgColor black
                           , textMiddle

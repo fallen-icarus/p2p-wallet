@@ -48,7 +48,7 @@ data DexEvent
   = ChangeDexScene DexScene
   -- | Add a new dex wallet using one of the known staking credentials.
   | AddNewDexWallet (AddEvent DexWallet DexWallet)
-  -- | Delete a swap wallet.
+  -- | Delete a dex wallet.
   | DeleteDexWallet (DeleteWithConfirmationEvent DexWallet)
   -- | Open the more popup widget
   | ShowDexMorePopup
@@ -164,7 +164,7 @@ data DexModel = DexModel
   , selectedWallet :: DexWallet
   -- | The stake wallet to possibly use for the new dex wallet. This enables previewing
   -- the stake wallet's info before confirming.
-  , newSwapCredential :: Maybe StakeWallet
+  , targetStakeCredential :: Maybe StakeWallet
   -- | Whether the add new wallet widget should be open.
   , addingWallet :: Bool
   -- | Whether the delete wallet widget should be open.
@@ -198,7 +198,7 @@ data DexModel = DexModel
   , showPositionsFilter :: Bool
   -- | The positions filter model.
   , positionsFilterModel :: PositionsFilterModel
-  -- | Teh positions filter scene.
+  -- | The positions filter scene.
   , positionsFilterScene :: FilterScene
   -- | Whether to show the filter widget for transactions.
   , showTransactionFilter :: Bool
@@ -216,7 +216,7 @@ instance Default DexModel where
   def = DexModel
     { scene = DexPositions
     , selectedWallet = def
-    , newSwapCredential = Nothing
+    , targetStakeCredential = Nothing
     , addingWallet = False
     , deletingWallet = False
     , choosingTradingPair = False

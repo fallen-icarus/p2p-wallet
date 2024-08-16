@@ -15,10 +15,14 @@ module P2PWallet.Data.Core.Internal.Bech32Address
   , plutusToBech32
   , paymentAddressToPlutusAddress
   , stakeAddressToPlutusCredential
+  , paymentAddressStakeCredential
 
     -- * Inspecting Bech32 Addresses
   , Address.AddressInfo(..)
   , inspectBech32Address
+
+    -- * PubKey Check
+  , isPubKeyOnlyAddress
   ) where
 
 import Data.Aeson (FromJSON(..),ToJSON(..))
@@ -103,6 +107,7 @@ parsePaymentAddress targetNetwork rawAddr = do
       Mainnet -> Address.shelleyMainnet
       Testnet -> Address.shelleyTestnet
 
+{-# WARNING parseStakeAddress "`parseStakeAddress` workaround remains in code" #-}
 -- | Try to convert a user supplied stake address to `StakeAddress`. Since bech32 addresses
 -- also encode the network used, this function requires specifying what network to expect
 -- with the address. Only shelley addresses are supported.
@@ -110,12 +115,17 @@ parseStakeAddress :: Network -> Text -> Either Text StakeAddress
 parseStakeAddress targetNetwork rawAddr = do
     Address.AddressInfo{..} <- inspectBech32Address rawAddr
     
-    -- The address should not have any payment credentials.
-    when (isJust $ infoScriptHash <|> infoSpendingKeyHash) $ 
-      Left "Address is not a stake address."
+    trace "Still need to remove workaround" $ pure ()
+    -- -- The address should not have any payment credentials.
+    -- when (isJust $ infoScriptHash <|> infoSpendingKeyHash) $ 
+    --   Left "Address is not a stake address."
+    --
+    -- -- The address should have exactly one staking credential. This check may not be necessary...
+    -- when (length (catMaybes [infoStakeScriptHash,infoStakeKeyHash]) /= 1) $
+    --   Left "Address is not a valid bech32 stake address."
 
-    -- The address should have exactly one staking credential. This check may not be necessary...
-    when (length (catMaybes [infoStakeScriptHash,infoStakeKeyHash]) /= 1) $
+    -- WORKAROUND - the stake script hash is in `infoScriptHash` instead of `infoStakeScriptHash`.
+    when (length (catMaybes [infoScriptHash,infoStakeKeyHash]) /= 1) $
       Left "Address is not a valid bech32 stake address."
 
     -- The address must be for the proper network.
@@ -223,3 +233,29 @@ stakeAddressToPlutusCredential (StakeAddress addr) = do
 
   maybeToRight "Address is not a valid bech32 stake address." $ 
     mStakeScriptHash <|> mStakeKeyHash
+
+-- | Extract the stake credential from a bech32 payment address.
+paymentAddressStakeCredential :: PaymentAddress -> Either Text Credential
+paymentAddressStakeCredential (PaymentAddress addr) = do
+  Address.AddressInfo{..} <- inspectBech32Address addr
+
+  let mStakeKeyHash = 
+        PV1.PubKeyCredential . PV1.PubKeyHash . BuiltinByteString <$> infoStakeKeyHash
+      mStakeScriptHash = 
+        PV1.ScriptCredential . PV1.ScriptHash . BuiltinByteString <$> infoStakeScriptHash
+
+  maybeToRight "Address does not have a staking credential." $ mStakeScriptHash <|> mStakeKeyHash
+
+-------------------------------------------------
+-- PubKeyCredential Check
+-------------------------------------------------
+-- | The app currently only supports pubkey user credentials, even for watched wallets.
+isPubKeyOnlyAddress :: Text -> Either Text ()
+isPubKeyOnlyAddress addr = do
+  Address.AddressInfo{..} <- inspectBech32Address addr
+  let mStakeScriptHash = 
+        PV1.ScriptCredential . PV1.ScriptHash . BuiltinByteString <$> infoStakeScriptHash
+      mScriptHash = 
+        PV1.ScriptCredential . PV1.ScriptHash . BuiltinByteString <$> infoScriptHash
+
+  when (isJust $ mStakeScriptHash <|> mScriptHash) $ Left "Only pubkey credentials are supported."

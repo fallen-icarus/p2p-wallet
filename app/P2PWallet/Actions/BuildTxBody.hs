@@ -95,6 +95,8 @@ buildTxBody network tx = do
   let paramsFile = ParamsFile $ toString tmpDir </> "params" <.> "json"
       txBodyFile = TxBodyFile $ toString tmpDir </> "tx" <.> "body"
       builderLogFile = BuilderLogFile $ toString tmpDir </> "builder" <.> "log"
+      -- This will over-write the old tx.body file.
+      transformedTxFile = TransformedTxFile $ toString tmpDir </> "tx" <.> "body"
 
   -- Create a fresh log file for this build iteration.
   logBuilderStep builderLogFile InitializeLogFile
@@ -179,6 +181,12 @@ buildTxBody network tx = do
   runBuildCmd_ builderLogFile $ buildRawCmd tmpDir paramsFile txBodyFile certificateFiles $ 
     -- The budgets need to be added again.
     updateBudgets budgets $ convertToTxBody finalizedTx
+
+  trace "Re-enable CBOR transformation for hardware wallet support" $ pure ()
+  -- -- Convert the tx.body file to the proper CBOR format for using the hardware wallet.
+  -- -- The old tx.body file will be over-written. This is done even if no hardware wallets need to be
+  -- -- used.
+  -- runBuildCmd_ builderLogFile $ transformTxBodyCmd txBodyFile transformedTxFile
 
   -- Return the updated `TxBuilderModel`. Mark the model as built; this must be done last in case
   -- there is an error with any of the previous steps. If the tx was marked as built too soon, it
@@ -343,3 +351,10 @@ updateBudgets (Just budgets) tx = foldl' updateBudget tx budgets
       Withdrawing idx ->
         -- Replace the old execution budgets with the newly calculated ones.
         oldTx & #withdrawals % ix idx % #stakingScriptInfo % _Just % #executionBudget .~ executionBudget
+
+-- | The command to convert the transaction to the proper cbor format.
+transformTxBodyCmd :: TxBodyFile -> TransformedTxFile -> Text
+transformTxBodyCmd txBodyFile transformedTxFile = 
+    fromString $ printf cmdTemplate (toString txBodyFile) (toString transformedTxFile)
+  where
+    cmdTemplate = "cardano-hw-cli transaction transform --tx-file %s --out-file %s" 

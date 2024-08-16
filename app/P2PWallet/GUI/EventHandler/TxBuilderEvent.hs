@@ -15,6 +15,7 @@ import P2PWallet.Actions.WitnessTxBody
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
+import P2PWallet.GUI.EventHandler.TxBuilderEvent.LoanBuilderEvent
 import P2PWallet.GUI.EventHandler.TxBuilderEvent.SwapBuilderEvent
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -31,6 +32,11 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Run swap event
   -----------------------------------------------
   SwapBuilderEvent swapEvent -> handleSwapBuilderEvent model swapEvent
+
+  -----------------------------------------------
+  -- Run loan event
+  -----------------------------------------------
+  LoanBuilderEvent loanEvent -> handleLoanBuilderEvent model loanEvent
 
   -----------------------------------------------
   -- Open the Add Popup
@@ -123,7 +129,9 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
     ConfirmAdding -> 
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (TxBuilderEvent . EditSelectedUserOutput . AddResult) $ do
-          let (idx,newOutput) = fromMaybe (0,def) $ txBuilderModel ^. #targetUserOutput
+          (idx,newOutput) <- fromJustOrAppError "targetUserOutput is Nothing" $ 
+            txBuilderModel ^. #targetUserOutput
+
           verifiedOutput <- 
             fromRightOrAppError $ 
               verifyNewUserOutput (config ^. #network) tickerMap fingerprintMap newOutput
@@ -267,7 +275,6 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
             toHexidecimal (txBuilderModel ^. #newTestMint % #exampleInput)
     ]
 
-
   -----------------------------------------------
   -- Building transactions
   -----------------------------------------------
@@ -340,10 +347,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   ExportTxBody modal -> case modal of
     StartProcess ->
       [ Task $ runActionOrAlert (TxBuilderEvent . ExportTxBody . ProcessResults) $
-          exportTxBody 
-            (config ^. #timeZone) 
-            (txBuilderModel ^. #targetPath) 
-            (txBuilderModel ^. #keyWitnessFiles)
+          exportTxBody (txBuilderModel ^. #targetPath) (txBuilderModel ^. #keyWitnessFiles)
       ]
     ProcessResults exportDestination -> 
       [ Model $ model 
@@ -408,8 +412,15 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
       [ Task $ runActionOrAlert (TxBuilderEvent . GetTxFileExportDirectory . AddResult) $ do
           let rawPath = toString $ txBuilderModel ^. #targetPath
 
-          -- Expand the filepath and return it.
-          expandFilePath rawPath >>= fromJustOrAppError ("Not a valid path: " <> toText rawPath)
+          -- Expand the path to get the absolute path.
+          expandedPath <- 
+            expandFilePath rawPath >>= fromJustOrAppError ("Not a valid path: " <> toText rawPath)
+
+          -- Verify the destination is not a file.
+          Dir.doesFileExist (toString expandedPath) >>= \exists -> when exists $
+            throwIO $ AppError "Destination directory is a file."
+
+          return expandedPath
       ]
     AddResult fullPath ->
       [ Model $ model 

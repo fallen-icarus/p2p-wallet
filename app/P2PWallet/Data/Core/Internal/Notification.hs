@@ -24,6 +24,7 @@ data NotificationType
   = PaymentNotification
   | StakeNotification
   | DexNotification
+  | LoanNotification
   deriving (Show,Eq,Ord)
 
 -------------------------------------------------

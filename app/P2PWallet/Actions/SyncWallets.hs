@@ -23,27 +23,29 @@ syncWallets databaseFile network ws@Wallets{..} = do
       concurrently fetchPaymentWallets $ concurrently fetchStakeWallets fetchParameters
       
     -- These are queried separately to minimize the chance of exceeding Koios' burst limit.
-    updatedDexWallets <- fetchDexWallets
+    (updatedDexWallets, updatedLoanWallets) <- concurrently fetchDexWallets fetchLoanWallets
     
     -- Save the new payment wallet states and throw an error if there is an issue saving.
     forM_ updatedPaymentWallets $ \paymentWallet -> do
       insertPaymentWallet databaseFile paymentWallet >>= fromRightOrAppError
-      insertTransactions databaseFile (paymentWallet ^. #transactions) >>= fromRightOrAppError
 
     -- Save the new stake wallet states and throw an error if there is an issue saving.
     forM_ updatedStakeWallets $ \stakeWallet -> do
       insertStakeWallet databaseFile stakeWallet >>= fromRightOrAppError
-      insertRewards databaseFile (stakeWallet ^. #rewardHistory) >>= fromRightOrAppError
 
     -- Save the new dex wallet states and throw an error if there is an issue saving.
     forM_ updatedDexWallets $ \dexWallet -> do
       insertDexWallet databaseFile dexWallet >>= fromRightOrAppError
-      insertTransactions databaseFile (dexWallet ^. #transactions) >>= fromRightOrAppError
+
+    -- Save the new loan wallet states and throw an error if there is an issue saving.
+    forM_ updatedLoanWallets $ \loanWallet -> do
+      insertLoanWallet databaseFile loanWallet >>= fromRightOrAppError
 
     let newNotifications = catMaybes $ mconcat
           [ zipWith notify paymentWallets updatedPaymentWallets
           , zipWith notify stakeWallets updatedStakeWallets
           , zipWith notify dexWallets updatedDexWallets
+          , zipWith notify loanWallets updatedLoanWallets
           ]
 
     -- Return the updated wallets and network parameters.
@@ -51,6 +53,7 @@ syncWallets databaseFile network ws@Wallets{..} = do
       & #paymentWallets .~ updatedPaymentWallets
       & #stakeWallets .~ updatedStakeWallets
       & #dexWallets .~ updatedDexWallets
+      & #loanWallets .~ updatedLoanWallets
   where
     fetchPaymentWallets :: IO [PaymentWallet]
     fetchPaymentWallets =
@@ -67,6 +70,12 @@ syncWallets databaseFile network ws@Wallets{..} = do
     fetchDexWallets :: IO [DexWallet]
     fetchDexWallets =
       pooledMapConcurrently runQueryDexWallet dexWallets >>= 
+        -- Throw an error if syncing failed.
+        mapM fromRightOrAppError
+
+    fetchLoanWallets :: IO [LoanWallet]
+    fetchLoanWallets =
+      pooledMapConcurrently runQueryLoanWallet loanWallets >>= 
         -- Throw an error if syncing failed.
         mapM fromRightOrAppError
 

@@ -37,12 +37,8 @@ module P2PWallet.Data.Core.Transaction
 
 import Data.Aeson
 
-import Database.SQLite.Simple (field,ToRow(..),FromRow(..))
-import Database.SQLite.Simple.ToField (toField)
-
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Koios.Transaction qualified as Koios
-import P2PWallet.Database
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
@@ -156,8 +152,6 @@ toTransactionPlutusContract Koios.TransactionPlutusContract{..} = TransactionPlu
 -- | The transaction type used by the GUI.
 data Transaction = Transaction
   { txHash :: Text
-  , profileId :: ProfileId
-  , paymentId :: PaymentId
   , blockTime :: POSIXTime
   , blockHeight :: Integer
   , fee :: Lovelace
@@ -181,146 +175,14 @@ data Transaction = Transaction
   , showMints :: Bool
   , plutusContracts :: [TransactionPlutusContract]
   , showPlutusContracts :: Bool
-  } deriving (Show,Eq)
+  } deriving (Generic,ToJSON,FromJSON,Show,Eq)
 
 makeFieldLabelsNoPrefix ''Transaction
 
-instance FromRow Transaction where
-  fromRow = do
-    txHash <- field
-    profileId <- field
-    paymentId <- field
-    blockTime <- field
-    blockHeight <- field
-    fee <- field
-    size <- field
-    deposit <- field
-    invalidBefore <- field
-    invalidAfter <- field
-    collateralInputs <- fromMaybe mzero . decode <$> field
-    referenceInputs <- fromMaybe mzero . decode <$> field
-    inputs <- fromMaybe mzero . decode <$> field
-    outputs <- fromMaybe mzero . decode <$> field
-    certificates <- fromMaybe mzero . decode <$> field
-    withdrawals <- fromMaybe mzero . decode <$> field
-    mints <- fromMaybe mzero . decode <$> field
-    plutusContracts <- fromMaybe mzero . decode <$> field
-    return $ Transaction
-      { txHash = txHash
-      , profileId = profileId
-      , paymentId = paymentId
-      , blockTime = blockTime
-      , blockHeight = blockHeight
-      , fee = fee
-      , size = size
-      , deposit = deposit
-      , invalidBefore = invalidBefore
-      , invalidAfter = invalidAfter
-      , collateralInputs = collateralInputs
-      , referenceInputs = referenceInputs
-      , inputs = inputs
-      , outputs = outputs
-      , certificates = certificates
-      , withdrawals = withdrawals
-      , mints = mints
-      , plutusContracts = plutusContracts
-      , showCollateralInputs = False
-      , showReferenceInputs = False
-      , showInputs = False
-      , showOutputs = False
-      , showCertificates = False
-      , showWithdrawals = False
-      , showMints = False
-      , showPlutusContracts = False
-      }
-
-instance ToRow Transaction where
-  toRow Transaction{..} =
-    [ toField txHash
-    , toField profileId
-    , toField paymentId
-    , toField blockTime
-    , toField blockHeight
-    , toField fee
-    , toField size
-    , toField deposit
-    , toField invalidBefore
-    , toField invalidAfter
-    , toField $ encode collateralInputs
-    , toField $ encode referenceInputs
-    , toField $ encode inputs
-    , toField $ encode outputs
-    , toField $ encode certificates
-    , toField $ encode withdrawals
-    , toField $ encode mints
-    , toField $ encode plutusContracts
-    ]
-
-instance TableName Transaction where
-  tableName = "transactions"
-
-instance Creatable Transaction where
-  createStmt = Query $ unwords
-    [ "CREATE TABLE " <> tableName @Transaction
-    , "("
-    , unwords $ intersperse ","
-        [ "tx_hash TEXT NOT NULL"
-        , "profile_id INTEGER REFERENCES profiles (profile_id)"
-        , "payment_id INTEGER REFERENCES payment_wallets (payment_id)"
-        , "block_time TEXT NOT NULL"
-        , "block_height INTEGER NOT NULL"
-        , "fee INTEGER NOT NULL"
-        , "size INTEGER NOT NULL"
-        , "deposit INTEGER NOT NULL"
-        , "invalid_before TEXT"
-        , "invalid_after TEXT"
-        , "collateral_inputs BLOB"
-        , "reference_inputs BLOB"
-        , "inputs BLOB"
-        , "outputs BLOB"
-        , "certificates BLOB"
-        , "withdrawals BLOB"
-        , "mints BLOB"
-        , "plutus_contracts BLOB"
-        , "PRIMARY KEY (tx_hash,payment_id)"
-        ]
-    , ");"
-    ]
-
-instance Insertable Transaction where
-  insertStmt = Query $ unwords
-    [ "INSERT OR REPLACE INTO " <> tableName @Transaction
-    , "("
-    , unwords $ intersperse ","
-        [ "tx_hash"
-        , "profile_id"
-        , "payment_id"
-        , "block_time"
-        , "block_height"
-        , "fee"
-        , "size"
-        , "deposit"
-        , "invalid_before"
-        , "invalid_after"
-        , "collateral_inputs"
-        , "reference_inputs"
-        , "inputs"
-        , "outputs"
-        , "certificates"
-        , "withdrawals"
-        , "mints"
-        , "plutus_contracts"
-        ]
-    , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
-    ]
-
 -- | Convert a Koios Transaction to a P2PWallet Transaction.
-toTransaction :: ProfileId -> PaymentId -> Koios.Transaction -> Transaction
-toTransaction profileId paymentId Koios.Transaction{..} = Transaction
+toTransaction :: Koios.Transaction -> Transaction
+toTransaction Koios.Transaction{..} = Transaction
   { txHash = txHash
-  , profileId = profileId
-  , paymentId = paymentId
   , blockTime = blockTime
   , blockHeight = blockHeight
   , fee = fee

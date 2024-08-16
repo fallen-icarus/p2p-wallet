@@ -21,11 +21,11 @@ import P2PWallet.Prelude
 pairPaymentWallet 
   :: Network 
   -> Profile 
-  -> PaymentId 
+  -> PaymentWalletId 
   -> NewPaymentWallet 
   -> [PaymentWallet] -- ^ The currently tracked payment wallets.
   -> IO PaymentWallet
-pairPaymentWallet network Profile{alias=_,network=_,..} paymentId NewPaymentWallet{..} known = do
+pairPaymentWallet network Profile{alias=_,network=_,..} paymentWalletId NewPaymentWallet{..} known = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
 
     when (any ((== alias) . view #alias) known) $ 
@@ -46,7 +46,7 @@ pairPaymentWallet network Profile{alias=_,network=_,..} paymentId NewPaymentWall
     return $ PaymentWallet 
       { network = network
       , profileId = profileId
-      , paymentId = paymentId
+      , paymentWalletId = paymentWalletId
       , alias = alias
       , paymentAddress = payAddr 
       , stakeAddress = mStakeAddr 
@@ -77,11 +77,11 @@ pairPaymentWallet network Profile{alias=_,network=_,..} paymentId NewPaymentWall
 pairStakeWallet 
   :: Network 
   -> Profile 
-  -> StakeId 
+  -> StakeWalletId 
   -> NewStakeWallet 
   -> [StakeWallet] -- ^ Currently tracked stake wallets.
   -> IO StakeWallet
-pairStakeWallet network Profile{alias=_,network=_,..} stakeId NewStakeWallet{..} known = do
+pairStakeWallet network Profile{alias=_,network=_,..} stakeWalletId NewStakeWallet{..} known = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
 
     when (any ((== alias) . view #alias) known) $ 
@@ -96,7 +96,7 @@ pairStakeWallet network Profile{alias=_,network=_,..} stakeId NewStakeWallet{..}
     return $ StakeWallet 
       { network = network
       , profileId = profileId
-      , stakeId = stakeId
+      , stakeWalletId = stakeWalletId
       , alias = alias
       , stakeAddress = stakeAddr 
       , stakeKeyDerivation = Just sKeyInfo
@@ -131,11 +131,11 @@ pairStakeWallet network Profile{alias=_,network=_,..} stakeId NewStakeWallet{..}
 watchPaymentWallet 
   :: Network 
   -> Profile 
-  -> PaymentId 
+  -> PaymentWalletId 
   -> NewPaymentWallet 
   -> [PaymentWallet] -- ^ Currently tracked payment wallets.
   -> IO PaymentWallet
-watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} known = do
+watchPaymentWallet network Profile{profileId} paymentWalletId NewPaymentWallet{..} known = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
 
     when (any ((== alias) . view #alias) known) $ 
@@ -146,10 +146,16 @@ watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} kno
     -- the stake address, if any.
     (payAddr,mStakeAddr) <- fromRightOrAppError $ genAddresses paymentAddress
 
+    -- No script addresses are currently supported.
+    fromRightOrAppError $ isPubKeyOnlyAddress $ toText payAddr
+
+    -- No stake script addresses are currently supported.
+    maybe (return ()) (fromRightOrAppError . isPubKeyOnlyAddress . toText) mStakeAddr
+
     return $ PaymentWallet 
       { network = network
       , profileId = profileId
-      , paymentId = paymentId
+      , paymentWalletId = paymentWalletId
       , alias = alias
       , paymentAddress = payAddr 
       , stakeAddress = mStakeAddr 
@@ -170,11 +176,11 @@ watchPaymentWallet network Profile{profileId} paymentId NewPaymentWallet{..} kno
 watchStakeWallet 
   :: Network 
   -> Profile 
-  -> StakeId 
+  -> StakeWalletId 
   -> NewStakeWallet 
   -> [StakeWallet] -- ^ Currently tracked stake wallets.
   -> IO StakeWallet
-watchStakeWallet network Profile {profileId} stakeId NewStakeWallet{..} known = do
+watchStakeWallet network Profile{profileId} stakeWalletId NewStakeWallet{..} known = do
     when (alias == "") $ throwIO $ AppError "Wallet name is empty."
 
     when (any ((== alias) . view #alias) known) $ 
@@ -183,10 +189,13 @@ watchStakeWallet network Profile {profileId} stakeId NewStakeWallet{..} known = 
     -- Check if the stakeAddress is a valid bech32 stake address. 
     stakeAddr <- fromRightOrAppError $ parseStakeAddress network stakeAddress
 
+    -- No script addresses are currently supported.
+    fromRightOrAppError $ isPubKeyOnlyAddress $ toText stakeAddr
+
     return $ StakeWallet 
       { network = network
       , profileId = profileId
-      , stakeId = stakeId
+      , stakeWalletId = stakeWalletId
       , alias = alias
       , stakeAddress = stakeAddr 
       , stakeKeyDerivation = Nothing 

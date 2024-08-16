@@ -43,7 +43,7 @@ swapExecutionsList reverseTickerMap = map utxoRow
                 , let prettyRef = display utxoRef in
                   flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
                     box_ [alignMiddle, onClick $ CopyText prettyRef] $
-                      label idCardIcon
+                      label targetUTxOIcon
                         `styleBasic` 
                           [ bgColor black
                           , textMiddle

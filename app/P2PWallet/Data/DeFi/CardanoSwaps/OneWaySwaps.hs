@@ -8,11 +8,12 @@ module P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps where
 
 import qualified Data.Map.Strict as Map
 import Data.Aeson
+import Data.Maybe (fromJust)
 
-import CardanoSwaps.Blueprints
 import qualified PlutusTx
 import qualified PlutusTx.Prelude as PlutusTx
-import Data.Maybe (fromJust)
+
+import CardanoSwaps.Blueprints
 
 import P2PWallet.Data.Core.Internal.Assets
 import P2PWallet.Data.Core.Internal.Bech32Address

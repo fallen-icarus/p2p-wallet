@@ -8,8 +8,7 @@ module P2PWallet.Data.Core.Wallets.PaymentWallet where
 
 import Data.Aeson
 
-import Database.SQLite.Simple (field,ToRow(..),FromRow(..))
-import Database.SQLite.Simple.ToField (toField)
+import Database.SQLite.Simple (ToRow,FromRow)
 
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Koios.AddressUTxO
@@ -61,18 +60,18 @@ instance FromJSON PersonalUTxO where
       <*> o .: "block_height"
       <*> return False
 
-toPersonalUTxO :: AddressUTxO -> PersonalUTxO
-toPersonalUTxO AddressUTxO{..} = PersonalUTxO
-  { utxoRef = utxoRef
-  , lovelace = lovelace
-  , datumHash = datumHash
-  , inlineDatum = inlineDatum
-  , referenceScriptHash = referenceScriptHash
-  , nativeAssets = nativeAssets
-  , blockTime = blockTime
-  , blockHeight = blockHeight
-  , showDetails = False
-  }
+instance FromAddressUTxO PersonalUTxO where
+  fromAddressUTxO AddressUTxO{..} = PersonalUTxO
+    { utxoRef = utxoRef
+    , lovelace = lovelace
+    , datumHash = datumHash
+    , inlineDatum = inlineDatum
+    , referenceScriptHash = referenceScriptHash
+    , nativeAssets = nativeAssets
+    , blockTime = blockTime
+    , blockHeight = blockHeight
+    , showDetails = False
+    }
 
 -------------------------------------------------
 -- Payment Wallet
@@ -85,7 +84,7 @@ toPersonalUTxO AddressUTxO{..} = PersonalUTxO
 data PaymentWallet = PaymentWallet
   { network :: Network
   , profileId :: ProfileId
-  , paymentId :: PaymentId
+  , paymentWalletId :: PaymentWalletId
   , alias :: Text
   , paymentAddress :: PaymentAddress
   , paymentKeyDerivation :: Maybe DerivationInfo
@@ -94,19 +93,19 @@ data PaymentWallet = PaymentWallet
   , utxos :: [PersonalUTxO]
   , lovelace :: Lovelace
   , nativeAssets :: [NativeAsset]
-  , transactions :: [Transaction] -- These are stored separately.
-  } deriving (Show,Eq)
+  , transactions :: [Transaction]
+  } deriving (Show,Eq,Generic,ToRow,FromRow)
 
 makeFieldLabelsNoPrefix ''PaymentWallet
 
 instance Ord PaymentWallet where
-  p1 <= p2 = p1 ^. #paymentId <= p2 ^. #paymentId
+  p1 <= p2 = p1 ^. #paymentWalletId <= p2 ^. #paymentWalletId
 
 instance Default PaymentWallet where
   def = PaymentWallet 
     { network = def
     , profileId = 0
-    , paymentId = 0
+    , paymentWalletId = 0
     , alias = "dummy" 
     , paymentAddress = PaymentAddress "" 
     , stakeAddress = Nothing 
@@ -118,49 +117,6 @@ instance Default PaymentWallet where
     , transactions = []
     }
 
-instance FromRow PaymentWallet where
-  fromRow = do
-    network <- field
-    profileId <- field
-    paymentId <- field
-    alias <- field
-    paymentAddress <- field
-    stakeAddress <- field
-    paymentKeyDerivation <- field
-    stakeKeyDerivation <- field
-    utxos <- fromMaybe mzero . decode <$> field
-    lovelace <- field
-    nativeAssets <- fromMaybe mzero . decode <$> field
-    return $ PaymentWallet
-      { network = network
-      , profileId = profileId
-      , paymentId = paymentId
-      , alias = alias
-      , paymentAddress = paymentAddress
-      , stakeAddress = stakeAddress
-      , paymentKeyDerivation = paymentKeyDerivation
-      , stakeKeyDerivation = stakeKeyDerivation
-      , utxos = utxos
-      , lovelace = lovelace
-      , nativeAssets = nativeAssets
-      , transactions = []
-      }
-
-instance ToRow PaymentWallet where
-  toRow PaymentWallet{..} =
-    [ toField network
-    , toField profileId
-    , toField paymentId
-    , toField alias
-    , toField paymentAddress
-    , toField stakeAddress
-    , toField paymentKeyDerivation
-    , toField stakeKeyDerivation
-    , toField $ encode utxos
-    , toField lovelace
-    , toField $ encode nativeAssets
-    ]
-
 instance TableName PaymentWallet where
   tableName = "payment_wallets"
 
@@ -171,7 +127,7 @@ instance Creatable PaymentWallet where
     , unwords $ intersperse ","
         [ "network TEXT NOT NULL"
         , "profile_id INTEGER REFERENCES profiles (profile_id)"
-        , "payment_id INTEGER PRIMARY KEY"
+        , "payment_wallet_id INTEGER PRIMARY KEY"
         , "alias TEXT NOT NULL"
         , "payment_address TEXT NOT NULL"
         , "payment_key_derivation TEXT"
@@ -180,7 +136,8 @@ instance Creatable PaymentWallet where
         , "utxos BLOB"
         , "lovelace INTEGER NOT NULL"
         , "native_assets BLOB"
-        , "UNIQUE(network,profile_id,payment_id,alias)"
+        , "transactions BLOB"
+        , "UNIQUE(network,profile_id,payment_wallet_id,alias)"
         ]
     , ");"
     ]
@@ -192,7 +149,7 @@ instance Insertable PaymentWallet where
     , unwords $ intersperse ","
         [ "network"
         , "profile_id"
-        , "payment_id"
+        , "payment_wallet_id"
         , "alias"
         , "payment_address"
         , "payment_key_derivation"
@@ -201,9 +158,10 @@ instance Insertable PaymentWallet where
         , "utxos"
         , "lovelace"
         , "native_assets"
+        , "transactions"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 instance Notify PaymentWallet where

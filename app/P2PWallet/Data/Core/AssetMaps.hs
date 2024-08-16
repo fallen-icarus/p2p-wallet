@@ -154,13 +154,15 @@ verifyNewTickerInfo NewTickerInfo{..} reverseTickerMap = do
 -- '# policy_id.asset_name'
 -- '# fingerprint'
 -- '# ticker'
--- All quantities must be greater than or equal to 0.
+-- All quantities must be greater than or equal to 0. This can also be used to parse "ADA" into 
+-- a `NativeAsset`.
 parseNativeAssets :: TickerMap -> FingerprintMap -> Text -> Either Text NativeAsset
 parseNativeAssets tickerMap fingerprintMap assetLine =
     case words assetLine of
       [num,name] -> do
         asset <- maybeToRight parseErrorMsg $ asum
-          [ parseTickerEntry num name
+          [ parseAdaEntry num name
+          , parseTickerEntry num name
           , parseOnChainEntry assetLine
           , parseFingerprintEntry num name
           ]
@@ -179,6 +181,13 @@ parseNativeAssets tickerMap fingerprintMap assetLine =
       , ""
       , "If using a ticker, make sure it is in the Ticker Registry."
       ]
+
+    parseAdaEntry :: Text -> Text -> Maybe NativeAsset
+    parseAdaEntry num t
+      | t == "ADA" = do
+          rawQuantity <- readMaybe @Decimal $ toString num
+          return $ lovelaceAsNativeAsset & #quantity .~ unFormatQuantity 6 rawQuantity
+      | otherwise = Nothing
 
     parseOnChainEntry :: Text -> Maybe NativeAsset
     parseOnChainEntry = parseNativeAsset

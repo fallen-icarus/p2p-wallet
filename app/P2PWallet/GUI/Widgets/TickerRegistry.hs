@@ -62,23 +62,8 @@ tickerRegistrySearchWidget AppModel{..} = do
               `styleDisabled` [textColor white]
               `styleFocus` [border 1 customBlue]
               `nodeEnabled` not isChanging
-          , spacer_ [width 5]
-          , toggleButton_ "Search" (toLensVL #forceRedraw)
-              [toggleButtonOffStyle searchOffStyle]
-              `styleBasic`
-                [ bgColor customGray4
-                , textColor customBlue
-                , textSize 12
-                , border 1 customBlue
-                ]
-              `styleHover` [ bgColor customGray1 ]
-              `styleDisabled`
-                [ textColor darkGray
-                , border 1 darkGray
-                ]
-              `nodeEnabled` not isChanging
           ]
-      , box_ [mergeRequired reqUpdate] $ zstack
+      , zstack
           [ widgetMaybe result resultWidget
               `nodeVisible` not isChanging
           , adaProhibitedWidget `nodeVisible` searchIsADA
@@ -117,22 +102,6 @@ tickerRegistrySearchWidget AppModel{..} = do
 
     isDeleting :: Bool
     isDeleting = tickerRegistryModel ^. #deletingTicker
-
-    reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
-    reqUpdate _ old new 
-      | old ^. #tickerRegistryModel % #search /= new ^. #tickerRegistryModel % #search = False
-      | otherwise = True
-
-    searchOffStyle :: Style
-    searchOffStyle = 
-      def `styleBasic` 
-            [ bgColor customGray4
-            , textColor customBlue
-            , textSize 12
-            , border 1 customBlue
-            ]
-          `styleHover`
-            [ bgColor customGray1 ]
 
     searchTarget :: Text
     searchTarget = tickerRegistryModel ^. #search

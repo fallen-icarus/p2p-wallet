@@ -15,7 +15,7 @@ import P2PWallet.Prelude
 assembleWitnesses :: [KeyWitnessFile] -> IO SignedTxFile
 assembleWitnesses witnessFiles = do
   tmpDir <- getTemporaryDirectory
-  let transformedTxFile = TransformedTxFile $ tmpDir </> "tx" <.> "transformed"
+  let transformedTxFile = TransformedTxFile $ tmpDir </> "tx" <.> "body"
       signedFile = SignedTxFile $ tmpDir </> "tx" <.> "signed"
 
   -- Assemble the witnesses to produce the final tx.signed file.

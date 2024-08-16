@@ -60,7 +60,7 @@ handleProfileEvent model@AppModel{..} evt = case evt of
           & #reverseTickerMap .~ toReverseTickerMap tickers
           & #fingerprintMap .~ 
               toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
-      , Task $ return $ SyncWallets StartProcess
+      -- , Task $ return $ SyncWallets StartProcess
       ]
 
   -- Log the user out of the currently selected profile, and return the user to the profile 

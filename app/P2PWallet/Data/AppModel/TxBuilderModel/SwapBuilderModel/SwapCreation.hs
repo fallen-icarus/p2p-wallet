@@ -148,7 +148,8 @@ clearNewSwapCreation NewSwapCreation{offerAsset,askAsset,network,tradingPairInve
 -------------------------------------------------
 -- NewSwapCreation <--> SwapCreation
 -------------------------------------------------
--- | Verify the user info for the new swap creation.
+-- | Verify the user info for the new swap creation. This function is quite complicated due to
+-- handling unit inversions.
 verifyNewSwapCreation 
   :: PaymentAddress 
   -> ReverseTickerMap 
@@ -242,7 +243,7 @@ verifyNewSwapCreation swapAddress reverseTickerMap NewSwapCreation{..} = do
     }
 
 -- | Convert a `SwapCreation` back to a `NewSwapCreation` for editing. This needs to invert
--- information if required.
+-- information if required. This function is quite complicated due to handling unit inversions.
 toNewSwapCreation :: ReverseTickerMap -> SwapCreation -> NewSwapCreation
 toNewSwapCreation reverseTickerMap SwapCreation{..} = NewSwapCreation
   { paymentAddress = paymentAddress

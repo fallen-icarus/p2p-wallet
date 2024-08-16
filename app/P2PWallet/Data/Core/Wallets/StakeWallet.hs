@@ -6,10 +6,7 @@
 
 module P2PWallet.Data.Core.Wallets.StakeWallet where
 
-import Data.Aeson
-
-import Database.SQLite.Simple (field,ToRow(..),FromRow(..))
-import Database.SQLite.Simple.ToField (toField)
+import Database.SQLite.Simple (ToRow,FromRow)
 
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Koios.Pool
@@ -25,7 +22,7 @@ import P2PWallet.Prelude
 data StakeWallet = StakeWallet
   { network :: Network
   , profileId :: ProfileId
-  , stakeId :: StakeId
+  , stakeWalletId :: StakeWalletId
   , alias :: Text
   , stakeAddress :: StakeAddress
   , stakeKeyDerivation :: Maybe DerivationInfo
@@ -36,7 +33,7 @@ data StakeWallet = StakeWallet
   , delegatedPool :: Maybe Pool
   , rewardHistory :: [StakeReward]
   , linkedAddresses :: [PaymentAddress]
-  } deriving (Show,Eq)
+  } deriving (Generic,ToRow,FromRow,Show,Eq)
 
 makeFieldLabelsNoPrefix ''StakeWallet
 
@@ -45,7 +42,7 @@ instance Default StakeWallet where
     { network = def
     , alias = "Dummy"
     , profileId = 0
-    , stakeId = 0
+    , stakeWalletId = 0
     , stakeAddress = StakeAddress "" 
     , stakeKeyDerivation = Nothing
     , registrationStatus = NotRegistered
@@ -57,52 +54,6 @@ instance Default StakeWallet where
     , linkedAddresses = []
     }
 
-instance FromRow StakeWallet where
-  fromRow = do
-    network <- field
-    profileId <- field
-    stakeId <- field
-    alias <- field
-    stakeAddress <- field
-    stakeKeyDerivation <- field
-    registrationStatus <- field
-    totalDelegation <- field
-    utxoBalance <- field
-    availableRewards <- field
-    delegatedPool <- fromMaybe mzero . decode <$> field
-    linkedAddresses <- fromMaybe mzero . decode <$> field
-    return $ StakeWallet
-      { network = network
-      , profileId = profileId
-      , stakeId = stakeId
-      , alias = alias
-      , stakeAddress = stakeAddress
-      , stakeKeyDerivation = stakeKeyDerivation
-      , registrationStatus = registrationStatus
-      , totalDelegation = totalDelegation
-      , utxoBalance = utxoBalance
-      , availableRewards = availableRewards
-      , delegatedPool = delegatedPool
-      , rewardHistory = []
-      , linkedAddresses = linkedAddresses
-      }
-
-instance ToRow StakeWallet where
-  toRow StakeWallet{..} =
-    [ toField network
-    , toField profileId
-    , toField stakeId
-    , toField alias
-    , toField stakeAddress
-    , toField stakeKeyDerivation
-    , toField registrationStatus
-    , toField totalDelegation
-    , toField utxoBalance
-    , toField availableRewards
-    , toField $ encode delegatedPool
-    , toField $ encode linkedAddresses
-    ]
-
 instance TableName StakeWallet where
   tableName = "stake_wallets"
 
@@ -113,7 +64,7 @@ instance Creatable StakeWallet where
     , unwords $ intersperse ","
         [ "network TEXT NOT NULL"
         , "profile_id INTEGER REFERENCES profiles (profile_id)"
-        , "stake_id INTEGER PRIMARY KEY"
+        , "stake_wallet_id INTEGER PRIMARY KEY"
         , "alias TEXT NOT NULL"
         , "stake_address TEXT"
         , "stake_key_derivation TEXT"
@@ -122,8 +73,9 @@ instance Creatable StakeWallet where
         , "utxo_balance INTEGER NOT NULL"
         , "available_rewards INTEGER NOT NULL"
         , "delegated_pool BLOB"
+        , "reward_history BLOB"
         , "linked_addresses BLOB"
-        , "UNIQUE(network,profile_id,stake_id,alias)"
+        , "UNIQUE(network,profile_id,stake_wallet_id,alias)"
         ]
     , ");"
     ]
@@ -135,7 +87,7 @@ instance Insertable StakeWallet where
     , unwords $ intersperse ","
         [ "network"
         , "profile_id"
-        , "stake_id"
+        , "stake_wallet_id"
         , "alias"
         , "stake_address"
         , "stake_key_derivation"
@@ -144,10 +96,11 @@ instance Insertable StakeWallet where
         , "utxo_balance"
         , "available_rewards"
         , "delegated_pool"
+        , "reward_history"
         , "linked_addresses"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 instance Notify StakeWallet where

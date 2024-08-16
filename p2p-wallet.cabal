@@ -24,8 +24,9 @@ common optimizations
     ghc-options: 
       -threaded 
       -rtsopts 
-      -with-rtsopts=-N 
+      "-with-rtsopts=-A128m -n2m -N"
       -O2
+      -j
 
 common extensions
     default-language: GHC2021
@@ -61,6 +62,7 @@ executable p2p-wallet
       P2PWallet.Actions.Query.Koios
       P2PWallet.Actions.Utils
       P2PWallet.Actions.SubmitTx
+      P2PWallet.Actions.SyncLoans
       P2PWallet.Actions.SyncOrderBooks
       P2PWallet.Actions.SyncWallets
       P2PWallet.Actions.WitnessTxBody
@@ -70,11 +72,27 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.DelegationModel
       P2PWallet.Data.AppModel.DexModel
       P2PWallet.Data.AppModel.HomeModel
+      P2PWallet.Data.AppModel.LendingModel
+      P2PWallet.Data.AppModel.LendingModel.BorrowModel
+      P2PWallet.Data.AppModel.LendingModel.BorrowModel.LenderOffersFilterModel
+      P2PWallet.Data.AppModel.LendingModel.BorrowModel.OpenAsksFilterModel
+      P2PWallet.Data.AppModel.LendingModel.LendModel
+      P2PWallet.Data.AppModel.LendingModel.LendModel.OpenOffersFilterModel
+      P2PWallet.Data.AppModel.LendingModel.LendModel.RequestsFilterModel
+      P2PWallet.Data.AppModel.LendingModel.LoanAskConfiguration
+      P2PWallet.Data.AppModel.LendingModel.LoanOfferConfiguration
       P2PWallet.Data.AppModel.ProfileModel
       P2PWallet.Data.AppModel.TickerRegistryModel
       P2PWallet.Data.AppModel.TxBuilderModel
       P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
       P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskClose
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskCreation
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferClose
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferCreation
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferUpdate
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
@@ -108,14 +126,19 @@ executable p2p-wallet
       P2PWallet.Data.Core.TxBody
       P2PWallet.Data.Core.Wallets
       P2PWallet.Data.Core.Wallets.DexWallet
+      P2PWallet.Data.Core.Wallets.LoanWallet
       P2PWallet.Data.Core.Wallets.PaymentWallet
       P2PWallet.Data.Core.Wallets.StakeWallet
+      P2PWallet.Data.DeFi.CardanoLoans
+      P2PWallet.Data.DeFi.CardanoLoans.Internal
       P2PWallet.Data.DeFi.CardanoSwaps.Common
       P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps
       P2PWallet.Data.DeFi.CardanoSwaps.TwoWaySwaps
       P2PWallet.Data.Koios.AddressUTxO
+      P2PWallet.Data.Koios.AssetTransaction
       P2PWallet.Data.Koios.BudgetEstimations
       P2PWallet.Data.Koios.LinkedPaymentAddresses
+      P2PWallet.Data.Koios.MintTransaction
       P2PWallet.Data.Koios.Pool
       P2PWallet.Data.Koios.PostTypes
       P2PWallet.Data.Koios.StakeAccount
@@ -129,9 +152,13 @@ executable p2p-wallet
       P2PWallet.GUI.EventHandler.DelegationEvent
       P2PWallet.GUI.EventHandler.DexEvent
       P2PWallet.GUI.EventHandler.HomeEvent
+      P2PWallet.GUI.EventHandler.LendingEvent
+      P2PWallet.GUI.EventHandler.LendingEvent.BorrowEvent
+      P2PWallet.GUI.EventHandler.LendingEvent.LendEvent
       P2PWallet.GUI.EventHandler.ProfileEvent
       P2PWallet.GUI.EventHandler.TickerRegistryEvent
       P2PWallet.GUI.EventHandler.TxBuilderEvent
+      P2PWallet.GUI.EventHandler.TxBuilderEvent.LoanBuilderEvent
       P2PWallet.GUI.EventHandler.TxBuilderEvent.SwapBuilderEvent
       P2PWallet.GUI.HelpMessages
       P2PWallet.GUI.Icons
@@ -153,6 +180,13 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Home.NativeAssets
       P2PWallet.GUI.Widgets.Home.Transactions
       P2PWallet.GUI.Widgets.Home.UTxOs
+      P2PWallet.GUI.Widgets.Lending
+      P2PWallet.GUI.Widgets.Lending.Borrow
+      P2PWallet.GUI.Widgets.Lending.Borrow.LenderOffers
+      P2PWallet.GUI.Widgets.Lending.Borrow.OpenAsks
+      P2PWallet.GUI.Widgets.Lending.Lend
+      P2PWallet.GUI.Widgets.Lending.Lend.OpenOffers
+      P2PWallet.GUI.Widgets.Lending.Lend.ViewLoanRequests
       P2PWallet.GUI.Widgets.MainMenu
       P2PWallet.GUI.Widgets.Networks
       P2PWallet.GUI.Widgets.Notifications
@@ -161,6 +195,13 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.TickerRegistry
       P2PWallet.GUI.Widgets.TxBuilder
       P2PWallet.GUI.Widgets.TxBuilder.Internal
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCloses
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCreations
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCloses
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCreations
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferUpdates
       P2PWallet.GUI.Widgets.TxBuilder.StatusBar
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCloses
@@ -181,6 +222,7 @@ executable p2p-wallet
       , monomer
       , lens
       , optics
+      , optics-core
       , text
       , data-default
       , time

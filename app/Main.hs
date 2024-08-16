@@ -5,6 +5,7 @@ module Main where
 import Monomer
 import Monomer.Lens qualified as L
 import Data.FileEmbed (embedFile)
+import Data.Time.Clock.POSIX qualified as Time
 
 import System.FilePath ((</>), (<.>))
 import System.Directory qualified as Dir
@@ -31,11 +32,15 @@ main = do
     -- Get the current date for the user.
     currentDate <- getCurrentDay timeZone
 
+    -- Get the current time for the user.
+    currentTime <- Time.getPOSIXTime
+
     let thirtyDaysAgo = addDays (-30) currentDate
         initModel = 
           def & #databaseFile .~ dbFilePath -- Use the full filepath for to the database.
               & #config % #timeZone .~ timeZone
               & #config % #currentDay .~ currentDate
+              & #config % #currentTime .~ currentTime
               & #homeModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
               & #dexModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
     startApp initModel handleEvent buildUI $ appCfg AppInit

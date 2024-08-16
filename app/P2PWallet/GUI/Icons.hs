@@ -9,6 +9,9 @@ helpIcon = remixQuestionLine
 clockIcon :: Text
 clockIcon = remixTimeLine
 
+expirationIcon :: Text
+expirationIcon = remixTimerLine
+
 calendarIcon :: Text
 calendarIcon = remixCalendarLine
 
@@ -120,6 +123,9 @@ contactsBookIcon = remixContactsBook2Line
 idCardIcon :: Text
 idCardIcon = toGlyph 0XF4E9
 
+targetUTxOIcon :: Text
+targetUTxOIcon = remixMapPinLine
+
 tickersIcon :: Text
 tickersIcon = remixCurrencyLine
 
@@ -173,3 +179,12 @@ optionsIcon = toGlyph 0XF3F3
 
 aftermarketIcon :: Text
 aftermarketIcon = remixStore3Line
+
+swappableCollateralIcon :: Text
+swappableCollateralIcon = toGlyph 0XF477
+
+acceptIcon :: Text
+acceptIcon = toGlyph 0XF3AB
+
+targetAddressIcon :: Text
+targetAddressIcon = remixFocus3Line
