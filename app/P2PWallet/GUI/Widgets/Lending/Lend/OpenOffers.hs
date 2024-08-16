@@ -107,8 +107,7 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
       let Loans.OfferDatum{..} = fromMaybe def $ loanUTxOOfferDatum u
           loanAmount = toNativeAsset loanAsset & #quantity .~ loanPrincipal
           duration = calcDaysInPosixPeriod $ fromPlutusTime loanTerm
-          collateralPrices = map (over _1 toNativeAsset) 
-                           $ map (over _2 toRational) 
+          collateralPrices = map (over _1 toNativeAsset . over _2 toRational) 
                            $ collateralization ^. #unCollateralization
           prettyInterest = unwords
             [ "Interest:"

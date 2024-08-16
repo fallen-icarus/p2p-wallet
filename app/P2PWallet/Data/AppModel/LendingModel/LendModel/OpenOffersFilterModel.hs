@@ -74,11 +74,10 @@ instance Default OpenOffersFilterModel where
 -- | Verify the information is valid.
 checkOpenOffersFilterModel :: TickerMap -> OpenOffersFilterModel -> Either Text ()
 checkOpenOffersFilterModel tickerMap OpenOffersFilterModel{..} = do
-  case loanAsset of
-    "" -> return ()
-    xs -> const () <$> parseNativeAssetName tickerMap xs
+  unless ("" == loanAsset) $
+    void $ parseNativeAssetName tickerMap loanAsset
 
-  const () <$> (mapM (parseNativeAssetName tickerMap) $ lines collateral)
+  mapM_ (parseNativeAssetName tickerMap) (lines collateral)
 
   let durationParseErrorMsg xs = unlines
         [ "Could not parse: " <> xs

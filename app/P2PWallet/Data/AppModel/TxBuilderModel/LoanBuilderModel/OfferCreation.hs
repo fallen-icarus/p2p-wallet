@@ -246,7 +246,7 @@ verifyNewOfferCreation reverseTickerMap tickerMap currentTime NewOfferCreation{.
     verifiedMinPayment <- case (verifiedCompoundFrequency, minPayment) of
       (Nothing, _) -> return 0 -- minPayment can only be used with a compound period.
       (_, "") -> return 0
-      (_, xs) -> fmap (view #quantity) $
+      (_, xs) -> view #quantity <$>
         parseFormattedAssetQuantity reverseTickerMap verifiedLoanAmount xs
 
     when (verifiedMinPayment < 0) $
@@ -258,7 +258,7 @@ verifyNewOfferCreation reverseTickerMap tickerMap currentTime NewOfferCreation{.
       (False, _) -> return Loans.NoPenalty
       (_, (NoNewPenalty, _)) -> return Loans.NoPenalty
       (_, (NewFixedPenalty, xs)) -> 
-        fmap (Loans.FixedFee . view #quantity) $
+        Loans.FixedFee . view #quantity <$>
           parseFormattedAssetQuantity reverseTickerMap verifiedLoanAmount xs
       (_, (NewPercentPenalty, xs)) -> 
         fmap (Loans.PercentFee . fromRational) $ 

@@ -165,7 +165,7 @@ allAsksWidget AppModel{lendingModel=LendingModel{lendModel},reverseTickerMap} = 
                     ]
                   `styleHover` [bgColor customGray1, cursorIcon CursorHand]
           , spacer_ [width 3]
-          , label ("Requests For Loans")
+          , label "Requests For Loans"
               `styleBasic` [textFont "Italics", textSize 14]
           , tooltip_ "Filter/Sort" [tooltipDelay 0] $
               toggleButton_ menuSearchIcon

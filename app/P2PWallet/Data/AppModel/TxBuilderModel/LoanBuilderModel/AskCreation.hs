@@ -56,7 +56,7 @@ instance AssetBalancesForChange (a,AskCreation) where
         -- Ada is not a native asset and is already part of the deposit.
         | policyId == "" = Nothing
         -- One unit of each asset must be deposited in each output.
-        | otherwise = Just $ asset & #quantity .~ (fromIntegral count * 1)
+        | otherwise = Just $ asset & #quantity .~ fromIntegral count
 
 -------------------------------------------------
 -- New Ask Creation

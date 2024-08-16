@@ -20,7 +20,7 @@ offerUpdatesList reverseTickerMap = map utxoRow
   where
     utxoRow :: (Int,OfferUpdate) -> AppNode
     utxoRow s@(idx,OfferUpdate{oldOffer,newOffer=OfferCreation{..}}) = do
-      let prettyLoanAmount = showAssetBalance True reverseTickerMap $ loanAmount
+      let prettyLoanAmount = showAssetBalance True reverseTickerMap loanAmount
           numberOfCollateral = length collateralization
       hstack
         [ vstack
