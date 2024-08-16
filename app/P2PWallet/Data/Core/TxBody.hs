@@ -16,6 +16,7 @@ module P2PWallet.Data.Core.TxBody where
 
 import Data.Aeson
 import System.FilePath ((</>), (<.>))
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Plutus
@@ -403,6 +404,33 @@ instance ToBuildCmdField [TxBodyMint] where
               ]
           , "--mint-reference-tx-in-execution-units " <> display executionBudget
           ]
+
+mergeTxBodyMints :: [TxBodyMint] -> [TxBodyMint]
+mergeTxBodyMints = map removeZeroQuantities
+                 . toList
+                 . Map.fromListWith sumMints
+                 . map (\mint@TxBodyMint{mintingPolicyHash} -> (mintingPolicyHash, mint))
+  where
+    -- Remove zero native asset quantities, but deliberately leave mints with empty an 
+    -- native asset field.
+    removeZeroQuantities :: TxBodyMint -> TxBodyMint
+    removeZeroQuantities tm = tm & #nativeAssets %~ filter ((/=0) . view #quantity)
+
+    sumMints :: TxBodyMint -> TxBodyMint -> TxBodyMint
+    sumMints main@TxBodyMint{nativeAssets} TxBodyMint{nativeAssets=otherAssets} =
+      main & #nativeAssets .~ sumNativeAssets (nativeAssets <> otherAssets)
+
+removeEmptyMints :: [TxBodyMint] -> [TxBodyMint]
+removeEmptyMints = mapMaybe checkMint
+  where
+    -- Return nothing if the `TxBodyMint` should be removed from the `TxBody`. Also remove zero
+    -- native asset quantities.
+    checkMint :: TxBodyMint -> Maybe TxBodyMint
+    checkMint tm@TxBodyMint{nativeAssets}
+      | null filteredAssets = Nothing
+      | otherwise = Just $ tm & #nativeAssets .~ filteredAssets
+      where 
+        filteredAssets = filter ((/=0) . view #quantity) nativeAssets
 
 -------------------------------------------------
 -- Collateral

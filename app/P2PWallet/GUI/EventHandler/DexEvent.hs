@@ -52,32 +52,33 @@ handleDexEvent model@AppModel{..} evt = case evt of
     [ Model $ model & #dexModel % #newSwapCreation %~ clearNewSwapCreation ]
     
   -----------------------------------------------
-  -- Add new swap wallet
+  -- Add new dex wallet
   -----------------------------------------------
   AddNewDexWallet modal -> case modal of
     StartAdding _ -> 
-      let currentDexWalletIds = map (view #stakeId) $ knownWallets ^. #dexWallets
-          availWallets = filter ((`notElem` currentDexWalletIds) . view #stakeId) $ 
+      let currentDexWalletIds = map (view #stakeWalletId) $ knownWallets ^. #dexWallets
+          availWallets = filter ((`notElem` currentDexWalletIds) . view #stakeWalletId) $ 
             knownWallets ^. #stakeWallets
       in  [ Model $ model 
               & #dexModel % #addingWallet .~ True -- Show widget.
-              & #dexModel % #newSwapCredential .~ maybeHead availWallets
+              & #dexModel % #targetStakeCredential .~ maybeHead availWallets
           ]
     CancelAdding -> 
       [ Model $ model 
           & #dexModel % #addingWallet .~ False -- Show widget.
-          & #dexModel % #newSwapCredential .~ Nothing
+          & #dexModel % #targetStakeCredential .~ Nothing
       ]
     ConfirmAdding -> 
       [ Task $ runActionOrAlert (DexEvent . AddNewDexWallet . AddResult) $ do
-          let stakeWallet = fromMaybe def $ dexModel ^. #newSwapCredential
+          stakeWallet <- fromJustOrAppError "targetStakeCredential is Nothing" $ 
+            dexModel ^. #targetStakeCredential
 
-          -- Get the new payment id for the new entry into the swap_wallet table.
-          paymentId <- getNextPaymentIdAcrossTables databaseFile >>= fromRightOrAppError
+          -- Get the new wallet id for the new entry into the dex_wallet table.
+          dexWalletId <- getNextDexWalletId databaseFile >>= fromRightOrAppError
 
           -- Create the new Dex wallet.
           verifiedDexWallet <- 
-            fromRightOrAppError $ processNewDexWallet paymentId stakeWallet
+            fromRightOrAppError $ processNewDexWallet dexWalletId stakeWallet
           
           -- Add the new payment wallet to the database.
           insertDexWallet databaseFile verifiedDexWallet >>= fromRightOrAppError
@@ -93,13 +94,14 @@ handleDexEvent model@AppModel{..} evt = case evt of
       ]
 
   -----------------------------------------------
-  -- Delete Swap Wallet
+  -- Delete Dex Wallet
   -----------------------------------------------
   DeleteDexWallet modal -> case modal of
     -- Show the confirmation widget.
     GetDeleteConfirmation _ -> 
-      [ Model $ model & #dexModel % #deletingWallet .~ True
-                      & #dexModel % #showMorePopup .~ False
+      [ Model $ model 
+          & #dexModel % #deletingWallet .~ True
+          & #dexModel % #showMorePopup .~ False
       ]
     CancelDeletion -> 
       -- Close the widget for confirming deletion.
@@ -108,15 +110,15 @@ handleDexEvent model@AppModel{..} evt = case evt of
       -- Delete the wallet from the database.
       [ Task $ runActionOrAlert (const $ DexEvent $ DeleteDexWallet PostDeletionAction) $ do
           -- Get the payment id for the payment wallet to delete.
-          let currentId = dexModel ^. #selectedWallet % #paymentId
+          let currentId = dexModel ^. #selectedWallet % #dexWalletId
 
           -- Delete the payment wallet.
           deleteDexWallet databaseFile currentId >>= fromRightOrAppError
       ]
     PostDeletionAction ->
       -- Delete the payment wallet from the cached list of wallets.
-      let currentId = dexModel ^. #selectedWallet % #paymentId
-          newWallets = filter (\w -> w ^. #paymentId /= currentId) $
+      let currentId = dexModel ^. #selectedWallet % #dexWalletId
+          newWallets = filter (\w -> w ^. #dexWalletId /= currentId) $
             knownWallets ^. #dexWallets
       in [ Model $ model 
             & #dexModel % #deletingWallet .~ False
@@ -465,16 +467,16 @@ handleDexEvent model@AppModel{..} evt = case evt of
 -------------------------------------------------
 -- | Process the new stake credential to generate the dex wallet info. Generete the one-way
 -- and two-way swap addresses for the desired stake credential.
-processNewDexWallet :: PaymentId -> StakeWallet -> Either Text DexWallet
-processNewDexWallet paymentId StakeWallet{..} = do
+processNewDexWallet :: DexWalletId -> StakeWallet -> Either Text DexWallet
+processNewDexWallet dexWalletId StakeWallet{..} = do
   stakeCred <- stakeAddressToPlutusCredential stakeAddress
   oneWaySwapAddress <- OneWay.genSwapAddress network $ Just stakeCred
   twoWaySwapAddress <- TwoWay.genSwapAddress network $ Just stakeCred
   return $ DexWallet
     { network = network
     , profileId = profileId
-    , paymentId = paymentId
-    , stakeId = stakeId
+    , dexWalletId = dexWalletId
+    , stakeWalletId = stakeWalletId
     , alias = alias
     , oneWaySwapAddress = oneWaySwapAddress
     , twoWaySwapAddress = twoWaySwapAddress

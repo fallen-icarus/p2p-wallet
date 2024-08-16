@@ -5,6 +5,7 @@ module P2PWallet.GUI.EventHandler
 
 import Monomer
 import Data.Text qualified as Text
+import Data.Time.Clock.POSIX qualified as Time
 
 import P2PWallet.Actions.SubmitTx
 import P2PWallet.Actions.SyncWallets
@@ -16,6 +17,7 @@ import P2PWallet.GUI.EventHandler.AddressBookEvent
 import P2PWallet.GUI.EventHandler.DelegationEvent
 import P2PWallet.GUI.EventHandler.DexEvent
 import P2PWallet.GUI.EventHandler.HomeEvent
+import P2PWallet.GUI.EventHandler.LendingEvent
 import P2PWallet.GUI.EventHandler.ProfileEvent
 import P2PWallet.GUI.EventHandler.TickerRegistryEvent
 import P2PWallet.GUI.EventHandler.TxBuilderEvent
@@ -116,6 +118,11 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   DexEvent modal -> handleDexEvent model modal
 
   -----------------------------------------------
+  -- Loans Events
+  -----------------------------------------------
+  LendingEvent modal -> handleLendingEvent model modal
+
+  -----------------------------------------------
   -- TxBuilder Events
   -----------------------------------------------
   TxBuilderEvent modal -> handleTxBuilderEvent model modal
@@ -127,10 +134,13 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   UpdateCurrentDate modal -> case modal of
     StartProcess -> 
       [ Task $ runActionOrAlert (UpdateCurrentDate . ProcessResults) $ 
-          getCurrentDay (config ^. #timeZone)
+          (,) <$> getCurrentDay (config ^. #timeZone)
+              <*> Time.getPOSIXTime
       ]
-    ProcessResults day ->
-      [ Model $ model & #config % #currentDay .~ day
+    ProcessResults (day,time) ->
+      [ Model $ model 
+          & #config % #currentDay .~ day
+          & #config % #currentTime .~ time
       , Task $ 
           if notifications /= [] then do
             return $ Alert $ unlines
@@ -154,21 +164,25 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
     ProcessResults (resp@Wallets{..}, networkParams, newNotifications) ->
       -- Disable `syncing` and update the list of wallets. Also update the information for
       -- the `selectedWallet`.
-      let paymentTarget = model ^. #homeModel % #selectedWallet % #paymentId
+      let paymentTarget = model ^. #homeModel % #selectedWallet % #paymentWalletId
           updatedPaymentTarget = 
-            fromMaybe def $ find (\w -> w ^. #paymentId == paymentTarget) paymentWallets
-          stakeTarget = model ^. #delegationModel % #selectedWallet % #stakeId
+            fromMaybe def $ find (\w -> w ^. #paymentWalletId == paymentTarget) paymentWallets
+          stakeTarget = model ^. #delegationModel % #selectedWallet % #stakeWalletId
           updatedStakeTarget = 
-            fromMaybe def $ find (\w -> w ^. #stakeId == stakeTarget) stakeWallets
-          dexTarget = model ^. #dexModel % #selectedWallet % #paymentId
-          updateDexTarget = 
-            fromMaybe def $ find (\w -> w ^. #paymentId == dexTarget) dexWallets
+            fromMaybe def $ find (\w -> w ^. #stakeWalletId == stakeTarget) stakeWallets
+          dexTarget = model ^. #dexModel % #selectedWallet % #dexWalletId
+          updatedDexTarget = 
+            fromMaybe def $ find (\w -> w ^. #dexWalletId == dexTarget) dexWallets
+          loanTarget = model ^. #lendingModel % #selectedWallet % #loanWalletId
+          updatedLoanTarget = 
+            fromMaybe def $ find (\w -> w ^. #loanWalletId == loanTarget) loanWallets
       in  [ Model $ model 
               & #waitingStatus % #syncingWallets .~ False
               & #knownWallets .~ resp
               & #homeModel % #selectedWallet .~ updatedPaymentTarget
               & #delegationModel % #selectedWallet .~ updatedStakeTarget
-              & #dexModel % #selectedWallet .~ updateDexTarget
+              & #dexModel % #selectedWallet .~ updatedDexTarget
+              & #lendingModel % #selectedWallet .~ updatedLoanTarget
               & #txBuilderModel % #parameters ?~ networkParams
               & #fingerprintMap .~ 
                   toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)

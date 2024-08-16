@@ -98,18 +98,8 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
 
     limitOrderRow :: SwapUTxO -> OneWay.SwapDatum -> AppNode
     limitOrderRow u@SwapUTxO{..} OneWay.SwapDatum{..} = do
-      let offerAsset = updateQuantity u $ NativeAsset
-            { policyId = offerId
-            , tokenName = offerName
-            , fingerprint = mkAssetFingerprint offerId offerName
-            , quantity = 0
-            }
-          askAsset = updateQuantity u $ NativeAsset
-            { policyId = askId
-            , tokenName = askName
-            , fingerprint = mkAssetFingerprint askId askName
-            , quantity = 0
-            }
+      let offerAsset = updateQuantity u $ mkNativeAsset offerId offerName
+          askAsset = updateQuantity u $ mkNativeAsset askId askName
           offerAssetName = showAssetNameOnly reverseTickerMap offerAsset
           askAssetName = showAssetNameOnly reverseTickerMap askAsset
           buyPrice = showPriceFormatted reverseTickerMap askAsset offerAsset 
@@ -156,7 +146,7 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
                 , let prettyRef = display utxoRef in
                   flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
                     box_ [alignMiddle, onClick $ CopyText $ display utxoRef] $
-                      label idCardIcon
+                      label targetUTxOIcon
                         `styleBasic` 
                           [ bgColor black
                           , textMiddle
@@ -242,18 +232,8 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
 
     liquiditySwapRow :: SwapUTxO -> TwoWay.SwapDatum -> AppNode
     liquiditySwapRow u@SwapUTxO{..} TwoWay.SwapDatum{..} = do
-      let asset1 = updateQuantity u $ NativeAsset
-            { policyId = asset1Id
-            , tokenName = asset1Name
-            , fingerprint = mkAssetFingerprint asset1Id asset1Name
-            , quantity = 0
-            }
-          asset2 = updateQuantity u $ NativeAsset
-            { policyId = asset2Id
-            , tokenName = asset2Name
-            , fingerprint = mkAssetFingerprint asset2Id asset2Name
-            , quantity = 0
-            }
+      let asset1 = updateQuantity u $ mkNativeAsset asset1Id asset1Name
+          asset2 = updateQuantity u $ mkNativeAsset asset2Id asset2Name
           asset1AssetName = showAssetNameOnly reverseTickerMap asset1
           asset2AssetName = showAssetNameOnly reverseTickerMap asset2
           sellAsset1Price = 
@@ -290,7 +270,7 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
                 , let prettyRef = display utxoRef in
                   flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
                     box_ [alignMiddle, onClick $ CopyText $ display utxoRef] $
-                      label idCardIcon
+                      label targetUTxOIcon
                         `styleBasic` 
                           [ bgColor black
                           , textMiddle

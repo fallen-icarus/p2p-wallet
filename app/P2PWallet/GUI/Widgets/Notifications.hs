@@ -71,6 +71,7 @@ notificationsList = vstack . map noteSection . groupBy sameCategory . sortOn snd
       PaymentNotification -> specificNoteSection "Home" xs
       StakeNotification -> specificNoteSection "Staking" xs
       DexNotification -> specificNoteSection "Dex" xs
+      LoanNotification -> specificNoteSection "Lending" xs
 
     noteRow :: (Int,Notification) -> AppNode
     noteRow (idx,Notification{..}) = do

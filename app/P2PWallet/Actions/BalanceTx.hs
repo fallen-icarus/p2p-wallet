@@ -45,6 +45,8 @@ balanceTx tx@TxBuilderModel{..} =
       , (totalWithdrawn, [])
       , (0, testTokensMinted)
       , assetBalancesForChange $ swapBuilderModel ^. #swapCloses
+      , assetBalancesForChange $ loanBuilderModel ^. #askCloses
+      , assetBalancesForChange $ loanBuilderModel ^. #offerCloses
       ]
 
     -- The amount of ADA and native assets from the output sources. All quantities in this list must
@@ -53,6 +55,8 @@ balanceTx tx@TxBuilderModel{..} =
     outputValue = sumAssetBalances
       [ assetBalancesForChange userOutputs
       , assetBalancesForChange $ swapBuilderModel ^. #swapCreations
+      , assetBalancesForChange $ loanBuilderModel ^. #askCreations
+      , assetBalancesForChange $ loanBuilderModel ^. #offerCreations
       , (-requiredDeposits, [])
       , (-fee, [])
       ]
@@ -62,6 +66,8 @@ balanceTx tx@TxBuilderModel{..} =
       , outputValue
       , assetBalancesForChange $ swapBuilderModel ^. #swapUpdates
       , assetBalancesForChange $ swapBuilderModel ^. #swapExecutions
+      , assetBalancesForChange $ loanBuilderModel ^. #askUpdates
+      , assetBalancesForChange $ loanBuilderModel ^. #offerUpdates
       ]
 
     newChange :: ChangeOutput
@@ -83,6 +89,12 @@ balanceTx tx@TxBuilderModel{..} =
       , swapBuilderModel ^. #swapCloses /= []
       , swapBuilderModel ^. #swapUpdates /= []
       , swapBuilderModel ^. #swapExecutions /= []
+      , loanBuilderModel ^. #askCreations /= []
+      , loanBuilderModel ^. #askCloses /= []
+      , loanBuilderModel ^. #askUpdates /= []
+      , loanBuilderModel ^. #offerCreations /= []
+      , loanBuilderModel ^. #offerCloses /= []
+      , loanBuilderModel ^. #offerUpdates /= []
       ]
 
     -- What kind of transaction this is.
@@ -99,4 +111,12 @@ balanceTx tx@TxBuilderModel{..} =
       , maybe [] (pure . view #paymentKeyDerivation) collateralInput
       , map (view $ _2 % #stakeKeyDerivation) $ swapBuilderModel ^. #swapCloses
       , map (view $ _2 % #oldSwap % #stakeKeyDerivation) $ swapBuilderModel ^. #swapUpdates
+      , map (view $ _2 % #borrowerKeyDerivation) $ loanBuilderModel ^. #askCreations
+      , map (view $ _2 % #oldAsk % #stakeKeyDerivation) $ loanBuilderModel ^. #askUpdates
+      , map (view $ _2 % #newAsk % #borrowerKeyDerivation) $ loanBuilderModel ^. #askUpdates
+      , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #askCloses
+      , map (view $ _2 % #lenderKeyDerivation) $ loanBuilderModel ^. #offerCreations
+      , map (view $ _2 % #oldOffer % #stakeKeyDerivation) $ loanBuilderModel ^. #offerUpdates
+      , map (view $ _2 % #newOffer % #lenderKeyDerivation) $ loanBuilderModel ^. #offerUpdates
+      , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #offerCloses
       ]

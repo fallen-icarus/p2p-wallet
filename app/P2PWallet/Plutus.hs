@@ -10,6 +10,11 @@ module P2PWallet.Plutus
   ( -- * Plutus Addresses
     PlutusAddress
 
+    -- * Plutus Time
+  , PlutusTime
+  , toPlutusTime
+  , fromPlutusTime
+
     -- * Plutus Rationals
   , PlutusRational
   , PlutusTx.fromGHC
@@ -24,6 +29,7 @@ module P2PWallet.Plutus
   , BuiltinByteString(..)
   , PV1.toPubKeyHash
   , PV1.TxOutRef(..)
+  , PV1.TxId(..)
   , PV1.CurrencySymbol(..)
   , PV1.TokenName(..)
   , PV1.Redeemer(..)
@@ -32,6 +38,9 @@ module P2PWallet.Plutus
   , PV1.RedeemerHash(..)
   , PV1.DatumHash(..)
   , PV2.OutputDatum(..)
+  , PlutusTx.UnsafeFromData(..)
+  , PlutusTx.ToData(..)
+  , PlutusTx.FromData(..)
   , _NoOutputDatum
   , _OutputDatum
   , _OutputDatumHash
@@ -46,6 +55,8 @@ module P2PWallet.Plutus
   , alwaysSucceedPolicyHash
   , toRedeemer
   , toDatum
+  , fromDatum
+  , fromRedeemer
   , scriptHashToPolicyId
   , policyIdToScriptHash
   , hashRedeemer
@@ -63,6 +74,7 @@ module P2PWallet.Plutus
   , toHexidecimal
   , unBuiltinByteString
   , isPubKeyCredential
+  , isScriptCredential
   , unsafeFromData
   , unsafeToBuiltinByteString
   ) where
@@ -70,9 +82,13 @@ module P2PWallet.Plutus
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as E
 import Data.Aeson as Aeson
+import Data.Aeson.Types qualified as Aeson
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Base16 as Base16
 import Control.Lens qualified as Lens
+import Data.Time.Clock.POSIX qualified as Time
+
+import Servant.API qualified as Servant
 
 import Database.SQLite.Simple (SQLData(SQLText))
 import Database.SQLite.Simple.FromField (FromField(..), returnError, ResultError(ConversionFailed))
@@ -93,6 +109,7 @@ import Cardano.Api qualified as Api
 import Cardano.Api.Shelley (toPlutusData,fromPlutusData,PlutusScript(..))
 import PlutusTx.Builtins qualified as Builtins
 import PlutusTx.Ratio qualified as PlutusTx
+import PlutusTx qualified
 
 import P2PWallet.Prelude
 
@@ -107,6 +124,27 @@ makePrisms ''PV2.OutputDatum
 -- | A type alias for the address type used as part of smart contracts.
 -- Helpful for making type signatures more clear.
 type PlutusAddress = PV1.Address
+
+-------------------------------------------------
+-- Plutus Time
+-------------------------------------------------
+-- | A type alias for the time type used as part of smart contracts.
+-- Helpful for making type signatures more clear.
+type PlutusTime = PV1.POSIXTime
+
+-- | Convert system time to on-chain time. System time is in seconds while plutus time is in
+-- milliseconds.
+toPlutusTime :: Time.POSIXTime -> PlutusTime
+toPlutusTime = PV1.POSIXTime 
+             . (* 1000) -- Convert seconds -> milliseconds
+             . round
+
+-- | Convert on-chain time to system time. System time is in seconds while plutus time is in
+-- milliseconds.
+fromPlutusTime :: PlutusTime -> Time.POSIXTime
+fromPlutusTime = fromInteger 
+               . (`div` 1000) -- Convert milliseconds -> seconds.
+               . PV1.getPOSIXTime
 
 -------------------------------------------------
 -- Plutus Rational
@@ -160,8 +198,14 @@ hashRedeemer = PV2.redeemerHash . toRedeemer
 toRedeemer :: (PV1.ToData a) => a -> PV1.Redeemer
 toRedeemer = PV1.Redeemer . PV1.dataToBuiltinData . PV1.toData
 
+fromRedeemer :: (PV1.FromData a) => PV1.Redeemer -> Maybe a
+fromRedeemer = PV1.fromBuiltinData . PV1.getRedeemer
+
 toDatum :: (PV1.ToData a) => a -> PV1.Datum
 toDatum = PV1.Datum . PV1.dataToBuiltinData . PV1.toData
+
+fromDatum :: (PV1.FromData a) => PV1.Datum -> Maybe a
+fromDatum = PV1.fromBuiltinData . PV1.getDatum
 
 scriptHashToPolicyId :: PV1.ScriptHash -> PV1.CurrencySymbol
 scriptHashToPolicyId = PV1.CurrencySymbol . PV1.getScriptHash
@@ -226,11 +270,31 @@ isPubKeyCredential :: PV1.Credential -> Bool
 isPubKeyCredential (PV1.PubKeyCredential _) = True
 isPubKeyCredential _ = False
 
+isScriptCredential :: PV1.Credential -> Bool
+isScriptCredential (PV1.ScriptCredential _) = True
+isScriptCredential _ = False
+
 unsafeFromData :: (PV1.UnsafeFromData a) => PV1.Data -> a
 unsafeFromData = PV1.unsafeFromBuiltinData . PV1.dataToBuiltinData
 
 unsafeToBuiltinByteString :: String -> Builtins.BuiltinByteString
 unsafeToBuiltinByteString = PV1.getLedgerBytes . fromRight "" . fromHex . fromString
+
+toPaymentPubKeyHash :: PV1.Credential -> Maybe PV1.PubKeyHash
+toPaymentPubKeyHash (PV1.PubKeyCredential k) = Just k
+toPaymentPubKeyHash _ = Nothing
+
+toPaymentScriptHash :: PV1.Credential -> Maybe PV1.ScriptHash
+toPaymentScriptHash (PV1.ScriptCredential k) = Just k
+toPaymentScriptHash _ = Nothing
+
+toStakePubKeyHash :: Maybe PV1.StakingCredential -> Maybe PV1.PubKeyHash
+toStakePubKeyHash (Just (PV1.StakingHash (PV1.PubKeyCredential pkh))) = Just pkh
+toStakePubKeyHash _ = Nothing
+
+toStakeScriptHash :: Maybe PV1.StakingCredential -> Maybe PV1.ScriptHash
+toStakeScriptHash (Just (PV1.StakingHash (PV1.ScriptCredential k))) = Just k
+toStakeScriptHash _ = Nothing
 
 -------------------------------------------------
 -- Orphans
@@ -243,6 +307,24 @@ instance ToJSON PV1.TxOutRef where
 
 instance Display PV1.TxOutRef where
   display PV1.TxOutRef{..} = show txOutRefId <> "#" <> show txOutRefIdx
+
+instance ToJSON PV1.ScriptHash where
+  toJSON = toJSON @Text . show
+
+instance FromJSON PV1.ScriptHash where
+  parseJSON = withText "ScriptHash" $ maybe mzero (return . PV1.ScriptHash) . parseHex
+
+instance ToJSON PV1.PubKeyHash where
+  toJSON = toJSON @Text . show
+
+instance FromJSON PV1.PubKeyHash where
+  parseJSON = withText "PubKeyHash" $ maybe mzero (return . PV1.PubKeyHash) . parseHex
+
+instance ToJSON PV1.POSIXTime where
+  toJSON = toJSON @Text . show . PV2.getPOSIXTime
+
+instance FromJSON PV1.POSIXTime where
+  parseJSON = withText "POSIXTime" $ maybe mzero (return . PV2.POSIXTime) . readMaybe . toString
 
 instance Display PV1.CurrencySymbol where
   display = show
@@ -259,9 +341,66 @@ instance FromField PV1.CurrencySymbol where
   fromField (Field (SQLText t) _) = maybe mzero (Ok . PV1.CurrencySymbol) $ parseHex t
   fromField f = returnError ConversionFailed f "need a text"
 
+instance Servant.ToHttpApiData PV1.CurrencySymbol where
+  toQueryParam = display
+
+instance Servant.ToHttpApiData PV1.TokenName where
+  toQueryParam = display
+
 instance ToField PV1.TokenName where
   toField = toField . display
 
 instance FromField PV1.TokenName where
   fromField (Field (SQLText t) _) = maybe mzero (Ok . PV1.TokenName) $ parseHex t
   fromField f = returnError ConversionFailed f "need a text"
+
+instance ToJSON PV1.Address where
+  toJSON (PV1.Address paymentCred mStakeCred) = 
+    object [ "payment_pub_key_hash" .= fmap (show @Text) (toPaymentPubKeyHash paymentCred)
+           , "payment_script_hash" .= fmap (show @Text) (toPaymentScriptHash paymentCred)
+           , "stake_pub_key_hash" .= fmap (show @Text) (toStakePubKeyHash mStakeCred)
+           , "stake_script_hash" .= fmap (show @Text) (toStakeScriptHash mStakeCred)
+           ]
+
+instance FromJSON PV1.Address where
+  parseJSON = withObject "Address" $ \o -> do
+    paymentKey <- fmap PV1.PubKeyCredential <$> o .:? "payment_pub_key_hash"
+    paymentScript <- fmap PV1.ScriptCredential <$> o .:? "payment_script_hash"
+    stakeKey <- fmap PV1.PubKeyCredential <$> o .:? "stake_pub_key_hash"
+    stakeScript <- fmap PV1.ScriptCredential <$> o .:? "stake_script_hash"
+
+    paymentCred <- maybe mzero return $ paymentKey <|> paymentScript
+    mStakeCred <- return $ maybe Nothing (Just . PV1.StakingHash) $ stakeKey <|> stakeScript
+
+    return $ PV1.Address paymentCred mStakeCred
+
+instance ToJSON PV1.Credential where
+  toJSON (PV1.PubKeyCredential kh) = object [ "key_hash" .= show @Text kh]
+  toJSON (PV1.ScriptCredential sh) = object [ "script_hash" .= show @Text sh]
+
+instance FromJSON PV2.Credential where
+  parseJSON val = maybe mzero pure $ asum
+      [ Aeson.parseMaybe parsePubKeyCredential val
+      , Aeson.parseMaybe parseScriptCredential val
+      ]
+    where
+      parsePubKeyCredential :: Aeson.Value -> Aeson.Parser PV2.Credential
+      parsePubKeyCredential = withObject "PubKeyCredential" $ \o ->
+        o .: "key_hash" >>= maybe mzero (pure . PV2.PubKeyCredential . PV2.PubKeyHash) . parseHex
+
+      parseScriptCredential :: Aeson.Value -> Aeson.Parser PV2.Credential
+      parseScriptCredential = withObject "ScriptCredential" $ \o ->
+        o .: "script_hash" >>= maybe mzero (pure . PV2.ScriptCredential . PV2.ScriptHash) . parseHex
+
+instance ToField PV2.Credential where
+  toField = toField . encode
+
+instance FromField PV2.Credential where
+  fromField = fmap (decode @PV2.Credential) . fromField @LBS.ByteString >=> maybe mzero Ok
+
+instance Display PV2.Credential where
+  display (PV2.PubKeyCredential kh) = show kh
+  display (PV2.ScriptCredential sh) = show sh
+
+instance Display PV1.POSIXTime where
+  display = show . PV1.getPOSIXTime

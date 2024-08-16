@@ -57,11 +57,11 @@ handleHomeEvent model@AppModel{..} evt = case evt of
               newWallet = homeModel ^. #newPaymentWallet
 
           -- Get the new payment id for the new entry into the payment_wallet table.
-          paymentId <- getNextPaymentIdAcrossTables databaseFile >>= fromRightOrAppError
+          paymentWalletId <- getNextPaymentWalletId databaseFile >>= fromRightOrAppError
           
           -- Validate the new payment wallet info, and export the required keys.
           verifiedPaymentWallet <- 
-            pairPaymentWallet network profile paymentId newWallet $ knownWallets ^. #paymentWallets
+            pairPaymentWallet network profile paymentWalletId newWallet $ knownWallets ^. #paymentWallets
 
           -- Add the new payment wallet to the database.
           insertPaymentWallet databaseFile verifiedPaymentWallet >>= fromRightOrAppError
@@ -103,11 +103,11 @@ handleHomeEvent model@AppModel{..} evt = case evt of
               newWallet = homeModel ^. #newPaymentWallet
 
           -- Get the new payment id for the new entry into the payment_wallet table.
-          paymentId <- getNextPaymentIdAcrossTables databaseFile >>= fromRightOrAppError
+          paymentWalletId <- getNextPaymentWalletId databaseFile >>= fromRightOrAppError
           
           -- Validate the new payment wallet info, and extract the stake address, if any.
           verifiedPaymentWallet <- 
-            watchPaymentWallet network profile paymentId newWallet $ knownWallets ^. #paymentWallets
+            watchPaymentWallet network profile paymentWalletId newWallet $ knownWallets ^. #paymentWallets
 
           -- Add the new payment wallet to the database.
           insertPaymentWallet databaseFile verifiedPaymentWallet >>= fromRightOrAppError
@@ -134,12 +134,12 @@ handleHomeEvent model@AppModel{..} evt = case evt of
               -- If this is a new stake address, add it to the database as well.
               if isJust stakeAddress && stakeAddress `notElem` knownStakeAddresses then do
                 -- Get the new stake id for the new entry into the stake_wallet table.
-                stakeId <- getNextStakeId databaseFile >>= fromRightOrAppError
+                stakeWalletId <- getNextStakeWalletId databaseFile >>= fromRightOrAppError
             
                 let newStakeWallet = StakeWallet
                       { network = network
                       , profileId = profileId
-                      , stakeId = stakeId
+                      , stakeWalletId = stakeWalletId
                       , alias = alias <> "_stake"
                       , stakeAddress = fromMaybe "" stakeAddress 
                       , stakeKeyDerivation = stakeKeyDerivation
@@ -188,11 +188,11 @@ handleHomeEvent model@AppModel{..} evt = case evt of
       -- The state is deliberately not updated in case there is an error with any of these steps.
       -- The state will be updated after everything has successfully executed.
       [ Task $ runActionOrAlert (HomeEvent . ChangePaymentWalletName . AddResult) $ do
-          let currentWallet@PaymentWallet{paymentId} = model ^. #homeModel % #selectedWallet
+          let currentWallet@PaymentWallet{paymentWalletId} = model ^. #homeModel % #selectedWallet
               newAlias = model ^. #homeModel % #newAliasField
               newWallet = currentWallet & #alias .~ newAlias
               -- Filter out the selected profile from the list of known payment wallets.
-              otherWallets = filter (\p -> paymentId /= p ^. #paymentId) $
+              otherWallets = filter (\p -> paymentWalletId /= p ^. #paymentWalletId) $
                 knownWallets ^. #paymentWallets
 
           when (newAlias == "") $ throwIO $ AppError "New name is empty."
@@ -205,11 +205,11 @@ handleHomeEvent model@AppModel{..} evt = case evt of
 
           return newWallet
       ] 
-    AddResult newWallet@PaymentWallet{paymentId} ->
+    AddResult newWallet@PaymentWallet{paymentWalletId} ->
       let -- Filter out the selected profile from the list of known payment wallets.
-          otherWallets = filter (\p -> paymentId /= p ^. #paymentId) $
+          otherWallets = filter (\p -> paymentWalletId /= p ^. #paymentWalletId) $
             knownWallets ^. #paymentWallets
-          newWallets = sortOn (view #paymentId) $ newWallet : otherWallets
+          newWallets = sortOn (view #paymentWalletId) $ newWallet : otherWallets
       -- Toggle the editingWallet flag.
       in  [ Model $ model 
               & #knownWallets % #paymentWallets .~ newWallets
@@ -235,15 +235,15 @@ handleHomeEvent model@AppModel{..} evt = case evt of
       -- Delete the payment wallet from the database.
       [ Task $ runActionOrAlert (const $ HomeEvent $ DeletePaymentWallet PostDeletionAction) $ do
           -- Get the payment id for the payment wallet to delete.
-          let currentId = homeModel ^. #selectedWallet % #paymentId
+          let currentId = homeModel ^. #selectedWallet % #paymentWalletId
 
           -- Delete the payment wallet.
           deletePaymentWallet databaseFile currentId >>= fromRightOrAppError
       ]
     PostDeletionAction ->
       -- Delete the payment wallet from the cached list of wallets.
-      let currentId = homeModel ^. #selectedWallet % #paymentId
-          newWallets = filter (\w -> w ^. #paymentId /= currentId) $
+      let currentId = homeModel ^. #selectedWallet % #paymentWalletId
+          newWallets = filter (\w -> w ^. #paymentWalletId /= currentId) $
             knownWallets ^. #paymentWallets
       in  [ Model $ model 
               & #homeModel % #deletingWallet .~ False

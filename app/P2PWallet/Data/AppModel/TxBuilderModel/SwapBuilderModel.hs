@@ -17,8 +17,6 @@ module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
   , module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapUpdate
   ) where
 
-import Data.Map.Strict qualified as Map
-
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
 import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
@@ -117,31 +115,13 @@ instance AddToTxBody SwapBuilderModel where
         & flip (foldl' addSwapUpdateToBuilder) swapUpdates
         -- Merge any beacon mints so that there is only one `TxBodyMint` per minting policy.
         -- Remove any mints that cancel out.
-        & #mints %~ mergeBeaconMints
+        & #mints %~ mergeTxBodyMints
+        & #mints %~ removeEmptyMints
         -- Adjust any redeemers based on whether all mints canceled out.
         & adjustSpendingRedeemers
         -- Add the swap executions. This is done after so that it does not mess with the beacon
         -- adjustments.
         & flip (foldl' addSwapExecutionToBuilder) swapExecutions
-    where
-      mergeBeaconMints :: [TxBodyMint] -> [TxBodyMint]
-      mergeBeaconMints = mapMaybe checkMint
-                       . toList
-                       . Map.fromListWith sumMints
-                       . map (\mint@TxBodyMint{mintingPolicyHash} -> (mintingPolicyHash, mint))
-
-      -- Return nothing if the `TxBodyMint` should be removed from the `TxBody`. Also remove zero
-      -- native asset quantities.
-      checkMint :: TxBodyMint -> Maybe TxBodyMint
-      checkMint tm@TxBodyMint{nativeAssets}
-        | null filteredAssets = Nothing
-        | otherwise = Just $ tm & #nativeAssets .~ filteredAssets
-        where 
-          filteredAssets = filter ((/=0) . view #quantity) nativeAssets
-
-      sumMints :: TxBodyMint -> TxBodyMint -> TxBodyMint
-      sumMints main@TxBodyMint{nativeAssets} TxBodyMint{nativeAssets=otherAssets} =
-        main & #nativeAssets .~ sumNativeAssets (nativeAssets <> otherAssets)
 
 addSwapUpdateToBuilder :: TxBody -> (Int,SwapUpdate) -> TxBody
 addSwapUpdateToBuilder txBody (idx,SwapUpdate{..}) =

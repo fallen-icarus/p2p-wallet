@@ -83,18 +83,8 @@ swapClosesList reverseTickerMap = map utxoRow
 
     liquiditySwapRow :: (Int,SwapClose) -> TwoWay.SwapDatum -> AppNode
     liquiditySwapRow (idx,s@SwapClose{utxoRef,walletAlias}) TwoWay.SwapDatum{..} = do
-      let asset1 = updateQuantity s $ NativeAsset
-            { policyId = asset1Id
-            , tokenName = asset1Name
-            , fingerprint = mkAssetFingerprint asset1Id asset1Name
-            , quantity = 0
-            }
-          asset2 = updateQuantity s $ NativeAsset
-            { policyId = asset2Id
-            , tokenName = asset2Name
-            , fingerprint = mkAssetFingerprint asset2Id asset2Name
-            , quantity = 0
-            }
+      let asset1 = updateQuantity s $ mkNativeAsset asset1Id asset1Name
+          asset2 = updateQuantity s $ mkNativeAsset asset2Id asset2Name
       hstack
         [ vstack
             [ hstack

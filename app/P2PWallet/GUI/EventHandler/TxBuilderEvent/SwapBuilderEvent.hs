@@ -75,8 +75,9 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
     ConfirmAdding -> 
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (swapBuilderEvent . EditSelectedSwapCreation . AddResult) $ do
-          let (idx,newSwapCreation@NewSwapCreation{paymentAddress}) = 
-                fromMaybe (0,def) $ txBuilderModel ^. #swapBuilderModel % #targetSwapCreation
+          (idx,newSwapCreation@NewSwapCreation{paymentAddress}) <- 
+            fromJustOrAppError "targetSwapCreation is Nothing" $
+                txBuilderModel ^. #swapBuilderModel % #targetSwapCreation
           verifiedSwap <- fromRightOrAppError $ 
             verifyNewSwapCreation paymentAddress reverseTickerMap newSwapCreation
 
@@ -117,8 +118,10 @@ handleSwapBuilderEvent model@AppModel{..} evt = case evt of
     ConfirmAdding -> 
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (swapBuilderEvent . EditSelectedSwapUpdate . AddResult) $ do
-          let (idx,newSwapCreation@NewSwapCreation{paymentAddress}) = 
-                fromMaybe (0,def) $ txBuilderModel ^. #swapBuilderModel % #targetSwapUpdate
+          (idx,newSwapCreation@NewSwapCreation{paymentAddress}) <- 
+            fromJustOrAppError "targetSwapUpdate is Nothing" $ 
+              txBuilderModel ^. #swapBuilderModel % #targetSwapUpdate
+
           verifiedSwap <- fromRightOrAppError $ 
             verifyNewSwapCreation paymentAddress reverseTickerMap newSwapCreation
 

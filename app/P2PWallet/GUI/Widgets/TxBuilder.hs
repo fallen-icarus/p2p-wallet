@@ -20,6 +20,7 @@ import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
+import P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder
 import P2PWallet.GUI.Widgets.TxBuilder.StatusBar
 import P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder
 import P2PWallet.GUI.Widgets.TxBuilder.TestMint
@@ -98,7 +99,12 @@ txBuilderWidget model@AppModel{..} = do
               , isNothing (swapBuilderModel ^. #targetSwapCreation)
               , isNothing (swapBuilderModel ^. #targetSwapUpdate)
               , isNothing (swapBuilderModel ^. #targetSwapExecution)
+              , isNothing (loanBuilderModel ^. #targetAskCreation)
+              , isNothing (loanBuilderModel ^. #targetAskUpdate)
+              , isNothing (loanBuilderModel ^. #targetOfferCreation)
+              , isNothing (loanBuilderModel ^. #targetOfferUpdate)
               , not addingChangeOutput
+              , not addingExternalUserOutput
               , not addingTestMint
               , not importing
               , not exporting
@@ -111,6 +117,14 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (swapBuilderModel ^. #targetSwapUpdate)
       , editSwapExecutionWidget model
           `nodeVisible` isJust (swapBuilderModel ^. #targetSwapExecution)
+      , editAskCreationWidget model
+          `nodeVisible` isJust (loanBuilderModel ^. #targetAskCreation)
+      , editAskUpdateWidget model
+          `nodeVisible` isJust (loanBuilderModel ^. #targetAskUpdate)
+      , editOfferCreationWidget model
+          `nodeVisible` isJust (loanBuilderModel ^. #targetOfferCreation)
+      , editOfferUpdateWidget model
+          `nodeVisible` isJust (loanBuilderModel ^. #targetOfferUpdate)
       , addExternalUserOutputWidget
           `nodeVisible` addingExternalUserOutput
       , addChangeOutputWidget
@@ -241,6 +255,7 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
                  + length userWithdrawals
                  + maybe 0 (const 1) testMint
                  + swapsActionCount swapBuilderModel
+                 + loanActionCount loanBuilderModel
   vstack
     [ label ("Actions " <> show (tupled [pretty numActions]))
         `styleBasic` [textSize 12]
@@ -250,6 +265,12 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
         , swapClosesList reverseTickerMap $ swapBuilderModel ^. #swapCloses
         , swapUpdatesList reverseTickerMap $ swapBuilderModel ^. #swapUpdates
         , swapExecutionsList reverseTickerMap $ swapBuilderModel ^. #swapExecutions
+        , askCreationsList reverseTickerMap $ loanBuilderModel ^. #askCreations
+        , askClosesList reverseTickerMap $ loanBuilderModel ^. #askCloses
+        , askUpdatesList reverseTickerMap $ loanBuilderModel ^. #askUpdates
+        , offerCreationsList reverseTickerMap $ loanBuilderModel ^. #offerCreations
+        , offerClosesList reverseTickerMap $ loanBuilderModel ^. #offerCloses
+        , offerUpdatesList reverseTickerMap $ loanBuilderModel ^. #offerUpdates
         , userCertificatesList userCertificates
         , userWithdrawalsList userWithdrawals
         , maybe [] (pure . testMintRow reverseTickerMap) testMint

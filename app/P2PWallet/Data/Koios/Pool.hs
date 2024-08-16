@@ -13,6 +13,11 @@ endpoint (the types are the same for mainnet).
 module P2PWallet.Data.Koios.Pool where
 
 import Data.Aeson
+import Data.ByteString.Lazy qualified as LBS
+
+import Database.SQLite.Simple.FromField (FromField(..))
+import Database.SQLite.Simple.ToField (ToField(..))
+import Database.SQLite.Simple.Ok (Ok(Ok))
 
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Prelude
@@ -140,3 +145,9 @@ instance FromJSON Pool where
       <*> o .: "live_stake"
       <*> o .: "live_delegators"
       <*> o .: "live_saturation"
+
+instance ToField Pool where
+  toField = toField . encode
+
+instance FromField Pool where
+  fromField = fmap (decode @Pool) . fromField @LBS.ByteString >=> maybe mzero Ok

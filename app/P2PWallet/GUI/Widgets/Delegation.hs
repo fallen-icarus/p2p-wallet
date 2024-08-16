@@ -425,7 +425,7 @@ historyTableWidget rewardHistory = do
         ] `styleBasic` [padding 5, bgColor customGray4, radiusTL 5, radiusTR 5]
     , spacer_ [width 1]
     , vscroll_ [scrollOverlay, wheelRate 50, thumbWidth 3] $ vstack_ [childSpacing_ 1] $ 
-        for (take 50 rewardHistory) $ \StakeReward{profileId=_,stakeId=_,..} ->
+        for (take 50 rewardHistory) $ \StakeReward{..} ->
           hgrid_ [childSpacing_ 3]
             [ box_ [alignMiddle] $ label (show spendableEpoch) 
                 `styleBasic` [padding 0, textSize 9, textColor lightGray]

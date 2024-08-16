@@ -13,6 +13,7 @@ import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Delegation
 import P2PWallet.GUI.Widgets.Dex
 import P2PWallet.GUI.Widgets.Home
+import P2PWallet.GUI.Widgets.Lending
 import P2PWallet.GUI.Widgets.MainMenu
 import P2PWallet.GUI.Widgets.Networks
 import P2PWallet.GUI.Widgets.Notifications
@@ -42,6 +43,7 @@ buildUI _ model@AppModel{..} = do
             , addressBookWidget model `nodeVisible` (AddressBookScene == scene)
             , tickerRegistryWidget model `nodeVisible` (TickerRegistryScene == scene)
             , dexWidget model `nodeVisible` (DexScene == scene)
+            , lendingWidget model `nodeVisible` (LendingScene == scene)
             , notificationsWidget model `nodeVisible` (NotificationsScene == scene)
             ]
         ] `nodeVisible` isJust selectedProfile
@@ -54,4 +56,5 @@ buildUI _ model@AppModel{..} = do
     , waitingOverlay "Submitting Transaction..." `nodeVisible` waitingStatus ^. #submitting
     , waitingOverlay "Adding to Builder..." `nodeVisible` waitingStatus ^. #addingToBuilder
     , waitingOverlay "Syncing Order Book..." `nodeVisible` waitingStatus ^. #syncingOrderBook
+    , waitingOverlay "Syncing Loan Requests..." `nodeVisible` waitingStatus ^. #syncingLoanAsks
     ] `styleBasic` [bgColor customGray4]

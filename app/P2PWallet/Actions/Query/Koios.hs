@@ -15,11 +15,24 @@ module P2PWallet.Actions.Query.Koios
   , runQueryAllRegisteredPools
   , runQuerySwaps
   , runQueryDexWallet
+  , runQueryLoanWallet
+  , runQueryLoanAsks
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
 import Servant.Client qualified as Client
-import Servant.API ((:<|>)(..), JSON, Post, Get, (:>), ReqBody, Required, QueryParam', QueryParam)
+import Servant.API 
+  ( ToHttpApiData
+  , (:<|>)(..)
+  , JSON
+  , Post
+  , Get
+  , (:>)
+  , ReqBody
+  , Required
+  , QueryParam'
+  , QueryParam
+  )
 import Network.HTTP.Client qualified as HTTP
 import Network.HTTP.Client.TLS qualified as HTTPS
 import Network.HTTP.Client (newManager)
@@ -28,9 +41,13 @@ import Data.Aeson.Types qualified as Aeson
 import Data.Text qualified as Text
 import UnliftIO.Async (mapConcurrently,concurrently)
 
+import P2PWallet.Data.AppModel.LendingModel.LoanAskConfiguration
+import P2PWallet.Data.AppModel.LendingModel.LoanOfferConfiguration
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Koios.AddressUTxO
+import P2PWallet.Data.Koios.AssetTransaction
 import P2PWallet.Data.Koios.LinkedPaymentAddresses
+import P2PWallet.Data.Koios.MintTransaction
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Koios.PostTypes
 import P2PWallet.Data.Koios.StakeAccount
@@ -42,6 +59,8 @@ import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoSwaps.Common
 import P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps qualified as OneWay
 import P2PWallet.Data.DeFi.CardanoSwaps.TwoWaySwaps qualified as TwoWay
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -69,6 +88,22 @@ customTlsSettings :: HTTP.ManagerSettings
 customTlsSettings = HTTPS.tlsManagerSettings
   { HTTP.managerResponseTimeout = HTTP.responseTimeoutMicro 5_000_000
   }
+
+-- Since Koios instances may occassionally return incorrect UTxOs if they are not
+-- close enough to the chain tip, this would mess with the wallet's notifications.
+-- To account for this, the UTxOs are queried three times and compared. At least
+-- two responses must match to move on. The redundant queries occur concurrently.
+queryWithRedundancies :: (Eq a) => IO (Either Text [a]) -> IO (Either Text [a])
+queryWithRedundancies query = do
+  (res1,(res2,res3)) <- concurrently query (concurrently query query)
+  let path1 = liftA3 (\a b c -> a == b || a == c) res1 res2 res3
+      path2 = liftA2 (==) res2 res3
+  case (path1,path2) of
+    (Right True ,_) -> return $ first show res1
+    (_, Right True) -> return $ first show res2
+    (Left err, _) -> return $ Left $ show err
+    (_, Left err) -> return $ Left $ show err
+    _ -> return $ Left "There was an error syncing. Wait a minute and try again."
 
 -------------------------------------------------
 -- High-Level API
@@ -138,9 +173,9 @@ runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
     case (,) <$> utxoRes <*> txRes of
       Right (us,txs) -> do
         return $ Right $ 
-          wallet & #utxos .~ map toPersonalUTxO us
+          wallet & #utxos .~ map fromAddressUTxO us
                  & #lovelace .~ sum (map (view #lovelace) us)
-                 & #transactions %~ mappend (map (P2P.toTransaction profileId paymentId) txs)
+                 & #transactions %~ mappend (map P2P.toTransaction txs)
                  & populateNativeAssets
       Left err -> return $ Left err
   where
@@ -159,16 +194,7 @@ runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
     -- To account for this, the UTxOs are queried three times and compared. At least
     -- two responses must match to move on. The redundant queries occur concurrently.
     queryUTxOsWithRedundancies :: IO (Either Text [AddressUTxO])
-    queryUTxOsWithRedundancies = do
-      (res1,(res2,res3)) <- concurrently fetchUTxOs (concurrently fetchUTxOs fetchUTxOs)
-      let path1 = liftA3 (\a b c -> a == b || a == c) res1 res2 res3
-          path2 = liftA2 (==) res2 res3
-      case (path1,path2) of
-        (Right True ,_) -> return $ first show res1
-        (_, Right True) -> return $ first show res2
-        (Left err, _) -> return $ Left $ show err
-        (_, Left err) -> return $ Left $ show err
-        _ -> return $ Left "There was an error syncing UTxOs. Wait a minute and try again."
+    queryUTxOsWithRedundancies = queryWithRedundancies fetchUTxOs
 
     -- Try to query the UTxOs. If a timeout error occurs, just try again.
     fetchUTxOs :: IO (Either Text [AddressUTxO])
@@ -201,7 +227,7 @@ runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
 
 -- | Sync the latest information for the stake wallet. Try to do as much concurrently as possible.
 runQueryStakeWalletInfo :: StakeWallet -> IO (Either Text StakeWallet)
-runQueryStakeWalletInfo wallet@StakeWallet{network,profileId,stakeId,stakeAddress} = do
+runQueryStakeWalletInfo wallet@StakeWallet{network,stakeAddress} = do
     (res1,(res2,res3)) <- 
       concurrently fetchAccountStatus $ concurrently fetchRewards fetchLinkedAddresses
     case (,,) <$> res1 <*> res2 <*> res3 of
@@ -216,7 +242,7 @@ runQueryStakeWalletInfo wallet@StakeWallet{network,profileId,stakeId,stakeAddres
                      & #utxoBalance .~ utxoBalance
                      & #availableRewards .~ availableRewards
                      & #delegatedPool .~ maybeHead pools
-                     & #rewardHistory .~ reverse (map (P2P.toStakeReward profileId stakeId) rewards)
+                     & #rewardHistory .~ reverse (map P2P.toStakeReward rewards)
                      & #linkedAddresses .~ linkedAddresses
       Right ([],_,_) -> 
         -- If a stake address has never been seen on chain before (ie, a UTxO has not been created 
@@ -318,7 +344,7 @@ runQueryDexWallet dexWallet@DexWallet{..} = do
           & #lovelace .~ sum (map (view #lovelace) allUTxOs)
           & #utxos .~ map fromAddressUTxO allUTxOs
           & populateNativeAssets
-          & #transactions %~ mappend (map (P2P.toTransaction profileId paymentId) txs)
+          & #transactions %~ mappend (map P2P.toTransaction txs)
       Left err -> return $ Left err
   where
     -- | Aggregate all native assets located at the wallet.
@@ -350,34 +376,14 @@ runQueryDexWallet dexWallet@DexWallet{..} = do
     -- To account for this, the UTxOs are queried three times and compared. At least
     -- two responses must match to move on. The redundant queries occur concurrently.
     queryOneWaySwapsWithRedundancies :: IO (Either Text [AddressUTxO])
-    queryOneWaySwapsWithRedundancies = do
-      (res1,(res2,res3)) <- 
-        concurrently fetchOneWaySwaps (concurrently fetchOneWaySwaps fetchOneWaySwaps)
-      let path1 = liftA3 (\a b c -> a == b || a == c) res1 res2 res3
-          path2 = liftA2 (==) res2 res3
-      case (path1,path2) of
-        (Right True ,_) -> return $ first show res1
-        (_, Right True) -> return $ first show res2
-        (Left err, _) -> return $ Left $ show err
-        (_, Left err) -> return $ Left $ show err
-        _ -> return $ Left "There was an error syncing UTxOs. Wait a minute and try again."
+    queryOneWaySwapsWithRedundancies = queryWithRedundancies fetchOneWaySwaps
 
     -- Since Koios instances may occassionally return incorrect UTxOs if they are not
     -- close enough to the chain tip, this would mess with the wallet's notifications.
     -- To account for this, the UTxOs are queried three times and compared. At least
     -- two responses must match to move on. The redundant queries occur concurrently.
     queryTwoWaySwapsWithRedundancies :: IO (Either Text [AddressUTxO])
-    queryTwoWaySwapsWithRedundancies = do
-      (res1,(res2,res3)) <- 
-        concurrently fetchTwoWaySwaps (concurrently fetchTwoWaySwaps fetchTwoWaySwaps)
-      let path1 = liftA3 (\a b c -> a == b || a == c) res1 res2 res3
-          path2 = liftA2 (==) res2 res3
-      case (path1,path2) of
-        (Right True ,_) -> return $ first show res1
-        (_, Right True) -> return $ first show res2
-        (Left err, _) -> return $ Left $ show err
-        (_, Left err) -> return $ Left $ show err
-        _ -> return $ Left "There was an error syncing UTxOs. Wait a minute and try again."
+    queryTwoWaySwapsWithRedundancies = queryWithRedundancies fetchTwoWaySwaps
 
     -- Try to query the tx hashes since last time. If a timeout error occurs, just try again.
     fetchTxHashes :: IO (Either Text [Text])
@@ -404,9 +410,131 @@ runQueryDexWallet dexWallet@DexWallet{..} = do
               (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
               (groupInto 50 hashes)
 
+-- | Get all information for a particular loan wallet.
+runQueryLoanWallet :: LoanWallet -> IO (Either Text LoanWallet)
+runQueryLoanWallet loanWallet@LoanWallet{..} = do
+    (txRes,(loansRes,offerRes)) <- 
+      concurrently queryTxsConcurrently $ 
+        concurrently queryLoansWithRedundancies queryOffersWithRedundancies
+
+    case (,,) <$> txRes <*> loansRes <*> offerRes of
+      Right (txs,loanUTxOs,offers) -> do
+        return $ Right $ loanWallet
+          & #lovelace .~ sum (map (view #lovelace) loanUTxOs)
+          & #utxos .~ map fromAddressUTxO loanUTxOs
+          & populateNativeAssets
+          & #transactions %~ mappend (map P2P.toTransaction txs)
+          & #offerUTxOs .~ map fromAddressUTxO offers
+      Left err -> return $ Left err
+  where
+    -- | Aggregate all native assets located at the wallet.
+    populateNativeAssets :: LoanWallet -> LoanWallet
+    populateNativeAssets s@LoanWallet{utxos=us} =
+      s & #nativeAssets .~ sumNativeAssets (concatMap (view #nativeAssets) us)
+
+    -- Add one to the blockHeight for the most recently recorded transaction for this wallet.
+    -- Koios will return any transactions for that block or later.
+    afterBlock :: Integer
+    afterBlock = (+1) $ maybe 0 (view #blockHeight) $ maybeHead transactions
+
+    -- Try to query the loan address' utxos.
+    fetchLoanUTxOs :: IO (Either Text [AddressUTxO])
+    fetchLoanUTxOs = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryAddressUTxOs [loanAddress]) env)
+
+    -- Since Koios instances may occassionally return incorrect UTxOs if they are not
+    -- close enough to the chain tip, this would mess with the wallet's notifications.
+    -- To account for this, the UTxOs are queried three times and compared. At least
+    -- two responses must match to move on. The redundant queries occur concurrently.
+    queryLoansWithRedundancies :: IO (Either Text [AddressUTxO])
+    queryLoansWithRedundancies = queryWithRedundancies fetchLoanUTxOs
+
+    -- Try to query the offer utxos tied to this user's credential.
+    fetchOfferUTxOs :: IO (Either Text [AddressUTxO])
+    fetchOfferUTxOs = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+          offerCfg = LoanOfferConfiguration
+            { lenderCredential = Just stakeCredential
+            }
+      first show <$> handleTimeoutError (runClientM (queryLoanOffers offerCfg) env)
+
+    -- Since Koios instances may occassionally return incorrect UTxOs if they are not
+    -- close enough to the chain tip, this would mess with the wallet's notifications.
+    -- To account for this, the UTxOs are queried three times and compared. At least
+    -- two responses must match to move on. The redundant queries occur concurrently.
+    queryOffersWithRedundancies :: IO (Either Text [AddressUTxO])
+    queryOffersWithRedundancies = queryWithRedundancies fetchOfferUTxOs
+
+    -- Try to query the tx hashes since last time. If a timeout error occurs, just try again.
+    fetchTxHashes :: IO (Either Text [Text])
+    fetchTxHashes = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> 
+        handleTimeoutError (runClientM (queryAddressTxHashes [loanAddress] afterBlock) env)
+
+    -- Try to query the transaction info concurrently. The transactions are grouped together,
+    -- 50 per response, since some transactions can be quite large.
+    queryTxsConcurrently :: IO (Either Text [Transaction])
+    queryTxsConcurrently = do
+      fetchTxHashes >>= \case
+        Left err -> return $ Left $ show err
+        Right hashes -> do
+          manager <- newManager customTlsSettings
+          let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+          bimap show concat . sequence <$> 
+            mapConcurrently 
+              (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
+              (groupInto 50 hashes)
+
+-- | Get the current open loan asks. Optionally filter the asks by loan asset and collateral.
+runQueryLoanAsks :: Network -> LoanAskConfiguration -> IO (Either Text [LoanUTxO])
+runQueryLoanAsks network loanAskCfg = do
+    askRes <- fetchOpenAsks
+
+    case askRes of
+      Right openAsks -> do
+        return $ Right $ sortOn loanUTxOLoanAmount $ map fromAddressUTxO openAsks
+      Left err -> return $ Left err
+  where
+    -- Try to query the open asks.
+    fetchOpenAsks :: IO (Either Text [AddressUTxO])
+    fetchOpenAsks = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> 
+        handleTimeoutError (runClientM (queryLoanAsks loanAskCfg) env)
+
 -------------------------------------------------
 -- Low-Level API
 -------------------------------------------------
+-- | Optionally filter by what is in the inline datum.
+newtype InlineDatumFilterParam = InlineDatumFilterParam Text
+  deriving newtype (ToHttpApiData,IsString)
+
+-- | Optionally filter by what assets are present in the UTxO.
+newtype AssetListFilterParam = AssetListFilterParam Text
+  deriving newtype (ToHttpApiData,IsString)
+
+-- | Offset the response.
+newtype OffsetParam = OffsetParam Int
+  deriving newtype (ToHttpApiData,Num)
+
+-- | Order the response.
+newtype OrderParam = OrderParam Text
+  deriving newtype (ToHttpApiData,IsString)
+
+-- | Which fields to return in the response.
+newtype SelectParam = SelectParam Text
+  deriving newtype (ToHttpApiData,IsString)
+
+-- | Whether to only return UTxOs that still exist. This is either "eq.false" or "eq.true".
+newtype IsSpentParam = IsSpentParam Text
+  deriving newtype (ToHttpApiData,IsString)
+
 type KoiosApi
   =     ReqBody '[JSON] SubmitTxCBOR
      :> Post '[JSON] Value
@@ -418,59 +546,98 @@ type KoiosApi
      :> Get '[JSON] Value
 
   :<|>  "address_utxos"
-     :> QueryParam' '[Required] "select" Text
-     :> QueryParam' '[Required] "is_spent" Text
-     :> QueryParam' '[Required] "offset" Int
-     :> QueryParam' '[Required] "order" Text
-     :> QueryParam "asset_list" Text
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "is_spent" IsSpentParam
+     :> QueryParam' '[Required] "offset" OffsetParam
+     :> QueryParam' '[Required] "order" OrderParam
+     :> QueryParam "asset_list" AssetListFilterParam
      :> ReqBody '[JSON] PaymentAddressesExtended
      :> Post '[JSON] [AddressUTxO]
 
   :<|> "address_txs"
-     :> QueryParam' '[Required] "select" Text
-     :> QueryParam' '[Required] "offset" Int
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "offset" OffsetParam
      :> ReqBody '[JSON] PaymentAddressesAfterBlock
      :> Post '[JSON] TxHashes
 
   :<|> "tx_info"
-     :> QueryParam' '[Required] "select" Text
-     :> QueryParam' '[Required] "order" Text
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "order" OrderParam
      :> ReqBody '[JSON] TxHashes
      :> Post '[JSON] [Transaction]
 
   :<|>  "account_info"
-     :> QueryParam' '[Required] "select" Text
+     :> QueryParam' '[Required] "select" SelectParam
      :> ReqBody '[JSON] StakeAddresses
      :> Post '[JSON] [StakeAccount]
 
   :<|>  "account_rewards"
-     :> QueryParam' '[Required] "select" Text
+     :> QueryParam' '[Required] "select" SelectParam
      :> ReqBody '[JSON] StakeAddresses
      :> Post '[JSON] [StakeRewards]
 
   :<|>  "pool_info"
-     :> QueryParam' '[Required] "select" Text
+     :> QueryParam' '[Required] "select" SelectParam
      :> QueryParam "sigma" Text
      :> QueryParam "meta_json" Text
      :> ReqBody '[JSON] Pools
      :> Post '[JSON] [Pool]
 
   :<|>  "account_addresses"
-     :> QueryParam' '[Required] "select" Text
+     :> QueryParam' '[Required] "select" SelectParam
      :> ReqBody '[JSON] StakeAddressesNonEmpty
      :> Post '[JSON] LinkedPaymentAddresses
 
   :<|> "pool_list"
-     :> QueryParam' '[Required] "select" Text
-     :> QueryParam' '[Required] "offset" Int
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "offset" OffsetParam
      :> QueryParam' '[Required] "pool_status" Text
      :> Get '[JSON] Pools
 
   :<|>  "asset_utxos"
-     :> QueryParam' '[Required] "select" Text
-     :> QueryParam' '[Required] "offset" Int
-     :> QueryParam' '[Required] "is_spent" Text
-     :> QueryParam "asset_list" Text
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "offset" OffsetParam
+     :> QueryParam' '[Required] "is_spent" IsSpentParam
+     :> QueryParam "asset_list" AssetListFilterParam
+     :> ReqBody '[JSON] AssetList
+     :> Post '[JSON] [AddressUTxO]
+
+  :<|>  "asset_history"
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "_asset_policy" CurrencySymbol
+     :> QueryParam' '[Required] "_asset_name" TokenName
+     :> Get '[JSON] [MintTransactions]
+
+  :<|>  "asset_txs"
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "_asset_policy" CurrencySymbol
+     :> QueryParam' '[Required] "_asset_name" TokenName
+     :> QueryParam' '[Required] "_history" Bool
+     :> Get '[JSON] [AssetTransaction]
+
+  -- A version of asset_utxos that supports filtering AskUTxOs by what is in the datum.
+  -- The inline datum is VERY specific to Ask UTxOs so this cannot be used with other UTxOs.
+  :<|>  "asset_utxos"
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "offset" OffsetParam
+     :> QueryParam' '[Required] "is_spent" IsSpentParam
+     -- Ada should always be the first asset in the collateral list if it is being used.
+     :> QueryParam "inline_datum->value->fields->7->map->0->k->bytes" InlineDatumFilterParam
+     -- The minimum loan duration.
+     :> QueryParam "inline_datum->value->fields->6->int" InlineDatumFilterParam
+     -- The maximum loan duration.
+     :> QueryParam "inline_datum->value->fields->6->int" InlineDatumFilterParam
+     :> QueryParam "asset_list" AssetListFilterParam
+     :> ReqBody '[JSON] AssetList
+     :> Post '[JSON] [AddressUTxO]
+
+  -- A version of asset_utxos that supports filtering OfferUTxOs by what is in the datum.
+  -- The inline datum is VERY specific to Ask UTxOs so this cannot be used with other UTxOs.
+  :<|>  "asset_utxos"
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "offset" OffsetParam
+     :> QueryParam' '[Required] "is_spent" IsSpentParam
+     :> QueryParam "asset_list" AssetListFilterParam
      :> ReqBody '[JSON] AssetList
      :> Post '[JSON] [AddressUTxO]
 
@@ -486,6 +653,10 @@ submitApi
   :<|> linkedPaymentAddressesApi
   :<|> poolListApi
   :<|> assetUTxOsApi
+  :<|> mintHistoryApi
+  :<|> assetTxHistoryApi
+  :<|> askUTxOsApi
+  :<|> offerUTxOsApi
   = client (Proxy :: Proxy KoiosApi)
 
 -- Query all UTxOs for a list of payment addresses.
@@ -493,15 +664,15 @@ queryAddressUTxOs :: [PaymentAddress] -> ClientM [AddressUTxO]
 queryAddressUTxOs addrs = queryUTxOs 0 []
   where
     -- | This queries 1000 UTxOs at a time.
-    queryUTxOs :: Int -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryUTxOs :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
     queryUTxOs offset !acc = do
       !res <- 
         addressUTxOsApi 
           select 
-          "eq.false" -- not spent
+          (IsSpentParam "eq.false")
           offset 
-          "block_height.asc"  -- ordering by block_height
-          Nothing -- no limit
+          (OrderParam "block_height.asc") 
+          Nothing
           (PaymentAddressesExtended addrs)
       if length res == 1000 then 
         -- Query again since there may be more.
@@ -510,9 +681,9 @@ queryAddressUTxOs addrs = queryUTxOs 0 []
         -- That should be the last of the results.
         return $ acc <> res
 
-    select :: Text
+    select :: SelectParam
     select =
-      mconcat $ intersperse ","
+      fromString $ intercalate ","
         [ "is_spent"
         , "tx_hash"
         , "tx_index"
@@ -532,7 +703,7 @@ queryAddressUTxOs addrs = queryUTxOs 0 []
 queryAddressTxHashes :: [PaymentAddress] -> Integer -> ClientM [Text]
 queryAddressTxHashes addrs lastBlock = queryHashes 0 []
   where
-    queryHashes :: Int -> [Text] -> ClientM [Text]
+    queryHashes :: OffsetParam -> [Text] -> ClientM [Text]
     queryHashes offset !acc = do
       (TxHashes hashes) <- 
         -- Only fetch the "tx_hash" column.
@@ -549,9 +720,9 @@ queryAddressTxHashes addrs lastBlock = queryHashes 0 []
 queryAddressTransactions :: [Text] -> ClientM [Transaction]
 queryAddressTransactions = txInfoApi select "block_height.desc" . TxHashes
   where
-    select :: Text
+    select :: SelectParam
     select = 
-      mconcat $ intersperse ","
+      fromString $ intercalate ","
         [ "tx_hash"
         , "tx_timestamp"
         , "block_height"
@@ -574,8 +745,9 @@ queryAddressTransactions = txInfoApi select "block_height.desc" . TxHashes
 queryStakeAccounts :: [StakeAddress] -> ClientM [StakeAccount]
 queryStakeAccounts addrs = stakeAccountApi select $ StakeAddresses addrs
   where
+    select :: SelectParam
     select =
-      toText $ intercalate ","
+      fromString $ intercalate ","
         [ "stake_address"
         , "status"
         , "delegated_pool"
@@ -595,8 +767,9 @@ queryPoolInfo :: Maybe Text -> Maybe Text -> Pools -> ClientM [Pool]
 queryPoolInfo _ _ (Pools []) = return []
 queryPoolInfo sigmaFilter metaFilter pools = poolInfoApi select sigmaFilter metaFilter pools
   where
+    select :: SelectParam
     select =
-      toText $ intercalate ","
+      fromString $ intercalate ","
         [ "pool_id_bech32"
         , "margin"
         , "fixed_cost"
@@ -617,7 +790,7 @@ queryLinkedPaymentAddresses :: [StakeAddress] -> ClientM [PaymentAddress]
 queryLinkedPaymentAddresses addrs = 
   unLinkedPaymentAddresses <$> linkedPaymentAddressesApi "addresses" (StakeAddressesNonEmpty addrs)
 
-queryPoolIds :: Int -> [PoolID] -> ClientM [PoolID]
+queryPoolIds :: OffsetParam -> [PoolID] -> ClientM [PoolID]
 queryPoolIds offset !acc = do
   (Pools poolIds) <- poolListApi "pool_id_bech32,pool_status" offset "eq.registered"
   if length poolIds == 1000 then
@@ -630,12 +803,13 @@ queryPoolIds offset !acc = do
 queryOneWaySwaps :: OfferAsset -> AskAsset -> ClientM [AddressUTxO]
 queryOneWaySwaps offerAsset askAsset = queryApi 0 []
   where
-    offerFilter :: Maybe Text
+    offerFilter :: Maybe AssetListFilterParam
     offerFilter 
       | offerAsset ^. #unOfferAsset % #policyId == "" = Nothing
-      | otherwise = Just $ "cs." <> assetToQueryParam (unOfferAsset offerAsset)
+      | otherwise = Just $ AssetListFilterParam $ 
+          "cs." <> assetToQueryParam (unOfferAsset offerAsset)
 
-    queryApi :: Int -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
     queryApi offset !acc = do
       res <- assetUTxOsApi select offset "eq.false" offerFilter $ 
         AssetList [(OneWay.beaconCurrencySymbol, OneWay.genPairBeaconName offerAsset askAsset)]
@@ -646,7 +820,6 @@ queryOneWaySwaps offerAsset askAsset = queryApi 0 []
         -- That should be the last of the results.
         return $ acc <> res
 
-      
     assetToQueryParam :: NativeAsset -> Text
     assetToQueryParam NativeAsset{policyId,tokenName} = mconcat
       [ "[{\"policy_id\":\""
@@ -656,8 +829,8 @@ queryOneWaySwaps offerAsset askAsset = queryApi 0 []
       , "\"}]"
       ]
 
-    select :: Text
-    select = fromString $ mconcat $ intersperse ","
+    select :: SelectParam
+    select = fromString $ intercalate ","
       [ "is_spent"
       , "tx_hash"
       , "tx_index"
@@ -675,12 +848,12 @@ queryOneWaySwaps offerAsset askAsset = queryApi 0 []
 queryTwoWaySwaps :: OfferAsset -> AskAsset -> ClientM [AddressUTxO]
 queryTwoWaySwaps (OfferAsset offerAsset) (AskAsset askAsset) = queryApi 0 []
   where
-    offerFilter :: Maybe Text
+    offerFilter :: Maybe AssetListFilterParam
     offerFilter 
       | offerAsset ^. #policyId == "" = Nothing
-      | otherwise = Just $ "cs." <> assetToQueryParam offerAsset
+      | otherwise = Just $ AssetListFilterParam $ "cs." <> assetToQueryParam offerAsset
 
-    queryApi :: Int -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
     queryApi offset !acc = do
       res <- assetUTxOsApi select offset "eq.false" offerFilter $ 
         AssetList [(TwoWay.beaconCurrencySymbol, TwoWay.genPairBeaconName offerAsset askAsset)]
@@ -691,7 +864,6 @@ queryTwoWaySwaps (OfferAsset offerAsset) (AskAsset askAsset) = queryApi 0 []
         -- That should be the last of the results.
         return $ acc <> res
 
-      
     assetToQueryParam :: NativeAsset -> Text
     assetToQueryParam NativeAsset{policyId,tokenName} = mconcat
       [ "[{\"policy_id\":\""
@@ -701,8 +873,163 @@ queryTwoWaySwaps (OfferAsset offerAsset) (AskAsset askAsset) = queryApi 0 []
       , "\"}]"
       ]
 
-    select :: Text
-    select = fromString $ mconcat $ intersperse ","
+    select :: SelectParam
+    select = fromString $ intercalate ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]
+
+queryLoanAsks :: LoanAskConfiguration -> ClientM [AddressUTxO]
+queryLoanAsks LoanAskConfiguration{..} = queryApi 0 []
+  where
+    minDurationFilter :: Maybe InlineDatumFilterParam
+    minDurationFilter = 
+      minDuration <&> 
+        InlineDatumFilterParam . ("gte." <>) . display . toPlutusTime . convertDaysToPosixPeriod
+
+    maxDurationFilter :: Maybe InlineDatumFilterParam
+    maxDurationFilter = 
+      maxDuration <&> 
+        InlineDatumFilterParam . ("lte." <>) . display . toPlutusTime . convertDaysToPosixPeriod
+
+    collateralAsAssets :: [Loans.Asset]
+    collateralAsAssets = map fromNativeAsset collateral
+
+    assetBeaconAsAsset :: [Loans.Asset]
+    assetBeaconAsAsset = case loanAsset of
+      Nothing -> []
+      Just asset -> 
+        let (Loans.AssetBeaconId assetBeacon) = 
+              Loans.genLoanAssetBeaconName $ fromNativeAsset asset
+         in [Loans.Asset (Loans.negotiationBeaconCurrencySymbol, assetBeacon)]
+
+    adaAsset :: Loans.Asset
+    adaAsset = fromNativeAsset lovelaceAsNativeAsset
+
+    adaCollateralFilter :: Maybe InlineDatumFilterParam
+    adaCollateralFilter
+      | adaAsset `elem` collateralAsAssets = Just $ InlineDatumFilterParam "eq.\"\""
+      | otherwise = Nothing
+    
+    -- Assets that must be present, besides the Ask beacon.
+    -- If ada is used as collateral, the filtering is uniquely handled.
+    requiredExtraAssets :: [Loans.Asset]
+    requiredExtraAssets = assetBeaconAsAsset <> filter (/= adaAsset) collateralAsAssets
+
+    collateralFilter
+      | null requiredExtraAssets  = Nothing
+      | otherwise = Just 
+                  $ AssetListFilterParam 
+                  $ assetToQueryParam requiredExtraAssets
+
+    assetToQueryParam :: [Loans.Asset] -> Text
+    assetToQueryParam assets = "cs.[" <> mconcat (intersperse "," (go assets)) <> "]"
+      where
+        go :: [Loans.Asset] -> [Text]
+        go [] = []
+        go (Loans.Asset (currSym,tokName):xs) = 
+          let policyId = display currSym
+              assetName = display tokName
+           in ("{\"policy_id\":\"" <> policyId <> "\",\"asset_name\":\"" <> assetName <> "\"}") : go xs
+
+    select :: SelectParam
+    select = fromString $ intercalate ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]
+
+    targetBeacon :: AssetList
+    targetBeacon = AssetList [(Loans.negotiationBeaconCurrencySymbol, Loans.askBeaconName)]
+
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- askUTxOsApi 
+        select 
+        offset 
+        "eq.false" 
+        adaCollateralFilter 
+        minDurationFilter 
+        maxDurationFilter
+        collateralFilter 
+        targetBeacon
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+queryLoanOffers :: LoanOfferConfiguration -> ClientM [AddressUTxO]
+queryLoanOffers LoanOfferConfiguration{..} = queryApi 0 []
+  where
+    lenderIdAsAsset :: [Loans.Asset]
+    lenderIdAsAsset = case lenderCredential of
+      Nothing -> []
+      Just cred -> 
+        let (Loans.LenderId lenderId) = Loans.genLenderId cred
+         in [Loans.Asset (Loans.negotiationBeaconCurrencySymbol, lenderId)]
+
+    -- Assets that must be present, besides the Offer beacon.
+    requiredExtraAssets :: [Loans.Asset]
+    requiredExtraAssets = lenderIdAsAsset
+
+    extraAssetFilter :: Maybe AssetListFilterParam
+    extraAssetFilter
+      | null requiredExtraAssets = Nothing
+      | otherwise = Just 
+                  $ AssetListFilterParam 
+                  $ assetToQueryParam requiredExtraAssets
+
+    targetBeacon :: AssetList
+    targetBeacon = AssetList [(Loans.negotiationBeaconCurrencySymbol, Loans.offerBeaconName)]
+
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- offerUTxOsApi 
+        select 
+        offset 
+        "eq.false" 
+        extraAssetFilter 
+        targetBeacon
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+    assetToQueryParam :: [Loans.Asset] -> Text
+    assetToQueryParam assets = "cs.[" <> mconcat (intersperse "," (go assets)) <> "]"
+      where
+        go :: [Loans.Asset] -> [Text]
+        go [] = []
+        go (Loans.Asset (currSym,tokName):xs) = 
+          let policyId = display currSym
+              assetName = display tokName
+           in ("{\"policy_id\":\"" <> policyId <> "\",\"asset_name\":\"" <> assetName <> "\"}") : go xs
+
+    select :: SelectParam
+    select = fromString $ intercalate ","
       [ "is_spent"
       , "tx_hash"
       , "tx_index"

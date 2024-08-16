@@ -193,8 +193,11 @@ onChainName = to name
     name :: NativeAsset -> Text
     name NativeAsset{policyId,tokenName} = display policyId <> "." <> display tokenName
 
+mkNativeAsset :: CurrencySymbol -> TokenName -> NativeAsset
+mkNativeAsset sym name = NativeAsset sym name (mkAssetFingerprint sym name) 0
+
 lovelaceAsNativeAsset :: NativeAsset
-lovelaceAsNativeAsset = NativeAsset "" "" (mkAssetFingerprint "" "") 0
+lovelaceAsNativeAsset = mkNativeAsset "" ""
 
 -- | Parse a native asset of either the form: "policy_id.token_name" or "# policy_id.token_name".
 parseNativeAsset :: Text -> Maybe NativeAsset
@@ -221,6 +224,14 @@ quantityOf NativeAsset{policyId,fingerprint} a
   | policyId == "" = a ^. #lovelace % #unLovelace
   | otherwise = maybe 0 (view #quantity) 
               $ find (\na -> na ^. #fingerprint == fingerprint) $ a ^. #nativeAssets
+
+-- | Convert a type 'a' to 'NativeAsset'.
+class ToNativeAsset a where
+  toNativeAsset :: a -> NativeAsset
+
+-- | Convert a type 'NativeAsset' to 'a'.
+class FromNativeAsset a where
+  fromNativeAsset :: NativeAsset -> a
 
 -------------------------------------------------
 -- Token Mints

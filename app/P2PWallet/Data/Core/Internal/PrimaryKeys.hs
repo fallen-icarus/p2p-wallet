@@ -24,18 +24,18 @@ newtype ProfileId = ProfileId { unProfileId :: Int }
 makeFieldLabelsNoPrefix ''ProfileId
 
 -- | The row id for the payment_wallets sqlite table.
-newtype PaymentId = PaymentId { unPaymentId :: Int }
+newtype PaymentWalletId = PaymentWalletId { unPaymentWalletId :: Int }
   deriving (Show)
   deriving newtype (Eq,Ord,Num,ToField,FromField)
 
-makeFieldLabelsNoPrefix ''PaymentId
+makeFieldLabelsNoPrefix ''PaymentWalletId
 
 -- | The row id for the stake_wallets sqlite table.
-newtype StakeId = StakeId { unStakeId :: Int }
+newtype StakeWalletId = StakeWalletId { unStakeWalletId :: Int }
   deriving (Show)
   deriving newtype (Eq,Ord,Num,ToField,FromField)
 
-makeFieldLabelsNoPrefix ''StakeId
+makeFieldLabelsNoPrefix ''StakeWalletId
 
 -- | The row id for the address_book sqlite table.
 newtype ContactId = ContactId { unContactId :: Int }
@@ -43,3 +43,17 @@ newtype ContactId = ContactId { unContactId :: Int }
   deriving newtype (Eq,Ord,Num,ToField,FromField)
 
 makeFieldLabelsNoPrefix ''ContactId
+
+-- | The row id for the loan_wallets sqlite table.
+newtype LoanWalletId = LoanWalletId { unLoanWalletId :: Int }
+  deriving (Show)
+  deriving newtype (Eq,Ord,Num,ToField,FromField)
+
+makeFieldLabelsNoPrefix ''LoanWalletId
+
+-- | The row id for the dex_wallets sqlite table.
+newtype DexWalletId = DexWalletId { unDexWalletId :: Int }
+  deriving (Show)
+  deriving newtype (Eq,Ord,Num,ToField,FromField)
+
+makeFieldLabelsNoPrefix ''DexWalletId

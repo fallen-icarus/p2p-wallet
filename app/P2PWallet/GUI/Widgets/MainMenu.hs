@@ -18,7 +18,7 @@ mainMenuWidget model@AppModel{txBuilderModel} = do
       [ changeSceneButton "Home" homeIcon HomeScene
       , changeSceneButton "Staking" delegationCenterIcon DelegationScene
       , changeSceneButton "DEX" dexIcon DexScene
-      , changeSceneButton "Loans" loansIcon LoansScene
+      , changeSceneButton "Lending" loansIcon LendingScene
       , changeSceneButton "Options" optionsIcon OptionsScene
       , changeSceneButton "Reseller" aftermarketIcon AftermarketScene
       , changeSceneButton "Contacts" contactsBookIcon AddressBookScene
