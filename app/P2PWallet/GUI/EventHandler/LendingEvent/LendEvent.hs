@@ -39,8 +39,9 @@ handleLendEvent model@AppModel{..} evt = case evt of
       ]
     ConfirmAdding ->
       [ Task $ runActionOrAlert (LendingEvent . LendEvent . InitializeLoanAskConfiguration . AddResult) $ do
-          newAskCfg <- fromJustOrAppError "newLoanAskConfiguration is Nothing" 
-            (lendingModel ^. #lendModel % #newLoanAskConfiguration)
+          -- `InitializeLoanAskConfiguration StartAdding` is not always called so this can still
+          -- be `Nothing`.
+          let newAskCfg = fromMaybe def $ lendingModel ^. #lendModel % #newLoanAskConfiguration
 
           fromRightOrAppError $ verifyNewLoanAskConfiguration tickerMap newAskCfg
       ]
