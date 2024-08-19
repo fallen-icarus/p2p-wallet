@@ -11,12 +11,14 @@ module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
   , hasAskActions
   , hasOfferActions
   , borrowAndLendError
+  , acceptAndNegotiateError
 
   , LoanBuilderEvent(..)
 
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskClose
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskCreation
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskUpdate
+  , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferAcceptance
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferClose
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferCreation
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferUpdate
@@ -26,11 +28,13 @@ import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskClose
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskCreation
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskUpdate
+import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferAcceptance
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferClose
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferCreation
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferUpdate
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
+import P2PWallet.Data.Core.Wallets.LoanWallet
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -63,6 +67,12 @@ data LoanBuilderEvent
   | RemoveSelectedOfferUpdate Int
   -- | Edit selected offer update.
   | EditSelectedOfferUpdate (AddEvent (Int,OfferUpdate) (Int,OfferCreation))
+  -- | Remove the selected offer acceptance from the builder.
+  | RemoveSelectedOfferAcceptance Int
+  -- | Edit selected offer acceptance. Only the specified collateral can be edited.
+  -- Changing the associated ask UTxO to close requires removing the offerAcceptance
+  -- and creating a new one from the lending page.
+  | EditSelectedOfferAcceptance (AddEvent (Int,OfferAcceptance) (Int,OfferAcceptance))
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -83,6 +93,9 @@ data LoanBuilderModel = LoanBuilderModel
   , offerUpdates :: [(Int,OfferUpdate)]
   -- | The `Int` is the index into `offerUpdates`.
   , targetOfferUpdate :: Maybe (Int,NewOfferCreation)
+  , offerAcceptances :: [(Int,OfferAcceptance)]
+  -- | The `Int` is the index into `offerAcceptances`.
+  , targetOfferAcceptance :: Maybe (Int,NewOfferAcceptance)
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''LoanBuilderModel
@@ -99,6 +112,8 @@ instance Default LoanBuilderModel where
     , offerCloses = []
     , offerUpdates = []
     , targetOfferUpdate = Nothing
+    , offerAcceptances = []
+    , targetOfferAcceptance = Nothing
     }
 
 -- | This is just an alias for `def`. The name is more clear what it is.
@@ -113,10 +128,12 @@ isEmptyLoanBuilderModel LoanBuilderModel{..} = and
   , null offerCreations
   , null offerCloses
   , null offerUpdates
+  , null offerAcceptances
   , isNothing targetAskCreation
   , isNothing targetAskUpdate
   , isNothing targetOfferCreation
   , isNothing targetOfferUpdate
+  , isNothing targetOfferAcceptance
   ]
 
 hasAskActions :: LoanBuilderModel -> Bool
@@ -133,11 +150,18 @@ hasOfferActions LoanBuilderModel{..} = or
   , offerUpdates /= []
   ]
 
-borrowAndLendError :: AppError
-borrowAndLendError = AppError $ unwords
+borrowAndLendError :: Text
+borrowAndLendError = unwords
   [ "Each transaction must be dedicated to either borrowing or lending."
   , "It is not possible to create/update/close asks and create/update/close offers"
   , "in the same transaction."
+  ]
+
+acceptAndNegotiateError :: Text
+acceptAndNegotiateError = unwords
+  [ "Whenever loan offers are being accepted, all negotiation UTxOs must be"
+  , "for the acceptance. This means asks and offers cannot be created/updated/closed"
+  , "in the same transaction as offer acceptances."
   ]
 
 -------------------------------------------------
@@ -149,17 +173,19 @@ instance AddToTxBody LoanBuilderModel where
   addToTxBody txBody LoanBuilderModel{..} = 
       txBody
         -- Add the ask creations.
-        & flip (foldl' addAskCreationToBuilder) askCreations
+        & flip (foldl' addAskCreationToBody) askCreations
         -- Add the ask closes.
-        & flip (foldl' addAskCloseToBuilder) askCloses
+        & flip (foldl' addAskCloseToBody) askCloses
         -- Add the ask updates.
-        & flip (foldl' addAskUpdateToBuilder) askUpdates
+        & flip (foldl' addAskUpdateToBody) askUpdates
         -- Add the offer creations.
-        & flip (foldl' addOfferCreationToBuilder) offerCreations
+        & flip (foldl' addOfferCreationToBody) offerCreations
         -- Add the offer closes.
-        & flip (foldl' addOfferCloseToBuilder) offerCloses
+        & flip (foldl' addOfferCloseToBody) offerCloses
         -- Add the offer updates.
-        & flip (foldl' addOfferUpdateToBuilder) offerUpdates
+        & flip (foldl' addOfferUpdateToBody) offerUpdates
+        -- Add the offer acceptances.
+        & flip (foldl' addOfferAcceptanceToBody) offerAcceptances
         -- Merge any beacon mints so that there is only one `TxBodyMint` per minting policy.
         & #mints %~ mergeTxBodyMints
         -- Adjust any executions based on whether all mints canceled out.
@@ -167,8 +193,8 @@ instance AddToTxBody LoanBuilderModel where
         -- Remove empty mints.
         & #mints %~ removeEmptyMints
 
-addAskCreationToBuilder :: TxBody -> (Int,AskCreation) -> TxBody
-addAskCreationToBuilder txBody (_,AskCreation{..}) =
+addAskCreationToBody :: TxBody -> (Int,AskCreation) -> TxBody
+addAskCreationToBody txBody (_,AskCreation{..}) =
     txBody 
       -- Add one instance of the output per count and preserve ordering of the
       -- output list.
@@ -235,8 +261,8 @@ addAskCreationToBuilder txBody (_,AskCreation{..}) =
       , executionBudget = def -- These must be calculated during the build step.
       }
 
-addAskCloseToBuilder :: TxBody -> (Int,AskClose) -> TxBody
-addAskCloseToBuilder txBody (_,AskClose{..}) =
+addAskCloseToBody :: TxBody -> (Int,AskClose) -> TxBody
+addAskCloseToBody txBody (_,AskClose{..}) =
     txBody
       -- Add the new ask to the inputs.
       & #inputs %~ flip snoc newInput
@@ -284,17 +310,16 @@ addAskCloseToBuilder txBody (_,AskClose{..}) =
       , executionBudget = def -- These must be calculated during the build step.
       }
 
-addAskUpdateToBuilder :: TxBody -> (Int,AskUpdate) -> TxBody
-addAskUpdateToBuilder txBody (idx,AskUpdate{..}) =
+addAskUpdateToBody :: TxBody -> (Int,AskUpdate) -> TxBody
+addAskUpdateToBody txBody (idx,AskUpdate{..}) =
   txBody
-    & flip addAskCreationToBuilder (idx,newAsk)
-    & flip addAskCloseToBuilder (idx,oldAsk)
+    & flip addAskCreationToBody (idx,newAsk)
+    & flip addAskCloseToBody (idx,oldAsk)
 
-addOfferCreationToBuilder :: TxBody -> (Int,OfferCreation) -> TxBody
-addOfferCreationToBuilder txBody (_,OfferCreation{..}) =
+addOfferCreationToBody :: TxBody -> (Int,OfferCreation) -> TxBody
+addOfferCreationToBody txBody (_,OfferCreation{..}) =
     txBody 
-      -- Add one instance of the output per count and preserve ordering of the
-      -- output list.
+      -- Add the output and preserve ordering of the output list.
       & #outputs %~ (<> [newOutput])
       -- Add the new beacons to be minted. 
       & #mints %~ (newMint:)
@@ -364,8 +389,8 @@ addOfferCreationToBuilder txBody (_,OfferCreation{..}) =
       , executionBudget = def -- These must be calculated during the build step.
       }
 
-addOfferCloseToBuilder :: TxBody -> (Int,OfferClose) -> TxBody
-addOfferCloseToBuilder txBody (_,OfferClose{..}) =
+addOfferCloseToBody :: TxBody -> (Int,OfferClose) -> TxBody
+addOfferCloseToBody txBody (_,OfferClose{..}) =
     txBody
       -- Add the new offer to the inputs.
       & #inputs %~ flip snoc newInput
@@ -415,11 +440,11 @@ addOfferCloseToBuilder txBody (_,OfferClose{..}) =
       , executionBudget = def -- These must be calculated during the build step.
       }
 
-addOfferUpdateToBuilder :: TxBody -> (Int,OfferUpdate) -> TxBody
-addOfferUpdateToBuilder txBody (idx,OfferUpdate{..}) =
+addOfferUpdateToBody :: TxBody -> (Int,OfferUpdate) -> TxBody
+addOfferUpdateToBody txBody (idx,OfferUpdate{..}) =
   txBody
-    & flip addOfferCreationToBuilder (idx,newOffer)
-    & flip addOfferCloseToBuilder (idx,oldOffer)
+    & flip addOfferCreationToBody (idx,newOffer)
+    & flip addOfferCloseToBody (idx,oldOffer)
 
 -- | If negotiation beacons do not need to be minted/burned, the beacon script should be executed as
 -- a staking script instead.
@@ -463,4 +488,170 @@ adjustNegotiationExecution txBody@TxBody{mints} =
       , lovelace = 0
       , stakeCredential = ScriptCredential Loans.negotiationBeaconScriptHash
       , stakingScriptInfo = mintInfoToStakingInfo <$> negotiationMint
+      }
+
+addOfferAcceptanceToBody :: TxBody -> (Int,OfferAcceptance) -> TxBody
+addOfferAcceptanceToBody txBody (_,OfferAcceptance{..}) =
+    txBody 
+      -- Add the offer and the ask to the inputs.
+      & #inputs %~ (<> [newOfferInput, newAskInput])
+      -- Add the output and preserve ordering of the output list.
+      & #outputs %~ (<> [newCollateralOutput, newLenderOutput])
+      -- Add the new beacons to be minted. 
+      & #mints %~ (<> [newActiveMint,newNegotiatonBurn])
+      -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
+      -- instance of `TxBody`. They will also be sorted.
+      & #requiredWitnesses %~ maybe id (:) requiredWitness
+      -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
+      -- instance of `TxBody`. They will also be sorted.
+      & #keyWitnesses %~ maybe id (:) requiredWitness
+      -- Invalid before must be set to the current time.
+      & #invalidBefore ?~ posixTimeToSlot slotConfig currentTime
+      -- Invalid hereafter must be set to the offer expiration if one is set.
+      & #invalidHereafter .~ 
+          fmap (posixTimeToSlot slotConfig) (targetOfferDatum ^. #offerExpiration)
+  where
+    slotConfig :: SlotConfig
+    slotConfig = case network of
+      Mainnet -> mainnetSlotConfig
+      Testnet -> testnetSlotConfig
+
+    -- The lender must approve the transaction.
+    requiredWitness :: Maybe KeyWitness
+    requiredWitness = case borrowerCredential of
+      ScriptCredential _ -> Nothing
+      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+
+    lovelaceQuantity :: NativeAsset -> Lovelace
+    lovelaceQuantity NativeAsset{policyId,quantity}
+      | policyId == "" = Lovelace quantity
+      | otherwise = 0
+
+    toNativeAssetQuantity :: NativeAsset -> Maybe NativeAsset
+    toNativeAssetQuantity asset@NativeAsset{policyId}
+      | policyId == "" = Nothing
+      | otherwise = Just asset
+
+    lenderPayemntAddress :: PaymentAddress
+    lenderPayemntAddress = fromRight ""
+                         $ fmap fst
+                         $ plutusToBech32 network 
+                         $ targetOfferDatum ^. #lenderAddress
+
+    targetOfferDatum = fromMaybe def $ loanUTxOOfferDatum offerUTxO
+
+    targetAskDatum = fromMaybe def $ loanUTxOAskDatum askUTxO
+
+    collateralLovelace = deposit + sum (map lovelaceQuantity collateralAmounts)
+    
+    lenderPaymentLovelace = Lovelace $ targetOfferDatum ^. #offerDeposit
+
+    collateralNativeAssets = mapMaybe toNativeAssetQuantity collateralAmounts
+
+    activeDatum = Loans.createActiveDatumFromOffer 
+      borrowerCredential 
+      (offerUTxO ^. #utxoRef)
+      currentTime
+      targetOfferDatum
+
+    collateralBeacons = 
+      -- One Active Beacon.
+      [ NativeAsset Loans.activeBeaconCurrencySymbol Loans.activeBeaconName "" 1
+      -- One Loan Asset Beacon.
+      , NativeAsset Loans.activeBeaconCurrencySymbol (activeDatum ^. #assetBeaconId % #unAssetBeaconId) "" 1
+      -- One Loan ID Beacon.
+      , NativeAsset Loans.activeBeaconCurrencySymbol (activeDatum ^. #loanId % #unLoanId) "" 1
+      -- One Borrower ID Beacon.
+      , NativeAsset Loans.activeBeaconCurrencySymbol (activeDatum ^. #borrowerId % #unBorrowerId) "" 1
+      ]
+
+    lenderPaymentBeacons = 
+      -- One Loan ID Beacon.
+      [ NativeAsset Loans.activeBeaconCurrencySymbol (activeDatum ^. #loanId % #unLoanId) "" 1
+      ]
+
+    negotiationBeacons =
+      -- One Ask Beacon.
+      [ NativeAsset Loans.negotiationBeaconCurrencySymbol Loans.askBeaconName "" (-1)
+      -- One Loan Asset Beacon from the ask UTxO.
+      , NativeAsset 
+          Loans.negotiationBeaconCurrencySymbol 
+          (targetAskDatum ^. #assetBeaconId % #unAssetBeaconId) 
+          "" 
+          (-1)
+      -- One Offer Beacon.
+      , NativeAsset Loans.negotiationBeaconCurrencySymbol Loans.offerBeaconName "" (-1)
+      -- One Loan Asset Beacon from the offer UTxO.
+      , NativeAsset 
+          Loans.negotiationBeaconCurrencySymbol 
+          (targetOfferDatum ^. #assetBeaconId % #unAssetBeaconId) 
+          "" 
+          (-1)
+      -- One Lender ID Beacon.
+      , NativeAsset 
+          Loans.negotiationBeaconCurrencySymbol 
+          (targetOfferDatum ^. #lenderId % #unLenderId) 
+          "" 
+          (-1)
+      ]
+
+    newCollateralOutput :: TxBodyOutput
+    newCollateralOutput = TxBodyOutput
+      { paymentAddress = askUTxO ^. #loanAddress
+      , lovelace = collateralLovelace
+      , nativeAssets = collateralNativeAssets <> collateralBeacons -- Add the beacons to the output.
+      , datum = OutputDatum $ toDatum activeDatum
+      }
+
+    newLenderOutput :: TxBodyOutput
+    newLenderOutput = TxBodyOutput
+      { paymentAddress = lenderPayemntAddress
+      , lovelace = lenderPaymentLovelace
+      , nativeAssets = lenderPaymentBeacons -- Add the beacons to the output.
+      , datum = OutputDatum $ toDatum $ Loans.PaymentDatum $ 
+          ( Loans.activeBeaconCurrencySymbol
+          , activeDatum ^. #loanId % #unLoanId
+          )
+      }
+
+    newActiveMint :: TxBodyMint
+    newActiveMint = TxBodyMint
+      { mintingPolicyHash = Loans.activeBeaconScriptHash
+      , nativeAssets = sumNativeAssets $ collateralBeacons <> lenderPaymentBeacons
+      , redeemer = toRedeemer $ Loans.CreateActive Loans.negotiationBeaconCurrencySymbol
+      , scriptWitness = ReferenceWitness $ Loans.getScriptRef network Loans.ActiveScript
+      , executionBudget = def -- These must be calculated during the build step.
+      }
+
+    newNegotiatonBurn :: TxBodyMint
+    newNegotiatonBurn = TxBodyMint
+      { mintingPolicyHash = Loans.negotiationBeaconScriptHash
+      , nativeAssets = negotiationBeacons
+      , redeemer = toRedeemer Loans.BurnNegotiationBeacons
+      , scriptWitness = ReferenceWitness $ Loans.getScriptRef network Loans.NegotiationScript
+      , executionBudget = def -- These must be calculated during the build step.
+      }
+
+    newOfferInput :: TxBodyInput
+    newOfferInput = TxBodyInput
+      { utxoRef = offerUTxO ^. #utxoRef
+      , spendingScriptInfo = Just $ SpendingScriptInfo
+          { datum = InputDatum
+          , redeemer = toRedeemer Loans.AcceptOffer
+          , scriptWitness = ReferenceWitness $ Loans.getScriptRef network Loans.LoanScript
+          , executionBudget = def
+          , scriptHash = Loans.loanScriptHash
+          }
+      }
+
+    newAskInput :: TxBodyInput
+    newAskInput = TxBodyInput
+      { utxoRef = askUTxO ^. #utxoRef
+      , spendingScriptInfo = Just $ SpendingScriptInfo
+          { datum = InputDatum
+          , redeemer = toRedeemer Loans.AcceptOffer
+          , scriptWitness = ReferenceWitness $ Loans.getScriptRef network Loans.LoanScript
+          , executionBudget = def
+          , scriptHash = Loans.loanScriptHash
+          }
       }

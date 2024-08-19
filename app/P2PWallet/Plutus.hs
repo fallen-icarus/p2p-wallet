@@ -14,6 +14,11 @@ module P2PWallet.Plutus
   , PlutusTime
   , toPlutusTime
   , fromPlutusTime
+  , Slot(..)
+  , SlotConfig
+  , posixTimeToSlot
+  , mainnetSlotConfig
+  , testnetSlotConfig
 
     -- * Plutus Rationals
   , PlutusRational
@@ -145,6 +150,56 @@ fromPlutusTime :: PlutusTime -> Time.POSIXTime
 fromPlutusTime = fromInteger 
                . (`div` 1000) -- Convert milliseconds -> seconds.
                . PV1.getPOSIXTime
+
+-- | Datatype to configure the length (ms) of one slot and the beginning of the
+-- first slot.
+data SlotConfig = SlotConfig
+  { scSlotLength :: !Integer
+  -- ^ Length (number of milliseconds) of one slot
+  , scSlotZeroTime :: !PV2.POSIXTime
+  -- ^ Beginning of slot 0 (in milliseconds)
+  } deriving (Eq, Show)
+
+newtype Slot = Slot { unSlot :: Integer }
+  deriving (Show)
+  deriving newtype (Eq,Ord)
+
+instance Display Slot where
+  display (Slot x) = show x
+
+-- -- | Get the starting 'POSIXTime' of a 'Slot' given a 'SlotConfig'.
+-- slotToBeginPOSIXTime :: SlotConfig -> Slot -> PV2.POSIXTime
+-- slotToBeginPOSIXTime SlotConfig{scSlotLength, scSlotZeroTime} (Slot n) =
+--   let msAfterBegin = n * scSlotLength
+--    in PV2.POSIXTime $ PV2.getPOSIXTime scSlotZeroTime + msAfterBegin
+
+-- | Convert a 'POSIXTime' to 'Slot' given a 'SlotConfig'.
+posixTimeToEnclosingSlot :: SlotConfig -> PV2.POSIXTime -> Slot
+posixTimeToEnclosingSlot SlotConfig{scSlotLength, scSlotZeroTime} (PV2.POSIXTime t) =
+  let timePassed = t - PV2.getPOSIXTime scSlotZeroTime
+      slotsPassed = timePassed `div` scSlotLength
+   in Slot slotsPassed
+
+-- slotToPOSIXTime :: SlotConfig -> Slot -> PV2.POSIXTime
+-- slotToPOSIXTime = slotToBeginPOSIXTime
+
+posixTimeToSlot :: SlotConfig -> PV2.POSIXTime -> Slot
+posixTimeToSlot = posixTimeToEnclosingSlot
+
+-- | The preproduction testnet has not always had 1 second slots. Therefore, the default settings
+-- for SlotConfig are not usable on the testnet. To fix this, the proper SlotConfig must be
+-- normalized to "pretend" that the testnet has always used 1 second slot intervals.
+--
+-- The normalization is done by taking a slot time and subtracting the slot number from it.
+-- For example, slot 56919374 occurred at 1712602574 POSIXTime. So subtracting the slot number 
+-- from the time yields the normalized 0 time. The final number needs to be converted to
+-- milliseconds.
+testnetSlotConfig :: SlotConfig
+testnetSlotConfig = SlotConfig 1000 $ PV2.POSIXTime $ (1712603045 - 56919845) * 1000
+
+-- | The mainnet config must also be normalized.
+mainnetSlotConfig :: SlotConfig
+mainnetSlotConfig = SlotConfig 1000 $ PV2.POSIXTime $ (1712661664 - 121095373) * 1000
 
 -------------------------------------------------
 -- Plutus Rational

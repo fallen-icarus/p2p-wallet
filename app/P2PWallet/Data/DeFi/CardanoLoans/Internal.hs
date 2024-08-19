@@ -236,7 +236,7 @@ PlutusTx.unstableMakeIsData ''Penalty
 -- | A wrapper around an asset's full name (policy id, token name). It uses
 -- a custom data encoding since Aiken uses a different encoding for it.
 newtype Asset = Asset { unAsset :: (PV2.CurrencySymbol,PV2.TokenName) }
-  deriving (Show,Eq)
+  deriving (Show,Eq,Ord)
 
 instance ToData Asset where
   toBuiltinData (Asset (sym,name)) = 

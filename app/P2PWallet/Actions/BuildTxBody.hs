@@ -304,6 +304,8 @@ buildRawCmd tmpDir paramsFile outFile certificateFiles TxBody{..} =
     , unwords $ for requiredWitnesses $ 
         \(KeyWitness (kh,_)) -> "--required-signer-hash " <> show kh
     , maybe "" (toBuildCmdField tmpDir) collateralInput
+    , maybe "" (\slot -> "--invalid-before " <> display slot) invalidBefore
+    , maybe "" (\slot -> "--invalid-hereafter " <> display slot) invalidHereafter
     , "--protocol-params-file " <> toText paramsFile
     , "--fee " <> show (unLovelace fee)
     , "--out-file " <> toText outFile

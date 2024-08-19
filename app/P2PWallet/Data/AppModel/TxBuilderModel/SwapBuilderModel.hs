@@ -108,11 +108,11 @@ instance AddToTxBody SwapBuilderModel where
   addToTxBody txBody SwapBuilderModel{..} = 
       txBody
         -- Add the swap creations.
-        & flip (foldl' addSwapCreationToBuilder) swapCreations
+        & flip (foldl' addSwapCreationToBody) swapCreations
         -- Add the swap closes.
-        & flip (foldl' addSwapCloseToBuilder) swapCloses
+        & flip (foldl' addSwapCloseToBody) swapCloses
         -- Add the swap updates.
-        & flip (foldl' addSwapUpdateToBuilder) swapUpdates
+        & flip (foldl' addSwapUpdateToBody) swapUpdates
         -- Merge any beacon mints so that there is only one `TxBodyMint` per minting policy.
         -- Remove any mints that cancel out.
         & #mints %~ mergeTxBodyMints
@@ -121,16 +121,16 @@ instance AddToTxBody SwapBuilderModel where
         & adjustSpendingRedeemers
         -- Add the swap executions. This is done after so that it does not mess with the beacon
         -- adjustments.
-        & flip (foldl' addSwapExecutionToBuilder) swapExecutions
+        & flip (foldl' addSwapExecutionToBody) swapExecutions
 
-addSwapUpdateToBuilder :: TxBody -> (Int,SwapUpdate) -> TxBody
-addSwapUpdateToBuilder txBody (idx,SwapUpdate{..}) =
+addSwapUpdateToBody :: TxBody -> (Int,SwapUpdate) -> TxBody
+addSwapUpdateToBody txBody (idx,SwapUpdate{..}) =
   txBody
-    & flip addSwapCreationToBuilder (idx,newSwap)
-    & flip addSwapCloseToBuilder (idx,oldSwap)
+    & flip addSwapCreationToBody (idx,newSwap)
+    & flip addSwapCloseToBody (idx,oldSwap)
 
-addSwapCreationToBuilder :: TxBody -> (Int,SwapCreation) -> TxBody
-addSwapCreationToBuilder txBody (_,SwapCreation{..}) =
+addSwapCreationToBody :: TxBody -> (Int,SwapCreation) -> TxBody
+addSwapCreationToBody txBody (_,SwapCreation{..}) =
     txBody 
       -- Add one instance of the output per count and preserve ordering of the
       -- output list.
@@ -228,8 +228,8 @@ addSwapCreationToBuilder txBody (_,SwapCreation{..}) =
       , executionBudget = def -- These must be calculated during the build step.
       }
 
-addSwapCloseToBuilder :: TxBody -> (Int,SwapClose) -> TxBody
-addSwapCloseToBuilder txBody (_,SwapClose{..}) =
+addSwapCloseToBody :: TxBody -> (Int,SwapClose) -> TxBody
+addSwapCloseToBody txBody (_,SwapClose{..}) =
     txBody
       -- Add the new swap to the inputs.
       & #inputs %~ flip snoc newInput
@@ -323,8 +323,8 @@ addSwapCloseToBuilder txBody (_,SwapClose{..}) =
       , executionBudget = def -- These must be calculated during the build step.
       }
 
-addSwapExecutionToBuilder :: TxBody -> (Int,SwapExecution) -> TxBody
-addSwapExecutionToBuilder txBody (_,SwapExecution{..}) =
+addSwapExecutionToBody :: TxBody -> (Int,SwapExecution) -> TxBody
+addSwapExecutionToBody txBody (_,SwapExecution{..}) =
     txBody
       -- Add the swap to be executed to the inputs.
       & #inputs %~ flip snoc newInput

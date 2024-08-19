@@ -23,6 +23,14 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
     zstack
       [ mainWidget
       , offersFilterWidget model `nodeVisible` (borrowModel ^. #showLenderOffersFilter)
+      , chooseAskWidget model `nodeVisible` and
+          [ isJust $ borrowModel ^. #newOfferAcceptance
+          , borrowModel ^. #offerAcceptanceScene == ChooseAskScene
+          ]
+      , specifyCollateralWidget model `nodeVisible` and
+          [ isJust $ borrowModel ^. #newOfferAcceptance
+          , borrowModel ^. #offerAcceptanceScene == SpecifyCollateralScene
+          ]
       ]
   where
     Config{currentTime} = config
@@ -145,6 +153,7 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
             , showLocalTime (config ^. #timeZone) exprTime
             ]
           swapCollateralMsg = "Collateral can be swapped out for other approved collateral"
+          acceptEvt = LendingEvent $ BorrowEvent $ AcceptLoanOffer $ ChooseOfferToAccept u
       hstack
         [ vstack
             [ hstack
@@ -242,7 +251,7 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
         , spacer_ [width 3]
         , flip styleBasic [padding 3] $ box_ [alignCenter,alignMiddle] $ vstack
             [ box_ [alignCenter,alignMiddle] $ tooltip_ "Accept Offer" [tooltipDelay 0] $
-                button acceptIcon AppInit
+                button acceptIcon acceptEvt
                   `styleBasic` 
                     [ textSize 10
                     , textColor customBlue
@@ -260,6 +269,183 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
                 , bgColor customGray2
                 ]
         ]
+
+chooseAskWidget :: AppModel -> AppNode
+chooseAskWidget AppModel{..} = do
+    vstack
+      [ centerWidget $ vstack
+          [ centerWidgetH $
+              label "Choose an Ask to Close"
+                `styleBasic` [textFont "Italics", textColor customBlue]
+          , flip styleBasic [padding 5] $ box $ vscroll_ [wheelRate 50] $ 
+              vstack_ [childSpacing] (map askRow allAsks)
+                `styleBasic` [padding 10]
+          , filler
+          , box_ [alignRight] $ 
+              button "Cancel" (LendingEvent $ BorrowEvent $ AcceptLoanOffer CancelAcceptance)
+                `styleBasic` [textSize 10]
+          ] `styleBasic`
+              [ bgColor customGray3
+              , radius 10
+              , border 1 black
+              , padding 30
+              ]
+      ] `styleBasic` 
+          [ bgColor $ black & #a .~ 0.4
+          , paddingT 50
+          , paddingB 50
+          , paddingL 30
+          , paddingR 30
+          , radius 10
+          ]
+  where
+    LoanWallet{..} = lendingModel ^. #selectedWallet
+
+    collateralAssetWidget :: NativeAsset -> AppNode
+    collateralAssetWidget asset = do
+      hstack
+        [ spacer_ [width 2]
+        , label (showAssetNameOnly reverseTickerMap asset) 
+            `styleBasic` [textColor lightGray, textSize 8]
+        , spacer_ [width 2]
+        ] `styleBasic` 
+            [ bgColor customGray4
+            , padding 2
+            , radius 3
+            , border 1 customGray1
+            ]
+
+    usedAsks = map (view $ _2 % #askUTxO % #utxoRef) 
+             $ txBuilderModel ^. #loanBuilderModel % #offerAcceptances
+
+    allAsks :: [LoanUTxO]
+    allAsks = utxos
+      & filter (\x -> isJust (loanUTxOAskDatum x) && (x ^. #utxoRef) `notElem` usedAsks)
+      & sortOn (view #blockTime) 
+
+    askRow :: LoanUTxO -> AppNode
+    askRow u = do
+      let Loans.AskDatum{..} = fromMaybe def $ loanUTxOAskDatum u
+          loanAmount = toNativeAsset loanAsset & #quantity .~ loanPrincipal
+          duration = calcDaysInPosixPeriod $ fromPlutusTime loanTerm
+          offeredCollateral = map toNativeAsset $ collateral ^. #unCollateral
+          chooseEvt = LendingEvent $ BorrowEvent $ AcceptLoanOffer $ ChooseAskToClose u
+      box_ [onClick chooseEvt] $ vstack
+        [ hstack
+            [ label ("Borrow " <> showAssetBalance True reverseTickerMap loanAmount)
+                `styleBasic` [textSize 10, textColor customBlue]
+            , filler
+            , label "Duration:"
+                `styleBasic` [textSize 10, textColor white]
+            , spacer_ [width 3]
+            , label (show duration <> " Days")
+                `styleBasic` [textSize 10, textColor white]
+            ]
+        , spacer_ [width 2]
+        , hstack
+            [ label "Offered Collateral:"
+                `styleBasic` [textSize 8, textColor lightGray]
+            , spacer_ [width 3]
+            , vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+                \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
+            ]
+        ] `styleBasic` 
+            [ padding 10
+            , bgColor customGray2
+            , radius 5
+            , border 1 black
+            ]
+          `styleHover`
+            [ border 1 customBlue
+            , cursorIcon CursorHand
+            ]
+
+specifyCollateralWidget :: AppModel -> AppNode
+specifyCollateralWidget AppModel{..} = do
+    let maybeLens' = maybeLens def $ #lendingModel % #borrowModel % #newOfferAcceptance
+        NewOfferAcceptance{offerUTxO} = fromMaybe def $ 
+          lendingModel ^. #borrowModel % #newOfferAcceptance
+        Loans.OfferDatum{loanAsset,collateralization,loanPrincipal} = fromMaybe def $
+          loanUTxOOfferDatum offerUTxO
+        loanAmount = toNativeAsset loanAsset & #quantity .~ loanPrincipal
+        collateralPrices = map (over _1 toNativeAsset . over _2 toRational) 
+                         $ collateralization ^. #unCollateralization
+    vstack
+      [ centerWidget $ vstack
+          [ centerWidgetH $
+              label "Specify your collateral"
+                `styleBasic` [textFont "Italics", textColor customBlue]
+          , label ("Loan Amount: " <> showAssetBalance True reverseTickerMap loanAmount)
+              `styleBasic` [textSize 12]
+          , spacer
+          , label "Collateral Rates:"
+              `styleBasic` [textSize 12]
+          , spacer_ [width 3]
+          , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
+              \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
+          , hstack
+              [ label "Collateral Assets (separated with newlines)"
+                  `styleBasic` [textSize 12]
+              , mainButton helpIcon (Alert collateralAmountsMsg)
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              ]
+          , textArea (toLensVL $ maybeLens' % #collateralAmounts)
+              `styleBasic` [height 180, textSize 10, bgColor customGray1]
+              `styleFocus` [border 1 customBlue]
+          , spacer
+          , box_ [alignRight] $ 
+              hstack
+                [ button "Cancel" (LendingEvent $ BorrowEvent $ AcceptLoanOffer CancelAcceptance)
+                    `styleBasic` [textSize 10]
+                , spacer
+                , mainButton "Confirm" (LendingEvent $ BorrowEvent $ AcceptLoanOffer ProcessAcceptance)
+                    `styleBasic` [textSize 10]
+                ]
+          , spacer
+          ] `styleBasic`
+              [ bgColor customGray3
+              , radius 10
+              , border 1 black
+              , padding 30
+              , paddingB 0
+              ]
+      ] `styleBasic` 
+          [ bgColor $ black & #a .~ 0.4
+          , padding 20
+          , radius 10
+          ]
+  where
+    collateralAssetWidget :: NativeAsset -> (NativeAsset,Rational) -> AppNode
+    collateralAssetWidget loanAsset (collateralAsset, price) = do
+      let formattedPrice = showPriceFormatted reverseTickerMap collateralAsset loanAsset price
+          prettyPrice = mconcat
+            [ formattedPrice
+            , " "
+            , showAssetNameOnly reverseTickerMap collateralAsset
+            , " / "
+            , showAssetNameOnly reverseTickerMap loanAsset
+            ]
+      hstack
+        [ spacer_ [width 2]
+        , label prettyPrice
+            `styleBasic` [textSize 12, textColor lightGray]
+        , spacer_ [width 2]
+        ] `styleBasic` 
+            [ bgColor customGray4
+            , padding 2
+            , paddingT 1
+            , paddingT 1
+            , radius 3
+            , border 1 customGray1
+            ]
 
 offersFilterWidget :: AppModel -> AppNode
 offersFilterWidget AppModel{lendingModel=LendingModel{..}} = do

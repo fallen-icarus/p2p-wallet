@@ -249,7 +249,6 @@ confirmDeleteWidget alias = do
         ]
     ] `styleBasic` [bgColor customGray3, padding 20]
 
-
 addNewUserOutputWidget :: Text -> AppNode
 addNewUserOutputWidget recipient = do
   centerWidget $ vstack
