@@ -276,3 +276,61 @@ handleLoanBuilderEvent model@AppModel{..} evt = case evt of
           , "The new offer UTxO requires a deposit of: " <> display (verifiedOffer ^. #deposit)
           ]
       ]
+
+  -----------------------------------------------
+  -- Remove Offer Acceptance from Builder
+  -----------------------------------------------
+  RemoveSelectedOfferAcceptance idx ->
+    [ Model $ model 
+        & #txBuilderModel % #loanBuilderModel % #offerAcceptances %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Edit the Offer Acceptance
+  -----------------------------------------------
+  EditSelectedOfferAcceptance modal -> case modal of
+    StartAdding mTarget ->
+      [ Model $ model & #txBuilderModel % #loanBuilderModel % #targetOfferAcceptance .~ 
+          fmap (fmap $ toNewOfferAcceptance reverseTickerMap) mTarget
+      ]
+    CancelAdding ->
+      [ Model $ model & #txBuilderModel % #loanBuilderModel % #targetOfferAcceptance .~ Nothing ]
+    ConfirmAdding ->
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (loanBuilderEvent . EditSelectedOfferAcceptance . AddResult) $ do
+          (idx,newOfferAcceptance) <-
+            fromJustOrAppError "Nothing set for `targetOfferAcceptance`" $ 
+              txBuilderModel ^. #loanBuilderModel % #targetOfferAcceptance
+
+          verifiedOfferAcceptance <- fromRightOrAppError $
+            verifyNewOfferAcceptance tickerMap (config ^. #currentTime) newOfferAcceptance
+
+          -- There will be two outputs for this action: the collateral output and the lender
+          -- output with the new Key NFT. The first value in the list is for the collateral
+          -- output.
+          minUTxOValue <- 
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
+                -- Use a blank loanBuilderModel to calculate the minUTxOValue for the new acceptance.
+                (emptyLoanBuilderModel & #offerAcceptances .~ [(0,verifiedOfferAcceptance)])
+
+          return $ (idx, verifiedOfferAcceptance & #deposit .~ minUTxOValue)
+      ]
+    AddResult (idx,verifiedOfferAcceptance) ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          & #txBuilderModel % #loanBuilderModel % #offerAcceptances % ix idx % _2 .~ 
+              verifiedOfferAcceptance
+          & #txBuilderModel % #loanBuilderModel % #targetOfferAcceptance .~ Nothing
+          & #txBuilderModel %~ balanceTx
+      , Task $ return $ Alert $ unlines
+          [ "Successfully added to builder!"
+          , ""
+          , "This new collateral output requires a deposit of: " <> 
+              display (verifiedOfferAcceptance ^. #deposit)
+          ]
+      ]

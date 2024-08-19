@@ -891,3 +891,15 @@ offerCollateralMsg = unlines
       , "will not be required to put up more collateral after the fact."
       ]
   ]
+
+collateralAmountsMsg :: Text
+collateralAmountsMsg = unlines
+  [ "How much of each collateral will you use?"
+  , ""
+  , "The asset quantities must be in one of the following formats:"
+  , "1. '# policy_id.asset_name'"
+  , "2. '# ticker' - if in Ticker Registry"
+  , "3. '# ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]

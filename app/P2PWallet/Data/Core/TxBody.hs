@@ -488,6 +488,10 @@ data TxBody = TxBody
   -- | The keys that must sign the transaction. This includes the keys in `requiredWitnesses`.
   , keyWitnesses :: [KeyWitness]
   , fee :: Lovelace
+  -- | The invalid before slot number.
+  , invalidBefore :: Maybe Slot
+  -- | The invalid hereafter slot number.
+  , invalidHereafter :: Maybe Slot
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''TxBody
@@ -526,6 +530,20 @@ instance Semigroup TxBody where
         -- Most txBodies will have a fee of zero so the non-zero one must be chosen.
         -- I do not think there is a case where two txBodies will both have fees set.
         max (txBody1 ^. #fee) (txBody2 ^. #fee)
+    , invalidBefore =
+        -- When two txBodies, use invalidBefore, the more restrictive one should be used.
+        case (txBody1 ^. #invalidBefore, txBody2 ^. #invalidBefore) of
+          (Nothing, Nothing) -> Nothing
+          (Nothing, x) -> x
+          (x, Nothing) -> x
+          (Just here1, Just here2) -> Just $ max here1 here2
+    , invalidHereafter =
+        -- When two txBodies, use invalidHereafter, the more restrictive one should be used.
+        case (txBody1 ^. #invalidHereafter, txBody2 ^. #invalidHereafter) of
+          (Nothing, Nothing) -> Nothing
+          (Nothing, x) -> x
+          (x, Nothing) -> x
+          (Just here1, Just here2) -> Just $ min here1 here2
     }
 
 instance Monoid TxBody where
@@ -539,6 +557,8 @@ instance Monoid TxBody where
     , requiredWitnesses = []
     , keyWitnesses = []
     , fee = 0
+    , invalidBefore = Nothing
+    , invalidHereafter = Nothing
     }
 
 instance ExportContractFiles TxBody where

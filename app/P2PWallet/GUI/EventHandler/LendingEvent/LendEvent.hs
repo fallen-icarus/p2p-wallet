@@ -125,7 +125,10 @@ handleLendEvent model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (LendingEvent . LendEvent . CreateNewOffer . AddResult) $ do
           when (hasAskActions $ txBuilderModel ^. #loanBuilderModel) $
-            throwIO borrowAndLendError
+            throwIO $ AppError $ borrowAndLendError
+
+          when ([] /= txBuilderModel ^. #loanBuilderModel % #offerAcceptances) $
+            throwIO $ AppError $ acceptAndNegotiateError
 
           newOffer <- fromJustOrAppError "newOfferCreation is Nothing" $
             lendingModel ^. #lendModel % #newOfferCreation
@@ -181,9 +184,9 @@ handleLendEvent model@AppModel{..} evt = case evt of
           Left err -> [ Task $ return $ Alert err ]
           Right newTxModel -> 
             if hasAskActions $ txBuilderModel ^. #loanBuilderModel then
-              [ Task $ runActionOrAlert (const AppInit) $ do
-                  throwIO borrowAndLendError
-              ]
+              [ Event $ Alert borrowAndLendError ]
+            else if [] /= txBuilderModel ^. #loanBuilderModel % #offerAcceptances then
+              [ Event $ Alert acceptAndNegotiateError ]
             else
               [ Model $ model & #txBuilderModel .~ newTxModel
               , Task $ return $ Alert "Successfully added to builder!"
@@ -250,7 +253,10 @@ handleLendEvent model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (LendingEvent . LendEvent . AddSelectedOfferUpdate . AddResult) $ do
           when (hasAskActions $ txBuilderModel ^. #loanBuilderModel) $ 
-            throwIO borrowAndLendError
+            throwIO $ AppError $ borrowAndLendError
+
+          when ([] /= txBuilderModel ^. #loanBuilderModel % #offerAcceptances) $
+            throwIO $ AppError $ acceptAndNegotiateError
 
           let LoanWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
                 lendingModel ^. #selectedWallet
@@ -323,6 +329,7 @@ processNewOfferClose u@OfferClose{utxoRef} model@TxBuilderModel{loanBuilderModel
     find (== utxoRef) (concat
       [ map (view $ _2 % #utxoRef) offerCloses
       , map (view $ _2 % #oldOffer % #utxoRef) offerUpdates
+      , map (view $ _2 % #offerUTxO % #utxoRef) offerAcceptances
       ])
 
   -- Get the input's new index.

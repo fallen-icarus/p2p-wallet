@@ -46,7 +46,10 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (LendingEvent . BorrowEvent . CreateNewAsk . AddResult) $ do
           when (hasOfferActions $ txBuilderModel ^. #loanBuilderModel) $
-            throwIO borrowAndLendError
+            throwIO $ AppError $ borrowAndLendError
+
+          when ([] /= txBuilderModel ^. #loanBuilderModel % #offerAcceptances) $
+            throwIO $ AppError $ acceptAndNegotiateError
 
           verifiedAskCreation <- fromRightOrAppError $
             verifyNewAskCreation tickerMap $ fromMaybe def $ 
@@ -90,9 +93,9 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
           Left err -> [ Task $ return $ Alert err ]
           Right newTxModel -> 
             if hasOfferActions $ txBuilderModel ^. #loanBuilderModel then
-              [ Task $ runActionOrAlert (const AppInit) $ do
-                  throwIO borrowAndLendError
-              ]
+              [ Event $ Alert borrowAndLendError ]
+            else if [] /= txBuilderModel ^. #loanBuilderModel % #offerAcceptances then
+              [ Event $ Alert acceptAndNegotiateError ]
             else
               [ Model $ model & #txBuilderModel .~ newTxModel
               , Task $ return $ Alert "Successfully added to builder!"
@@ -124,7 +127,10 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (LendingEvent . BorrowEvent . AddSelectedAskUpdate . AddResult) $ do
           when (hasOfferActions $ txBuilderModel ^. #loanBuilderModel) $ 
-            throwIO borrowAndLendError
+            throwIO $ AppError $ borrowAndLendError
+
+          when ([] /= txBuilderModel ^. #loanBuilderModel % #offerAcceptances) $
+            throwIO $ AppError $ acceptAndNegotiateError
 
           let LoanWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
                 lendingModel ^. #selectedWallet
@@ -209,6 +215,98 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
         & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
 
+  -----------------------------------------------
+  -- Add Selected Offer Acceptance to Builder
+  -----------------------------------------------
+  AcceptLoanOffer modal -> case modal of
+    ChooseOfferToAccept offerUTxO ->
+      let usedAsks = map (view $ _2 % #askUTxO % #utxoRef) 
+                   $ txBuilderModel ^. #loanBuilderModel % #offerAcceptances
+          availableAsks = filter 
+            (\x -> isJust (loanUTxOAskDatum x) && (x ^. #utxoRef) `notElem` usedAsks)
+            (lendingModel ^. #selectedWallet % #utxos)
+          currentOffersBeingSpent = map (view $ _2 % #offerUTxO % #utxoRef) 
+                                  $ txBuilderModel ^. #loanBuilderModel % #offerAcceptances
+       in if null availableAsks then
+            [ Event $ Alert $ unwords 
+                [ "There are no available loan asks to close. You must first create a new ask"
+                , "before you can accept another offer."
+                ]
+            ]
+          else if (offerUTxO ^. #utxoRef) `elem` currentOffersBeingSpent then
+            [ Event $ Alert "This offer is already being accepted." ]
+          else
+            [ Model $ model
+                & #lendingModel % #borrowModel % #offerAcceptanceScene .~ ChooseAskScene
+                & #lendingModel % #borrowModel % #newOfferAcceptance ?~
+                    createNewOfferAcceptance 
+                      reverseTickerMap 
+                      offerUTxO
+                      (fromMaybe def $ maybeHead availableAsks)
+                      (lendingModel ^. #selectedWallet)
+            ]
+    CancelAcceptance ->
+      [ Model $ model
+          & #lendingModel % #borrowModel % #newOfferAcceptance .~ Nothing
+      ]
+    ChooseAskToClose askUTxO ->
+      [ Model $ model
+          & #lendingModel % #borrowModel % #newOfferAcceptance % _Just % #askUTxO .~ askUTxO
+          & #lendingModel % #borrowModel % #offerAcceptanceScene .~ SpecifyCollateralScene
+      ]
+    ReturnToChooseAskMenu ->
+      [ Model $ model
+          & #lendingModel % #borrowModel % #offerAcceptanceScene .~ ChooseAskScene
+      ]
+    ProcessAcceptance ->
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (LendingEvent . BorrowEvent . AcceptLoanOffer . AddNewAcceptance) $ do
+          let loanBuilderModel = txBuilderModel ^. #loanBuilderModel
+          when (hasAskActions loanBuilderModel || hasOfferActions loanBuilderModel) $
+            throwIO $ AppError $ acceptAndNegotiateError
+
+          newOfferAcceptance <-
+            fromJustOrAppError "Nothing set for `newOfferAcceptance`" $ 
+              lendingModel ^. #borrowModel % #newOfferAcceptance
+
+          verifiedOfferAcceptance <- fromRightOrAppError $
+            verifyNewOfferAcceptance tickerMap (config ^. #currentTime) newOfferAcceptance
+
+          -- There will be two outputs for this action: the collateral output and the lender
+          -- output with the new Key NFT. The first value in the list is for the collateral
+          -- output.
+          minUTxOValue <- 
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
+                -- Use a blank loanBuilderModel to calculate the minUTxOValue for the new acceptance.
+                (emptyLoanBuilderModel & #offerAcceptances .~ [(0,verifiedOfferAcceptance)])
+
+          return $ verifiedOfferAcceptance & #deposit .~ minUTxOValue
+      ]
+    AddNewAcceptance verifiedOfferAcceptance ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          -- Add the new acceptance with a dummy index.
+          & #txBuilderModel % #loanBuilderModel % #offerAcceptances %~ 
+              flip snoc (0,verifiedOfferAcceptance)
+          -- Sort the acceptances by the offer UTxO. This is required to generate the outputs
+          -- in the proper order.
+          & #txBuilderModel % #loanBuilderModel % #offerAcceptances %~ 
+              sortOn (view $ _2 % #offerUTxO % #utxoRef)
+          -- Reindex the acceptances after sorting.
+          & #txBuilderModel % #loanBuilderModel % #offerAcceptances %~ reIndex
+          & #lendingModel % #borrowModel % #newOfferAcceptance .~ Nothing
+          & #txBuilderModel %~ balanceTx
+      , Task $ return $ Alert $ unlines
+          [ "Successfully added to builder!"
+          , ""
+          , "This new collateral output requires a deposit of: " <> 
+              display (verifiedOfferAcceptance ^. #deposit)
+          ]
+      ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
@@ -220,6 +318,7 @@ processNewAskClose u@AskClose{utxoRef} model@TxBuilderModel{loanBuilderModel=Loa
     find (== utxoRef) (concat
       [ map (view $ _2 % #utxoRef) askCloses
       , map (view $ _2 % #oldAsk % #utxoRef) askUpdates
+      , map (view $ _2 % #askUTxO % #utxoRef) offerAcceptances
       ])
 
   -- Get the input's new index.

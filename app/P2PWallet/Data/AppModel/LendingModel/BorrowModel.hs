@@ -13,6 +13,8 @@ module P2PWallet.Data.AppModel.LendingModel.BorrowModel
   ( BorrowScene(..)
   , BorrowEvent(..)
   , BorrowModel(..)
+  , AcceptOfferEvent(..)
+  , AcceptOfferScene(..)
 
   , module P2PWallet.Data.AppModel.LendingModel.BorrowModel.LenderOffersFilterModel
   , module P2PWallet.Data.AppModel.LendingModel.BorrowModel.OpenAsksFilterModel
@@ -44,6 +46,27 @@ data BorrowScene
 -------------------------------------------------
 -- Borrow Scene Events
 -------------------------------------------------
+-- | Accept Offer Scene
+data AcceptOfferScene
+  = ChooseAskScene
+  | SpecifyCollateralScene
+  deriving (Show,Eq)
+
+-- | Accepting offers has a unique UI flow.
+data AcceptOfferEvent
+  -- | Pick the offer UTxO.
+  = ChooseOfferToAccept LoanUTxO
+  -- | Pick an ask UTxO to close.
+  | ChooseAskToClose LoanUTxO
+  -- | Return to choose ask menu.
+  | ReturnToChooseAskMenu
+  -- | Process acceptance. Catch any errors at this step.
+  | ProcessAcceptance
+  -- | Finishing processing the information and add the offer to the builder.
+  | AddNewAcceptance OfferAcceptance
+  -- | Cancel accepting the offer.
+  | CancelAcceptance
+
 -- | The possible UI events on the Borrow Scene
 data BorrowEvent
   -- | Change the Borrow subscene to the specified subscene.
@@ -62,6 +85,8 @@ data BorrowEvent
   | CheckLenderOffersFilterModel
   -- | Reset the lender offers fitler model.
   | ResetLenderOffersFilters
+  -- | Add a new offer acceptance to the builder.
+  | AcceptLoanOffer AcceptOfferEvent
 
 -------------------------------------------------
 -- Borrow State
@@ -82,6 +107,10 @@ data BorrowModel = BorrowModel
   , showLenderOffersFilter :: Bool
   -- | The lender offers filter model.
   , lenderOffersFilterModel :: LenderOffersFilterModel
+  -- | The new offer acceptance.
+  , newOfferAcceptance :: Maybe NewOfferAcceptance
+  -- | The accept offer scene.
+  , offerAcceptanceScene :: AcceptOfferScene
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''BorrowModel
@@ -95,4 +124,6 @@ instance Default BorrowModel where
     , openAsksFilterModel = def
     , showLenderOffersFilter = False
     , lenderOffersFilterModel = def
+    , newOfferAcceptance = def
+    , offerAcceptanceScene = ChooseAskScene
     }
