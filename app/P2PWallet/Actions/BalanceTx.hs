@@ -108,6 +108,7 @@ balanceTx tx@TxBuilderModel{..} =
     keyInfos = concat
       [ map (view $ _2 % #stakeKeyDerivation) userWithdrawals
       , map (view $ _2 % #paymentKeyDerivation) userInputs
+      , map (view $ _2 % #stakeKeyDerivation) userCertificates
       , maybe [] (pure . view #paymentKeyDerivation) collateralInput
       , map (view $ _2 % #stakeKeyDerivation) $ swapBuilderModel ^. #swapCloses
       , map (view $ _2 % #oldSwap % #stakeKeyDerivation) $ swapBuilderModel ^. #swapUpdates
