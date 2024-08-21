@@ -366,6 +366,32 @@ instance FromJSON ActiveDatum where
       <*> (o .: "total_payment_this_epoch")
       <*> (o .: "loan_id")
 
+instance Default ActiveDatum where
+  def = ActiveDatum
+    { activeBeaconId = ""
+    , paymentObserverHash = ""
+    , interestObserverHash = ""
+    , addressUpdateObserverHash = ""
+    , borrowerId = ""
+    , lenderAddress = Address (PubKeyCredential "") Nothing
+    , loanAsset = Asset ("","")
+    , assetBeaconId = ""
+    , loanPrincipal = 0
+    , compoundFrequency = Nothing
+    , lastCompounding = 0
+    , loanTerm = 0
+    , loanInterest = Fraction (0,1)
+    , minPayment = 0
+    , penalty = NoPenalty
+    , collateralization = Collateralization []
+    , collateralIsSwappable = False
+    , claimExpiration = 0
+    , loanExpiration = 0
+    , loanOutstanding = 0
+    , totalEpochPayments = 0
+    , loanId = ""
+    }
+
 -------------------------------------------------
 -- Payment Datum
 -------------------------------------------------

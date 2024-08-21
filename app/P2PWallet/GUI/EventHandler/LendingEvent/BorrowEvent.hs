@@ -55,6 +55,11 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
             verifyNewAskCreation tickerMap $ fromMaybe def $ 
               lendingModel ^. #borrowModel % #newAskCreation
 
+          fromRightOrAppError $ 
+            checkIsSameLoanUserCredential 
+              (verifiedAskCreation ^. #borrowerCredential)
+              (txBuilderModel ^. #loanBuilderModel)
+
           -- There should only be one output in the `TxBody` for this action.
           minUTxOValue <- 
             fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
@@ -74,6 +79,8 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
               & #waitingStatus % #addingToBuilder .~ False
               & #txBuilderModel % #loanBuilderModel % #askCreations %~ 
                   flip snoc (newIdx,verifiedAskCreation)
+              & #txBuilderModel % #loanBuilderModel % #userCredential ?~
+                  verifiedAskCreation ^. #borrowerCredential
               & #lendingModel % #borrowModel % #newAskCreation .~ Nothing
               & #txBuilderModel %~ balanceTx
           , Task $ return $ Alert $ unlines
@@ -140,6 +147,11 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
 
           verifiedAskCreation <- fromRightOrAppError $ verifyNewAskCreation tickerMap newAsk
 
+          fromRightOrAppError $ 
+            checkIsSameLoanUserCredential 
+              (verifiedAskCreation ^. #borrowerCredential)
+              (txBuilderModel ^. #loanBuilderModel)
+
           -- Verify that the new utxo is not already being spent.
           flip whenJust (const $ throwIO $ AppError "This ask UTxO is already being spent.") $
             find (== utxoRef) (concat
@@ -171,6 +183,8 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
               & #waitingStatus % #addingToBuilder .~ False
               & #txBuilderModel % #loanBuilderModel % #askUpdates %~ 
                   flip snoc (newIdx,verifiedAskUpdate)
+              & #txBuilderModel % #loanBuilderModel % #userCredential ?~
+                  verifiedAskUpdate ^. #newAsk % #borrowerCredential
               & #lendingModel % #borrowModel % #newAskUpdate .~ Nothing
               & #txBuilderModel %~ balanceTx
           , Task $ return $ Alert $ unlines
@@ -265,6 +279,11 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
           when (hasAskActions loanBuilderModel || hasOfferActions loanBuilderModel) $
             throwIO $ AppError $ acceptAndNegotiateError
 
+          -- Full loan payments cannot happen in the same transaction where offers are accepted.
+          let payments = txBuilderModel ^. #loanBuilderModel % #loanPayments
+          when (any (view $ _2 % #isFullPayment) payments) $
+            throwIO $ AppError acceptAndFullPaymentError
+
           newOfferAcceptance <-
             fromJustOrAppError "Nothing set for `newOfferAcceptance`" $ 
               lendingModel ^. #borrowModel % #newOfferAcceptance
@@ -272,9 +291,14 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
           verifiedOfferAcceptance <- fromRightOrAppError $
             verifyNewOfferAcceptance tickerMap (config ^. #currentTime) newOfferAcceptance
 
+          fromRightOrAppError $ 
+            checkIsSameLoanUserCredential 
+              (verifiedOfferAcceptance ^. #borrowerCredential)
+              (txBuilderModel ^. #loanBuilderModel)
+
           -- There will be two outputs for this action: the collateral output and the lender
           -- output with the new Key NFT. The first value in the list is for the collateral
-          -- output.
+          -- output, the second output is for the lender payment output.
           minUTxOValue <- 
             fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
               calculateMinUTxOValue 
@@ -297,6 +321,8 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
               sortOn (view $ _2 % #offerUTxO % #utxoRef)
           -- Reindex the acceptances after sorting.
           & #txBuilderModel % #loanBuilderModel % #offerAcceptances %~ reIndex
+          & #txBuilderModel % #loanBuilderModel % #userCredential ?~
+              verifiedOfferAcceptance ^. #borrowerCredential
           & #lendingModel % #borrowModel % #newOfferAcceptance .~ Nothing
           & #txBuilderModel %~ balanceTx
       , Task $ return $ Alert $ unlines
@@ -304,6 +330,79 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
           , ""
           , "This new collateral output requires a deposit of: " <> 
               display (verifiedOfferAcceptance ^. #deposit)
+          ]
+      ]
+
+  -----------------------------------------------
+  -- Add New loan payment
+  -----------------------------------------------
+  MakeLoanPayment modal -> case modal of
+    StartAdding mTarget ->
+      let borrowerWallet = lendingModel ^. #selectedWallet
+          newPayment = (\x -> createNewLoanPayment reverseTickerMap x borrowerWallet) <$> mTarget
+       in [ Model $ model
+              & #lendingModel % #borrowModel % #newLoanPayment .~ newPayment
+          ]
+    CancelAdding ->
+      [ Model $ model
+          & #lendingModel % #borrowModel % #newLoanPayment .~ Nothing
+      ]
+    ConfirmAdding ->
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (LendingEvent . BorrowEvent . MakeLoanPayment . AddResult) $ do
+          newPayment <-
+            fromJustOrAppError "Nothing set for `newPayment`" $ 
+              lendingModel ^. #borrowModel % #newLoanPayment
+
+          verifiedNewPayment <- fromRightOrAppError $ 
+            verifyNewLoanPayment reverseTickerMap tickerMap (config ^. #currentTime) newPayment
+
+          fromRightOrAppError $ 
+            checkIsSameLoanUserCredential 
+              (verifiedNewPayment ^. #borrowerCredential)
+              (txBuilderModel ^. #loanBuilderModel)
+
+          -- Full loan payments cannot happen in the same transaction where offers are accepted.
+          when (verifiedNewPayment ^. #isFullPayment) $
+            unless (txBuilderModel ^. #loanBuilderModel % #offerAcceptances == []) $
+              throwIO $ AppError acceptAndFullPaymentError
+
+          -- There will be two outputs for this action: the collateral output and the lender
+          -- output with the new Key NFT. The first value in the list is for the lender
+          -- output. When a partial payment is made, the second output will be the required
+          -- collateral output.
+          minValues <- calculateMinUTxOValue 
+            (config ^. #network) 
+            (txBuilderModel ^? #parameters % _Just % _1) 
+            -- Use a blank loanBuilderModel to calculate the minUTxOValue for the new payment.
+            (emptyLoanBuilderModel & #loanPayments .~ [(0,verifiedNewPayment)])
+
+          updatedVerifiedPayment <- fromRightOrAppError $
+            updateLoanPaymentDeposits minValues verifiedNewPayment reverseTickerMap
+
+          -- Return the `LoanPayment` with the updated deposit field.
+          return updatedVerifiedPayment 
+      ]
+    AddResult verifiedNewPayment ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          -- Add the new payment with a dummy index.
+          & #txBuilderModel % #loanBuilderModel % #loanPayments %~ 
+              flip snoc (0,verifiedNewPayment)
+          -- Sort the payments by the active UTxO. This is required to generate the outputs
+          -- in the proper order.
+          & #txBuilderModel % #loanBuilderModel % #loanPayments %~ 
+              sortOn (view $ _2 % #activeUTxO % #utxoRef)
+          -- Reindex the acceptances after sorting.
+          & #txBuilderModel % #loanBuilderModel % #offerAcceptances %~ reIndex
+          & #txBuilderModel % #loanBuilderModel % #userCredential ?~
+              verifiedNewPayment ^. #borrowerCredential
+          & #lendingModel % #borrowModel % #newLoanPayment .~ Nothing
+          & #txBuilderModel %~ balanceTx
+      , Event $ Alert $ unlines
+          [ "Successfully added to builder!"
+          , ""
+          , createLoanPaymentDepositMsg verifiedNewPayment
           ]
       ]
 
@@ -321,8 +420,13 @@ processNewAskClose u@AskClose{utxoRef} model@TxBuilderModel{loanBuilderModel=Loa
       , map (view $ _2 % #askUTxO % #utxoRef) offerAcceptances
       ])
 
+  -- All actions must be for the same user.
+  checkIsSameLoanUserCredential (u ^. #borrowerCredential) (model ^. #loanBuilderModel)
+
   -- Get the input's new index.
   let newIdx = length askCloses
 
   -- Add the new close to the end of the list of ask closes.
-  return $ balanceTx $ model & #loanBuilderModel % #askCloses %~ flip snoc (newIdx,u)
+  return $ balanceTx $ model 
+    & #loanBuilderModel % #askCloses %~ flip snoc (newIdx,u)
+    & #loanBuilderModel % #userCredential ?~ u ^. #borrowerCredential

@@ -12,12 +12,15 @@ module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
   , hasOfferActions
   , borrowAndLendError
   , acceptAndNegotiateError
+  , acceptAndFullPaymentError
+  , checkIsSameLoanUserCredential
 
   , LoanBuilderEvent(..)
 
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskClose
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskCreation
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskUpdate
+  , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LoanPayment
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferAcceptance
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferClose
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferCreation
@@ -28,6 +31,7 @@ import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskClose
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskCreation
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskUpdate
+import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LoanPayment
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferAcceptance
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferClose
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferCreation
@@ -73,6 +77,10 @@ data LoanBuilderEvent
   -- Changing the associated ask UTxO to close requires removing the offerAcceptance
   -- and creating a new one from the lending page.
   | EditSelectedOfferAcceptance (AddEvent (Int,OfferAcceptance) (Int,OfferAcceptance))
+  -- | Remove the selected loan payment from the builder.
+  | RemoveSelectedLoanPayment Int
+  -- | Edit selected loan payment.
+  | EditSelectedLoanPayment (AddEvent (Int,LoanPayment) (Int,LoanPayment))
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -81,7 +89,8 @@ data LoanBuilderEvent
 -- | Due to the number of possible loan actions, they are grouped in this sub-model to
 -- help the code stay organized.
 data LoanBuilderModel = LoanBuilderModel
-  { askCreations :: [(Int,AskCreation)]
+  { userCredential :: Maybe Credential
+  , askCreations :: [(Int,AskCreation)]
   , targetAskCreation :: Maybe (Int,NewAskCreation)
   , askCloses :: [(Int,AskClose)]
   , askUpdates :: [(Int,AskUpdate)]
@@ -96,13 +105,17 @@ data LoanBuilderModel = LoanBuilderModel
   , offerAcceptances :: [(Int,OfferAcceptance)]
   -- | The `Int` is the index into `offerAcceptances`.
   , targetOfferAcceptance :: Maybe (Int,NewOfferAcceptance)
+  , loanPayments :: [(Int,LoanPayment)]
+  -- | The `Int` is the index into `loanPayments`.
+  , targetLoanPayment :: Maybe (Int,NewLoanPayment)
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''LoanBuilderModel
 
 instance Default LoanBuilderModel where
   def = LoanBuilderModel
-    { askCreations = []
+    { userCredential = Nothing
+    , askCreations = []
     , targetAskCreation = Nothing
     , askCloses = []
     , askUpdates = []
@@ -114,6 +127,8 @@ instance Default LoanBuilderModel where
     , targetOfferUpdate = Nothing
     , offerAcceptances = []
     , targetOfferAcceptance = Nothing
+    , loanPayments = []
+    , targetLoanPayment = Nothing
     }
 
 -- | This is just an alias for `def`. The name is more clear what it is.
@@ -129,11 +144,13 @@ isEmptyLoanBuilderModel LoanBuilderModel{..} = and
   , null offerCloses
   , null offerUpdates
   , null offerAcceptances
+  , null loanPayments
   , isNothing targetAskCreation
   , isNothing targetAskUpdate
   , isNothing targetOfferCreation
   , isNothing targetOfferUpdate
   , isNothing targetOfferAcceptance
+  , isNothing targetLoanPayment
   ]
 
 hasAskActions :: LoanBuilderModel -> Bool
@@ -164,6 +181,18 @@ acceptAndNegotiateError = unwords
   , "in the same transaction as offer acceptances."
   ]
 
+acceptAndFullPaymentError :: Text
+acceptAndFullPaymentError = unwords
+  [ "Loans cannot be accepted in the same transaction where another loan's final payment is made."
+  , "This requirement is due to how the on-chain credit history works."
+  ]
+
+checkIsSameLoanUserCredential :: Credential -> LoanBuilderModel -> Either Text ()
+checkIsSameLoanUserCredential newCredential LoanBuilderModel{userCredential} =
+  whenJust userCredential $ \cred ->
+    unless (cred == newCredential) $
+      Left "All loan actions in a transaction must be for the same user credential."
+
 -------------------------------------------------
 -- LoanBuilderModel --> TxBody
 -------------------------------------------------
@@ -186,12 +215,16 @@ instance AddToTxBody LoanBuilderModel where
         & flip (foldl' addOfferUpdateToBody) offerUpdates
         -- Add the offer acceptances.
         & flip (foldl' addOfferAcceptanceToBody) offerAcceptances
+        -- Add the loan payments.
+        & flip (foldl' addLoanPaymentToBody) loanPayments
         -- Merge any beacon mints so that there is only one `TxBodyMint` per minting policy.
         & #mints %~ mergeTxBodyMints
         -- Adjust any executions based on whether all mints canceled out.
         & adjustNegotiationExecution
         -- Remove empty mints.
         & #mints %~ removeEmptyMints
+        -- Remove duplicate stake withdrawals. This removes duplicate observer entries.
+        & #withdrawals %~ ordNubOn (view #stakeCredential)
 
 addAskCreationToBody :: TxBody -> (Int,AskCreation) -> TxBody
 addAskCreationToBody txBody (_,AskCreation{..}) =
@@ -508,9 +541,17 @@ addOfferAcceptanceToBody txBody (_,OfferAcceptance{..}) =
       -- Invalid before must be set to the current time.
       & #invalidBefore ?~ posixTimeToSlot slotConfig currentTime
       -- Invalid hereafter must be set to the offer expiration if one is set.
-      & #invalidHereafter .~ 
-          fmap (posixTimeToSlot slotConfig) (targetOfferDatum ^. #offerExpiration)
+      & #invalidHereafter .~ upperBound
   where
+    upperBound :: Maybe Slot
+    upperBound = case targetOfferDatum ^. #offerExpiration of
+      Nothing -> Nothing
+      Just nextDeadline -> Just $
+        -- The node can only specify invalidHereafter for 1.5 days into the future due to the
+        -- possibility for epoch lengths and slot lengths to change. Using a tighter bound will not
+        -- change the behavior of the protocol.
+        min (posixTimeToSlot slotConfig nextDeadline) (129600 + posixTimeToSlot slotConfig currentTime)
+
     slotConfig :: SlotConfig
     slotConfig = case network of
       Mainnet -> mainnetSlotConfig
@@ -655,3 +696,146 @@ addOfferAcceptanceToBody txBody (_,OfferAcceptance{..}) =
           , scriptHash = Loans.loanScriptHash
           }
       }
+
+addLoanPaymentToBody :: TxBody -> (Int,LoanPayment) -> TxBody
+addLoanPaymentToBody txBody (_,LoanPayment{..}) =
+    txBody 
+      -- Add the collateral input to the input list.
+      & #inputs %~ (<> [newCollateralInput])
+      -- Add the lender output and preserve ordering of the output list. This output is always
+      -- required.
+      & #outputs %~ (<> [newLenderOutput])
+      -- If a collateral output is required, add the output and preserve ordering of the output list.
+      -- This output is only required if this is a partial payment.
+      & #outputs %~ maybe id (flip snoc) mCollateralOutput
+      -- Add the new beacons to be minted. This burning is only required if it is a full payment.
+      & #mints %~ maybe id (flip snoc) mActiveBurn
+      -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
+      -- instance of `TxBody`. They will also be sorted.
+      & #requiredWitnesses %~ maybe id (:) requiredWitness
+      -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
+      -- instance of `TxBody`. They will also be sorted.
+      & #keyWitnesses %~ maybe id (:) requiredWitness
+      -- Invalid hereafter must be set to the next deadline.
+      & #invalidHereafter ?~ upperBound
+      -- Add the payment observer execution.
+      & #withdrawals %~ (paymentObserverStakeWithdrawal:)
+  where
+    upperBound :: Slot
+    upperBound = 
+      -- The node can only specify invalidHereafter for 1.5 days into the future due to the
+      -- possibility for epoch lengths and slot lengths to change. Using a tighter bound will not
+      -- change the behavior of the protocol.
+      min (posixTimeToSlot slotConfig nextDeadline) (129600 + posixTimeToSlot slotConfig currentTime)
+
+    slotConfig :: SlotConfig
+    slotConfig = case network of
+      Mainnet -> mainnetSlotConfig
+      Testnet -> testnetSlotConfig
+
+    -- The lender must approve the transaction.
+    requiredWitness :: Maybe KeyWitness
+    requiredWitness = case borrowerCredential of
+      ScriptCredential _ -> Nothing
+      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+
+    lovelaceQuantity :: NativeAsset -> Lovelace
+    lovelaceQuantity NativeAsset{policyId,quantity}
+      | policyId == "" = Lovelace quantity
+      | otherwise = 0
+
+    toNativeAssetQuantity :: NativeAsset -> Maybe NativeAsset
+    toNativeAssetQuantity asset@NativeAsset{policyId}
+      | policyId == "" = Nothing
+      | otherwise = Just asset
+
+    targetActiveDatum@Loans.ActiveDatum{..} = fromMaybe def $ loanUTxOActiveDatum activeUTxO
+
+    nextDeadline = case (+lastCompounding) <$> compoundFrequency of
+      Nothing -> loanExpiration
+      Just nextCompounding -> min nextCompounding loanExpiration
+
+    postPaymentDatum = 
+      Loans.createPostPaymentActiveDatum (paymentAmount ^. #quantity) targetActiveDatum
+
+    lenderPayemntAddress :: PaymentAddress
+    lenderPayemntAddress = fromRight ""
+                         $ fmap fst
+                         $ plutusToBech32 network 
+                         $ targetActiveDatum ^. #lenderAddress
+
+    newCollateralInput :: TxBodyInput
+    newCollateralInput = TxBodyInput
+      { utxoRef = activeUTxO ^. #utxoRef
+      , spendingScriptInfo = Just $ SpendingScriptInfo
+          { datum = InputDatum
+          , redeemer = toRedeemer $ Loans.MakePayment $ paymentAmount ^. #quantity
+          , scriptWitness = ReferenceWitness $ Loans.getScriptRef network Loans.LoanScript
+          , executionBudget = def
+          , scriptHash = Loans.loanScriptHash
+          }
+      }
+
+    collateralBeacons = 
+      -- One Active Beacon.
+      [ NativeAsset Loans.activeBeaconCurrencySymbol Loans.activeBeaconName "" 1
+      -- One Loan Asset Beacon.
+      , NativeAsset Loans.activeBeaconCurrencySymbol (targetActiveDatum ^. #assetBeaconId % #unAssetBeaconId) "" 1
+      -- One Loan ID Beacon.
+      , NativeAsset Loans.activeBeaconCurrencySymbol (targetActiveDatum ^. #loanId % #unLoanId) "" 1
+      -- One Borrower ID Beacon.
+      , NativeAsset Loans.activeBeaconCurrencySymbol (targetActiveDatum ^. #borrowerId % #unBorrowerId) "" 1
+      ]
+
+    collateralLovelace = collateralDeposit + sum (map lovelaceQuantity collateralBalances)
+    
+    collateralNativeAssets = mapMaybe toNativeAssetQuantity collateralBalances
+
+    mCollateralOutput :: Maybe TxBodyOutput
+    mCollateralOutput 
+      | isFullPayment = Nothing
+      | otherwise = Just $ TxBodyOutput
+          { paymentAddress = activeUTxO ^. #loanAddress
+          , lovelace = collateralLovelace
+          , nativeAssets = collateralNativeAssets <> collateralBeacons -- Add the beacons to the output.
+          , datum = OutputDatum $ toDatum postPaymentDatum
+          }
+
+    lenderPaymentLovelace = paymentDeposit + lovelaceQuantity paymentAmount
+
+    lenderNativeAssets = mapMaybe toNativeAssetQuantity [paymentAmount]
+
+    newLenderOutput :: TxBodyOutput
+    newLenderOutput = TxBodyOutput
+      { paymentAddress = lenderPayemntAddress
+      , lovelace = lenderPaymentLovelace
+      , nativeAssets = lenderNativeAssets
+      , datum = OutputDatum $ toDatum $ Loans.PaymentDatum $ 
+          ( Loans.activeBeaconCurrencySymbol
+          , targetActiveDatum ^. #loanId % #unLoanId
+          )
+      }
+
+    mActiveBurn :: Maybe TxBodyMint
+    mActiveBurn
+      | isFullPayment = Just $ TxBodyMint
+          { mintingPolicyHash = Loans.activeBeaconScriptHash
+          , nativeAssets = map (over #quantity negate) collateralBeacons
+          , redeemer = toRedeemer Loans.BurnActiveBeacons
+          , scriptWitness = ReferenceWitness $ Loans.getScriptRef network Loans.ActiveScript
+          , executionBudget = def -- These must be calculated during the build step.
+          }
+      | otherwise = Nothing
+
+    paymentObserverStakeWithdrawal :: TxBodyWithdrawal
+    paymentObserverStakeWithdrawal = TxBodyWithdrawal
+      { stakeAddress = Loans.paymentObserverStakeAddress Testnet
+      , lovelace = 0
+      , stakeCredential = ScriptCredential Loans.paymentObserverScriptHash
+      , stakingScriptInfo = Just $ StakingScriptInfo
+          { scriptWitness = ReferenceWitness $ Loans.getScriptRef network Loans.PaymentObserverScript
+          , redeemer = toRedeemer Loans.ObservePayment
+          , executionBudget = def
+          }
+      }
+

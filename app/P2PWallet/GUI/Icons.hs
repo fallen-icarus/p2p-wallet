@@ -188,3 +188,12 @@ acceptIcon = toGlyph 0XF3AB
 
 targetAddressIcon :: Text
 targetAddressIcon = remixFocus3Line
+
+rolloverLoanIcon :: Text
+rolloverLoanIcon = remixDraftLine
+
+paymentIcon :: Text
+paymentIcon = remixSecurePaymentLine
+
+claimCollateralIcon :: Text
+claimCollateralIcon = remixSafeLine

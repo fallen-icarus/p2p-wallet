@@ -334,3 +334,62 @@ handleLoanBuilderEvent model@AppModel{..} evt = case evt of
               display (verifiedOfferAcceptance ^. #deposit)
           ]
       ]
+
+  -----------------------------------------------
+  -- Remove Loan Payment from Builder
+  -----------------------------------------------
+  RemoveSelectedLoanPayment idx ->
+    [ Model $ model 
+        & #txBuilderModel % #loanBuilderModel % #loanPayments %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Edit the Loan Payment
+  -----------------------------------------------
+  EditSelectedLoanPayment modal -> case modal of
+    StartAdding mTarget ->
+      [ Model $ model & #txBuilderModel % #loanBuilderModel % #targetLoanPayment .~ 
+          fmap (fmap $ toNewLoanPayment reverseTickerMap) mTarget
+      ]
+    CancelAdding ->
+      [ Model $ model & #txBuilderModel % #loanBuilderModel % #targetLoanPayment .~ Nothing ]
+    ConfirmAdding ->
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (loanBuilderEvent . EditSelectedLoanPayment . AddResult) $ do
+          (idx,newLoanPayemnt) <-
+            fromJustOrAppError "Nothing set for `targetLoanPayment`" $ 
+              txBuilderModel ^. #loanBuilderModel % #targetLoanPayment
+
+          verifiedNewPayment <- fromRightOrAppError $
+            verifyNewLoanPayment reverseTickerMap tickerMap (config ^. #currentTime) newLoanPayemnt
+
+          -- There will be two outputs for this action: the collateral output and the lender
+          -- output with the new Key NFT. The first value in the list is for the lender
+          -- output. When a partial payment is made, the second output will be the required
+          -- collateral output.
+          minValues <- calculateMinUTxOValue 
+            (config ^. #network) 
+            (txBuilderModel ^? #parameters % _Just % _1) 
+            -- Use a blank loanBuilderModel to calculate the minUTxOValue for the new payment.
+            (emptyLoanBuilderModel & #loanPayments .~ [(0,verifiedNewPayment)])
+
+          updatedVerifiedPayment <- fromRightOrAppError $
+            updateLoanPaymentDeposits minValues verifiedNewPayment reverseTickerMap
+
+          return (idx,updatedVerifiedPayment)
+      ]
+    AddResult (idx,verifiedNewPayment) ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          & #txBuilderModel % #loanBuilderModel % #loanPayments % ix idx % _2 .~ 
+              verifiedNewPayment
+          & #txBuilderModel % #loanBuilderModel % #targetLoanPayment .~ Nothing
+          & #txBuilderModel %~ balanceTx
+      , Event $ Alert $ unlines
+          [ "Successfully added to builder!"
+          , ""
+          , createLoanPaymentDepositMsg verifiedNewPayment
+          ]
+      ]

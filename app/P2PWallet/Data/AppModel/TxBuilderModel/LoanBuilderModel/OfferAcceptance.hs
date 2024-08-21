@@ -129,7 +129,7 @@ createNewOfferAcceptance reverseTickerMap offerUTxO firstAskUTxO borrowerWallet 
 -------------------------------------------------
 -- NewOfferAcceptance <--> OfferAcceptance
 -------------------------------------------------
--- | Verify the user info for the new offer.
+-- | Verify the user info.
 verifyNewOfferAcceptance
   :: TickerMap 
   -> POSIXTime -- ^ Current time.

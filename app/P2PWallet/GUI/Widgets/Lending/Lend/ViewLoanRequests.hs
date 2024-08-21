@@ -588,7 +588,7 @@ createNewOfferWidget AppModel{lendingModel, knownWallets, reverseTickerMap, tick
                 `styleBasic` [textSize 10]
             , spacer
             , textField_ (toLensVL $ maybeLens' % #loanAmount) 
-                  [placeholder "5"] 
+                  [placeholder "5 ADA"] 
                 `styleBasic` [textSize 10, width 150, bgColor customGray1, sndColor darkGray]
                 `styleFocus` [border 1 customBlue]
             ]

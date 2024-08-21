@@ -149,8 +149,7 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
                         $ knownWallets ^. #paymentWallets
           addressTip = unwords $ filter (/= "")
             [ "Payments to"
-            , maybe "" (view #alias) mTargetWallet
-            , ":"
+            , maybe ":" ((<> ":") . view #alias) mTargetWallet
             , display payToAddress
             ]
       hstack

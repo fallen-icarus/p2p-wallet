@@ -64,11 +64,13 @@ balanceTx tx@TxBuilderModel{..} =
     (lovelaceChange, assetsChange) = sumAssetBalances 
       [ inputValue
       , outputValue
+      -- These have inputs and outputs so they are sub-balances.
       , assetBalancesForChange $ swapBuilderModel ^. #swapUpdates
       , assetBalancesForChange $ swapBuilderModel ^. #swapExecutions
       , assetBalancesForChange $ loanBuilderModel ^. #askUpdates
       , assetBalancesForChange $ loanBuilderModel ^. #offerUpdates
       , assetBalancesForChange $ loanBuilderModel ^. #offerAcceptances
+      , assetBalancesForChange $ loanBuilderModel ^. #loanPayments
       ]
 
     newChange :: ChangeOutput
@@ -97,6 +99,7 @@ balanceTx tx@TxBuilderModel{..} =
       , loanBuilderModel ^. #offerCloses /= []
       , loanBuilderModel ^. #offerUpdates /= []
       , loanBuilderModel ^. #offerAcceptances /= []
+      , loanBuilderModel ^. #loanPayments /= []
       ]
 
     -- What kind of transaction this is.
@@ -123,4 +126,5 @@ balanceTx tx@TxBuilderModel{..} =
       , map (view $ _2 % #newOffer % #lenderKeyDerivation) $ loanBuilderModel ^. #offerUpdates
       , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #offerCloses
       , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #offerAcceptances
+      , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #loanPayments
       ]
