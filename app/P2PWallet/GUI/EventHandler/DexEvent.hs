@@ -90,7 +90,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
           & #knownWallets % #dexWallets %~ flip snoc verifiedDexWallet
           & #dexModel % #addingWallet .~ False
           & #dexModel % #selectedWallet .~ verifiedDexWallet
-      , Task $ return $ SyncWallets StartProcess
+      , Task $ return $ SyncWallets $ StartProcess Nothing
       ]
 
   -----------------------------------------------
@@ -169,7 +169,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
           -- Only sync the order book for the new trading pair if it has not been synced yet.
           -- Users can manually resync if necessary.
           case Map.lookup tradingPair $ dexModel ^. #cachedOrderBooks of
-            Nothing -> return $ DexEvent $ SyncOrderBook StartProcess
+            Nothing -> return $ DexEvent $ SyncOrderBook $ StartProcess Nothing
             Just _ -> return AppInit
       ]
 
@@ -184,7 +184,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
   -- Create New Limit Order
   -----------------------------------------------
   AddNewLimitOrderCreation modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (DexEvent . AddNewLimitOrderCreation . ProcessResults) $ do
           let swapAddress = dexModel ^. #selectedWallet % #oneWaySwapAddress
@@ -227,7 +227,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
   -- Create New Liquidity Swap
   -----------------------------------------------
   AddNewLiquiditySwapCreation modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (DexEvent . AddNewLimitOrderCreation . ProcessResults) $ do
           let swapAddress = dexModel ^. #selectedWallet % #twoWaySwapAddress
@@ -271,7 +271,7 @@ handleDexEvent model@AppModel{..} evt = case evt of
   -- Sync Order Book
   -----------------------------------------------
   SyncOrderBook modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       [ Model $ model & #waitingStatus % #syncingOrderBook .~ True
       , Task $ do
           let (offerAsset,askAsset) = fromMaybe def $ dexModel ^. #selectedTradingPair

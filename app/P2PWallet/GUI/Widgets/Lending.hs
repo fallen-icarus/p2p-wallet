@@ -98,7 +98,7 @@ mainWidget model@AppModel{scene=_,..} =
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer
       , tooltip_ "Refresh Wallets" [tooltipDelay 0] $
-          box_ [alignMiddle, onClick $ SyncWallets StartProcess] $
+          box_ [alignMiddle, onClick $ SyncWallets $ StartProcess Nothing] $
             label refreshIcon
               `styleBasic` 
                 [ border 0 transparent

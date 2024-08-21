@@ -86,7 +86,7 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
               , headerField "Margin" marginMsg
               , sortButton descendingSortIcon (PoolMargin SortDescending)
               ]
-          , box_ [alignMiddle, onClick $ DelegationEvent $ SyncRegisteredPools StartProcess] $ 
+          , box_ [alignMiddle, onClick $ DelegationEvent $ SyncRegisteredPools $ StartProcess Nothing] $ 
               tooltip_ "Refresh" [tooltipDelay 0] $ 
                 label refreshIcon
                   `styleBasic`

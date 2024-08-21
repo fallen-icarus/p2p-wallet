@@ -16,16 +16,26 @@ import P2PWallet.Prelude
 
 borrowWidget :: AppModel -> AppNode
 borrowWidget model@AppModel{lendingModel} = do
-    vstack 
-      [ spacer
-      , centerWidgetH borrowSceneMenu
-      , spacer
-      , box_ [mergeRequired reqUpdate] (openAsksWidget model)
-          `nodeVisible` (lendingModel ^. #borrowModel % #scene == OpenAsks)
-      , box_ [mergeRequired reqUpdate] (lenderOffersWidget model)
-          `nodeVisible` (lendingModel ^. #borrowModel % #scene == CurrentOffers)
-      , box_ [mergeRequired reqUpdate] (activeLoansWidget model)
-          `nodeVisible` (lendingModel ^. #borrowModel % #scene == ActiveLoans)
+    zstack
+      [ vstack 
+          [ spacer
+          , centerWidgetH borrowSceneMenu
+          , spacer
+          , box_ [mergeRequired reqUpdate] (openAsksWidget model)
+              `nodeVisible` (lendingModel ^. #borrowModel % #scene == OpenAsks)
+          , box_ [mergeRequired reqUpdate] (lenderOffersWidget model)
+              `nodeVisible` (lendingModel ^. #borrowModel % #scene == CurrentOffers)
+          , box_ [mergeRequired reqUpdate] (activeLoansWidget model)
+              `nodeVisible` (lendingModel ^. #borrowModel % #scene == ActiveLoans)
+          ]
+        -- The inspected loan is here since only one loan can be inspected at a time.
+        -- It doesn't make sense to move to other borrower scenes while inspecting a loan.
+      , inspectLoanWidget model
+          `nodeVisible` and
+            [ isJust $ lendingModel ^. #borrowModel % #inspectedLoan
+            -- Hide until after syncing is complete.
+            , not $ model ^. #waitingStatus % #syncingLoanHistory
+            ]
       ]
   where
     borrowSceneButton :: Text -> BorrowScene -> AppNode

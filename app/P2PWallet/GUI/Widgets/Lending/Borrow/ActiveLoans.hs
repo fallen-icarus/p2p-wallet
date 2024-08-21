@@ -1,8 +1,10 @@
 module P2PWallet.GUI.Widgets.Lending.Borrow.ActiveLoans
   ( activeLoansWidget
+  , inspectLoanWidget
   ) where
 
 import Monomer as M hiding (duration)
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
@@ -150,6 +152,7 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
             (lovelaceAsNativeAsset & #quantity .~ unLovelace utxoLovelace) : utxoNativeAssets
           lockedCollateral = 
             filter ((/= Loans.activeBeaconCurrencySymbol) . view #policyId) allAssets
+          loanHistoryEvt = LendingEvent $ BorrowEvent $ InspectActiveLoanHistory loanId
           (buttonEvt,buttonTip,buttonIcon,buttonEnabled)
             | currentTime >= nextPaymentDueDate && currentTime < expiration =
                 -- A rollover is required to apply the interest and penalties.
@@ -212,6 +215,24 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
                           , textSize 10
                           , textColor customRed
                               ]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ 
+                    tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
+                      box_ [alignMiddle , onClick loanHistoryEvt] $
+                        label idCardIcon
+                          `styleBasic` 
+                            [ bgColor black
+                            , textMiddle
+                            , textFont "Remix"
+                            , textSize 8
+                            , textColor customBlue
+                            , paddingT 1
+                            , paddingB 1
+                            , paddingL 3
+                            , paddingR 3
+                            , radius 5
+                            ]
+                          `styleHover` [bgColor customGray1, cursorIcon CursorHand]
                 , filler
                 , label prettyNextPaymentDueDate
                     `styleBasic` [textSize 10, textColor white]
@@ -395,3 +416,134 @@ makePaymentWidget AppModel{..} = do
             , radius 3
             , border 1 customGray1
             ]
+
+inspectLoanWidget :: AppModel -> AppNode
+inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
+    vstack
+      [ vstack
+          [ centerWidgetH $
+              label "Event History For Loan ID"
+                `styleBasic` [textFont "Italics", textColor customBlue]
+          , spacer
+          , copyableLabelSelf (display targetId) lightGray 12
+          , spacer
+          , flip styleBasic [padding 5] $ box $ vscroll_ [wheelRate 50] $ 
+              vstack_ [childSpacing] (map eventRow history)
+          , filler
+          , hstack
+              [ filler
+              , button "Close" $ LendingEvent $ BorrowEvent CloseInspectedActiveLoanHistory
+              ]
+          ] `styleBasic`
+              [ bgColor customGray3
+              , padding 30
+              , radius 10
+              ]
+      ] `styleBasic` 
+          [ bgColor $ black & #a .~ 0.4
+          , padding 30
+          , radius 10
+          ]
+  where
+    targetId :: Loans.LoanId
+    targetId = fromMaybe "" $ borrowModel ^. #inspectedLoan
+
+    history :: [LoanEvent]
+    history = fromMaybe [] $ Map.lookup targetId cachedLoanHistories
+
+    explainEvent :: LoanEvent -> Text
+    explainEvent LoanEvent{state=eventState, event, timeStamp} =
+      let Loans.ActiveDatum{loanAsset, claimExpiration} = fromMaybe def eventState 
+          loanNativeAsset = toNativeAsset loanAsset
+       in case event of
+            Left (Loans.CreateActive _) -> "Loan started."
+            Right (Loans.MakePayment amount) -> mconcat
+              [ "Made payment of "
+              , showAssetBalance True reverseTickerMap $ loanNativeAsset & #quantity .~ amount
+              , "."
+              ]
+            Right (Loans.ApplyInterest deposit times) -> mconcat
+              [ "Applied interest "
+              , show times
+              , " time(s) with deposit increase of "
+              , display $ Lovelace deposit
+              , "."
+              ]
+            Right Loans.SpendWithKeyNFT -> "Defaulted collateral claimed by lender."
+            Right (Loans.UpdateLenderAddress newAddress deposit) -> mconcat
+              [ "Lender changed the required payment address to "
+              , display $ fromRight "" $ 
+                  fmap fst $ plutusToBech32 (config ^. #network) newAddress
+              , " with deposit increase of "
+              , display $ Lovelace deposit
+              , "."
+              ]
+            Right Loans.Unlock -> 
+              if claimExpiration < toPlutusTime timeStamp 
+              then "Lost collateral claimed by borrower."
+              else "Invalid Active UTxO closed by borrower."
+            _ -> error "Other loan redeemer used."
+
+    eventRow :: LoanEvent -> AppNode
+    eventRow e@LoanEvent{timeStamp} = do
+      vstack
+        [ hstack
+            [ label (explainEvent e)
+                `styleBasic` [textSize 10]
+            , filler
+            ]
+        , spacer_ [width 2]
+        , hstack
+            [ label calendarIcon
+                `styleBasic` 
+                  [ textSize 10
+                  , textColor customBlue
+                  , textFont "Remix"
+                  , paddingT 5
+                  ]
+            , spacer_ [width 3]
+            , label (showLocalDate (config ^. #timeZone) timeStamp)
+                `styleBasic` 
+                  [ textSize 10
+                  , textColor lightGray
+                  ]
+            , spacer
+            , label clockIcon
+                `styleBasic` 
+                  [ textSize 10
+                  , textColor customBlue
+                  , textFont "Remix"
+                  , paddingT 5
+                  ]
+            , spacer_ [width 3]
+            , label (showLocalTime (config ^. #timeZone) timeStamp)
+                `styleBasic` 
+                  [ textSize 10
+                  , textColor lightGray
+                  ]
+            , filler
+            ]
+        ] `styleBasic` 
+            [ padding 10
+            , bgColor customGray2
+            , radius 5
+            , border 1 black
+            ]
+
+-------------------------------------------------
+-- Helper Widgets
+-------------------------------------------------
+-- | A label button that will copy itself.
+copyableLabelSelf :: Text -> Color -> Double -> WidgetNode s AppEvent
+copyableLabelSelf caption color fontSize = 
+  tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
+    `styleBasic`
+      [ padding 0
+      , radius 5
+      , textMiddle
+      , textSize fontSize
+      , border 0 transparent
+      , textColor color
+      , bgColor transparent
+      ]
+    `styleHover` [textColor customBlue, cursorIcon CursorHand]

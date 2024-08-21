@@ -13,16 +13,26 @@ module P2PWallet.Data.AppModel.LendingModel
   ( LendingScene(..)
   , LendingEvent(..)
   , LendingModel(..)
+  , CachedLoanHistories
 
   , module P2PWallet.Data.AppModel.LendingModel.BorrowModel
   , module P2PWallet.Data.AppModel.LendingModel.LendModel
   ) where
 
+import Data.Map.Strict qualified as Map
+
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.LendingModel.BorrowModel
 import P2PWallet.Data.AppModel.LendingModel.LendModel
 import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Prelude
+
+-------------------------------------------------
+-- Cached Loan Event History
+-------------------------------------------------
+-- | A type alias for a map from LoanId to loan event history.
+type CachedLoanHistories = Map.Map Loans.LoanId [LoanEvent]
 
 -------------------------------------------------
 -- Lending Scenes and Overlays
@@ -54,6 +64,8 @@ data LendingEvent
   | BorrowEvent BorrowEvent
   -- | An event for the LendModel.
   | LendEvent LendEvent
+  -- | Lookup a specific loan's event history.
+  | LookupLoanHistory (ProcessEvent Loans.LoanId CachedLoanHistories)
 
 -------------------------------------------------
 -- Lending State
@@ -76,6 +88,8 @@ data LendingModel = LendingModel
   , borrowModel :: BorrowModel
   -- | The lend model.
   , lendModel :: LendModel
+  -- | The cached loan histories.
+  , cachedLoanHistories :: CachedLoanHistories
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''LendingModel
@@ -90,4 +104,5 @@ instance Default LendingModel where
     , showMorePopup = False
     , borrowModel = def
     , lendModel = def
+    , cachedLoanHistories = mempty
     }

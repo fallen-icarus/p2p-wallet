@@ -49,13 +49,13 @@ txBuilderWidget model@AppModel{..} = do
               [ filler
               , box_ [alignMiddle] $ hstack
                   [ spacer_ [width 50]
-                  , mainButton "Build" (TxBuilderEvent $ BuildTx StartProcess)
+                  , mainButton "Build" (TxBuilderEvent $ BuildTx $ StartProcess Nothing)
                       `nodeVisible` isBuildable
                   , button "Build" AppInit
                       `nodeEnabled` False -- This button is just for show.
                       `nodeVisible` not isBuildable
                   , spacer_ [width 3]
-                  , mainButton "Sign & Submit" (TxBuilderEvent $ WitnessTx StartProcess)
+                  , mainButton "Sign & Submit" (TxBuilderEvent $ WitnessTx $ StartProcess Nothing)
                       `nodeVisible` and
                         [ txBuilderModel ^. #isBuilt
                         , txBuilderModel ^. #txType == PairedTx

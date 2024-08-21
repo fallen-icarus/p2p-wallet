@@ -3,7 +3,7 @@ module P2PWallet.GUI.Widgets.Lending.Lend.OpenOffers
   ) where
 
 import Monomer as M hiding (duration)
-import Data.Map qualified as Map
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps

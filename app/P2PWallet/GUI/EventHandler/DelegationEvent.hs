@@ -38,7 +38,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
     , Task $ 
         -- Only sync if no pools are cached yet.
         if null $ model ^. #delegationModel % #registeredPools
-        then return $ DelegationEvent $ SyncRegisteredPools StartProcess
+        then return $ DelegationEvent $ SyncRegisteredPools $ StartProcess Nothing
         else return AppInit
     ]
 
@@ -87,7 +87,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           & #delegationModel % #addingWallet .~ False
           & #delegationModel % #selectedWallet .~ verifiedStakeWallet
           & #scene .~ DelegationScene
-       , Task $ return $ SyncWallets StartProcess
+       , Task $ return $ SyncWallets $ StartProcess Nothing
        ]
 
   -----------------------------------------------
@@ -132,7 +132,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
           & #delegationModel % #addingWallet .~ False
           & #delegationModel % #selectedWallet .~ verifiedStakeWallet
           & #scene .~ DelegationScene
-       , Task $ return $ SyncWallets StartProcess
+       , Task $ return $ SyncWallets $ StartProcess Nothing
        ]
 
   -----------------------------------------------
@@ -232,7 +232,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
   -- Syncing Registered Pools
   -----------------------------------------------
   SyncRegisteredPools modal -> case modal of
-    StartProcess -> 
+    StartProcess _ -> 
       -- Set `syncing` to True to let users know syncing is happening.
       [ Model $ model & #waitingStatus % #syncingPools .~ True 
       , Task $ do

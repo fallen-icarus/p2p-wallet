@@ -290,3 +290,32 @@ instance FromJSON Transaction where
         <*> o .: "withdrawals"
         <*> o .: "assets_minted"
         <*> o .: "plutus_contracts"
+
+-------------------------------------------------
+-- Event Transaction
+-------------------------------------------------
+-- | The type respesenting only some of the information returned with the tx_info query. This
+-- is useful for determining a chain of events for the protocols.
+data EventTransaction = EventTransaction
+  { txHash :: Text
+  , blockTime :: POSIXTime
+  , blockHeight :: Integer
+  , inputs :: [TransactionUTxO]
+  , outputs :: [TransactionUTxO]
+  , mints :: [NativeAsset]
+  , plutusContracts :: [TransactionPlutusContract]
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''EventTransaction
+
+instance FromJSON EventTransaction where
+  parseJSON =
+    withObject "EventTransaction" $ \o ->
+      EventTransaction
+        <$> o .: "tx_hash"
+        <*> o .: "tx_timestamp"
+        <*> o .: "block_height"
+        <*> o .: "inputs"
+        <*> o .: "outputs"
+        <*> o .: "assets_minted"
+        <*> o .: "plutus_contracts"

@@ -25,6 +25,7 @@ import P2PWallet.Data.AppModel.LendingModel.BorrowModel.LenderOffersFilterModel
 import P2PWallet.Data.AppModel.LendingModel.BorrowModel.OpenAsksFilterModel
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
 import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -93,6 +94,10 @@ data BorrowEvent
   | MakeLoanPayment (AddEvent LoanUTxO LoanPayment)
   -- | Claim the lost collateral.
   | ClaimLostCollateral LoanUTxO
+  -- | Inspect Active Loan's history.
+  | InspectActiveLoanHistory Loans.LoanId
+  -- | Stop inspecting the loan's history.
+  | CloseInspectedActiveLoanHistory
 
 -------------------------------------------------
 -- Borrow State
@@ -119,6 +124,8 @@ data BorrowModel = BorrowModel
   , offerAcceptanceScene :: AcceptOfferScene
   -- | The new loan payment.
   , newLoanPayment :: Maybe NewLoanPayment
+  -- | Focused loan history.
+  , inspectedLoan :: Maybe Loans.LoanId
   -- | Whether to show the filter widget for active loans.
   , showActiveLoansFilter :: Bool
   } deriving (Show,Eq)
@@ -137,5 +144,6 @@ instance Default BorrowModel where
     , newOfferAcceptance = def
     , offerAcceptanceScene = ChooseAskScene
     , newLoanPayment = Nothing
+    , inspectedLoan = Nothing
     , showActiveLoansFilter = False
     }

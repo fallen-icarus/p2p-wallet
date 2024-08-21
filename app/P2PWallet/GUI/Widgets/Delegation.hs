@@ -199,7 +199,7 @@ mainWidget AppModel{..} =
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         , spacer_ [width 5]
         , box_ [alignMiddle] $ tooltip_ "Refresh" [tooltipDelay 0] $
-            button refreshIcon (SyncWallets StartProcess)
+            button refreshIcon (SyncWallets $ StartProcess Nothing)
             `styleBasic`
               [ border 0 transparent
               , radius 20

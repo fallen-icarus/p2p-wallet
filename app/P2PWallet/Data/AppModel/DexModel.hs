@@ -64,11 +64,11 @@ data DexEvent
   -- | Set the new trading pair as teh selected trading pair.
   | SetNewTradingPair (AddEvent (Text,Text) (OfferAsset, AskAsset))
   -- | Add the new limit order to the transaction builder.
-  | AddNewLimitOrderCreation (ProcessEvent SwapCreation)
+  | AddNewLimitOrderCreation (ProcessEvent () SwapCreation)
   -- | Add the new liquidity swap to the transaction builder.
-  | AddNewLiquiditySwapCreation (ProcessEvent SwapCreation)
+  | AddNewLiquiditySwapCreation (ProcessEvent () SwapCreation)
   -- | Sync the order-book for the selected trading pair.
-  | SyncOrderBook (ProcessEvent CachedOrderBooks)
+  | SyncOrderBook (ProcessEvent () CachedOrderBooks)
   -- | Add the new swap close to the transaction builder.
   | AddSelectedSwapClose SwapUTxO
   -- | Add the new swap update to the transaction builder.

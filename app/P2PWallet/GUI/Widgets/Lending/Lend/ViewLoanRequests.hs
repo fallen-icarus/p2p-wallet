@@ -151,7 +151,7 @@ allAsksWidget AppModel{lendingModel=LendingModel{lendModel},reverseTickerMap} = 
     cushionWidgetH $ vstack
       [ centerWidgetH $ hstack 
           [ tooltip_ "Resync Requests" [tooltipDelay 0] $
-              box_ [alignMiddle, onClick $ LendingEvent $ LendEvent $ SyncLoanAsks StartProcess] $
+              box_ [alignMiddle, onClick $ LendingEvent $ LendEvent $ SyncLoanAsks $ StartProcess Nothing] $
                 label refreshIcon
                   `styleBasic` 
                     [ border 0 transparent
@@ -352,7 +352,7 @@ requestsFilterWidget AppModel{lendingModel=LendingModel{..}} = do
                 , hstack 
                     [ filler
                     , toggleButton_ "Confirm" (toLensVL $ rootLens % #showViewRequestsFilter)
-                        [onClick $ LendingEvent $ LendEvent $ UpdateLoanAskConfiguration StartProcess]
+                        [onClick $ LendingEvent $ LendEvent $ UpdateLoanAskConfiguration $ StartProcess Nothing]
                     ] `styleBasic` [padding 10]
                 ] `styleBasic`
                     [ bgColor customGray3

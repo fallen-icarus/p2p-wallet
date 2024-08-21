@@ -58,9 +58,9 @@ data LendEvent
   -- | Set the new loan ask configuration when none has been set before.
   | InitializeLoanAskConfiguration (AddEvent NewLoanAskConfiguration LoanAskConfiguration)
   -- | Sync the loan asks for the selected ask configuration.
-  | SyncLoanAsks (ProcessEvent CachedLoanAsks)
+  | SyncLoanAsks (ProcessEvent () CachedLoanAsks)
   -- | Update the loan ask configuration that is already set.
-  | UpdateLoanAskConfiguration (ProcessEvent LoanAskConfiguration)
+  | UpdateLoanAskConfiguration (ProcessEvent () LoanAskConfiguration)
   -- | Create a new Offer UTxO.
   | CreateNewOffer (AddEvent LoanUTxO OfferCreation)
   -- | Add the new offer close to the transaction builder.

@@ -17,7 +17,7 @@ handleProfileEvent :: AppModel -> ProfileEvent -> [AppEventResponse AppModel App
 handleProfileEvent model@AppModel{..} evt = case evt of
   -- Load all tracked profiles for the specified network.
   LoadKnownProfiles modal -> case modal of
-    StartProcess -> 
+    StartProcess _ -> 
       [ Task $ runActionOrAlert (ProfileEvent . LoadKnownProfiles . ProcessResults) $
           -- Try to load the profiles from the sqlite database. Show the user any error that appears.
           loadProfiles databaseFile (config ^. #network) >>= fromRightOrAppError
@@ -34,12 +34,12 @@ handleProfileEvent model@AppModel{..} evt = case evt of
     [ Model $ model 
         & #selectedProfile ?~ profile 
         & #waitingStatus % #loadingProfile .~ True
-    , Task $ return $ ProfileEvent $ LoadProfileInfo StartProcess
+    , Task $ return $ ProfileEvent $ LoadProfileInfo $ StartProcess Nothing
     ]
 
   -- Load all info for the selected profile.
   LoadProfileInfo modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       let profile = fromMaybe def selectedProfile in
       [ Task $ runActionOrAlert (ProfileEvent . LoadProfileInfo . ProcessResults) $
           (,,) <$> (loadWallets databaseFile profile >>= fromRightOrAppError)
@@ -178,5 +178,5 @@ handleProfileEvent model@AppModel{..} evt = case evt of
       [ Model $ model 
           & #profileModel % #deletingProfile .~ False
           & #selectedProfile .~ Nothing
-      , Task $ return $ ProfileEvent $ LoadKnownProfiles StartProcess
+      , Task $ return $ ProfileEvent $ LoadKnownProfiles $ StartProcess Nothing
       ]
