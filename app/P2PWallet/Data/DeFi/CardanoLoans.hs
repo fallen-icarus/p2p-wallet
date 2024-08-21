@@ -493,7 +493,7 @@ data ActiveBeaconsRedeemer
   | BurnAndUnlockLost
   -- | Burn any beacons.
   | BurnActiveBeacons
-  deriving (Eq,Show)
+  deriving (Eq,Show,Generic,FromJSON,ToJSON)
 
 PlutusTx.makeIsDataIndexed ''AskDatum [('AskDatum,0)]
 PlutusTx.makeIsDataIndexed ''OfferDatum [('OfferDatum,1)]

@@ -44,7 +44,7 @@ data HomeEvent
   -- | Watch a new `PaymentWallet`. It can only be done from the `HomeAbout` subscene.
   | WatchPaymentWallet (AddEvent PaymentWallet PaymentWallet)
   -- | Add the corresponding stake wallet to the database.
-  | AddCorrespondingStakeWallet (ProcessEvent StakeWallet)
+  | AddCorrespondingStakeWallet (ProcessEvent () StakeWallet)
   -- | Change a payment wallet name.
   | ChangePaymentWalletName (AddEvent Text PaymentWallet)
   -- | Delete a payment wallet.

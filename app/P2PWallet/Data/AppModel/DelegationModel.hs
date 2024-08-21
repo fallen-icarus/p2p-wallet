@@ -39,7 +39,7 @@ data DelegationEvent
   -- | Reset Pool Filters.
   | ResetPoolFilters
   -- | Sync all registered pools.
-  | SyncRegisteredPools (ProcessEvent [Pool])
+  | SyncRegisteredPools (ProcessEvent () [Pool])
   -- | Add the selected user certificate to the tx builder. The `Text` is the target
   -- pool name so that the GUI can show it on the Builder scene.
   | AddSelectedUserCertificate (Maybe Text,CertificateAction)

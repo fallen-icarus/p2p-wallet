@@ -399,6 +399,13 @@ instance FromField PV1.CurrencySymbol where
 instance Servant.ToHttpApiData PV1.CurrencySymbol where
   toQueryParam = display
 
+instance ToJSON PV1.CurrencySymbol where
+  toJSON = toJSON . display
+
+instance FromJSON PV1.CurrencySymbol where
+  parseJSON = withText "CurrencySymbol" $ 
+    maybe mzero (return . PV1.CurrencySymbol) . parseHex
+
 instance Servant.ToHttpApiData PV1.TokenName where
   toQueryParam = display
 

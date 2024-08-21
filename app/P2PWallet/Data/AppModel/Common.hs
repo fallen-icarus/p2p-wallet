@@ -45,11 +45,11 @@ data DeleteWithConfirmationEvent a
 -------------------------------------------------
 -- Process Event
 -------------------------------------------------
--- | Most interactions with the real world require two steps: get/edit/delete the data, and process the result.
--- This tries to separate the pure part from the IO part.
-data ProcessEvent a
-  = StartProcess -- IO step.
-  | ProcessResults a -- Pure step.
+-- | Most interactions with the real world require two steps: get/edit/delete the data, and process
+-- the result. This tries to separate the pure part from the IO part.
+data ProcessEvent a b
+  = StartProcess (Maybe a) -- IO step optionally using some extra information.
+  | ProcessResults b -- Pure step.
   deriving (Show,Eq)
 
 -------------------------------------------------

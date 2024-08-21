@@ -88,6 +88,8 @@ data WaitingStatus = WaitingStatus
   , syncingOrderBook :: Bool
   -- | The app is syncing the loan asks for the selected ask configuration.
   , syncingLoanAsks :: Bool
+  -- | The app is syncing the loan history for the selected loan.
+  , syncingLoanHistory :: Bool
   -- | The app is building the transaction.
   , building :: Bool
   -- | The app is loading the profile.
@@ -108,6 +110,7 @@ instance Default WaitingStatus where
     , syncingPools = False
     , syncingOrderBook = False
     , syncingLoanAsks = False
+    , syncingLoanHistory = False
     , building = False
     , loadingProfile = False
     , submitting = False
@@ -136,9 +139,9 @@ data AppEvent
   -- | Sync the currently tracked wallets. This can be called from most scenes which is why it
   -- is a main event. This also gets the current network parameters so they are available for
   -- building transactions.
-  | SyncWallets (ProcessEvent (Wallets, (ByteString,Decimal) ,[Notification]))
+  | SyncWallets (ProcessEvent () (Wallets, (ByteString,Decimal) ,[Notification]))
   -- | Update the current date.
-  | UpdateCurrentDate (ProcessEvent (Day, POSIXTime))
+  | UpdateCurrentDate (ProcessEvent () (Day, POSIXTime))
   -- | An event for the Home page.
   | HomeEvent HomeEvent 
   -- | An event for the Delegation page.

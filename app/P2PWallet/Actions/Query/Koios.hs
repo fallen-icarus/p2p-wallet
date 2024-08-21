@@ -17,6 +17,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryDexWallet
   , runQueryLoanWallet
   , runQueryLoanAsks
+  , runQueryLoanHistory
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
@@ -508,6 +509,12 @@ runQueryLoanAsks network loanAskCfg = do
       first show <$> 
         handleTimeoutError (runClientM (queryLoanAsks loanAskCfg) env)
 
+runQueryLoanHistory :: Network -> Loans.LoanId -> IO (Either Text [LoanEvent])
+runQueryLoanHistory network loanId = do
+  manager <- newManager customTlsSettings
+  let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+  first show <$> handleTimeoutError (runClientM (queryLoanTxHistory loanId) env)
+
 -------------------------------------------------
 -- Low-Level API
 -------------------------------------------------
@@ -565,6 +572,12 @@ type KoiosApi
      :> QueryParam' '[Required] "order" OrderParam
      :> ReqBody '[JSON] TxHashes
      :> Post '[JSON] [Transaction]
+
+  :<|> "tx_info"
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "order" OrderParam
+     :> ReqBody '[JSON] TxHashes
+     :> Post '[JSON] [EventTransaction]
 
   :<|>  "account_info"
      :> QueryParam' '[Required] "select" SelectParam
@@ -646,7 +659,8 @@ submitApi
   :<|> paramsApi
   :<|> addressUTxOsApi 
   :<|> addressTxsApi
-  :<|> txInfoApi 
+  :<|> fullTxInfoApi 
+  :<|> eventTxInfoApi 
   :<|> stakeAccountApi
   :<|> stakeRewardsApi
   :<|> poolInfoApi
@@ -718,7 +732,7 @@ queryAddressTxHashes addrs lastBlock = queryHashes 0 []
 -- Query the information for a list of transaction hashes. The transactions are returned latest
 -- first.
 queryAddressTransactions :: [Text] -> ClientM [Transaction]
-queryAddressTransactions = txInfoApi select "block_height.desc" . TxHashes
+queryAddressTransactions = fullTxInfoApi select "block_height.desc" . TxHashes
   where
     select :: SelectParam
     select = 
@@ -1042,4 +1056,37 @@ queryLoanOffers LoanOfferConfiguration{..} = queryApi 0 []
       , "reference_script"
       , "block_time"
       , "block_height"
+      ]
+
+-- Query all transactions involving a given asset.
+queryAssetTxHashes :: CurrencySymbol -> TokenName -> ClientM [Text]
+queryAssetTxHashes policyId name = queryHashes 0 []
+  where
+    queryHashes :: OffsetParam -> [Text] -> ClientM [Text]
+    queryHashes offset !acc = do
+      hashes <- map (view #txHash) <$>
+        -- Only fetch the "tx_hash" column.
+        assetTxHistoryApi "tx_hash" policyId name True
+      if length hashes == 1000 then 
+        -- Query again since there may be more.
+        queryHashes (offset + 1000) $ acc <> hashes
+      else
+        -- That should be the last of the results.
+        return $ acc <> hashes
+
+-- | Query all transactions for a specific loan id.
+queryLoanTxHistory :: Loans.LoanId -> ClientM [LoanEvent]
+queryLoanTxHistory i@(Loans.LoanId loanId) = do
+    info <- queryAssetTxHashes Loans.activeBeaconCurrencySymbol loanId >>= 
+      eventTxInfoApi select "block_height.asc" . TxHashes
+    return $ mapMaybe (toLoanEvent i) info
+  where
+    select = SelectParam $ toText $ intercalate ","
+      [ "tx_hash"
+      , "tx_timestamp"
+      , "block_height"
+      , "inputs"
+      , "outputs"
+      , "assets_minted"
+      , "plutus_contracts"
       ]

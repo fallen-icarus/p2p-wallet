@@ -279,7 +279,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Building transactions
   -----------------------------------------------
   BuildTx modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       -- Build the transaction using the current `txBuilderModel`. It will calculate the fee
       -- and will return an updated `txBuilderModel`. The resulting tx.body file will be
       -- located in the tmp directory. If an error is throw, it will be displayed in an alert
@@ -304,7 +304,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Witnessing transactions
   -----------------------------------------------
   WitnessTx modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       if not $ txBuilderModel ^. #isBuilt
       then [ Task $ return $ Alert "The transaction must first be built." ]
       else
@@ -320,18 +320,18 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
       , Task $ case txBuilderModel ^. #txType of
           PairedTx -> 
             -- The witnesses can be assembled and then submitted to the blockchain.
-            return $ TxBuilderEvent $ AssembleWitnesses StartProcess
+            return $ TxBuilderEvent $ AssembleWitnesses $ StartProcess Nothing
           _ ->
             -- Export the tx.body file so it can be signed externally. The witnesses will also be
             -- exported.
-            return $ TxBuilderEvent $ ExportTxBody StartProcess
+            return $ TxBuilderEvent $ ExportTxBody $ StartProcess Nothing
       ]
 
   -----------------------------------------------
   -- Assembling witnesses
   -----------------------------------------------
   AssembleWitnesses modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       [ Task $ runActionOrAlert (TxBuilderEvent . AssembleWitnesses . ProcessResults) $
           assembleWitnesses (txBuilderModel ^. #keyWitnessFiles)
       ]
@@ -345,7 +345,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Exporting the tx.body file and witnesses
   -----------------------------------------------
   ExportTxBody modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       [ Task $ runActionOrAlert (TxBuilderEvent . ExportTxBody . ProcessResults) $
           exportTxBody (txBuilderModel ^. #targetPath) (txBuilderModel ^. #keyWitnessFiles)
       ]
@@ -428,7 +428,7 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
           & #txBuilderModel % #exporting .~ False
       , Task $ return $ do
           if txBuilderModel ^. #txType == WatchedTx then
-            TxBuilderEvent $ ExportTxBody StartProcess
+            TxBuilderEvent $ ExportTxBody $ StartProcess Nothing
           else
-            TxBuilderEvent $ WitnessTx StartProcess
+            TxBuilderEvent $ WitnessTx $ StartProcess Nothing
       ]

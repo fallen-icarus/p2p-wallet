@@ -84,7 +84,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   -- Set the app config to that network and load the profiles associated with that network.
   SetNetwork targetNetwork -> 
     [ Model $ model & #config % #network .~ targetNetwork
-    , Task $ return $ ProfileEvent $ LoadKnownProfiles StartProcess
+    , Task $ return $ ProfileEvent $ LoadKnownProfiles $ StartProcess Nothing
     ]
 
   -----------------------------------------------
@@ -132,7 +132,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- This is always called after syncing so it will handle any new notifications.
   UpdateCurrentDate modal -> case modal of
-    StartProcess -> 
+    StartProcess _ -> 
       [ Task $ runActionOrAlert (UpdateCurrentDate . ProcessResults) $ 
           (,) <$> getCurrentDay (config ^. #timeZone)
               <*> Time.getPOSIXTime
@@ -154,7 +154,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   -- Syncing Wallets
   -----------------------------------------------
   SyncWallets modal -> case modal of
-    StartProcess -> 
+    StartProcess _ -> 
       -- Set `syncing` to True to let users know syncing is happening.
       [ Model $ model & #waitingStatus % #syncingWallets .~ True 
       , Task $ do
@@ -188,7 +188,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
                   toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
               & #notifications .~ zip [0..] newNotifications
           -- `UpdateCurrentDate` will handle any new notifications alerts.
-          , Task $ return $ UpdateCurrentDate StartProcess
+          , Task $ return $ UpdateCurrentDate $ StartProcess Nothing
           ]
 
   -----------------------------------------------

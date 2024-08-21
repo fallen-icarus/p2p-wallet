@@ -75,7 +75,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           & #homeModel % #addingWallet .~ False
           & #homeModel % #selectedWallet .~ verifiedPaymentWallet
           & #scene .~ HomeScene
-      , Task $ return $ HomeEvent $ AddCorrespondingStakeWallet StartProcess
+      , Task $ return $ HomeEvent $ AddCorrespondingStakeWallet $ StartProcess Nothing
       ]
 
   -----------------------------------------------
@@ -120,14 +120,14 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           & #homeModel % #addingWallet .~ False
           & #homeModel % #selectedWallet .~ verifiedPaymentWallet
           & #scene .~ HomeScene
-      , Task $ return $ HomeEvent $ AddCorrespondingStakeWallet StartProcess
+      , Task $ return $ HomeEvent $ AddCorrespondingStakeWallet $ StartProcess Nothing
       ]
 
   -----------------------------------------------
   -- Add the corresponding stake wallet when adding a payment wallet
   -----------------------------------------------
   AddCorrespondingStakeWallet modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       let PaymentWallet{..} = homeModel ^. #selectedWallet
           knownStakeAddresses = map (Just . view #stakeAddress) $ knownWallets ^. #stakeWallets
       in  [ Task $ do
@@ -158,13 +158,13 @@ handleHomeEvent model@AppModel{..} evt = case evt of
                 return $ HomeEvent $ AddCorrespondingStakeWallet $ ProcessResults newStakeWallet
               -- Otherwise, just sync the wallets.
               else
-                return $ SyncWallets StartProcess
+                return $ SyncWallets $ StartProcess Nothing
           ]
     ProcessResults newStakeWallet ->
       [ Model $ model 
           & #knownWallets % #stakeWallets %~ flip snoc newStakeWallet
           & #delegationModel % #selectedWallet .~ newStakeWallet
-      , Task $ return $ SyncWallets StartProcess
+      , Task $ return $ SyncWallets $ StartProcess Nothing
       ]
 
   -----------------------------------------------

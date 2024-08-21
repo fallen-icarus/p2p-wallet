@@ -6,6 +6,7 @@ module P2PWallet.GUI.EventHandler.LendingEvent
 import Monomer
 
 import P2PWallet.Actions.Database
+import P2PWallet.Actions.SyncLoans
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
@@ -67,7 +68,7 @@ handleLendingEvent model@AppModel{..} evt = case evt of
           & #knownWallets % #loanWallets %~ flip snoc verifiedLoanWallet
           & #lendingModel % #addingWallet .~ False
           & #lendingModel % #selectedWallet .~ verifiedLoanWallet
-      , Task $ return $ SyncWallets StartProcess
+      , Task $ return $ SyncWallets $ StartProcess Nothing
       ]
 
   -----------------------------------------------
@@ -111,6 +112,22 @@ handleLendingEvent model@AppModel{..} evt = case evt of
   -- Lend Event
   ---------------------------------------------
   LendEvent lendEvt -> handleLendEvent model lendEvt
+
+  -----------------------------------------------
+  -- Sync Loan History
+  -----------------------------------------------
+  LookupLoanHistory modal -> case modal of
+    StartProcess mLoanId ->
+      [ Model $ model & #waitingStatus % #syncingLoanHistory .~ True
+      , Task $ runActionOrAlert (LendingEvent . LookupLoanHistory . ProcessResults) $ do
+          loanId <- fromJustOrAppError "mLoanId is Nothing"  mLoanId
+          syncLoanHistory (config ^. #network) loanId $ lendingModel ^. #cachedLoanHistories
+      ]
+    ProcessResults newCachedLoanHistories ->
+      [ Model $ model 
+          & #waitingStatus % #syncingLoanHistory .~ False
+          & #lendingModel % #cachedLoanHistories .~ newCachedLoanHistories
+      ]
 
 -------------------------------------------------
 -- Helper Functions

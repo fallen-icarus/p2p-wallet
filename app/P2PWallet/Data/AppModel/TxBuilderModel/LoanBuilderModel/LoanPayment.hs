@@ -6,7 +6,7 @@
 
 module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LoanPayment where
 
-import Data.Map qualified as Map
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.Core.AssetMaps
 import P2PWallet.Data.Core.Internal

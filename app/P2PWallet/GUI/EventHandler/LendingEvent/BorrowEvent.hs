@@ -4,6 +4,7 @@ module P2PWallet.GUI.EventHandler.LendingEvent.BorrowEvent
   ) where
 
 import Monomer
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.CalculateMinUTxOValue
@@ -405,6 +406,18 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
           , createLoanPaymentDepositMsg verifiedNewPayment
           ]
       ]
+
+  -----------------------------------------------
+  -- Inspecting Loan Histories
+  -----------------------------------------------
+  InspectActiveLoanHistory loanId -> 
+    [ Model $ model & #lendingModel % #borrowModel % #inspectedLoan ?~ loanId 
+    , Event $ case Map.lookup loanId (lendingModel ^. #cachedLoanHistories) of
+        Nothing -> LendingEvent $ LookupLoanHistory $ StartProcess $ Just loanId
+        Just _ -> AppInit
+    ]
+  CloseInspectedActiveLoanHistory -> 
+    [ Model $ model & #lendingModel % #borrowModel % #inspectedLoan .~ Nothing ]
 
 -------------------------------------------------
 -- Helper Functions

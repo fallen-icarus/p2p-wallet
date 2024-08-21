@@ -56,7 +56,7 @@ handleLendEvent model@AppModel{..} evt = case evt of
           -- Only sync the loan asks for the configuration if it has not been synced yet.
           -- Users can manually resync if necessary.
           case Map.lookup verifiedAskConfig $ lendingModel ^. #lendModel % #cachedLoanAsks of
-            Nothing -> return $ LendingEvent $ LendEvent $ SyncLoanAsks StartProcess
+            Nothing -> return $ LendingEvent $ LendEvent $ SyncLoanAsks $ StartProcess Nothing
             Just _ -> return AppInit
       ]
 
@@ -64,7 +64,7 @@ handleLendEvent model@AppModel{..} evt = case evt of
   -- Update the desired ask configuration.
   -----------------------------------------------
   UpdateLoanAskConfiguration modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       [ Task $ runActionOrAlert (LendingEvent . LendEvent . UpdateLoanAskConfiguration . ProcessResults) $ do
           let newAskCfg = lendingModel ^. #lendModel % #requestsFilterModel % #newLoanAskConfiguration
 
@@ -77,7 +77,7 @@ handleLendEvent model@AppModel{..} evt = case evt of
           -- Only sync the loan asks for the configuration if it has not been synced yet.
           -- Users can manually resync if necessary.
           case Map.lookup verifiedAskConfig $ lendingModel ^. #lendModel % #cachedLoanAsks of
-            Nothing -> return $ LendingEvent $ LendEvent $ SyncLoanAsks StartProcess
+            Nothing -> return $ LendingEvent $ LendEvent $ SyncLoanAsks $ StartProcess Nothing
             Just _ -> return AppInit
       ]
 
@@ -85,7 +85,7 @@ handleLendEvent model@AppModel{..} evt = case evt of
   -- Sync Loan Asks
   -----------------------------------------------
   SyncLoanAsks modal -> case modal of
-    StartProcess ->
+    StartProcess _ ->
       [ Model $ model & #waitingStatus % #syncingLoanAsks .~ True
       , Task $ runActionOrAlert (LendingEvent . LendEvent . SyncLoanAsks . ProcessResults) $ do
           askConfig <- fromJustOrAppError "selectedLoanAskConfiguration is Nothing" $ 

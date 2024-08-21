@@ -338,7 +338,7 @@ orderBookWidget AppModel{dexModel=DexModel{..}, reverseTickerMap} = do
                 `styleHover` [bgColor customGray1, cursorIcon CursorHand]
         , spacer_ [width 5]
         , tooltip_ "Resync Order Book" [tooltipDelay 0] $
-            box_ [alignMiddle, onClick $ DexEvent $ SyncOrderBook StartProcess] $
+            box_ [alignMiddle, onClick $ DexEvent $ SyncOrderBook $ StartProcess Nothing] $
               label refreshIcon
                 `styleBasic` 
                   [ border 0 transparent
@@ -520,7 +520,8 @@ createLimitOrderWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
         ]
     , spacer
     , box_ [alignRight] $ 
-        mainButton "Create Limit Order" (DexEvent $ AddNewLimitOrderCreation StartProcess)
+        mainButton "Create Limit Order" 
+          (DexEvent $ AddNewLimitOrderCreation $ StartProcess Nothing)
           `styleBasic`
             [textSize 10]
     ]
@@ -652,7 +653,8 @@ createLiquiditySwapWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
         ]
     , spacer
     , box_ [alignRight] $ 
-        mainButton "Create Liquidity Swap" (DexEvent $ AddNewLiquiditySwapCreation StartProcess)
+        mainButton "Create Liquidity Swap" 
+          (DexEvent $ AddNewLiquiditySwapCreation $ StartProcess Nothing)
           `styleBasic`
             [textSize 10]
     ]

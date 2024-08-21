@@ -141,7 +141,7 @@ mainWidget model@AppModel{scene=_,..} =
             `styleBasic` [textFont "Remix", paddingT 10]
           -- A button to manually resync the wallets.
         , tooltip_ "Refresh" [tooltipDelay 0] $
-            button refreshIcon (SyncWallets StartProcess)
+            button refreshIcon (SyncWallets $ StartProcess Nothing)
             `styleBasic`
               [ border 0 transparent
               , radius 20

@@ -15,6 +15,7 @@ import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Transaction
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Data.Koios.AddressUTxO
+import P2PWallet.Data.Koios.Transaction qualified as Koios
 import P2PWallet.Database
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -175,9 +176,10 @@ data LoanEvent = LoanEvent
   -- | The time of the event.
   , timeStamp :: POSIXTime
   -- | The state at the time of the event. This is the state _before_ the event occurs.
-  , state :: Loans.ActiveDatum
+  -- When the loan is first started, the state will be `Nothing`.
+  , state :: Maybe Loans.ActiveDatum
   -- | The action taken.
-  , event :: Loans.LoanRedeemer
+  , event :: Either Loans.ActiveBeaconsRedeemer Loans.LoanRedeemer
   } deriving (Show,Eq,Generic,FromJSON,ToJSON)
 
 makeFieldLabelsNoPrefix ''LoanEvent
@@ -186,6 +188,48 @@ instance Ord LoanEvent where
   event1 <= event2
     | event1 ^. #loanId == event2 ^. #loanId = event1 ^. #timeStamp <= event2 ^. #timeStamp
     | otherwise = event1 ^. #loanId <= event2 ^. #loanId
+
+toLoanEvent :: Loans.LoanId -> Koios.EventTransaction -> Maybe LoanEvent
+toLoanEvent loanId Koios.EventTransaction{..} = do
+    (parsedRedeemer, parsedDatum) <- 
+      findLoanInput plutusContracts <|> findLoanStart plutusContracts
+
+    return $ LoanEvent
+      { loanId = loanId
+      , state = parsedDatum
+      , event = parsedRedeemer
+      , timeStamp = blockTime
+      }
+  where
+    -- This covers all but the start of the loan.
+    findLoanInput 
+      :: [Koios.TransactionPlutusContract] 
+      -> Maybe (Either Loans.ActiveBeaconsRedeemer Loans.LoanRedeemer, Maybe Loans.ActiveDatum)
+    findLoanInput [] = Nothing
+    findLoanInput (Koios.TransactionPlutusContract{redeemer,datum}:xs) =
+      case datum >>= decodeData @Loans.ActiveDatum of
+        Nothing -> findLoanInput xs
+        Just activeDatum -> 
+          if activeDatum ^. #loanId == loanId 
+          then (,Just activeDatum) . Right <$> decodeData redeemer
+          else findLoanInput xs
+
+    findLoanStart
+      :: [Koios.TransactionPlutusContract]
+      -> Maybe (Either Loans.ActiveBeaconsRedeemer Loans.LoanRedeemer, Maybe Loans.ActiveDatum)
+    findLoanStart [] = Nothing
+    findLoanStart (Koios.TransactionPlutusContract{redeemer}:xs) =
+      case decodeData @Loans.ActiveBeaconsRedeemer redeemer of
+        Just r@(Loans.CreateActive _) -> 
+          let mintsLoanId NativeAsset{..} = and
+                [ policyId == Loans.activeBeaconCurrencySymbol 
+                , tokenName == Loans.unLoanId loanId 
+                , quantity == 2
+                ]
+           in if any mintsLoanId mints
+              then Just (Left r, Nothing)
+              else findLoanStart xs
+        _ -> findLoanStart xs
 
 -------------------------------------------------
 -- Loan Result

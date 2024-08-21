@@ -18,11 +18,11 @@ import P2PWallet.Prelude
 -------------------------------------------------
 data ProfileEvent
   -- | Load the profiles for that network, and then prompt the user to pick one.
-  = LoadKnownProfiles (ProcessEvent [Profile])
+  = LoadKnownProfiles (ProcessEvent () [Profile])
   -- | Load selected profile.
   | LoadSelectedProfile Profile
   -- | Load known information for this profile.
-  | LoadProfileInfo (ProcessEvent (Wallets, [AddressEntry], [TickerInfo]))
+  | LoadProfileInfo (ProcessEvent () (Wallets, [AddressEntry], [TickerInfo]))
   -- | Log out of current profile.
   | LogoutProfile
   -- | Add a new profile.

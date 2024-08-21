@@ -81,15 +81,15 @@ data TxBuilderEvent
   | LoanBuilderEvent LoanBuilderEvent
   -- | Build the transaction while also estimating the execution budgets and tx fee. Return the
   -- updated TxBuilderModel.
-  | BuildTx (ProcessEvent TxBuilderModel)
+  | BuildTx (ProcessEvent () TxBuilderModel)
   -- | Witness a transaction that was built using the TxBuilder. Return the absolute filepaths for
   -- the witness files.
-  | WitnessTx (ProcessEvent [KeyWitnessFile])
+  | WitnessTx (ProcessEvent () [KeyWitnessFile])
   -- | Assemble the witness files to produced the signed tx file.
-  | AssembleWitnesses (ProcessEvent SignedTxFile)
+  | AssembleWitnesses (ProcessEvent () SignedTxFile)
   -- | Export the transaction body and any witnesses. It will be exported to the user's home
   -- directory.
-  | ExportTxBody (ProcessEvent FilePath)
+  | ExportTxBody (ProcessEvent () FilePath)
   -- | Import an externally signed transaction to submit it through the wallet.
   | ImportSignedTxFile (AddEvent FilePath FilePath)
   -- | Get the export destination for the transaction files.
