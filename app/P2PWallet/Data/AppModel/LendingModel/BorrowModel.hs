@@ -87,6 +87,12 @@ data BorrowEvent
   | ResetLenderOffersFilters
   -- | Add a new offer acceptance to the builder.
   | AcceptLoanOffer AcceptOfferEvent
+  -- | Apply the interest/penalties to a loan.
+  | RolloverLoan LoanUTxO
+  -- | Make a loan payment.
+  | MakeLoanPayment (AddEvent LoanUTxO LoanPayment)
+  -- | Claim the lost collateral.
+  | ClaimLostCollateral LoanUTxO
 
 -------------------------------------------------
 -- Borrow State
@@ -111,6 +117,10 @@ data BorrowModel = BorrowModel
   , newOfferAcceptance :: Maybe NewOfferAcceptance
   -- | The accept offer scene.
   , offerAcceptanceScene :: AcceptOfferScene
+  -- | The new loan payment.
+  , newLoanPayment :: Maybe NewLoanPayment
+  -- | Whether to show the filter widget for active loans.
+  , showActiveLoansFilter :: Bool
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''BorrowModel
@@ -126,4 +136,6 @@ instance Default BorrowModel where
     , lenderOffersFilterModel = def
     , newOfferAcceptance = def
     , offerAcceptanceScene = ChooseAskScene
+    , newLoanPayment = Nothing
+    , showActiveLoansFilter = False
     }

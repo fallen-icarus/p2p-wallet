@@ -126,6 +126,12 @@ loanUTxOOfferDatum LoanUTxO{loanDatum} = case loanDatum of
   Just (OfferDatum offerDatum) -> Just offerDatum
   _ -> Nothing
 
+-- | Get the ActiveDatum from a LoanUTxO.
+loanUTxOActiveDatum :: LoanUTxO -> Maybe Loans.ActiveDatum
+loanUTxOActiveDatum LoanUTxO{loanDatum} = case loanDatum of
+  Just (ActiveDatum activeDatum) -> Just activeDatum
+  _ -> Nothing
+
 -- | Get the loan amount from a LoanUTxO. The loan principle is the quantity.
 loanUTxOLoanAmount :: LoanUTxO -> Maybe NativeAsset
 loanUTxOLoanAmount LoanUTxO{loanDatum} = case loanDatum of

@@ -9,6 +9,7 @@ import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.GUI.Widgets.Lending.Borrow.ActiveLoans
 import P2PWallet.GUI.Widgets.Lending.Borrow.LenderOffers
 import P2PWallet.GUI.Widgets.Lending.Borrow.OpenAsks
 import P2PWallet.Prelude
@@ -23,6 +24,8 @@ borrowWidget model@AppModel{lendingModel} = do
           `nodeVisible` (lendingModel ^. #borrowModel % #scene == OpenAsks)
       , box_ [mergeRequired reqUpdate] (lenderOffersWidget model)
           `nodeVisible` (lendingModel ^. #borrowModel % #scene == CurrentOffers)
+      , box_ [mergeRequired reqUpdate] (activeLoansWidget model)
+          `nodeVisible` (lendingModel ^. #borrowModel % #scene == ActiveLoans)
       ]
   where
     borrowSceneButton :: Text -> BorrowScene -> AppNode

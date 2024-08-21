@@ -742,8 +742,15 @@ offerBorrowerIdMsg = unwords
   ]
 
 offerLoanAmountMsg :: Text
-offerLoanAmountMsg = unwords
-  [ "The amount to be loaned out."
+offerLoanAmountMsg = unlines
+  [ "How much will you lend?"
+  , ""
+  , "The asset quantity must be in one of the following formats:"
+  , "1. '# policy_id.asset_name'"
+  , "2. '# ticker' - if in Ticker Registry"
+  , "3. '# ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
   ]
 
 offerPaymentAddressMsg :: Text
@@ -902,4 +909,39 @@ collateralAmountsMsg = unlines
   , "3. '# ADA' - if the asset is ada."
   , ""
   , "Fingerprints are not supported."
+  ]
+
+paymentCollateralAmountsMsg :: Text
+paymentCollateralAmountsMsg = unlines
+  [ unwords
+      [ "You can reclaim collateral proportionally to how much you are paying back."
+      , "You must specify how much collateral you intend to leave locked up."
+      ]
+  , ""
+  , "The asset quantities must be in one of the following formats:"
+  , "1. '# policy_id.asset_name'"
+  , "2. '# ticker' - if in Ticker Registry"
+  , "3. '# ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+paymentAmountMsg :: Text
+paymentAmountMsg = unlines
+  [ "How much will you pay back?"
+  , ""
+  , "The asset quantities must be in one of the following formats:"
+  , "1. '# policy_id.asset_name'"
+  , "2. '# ticker' - if in Ticker Registry"
+  , "3. '# ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  , ""
+  , unwords
+      [ "The payment output must also have enough ada to satisfy the minUTxOValue. If the loan asset"
+      , "is ada, the minUTxOValue is covered by the payment itself. However, if the loan asset is"
+      , "a native asset, ada will need to be given to the lender in addition to the native asset"
+      , "quantity. This extra ada can be minimized by making the fewest number of payments required"
+      , "by the loan."
+      ]
   ]

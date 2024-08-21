@@ -136,6 +136,11 @@ handleLendEvent model@AppModel{..} evt = case evt of
           verifiedOfferCreation <- fromRightOrAppError $
             verifyNewOfferCreation reverseTickerMap tickerMap (config ^. #currentTime) newOffer
 
+          fromRightOrAppError $ 
+            checkIsSameLoanUserCredential 
+              (verifiedOfferCreation ^. #lenderCredential)
+              (txBuilderModel ^. #loanBuilderModel)
+
           -- There should only be one output in the `TxBody` for this action. The calculation must
           -- be done twice because the datum must be updated with the minUTxOValue as well.
           minUTxOValue <- do
@@ -165,6 +170,8 @@ handleLendEvent model@AppModel{..} evt = case evt of
               & #waitingStatus % #addingToBuilder .~ False
               & #txBuilderModel % #loanBuilderModel % #offerCreations %~ 
                   flip snoc (newIdx,verifiedOfferCreation)
+              & #txBuilderModel % #loanBuilderModel % #userCredential ?~
+                  verifiedOfferCreation ^. #lenderCredential
               & #lendingModel % #lendModel % #newOfferCreation .~ Nothing
               & #txBuilderModel %~ balanceTx
           , Task $ return $ Alert $ unlines
@@ -267,6 +274,11 @@ handleLendEvent model@AppModel{..} evt = case evt of
           verifiedOfferCreation <- fromRightOrAppError $
             verifyNewOfferCreation reverseTickerMap tickerMap (config ^. #currentTime) newOffer
 
+          fromRightOrAppError $ 
+            checkIsSameLoanUserCredential 
+              (verifiedOfferCreation ^. #lenderCredential)
+              (txBuilderModel ^. #loanBuilderModel)
+
           -- Verify that the new utxo is not already being spent.
           flip whenJust (const $ throwIO $ AppError "This offer UTxO is already being spent.") $
             find (== utxoRef) (concat
@@ -308,6 +320,8 @@ handleLendEvent model@AppModel{..} evt = case evt of
               & #waitingStatus % #addingToBuilder .~ False
               & #txBuilderModel % #loanBuilderModel % #offerUpdates %~ 
                   flip snoc (newIdx,verifiedOfferUpdate)
+              & #txBuilderModel % #loanBuilderModel % #userCredential ?~
+                  verifiedOfferUpdate ^. #newOffer % #lenderCredential
               & #lendingModel % #lendModel % #newOfferUpdate .~ Nothing
               & #txBuilderModel %~ balanceTx
           , Task $ return $ Alert $ unlines
@@ -332,8 +346,13 @@ processNewOfferClose u@OfferClose{utxoRef} model@TxBuilderModel{loanBuilderModel
       , map (view $ _2 % #offerUTxO % #utxoRef) offerAcceptances
       ])
 
+  -- All actions must be for the same user.
+  checkIsSameLoanUserCredential (u ^. #lenderCredential) (model ^. #loanBuilderModel)
+
   -- Get the input's new index.
   let newIdx = length offerCloses
 
   -- Add the new close to the end of the list of ask closes.
-  return $ balanceTx $ model & #loanBuilderModel % #offerCloses %~ flip snoc (newIdx,u)
+  return $ balanceTx $ model 
+    & #loanBuilderModel % #offerCloses %~ flip snoc (newIdx,u)
+    & #loanBuilderModel % #userCredential ?~ u ^. #lenderCredential

@@ -162,7 +162,7 @@ data SlotConfig = SlotConfig
 
 newtype Slot = Slot { unSlot :: Integer }
   deriving (Show)
-  deriving newtype (Eq,Ord)
+  deriving newtype (Eq,Ord,Num)
 
 instance Display Slot where
   display (Slot x) = show x
