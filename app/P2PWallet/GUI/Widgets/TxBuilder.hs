@@ -279,6 +279,7 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
         , offerUpdatesList reverseTickerMap $ loanBuilderModel ^. #offerUpdates
         , offerAcceptancesList reverseTickerMap $ loanBuilderModel ^. #offerAcceptances
         , loanPaymentsList reverseTickerMap $ loanBuilderModel ^. #loanPayments
+        , interestApplicationsList $ loanBuilderModel ^. #interestApplications
         , userCertificatesList userCertificates
         , userWithdrawalsList userWithdrawals
         , maybe [] (pure . testMintRow reverseTickerMap) testMint

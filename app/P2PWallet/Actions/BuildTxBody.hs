@@ -145,13 +145,13 @@ buildTxBody network tx = do
   -- the fee before the second calculation).
   fee <- do
       feeCalc1 <- 
-        estimateTxFee network tmpDir builderLogFile paramsFile txBodyFile certificateFiles $ 
+        estimateTxFee tmpDir builderLogFile paramsFile txBodyFile certificateFiles $ 
           -- The original `TxBody` does not have the updated budgets so it must be updated
           -- before calculating the fee.
           updateBudgets budgets initialTxBody
       
       -- Calculate the fee a second time.
-      estimateTxFee network tmpDir builderLogFile paramsFile txBodyFile certificateFiles $
+      estimateTxFee tmpDir builderLogFile paramsFile txBodyFile certificateFiles $
         -- The result of `convertToTxBody` does not have the calculated budgets so they must be
         -- added again.
         updateBudgets budgets $ 
@@ -245,15 +245,14 @@ buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificat
 
 -- | Calculate the fee.
 estimateTxFee 
-  :: Network 
-  -> TmpDirectory 
+  :: TmpDirectory 
   -> BuilderLogFile
   -> ParamsFile 
   -> TxBodyFile 
   -> [CertificateFile] 
   -> TxBody 
   -> IO Lovelace
-estimateTxFee network tmpDir builderLogFile paramsFile txBodyFile certificateFiles tx@TxBody{..} = do
+estimateTxFee tmpDir builderLogFile paramsFile txBodyFile certificateFiles tx@TxBody{..} = do
     -- This builds the tx.body file and stores it in the tmp directory. 
     runBuildCmd_ builderLogFile $ buildRawCmd tmpDir paramsFile txBodyFile certificateFiles tx
 
