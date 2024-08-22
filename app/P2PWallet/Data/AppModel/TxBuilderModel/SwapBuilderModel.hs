@@ -115,8 +115,7 @@ instance AddToTxBody SwapBuilderModel where
         & flip (foldl' addSwapUpdateToBody) swapUpdates
         -- Merge any beacon mints so that there is only one `TxBodyMint` per minting policy.
         -- Remove any mints that cancel out.
-        & #mints %~ mergeTxBodyMints
-        & #mints %~ removeEmptyMints
+        & #mints %~ (removeEmptyMints . mergeTxBodyMints)
         -- Adjust any redeemers based on whether all mints canceled out.
         & adjustSpendingRedeemers
         -- Add the swap executions. This is done after so that it does not mess with the beacon
@@ -137,6 +136,7 @@ addSwapCreationToBody txBody (_,SwapCreation{..}) =
       & #outputs %~ (<> replicate count newOutput)
       -- Add the new beacons to be minted. 
       & #mints %~ (newMint:)
+      & #network .~ network
   where
     lovelaceQuantity :: NativeAsset -> Lovelace
     lovelaceQuantity NativeAsset{policyId,quantity}
@@ -160,9 +160,15 @@ addSwapCreationToBody txBody (_,SwapCreation{..}) =
     adjustPrice :: Rational -> Rational -> Rational
     adjustPrice fee originalPrice = originalPrice * (1 - fee)
 
-    (beaconRedeemer :: Redeemer, beaconReference :: TxOutRef) = case (network,swapType) of
-      (_, LimitOrder) -> (toRedeemer OneWay.CreateOrCloseSwaps, OneWay.beaconScriptTestnetRef)
-      (_, LiquiditySwap) -> (toRedeemer TwoWay.CreateOrCloseSwaps, TwoWay.beaconScriptTestnetRef)
+    (beaconRedeemer :: Redeemer, beaconReference :: TxOutRef) = case swapType of
+      LimitOrder -> 
+        ( toRedeemer OneWay.CreateOrCloseSwaps
+        , OneWay.getScriptRef network OneWay.beaconScriptHash
+        )
+      LiquiditySwap -> 
+        ( toRedeemer TwoWay.CreateOrCloseSwaps
+        , TwoWay.getScriptRef network TwoWay.beaconScriptHash
+        )
 
     (swapDatum :: Datum , beacons :: [NativeAsset] , beaconSym :: CurrencySymbol) = 
       case swapType of
@@ -241,24 +247,30 @@ addSwapCloseToBody txBody (_,SwapClose{..}) =
       -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
+      & #network .~ network
   where
     (spendingRedeemer :: Redeemer,spendingReference :: TxOutRef,spendingScriptHash :: ScriptHash) = 
-      case (network,swapType) of
-        (_, LimitOrder) -> 
+      case swapType of
+        LimitOrder -> 
           ( toRedeemer OneWay.SpendWithMint
-          , OneWay.swapScriptTestnetRef
+          , OneWay.getScriptRef network OneWay.swapScriptHash
           , OneWay.swapScriptHash
           )
-        (_, LiquiditySwap) -> 
+        LiquiditySwap -> 
           ( toRedeemer TwoWay.SpendWithMint
-          , TwoWay.swapScriptTestnetRef
+          , TwoWay.getScriptRef network TwoWay.swapScriptHash
           , TwoWay.swapScriptHash
           )
 
-    (beaconRedeemer :: Redeemer, beaconReference :: TxOutRef) = 
-      case (network,swapType) of
-        (_, LimitOrder) -> (toRedeemer OneWay.CreateOrCloseSwaps, OneWay.beaconScriptTestnetRef)
-        (_, LiquiditySwap) -> (toRedeemer TwoWay.CreateOrCloseSwaps, TwoWay.beaconScriptTestnetRef)
+    (beaconRedeemer :: Redeemer, beaconReference :: TxOutRef) = case swapType of
+      LimitOrder -> 
+        ( toRedeemer OneWay.CreateOrCloseSwaps
+        , OneWay.getScriptRef network OneWay.beaconScriptHash
+        )
+      LiquiditySwap -> 
+        ( toRedeemer TwoWay.CreateOrCloseSwaps
+        , TwoWay.getScriptRef network TwoWay.beaconScriptHash
+        )
 
     (beacons :: [NativeAsset], beaconSym :: CurrencySymbol) = 
       case swapDatum of
@@ -330,17 +342,18 @@ addSwapExecutionToBody txBody (_,SwapExecution{..}) =
       & #inputs %~ flip snoc newInput
       -- Add the required swap output to the list of outputs. Preserve ordering of the output list.
       & #outputs %~ flip snoc newOutput
+      & #network .~ network
   where
     (spendingRedeemer :: Redeemer,spendingReference :: TxOutRef,spendingScriptHash :: ScriptHash) = 
-      case (network,swapType) of
-        (_, LimitOrder) -> 
+      case swapType of
+        LimitOrder -> 
           ( toRedeemer OneWay.Swap
-          , OneWay.swapScriptTestnetRef
+          , OneWay.getScriptRef network OneWay.swapScriptHash
           , OneWay.swapScriptHash
           )
-        (_, LiquiditySwap) -> 
+        LiquiditySwap -> 
           ( toRedeemer $ TwoWay.getRequiredSwapDirection offerAsset askAsset
-          , TwoWay.swapScriptTestnetRef
+          , TwoWay.getScriptRef network TwoWay.swapScriptHash
           , TwoWay.swapScriptHash
           )
 
@@ -414,7 +427,7 @@ addSwapExecutionToBody txBody (_,SwapExecution{..}) =
 -- minting is required, then the spending redeemers must be changed to `SpendWithStake` and
 -- a staking execution must be added for the beacon script.
 adjustSpendingRedeemers :: TxBody -> TxBody
-adjustSpendingRedeemers txBody@TxBody{mints,inputs} = 
+adjustSpendingRedeemers txBody@TxBody{network,mints,inputs} = 
     txBody
       & adjustOneWaySpendingRedeemers
       & adjustTwoWaySpendingRedeemers
@@ -461,11 +474,12 @@ adjustSpendingRedeemers txBody@TxBody{mints,inputs} =
 
     oneWayStakeWithdrawal :: TxBodyWithdrawal
     oneWayStakeWithdrawal = TxBodyWithdrawal
-      { stakeAddress = OneWay.beaconStakeAddress Testnet
+      { stakeAddress = OneWay.beaconStakeAddress network
       , lovelace = 0
       , stakeCredential = ScriptCredential OneWay.beaconScriptHash
       , stakingScriptInfo = Just $ StakingScriptInfo
-          { scriptWitness = ReferenceWitness OneWay.beaconScriptTestnetRef
+          { scriptWitness = ReferenceWitness $
+              OneWay.getScriptRef network OneWay.beaconScriptHash
           , redeemer = toRedeemer OneWay.UpdateSwaps
           , executionBudget = def
           }
@@ -473,11 +487,12 @@ adjustSpendingRedeemers txBody@TxBody{mints,inputs} =
 
     twoWayStakeWithdrawal :: TxBodyWithdrawal
     twoWayStakeWithdrawal = TxBodyWithdrawal
-      { stakeAddress = TwoWay.beaconStakeAddress Testnet
+      { stakeAddress = TwoWay.beaconStakeAddress network
       , lovelace = 0
       , stakeCredential = ScriptCredential TwoWay.beaconScriptHash
       , stakingScriptInfo = Just $ StakingScriptInfo
-          { scriptWitness = ReferenceWitness TwoWay.beaconScriptTestnetRef
+          { scriptWitness = ReferenceWitness $
+              TwoWay.getScriptRef network TwoWay.beaconScriptHash
           , redeemer = toRedeemer TwoWay.UpdateSwaps
           , executionBudget = def
           }

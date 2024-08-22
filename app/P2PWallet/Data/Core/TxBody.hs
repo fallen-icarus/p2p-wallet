@@ -492,6 +492,8 @@ data TxBody = TxBody
   , invalidBefore :: Maybe Slot
   -- | The invalid hereafter slot number.
   , invalidHereafter :: Maybe Slot
+  -- | The network this transaction is for.
+  , network :: Network
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''TxBody
@@ -544,6 +546,10 @@ instance Semigroup TxBody where
           (Nothing, x) -> x
           (x, Nothing) -> x
           (Just here1, Just here2) -> Just $ min here1 here2
+    , network = 
+        if txBody1 ^. #network /= txBody2 ^. #network 
+        then error "Networks don't match" -- This should never happen.
+        else txBody1 ^. #network
     }
 
 instance Monoid TxBody where
@@ -559,6 +565,7 @@ instance Monoid TxBody where
     , fee = 0
     , invalidBefore = Nothing
     , invalidHereafter = Nothing
+    , network = def
     }
 
 instance ExportContractFiles TxBody where
