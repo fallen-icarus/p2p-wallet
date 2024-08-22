@@ -242,10 +242,10 @@ orderBookWidget AppModel{dexModel=DexModel{..}, reverseTickerMap} = do
               priceCaption x = x <> " " <> offerAssetName <> " / " <> askAssetName
           hstack
             [ label positionCaption
-                `styleBasic` [textSize 8, textColor customBlue]
+                `styleBasic` [textFont "Bold", textSize 8, textColor customBlue]
             , filler
             , label (priceCaption prettyPrice)
-                `styleBasic` [textSize 8, textColor customBlue]
+                `styleBasic` [textFont "Bold", textSize 8, textColor customBlue]
             ] `styleBasic`
                 [ padding 5
                 , radius 5
@@ -282,10 +282,10 @@ orderBookWidget AppModel{dexModel=DexModel{..}, reverseTickerMap} = do
               priceCaption x = x <> " " <> offerAssetName <> " / " <> askAssetName
           hstack
             [ label positionCaption
-                `styleBasic` [textSize 8, textColor customRed]
+                `styleBasic` [textFont "Bold", textSize 8, textColor customRed]
             , filler
             , label (priceCaption prettyPrice)
-                `styleBasic` [textSize 8, textColor customRed]
+                `styleBasic` [textFont "Bold", textSize 8, textColor customRed]
             , spacer_ [width 5]
             , box_ [alignMiddle, onClick swapEvent] $
                 tooltip_ "Swap" [tooltipDelay 0] $
