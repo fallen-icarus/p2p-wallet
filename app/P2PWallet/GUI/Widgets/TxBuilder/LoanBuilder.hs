@@ -15,12 +15,14 @@ module P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder
   , editOfferAcceptanceWidget
   , loanPaymentsList
   , editLoanPaymentWidget
+  , interestApplicationsList
   ) where
 
 import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCloses
 import P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCreations
 import P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskUpdates
+import P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.InterestApplications
 import P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.LoanPayments
 import P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferAcceptances
 import P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCloses
@@ -38,4 +40,5 @@ loanActionCount LoanBuilderModel{..} = sum
   , length offerUpdates
   , length offerAcceptances
   , length loanPayments
+  , length interestApplications
   ]

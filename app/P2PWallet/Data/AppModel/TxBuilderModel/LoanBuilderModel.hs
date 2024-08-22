@@ -20,6 +20,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskClose
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskCreation
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskUpdate
+  , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.InterestApplication
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LoanPayment
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferAcceptance
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferClose
@@ -31,6 +32,7 @@ import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskClose
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskCreation
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskUpdate
+import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.InterestApplication
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LoanPayment
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferAcceptance
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferClose
@@ -81,6 +83,8 @@ data LoanBuilderEvent
   | RemoveSelectedLoanPayment Int
   -- | Edit selected loan payment.
   | EditSelectedLoanPayment (AddEvent (Int,LoanPayment) (Int,LoanPayment))
+  -- | Remove the selected interest application from the builder.
+  | RemoveSelectedInterestApplication Int
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -108,6 +112,7 @@ data LoanBuilderModel = LoanBuilderModel
   , loanPayments :: [(Int,LoanPayment)]
   -- | The `Int` is the index into `loanPayments`.
   , targetLoanPayment :: Maybe (Int,NewLoanPayment)
+  , interestApplications :: [(Int,InterestApplication)]
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''LoanBuilderModel
@@ -129,6 +134,7 @@ instance Default LoanBuilderModel where
     , targetOfferAcceptance = Nothing
     , loanPayments = []
     , targetLoanPayment = Nothing
+    , interestApplications = []
     }
 
 -- | This is just an alias for `def`. The name is more clear what it is.
@@ -145,6 +151,7 @@ isEmptyLoanBuilderModel LoanBuilderModel{..} = and
   , null offerUpdates
   , null offerAcceptances
   , null loanPayments
+  , null interestApplications
   , isNothing targetAskCreation
   , isNothing targetAskUpdate
   , isNothing targetOfferCreation
@@ -217,6 +224,8 @@ instance AddToTxBody LoanBuilderModel where
         & flip (foldl' addOfferAcceptanceToBody) offerAcceptances
         -- Add the loan payments.
         & flip (foldl' addLoanPaymentToBody) loanPayments
+        -- Add the interest applications.
+        & flip (foldl' addInterestApplicationToBody) interestApplications
         -- Merge any beacon mints so that there is only one `TxBodyMint` per minting policy.
         & #mints %~ mergeTxBodyMints
         -- Adjust any executions based on whether all mints canceled out.
@@ -240,6 +249,7 @@ addAskCreationToBody txBody (_,AskCreation{..}) =
       -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
+      & #network .~ network
   where
     -- The borrower must approve the transaction.
     requiredWitness :: Maybe KeyWitness
@@ -307,6 +317,7 @@ addAskCloseToBody txBody (_,AskClose{..}) =
       -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
+      & #network .~ network
   where
     beacons = case askDatum of
       Nothing -> []
@@ -362,6 +373,7 @@ addOfferCreationToBody txBody (_,OfferCreation{..}) =
       -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
+      & #network .~ network
   where
     -- The lender must approve the transaction.
     requiredWitness :: Maybe KeyWitness
@@ -435,6 +447,7 @@ addOfferCloseToBody txBody (_,OfferClose{..}) =
       -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
+      & #network .~ network
   where
     beacons = case offerDatum of
       Nothing -> []
@@ -482,7 +495,7 @@ addOfferUpdateToBody txBody (idx,OfferUpdate{..}) =
 -- | If negotiation beacons do not need to be minted/burned, the beacon script should be executed as
 -- a staking script instead.
 adjustNegotiationExecution :: TxBody -> TxBody
-adjustNegotiationExecution txBody@TxBody{mints} = 
+adjustNegotiationExecution txBody@TxBody{network,mints} = 
     txBody
       & adjustExecution
   where
@@ -517,7 +530,7 @@ adjustNegotiationExecution txBody@TxBody{mints} =
 
     negotiationStakeWithdrawal :: TxBodyWithdrawal
     negotiationStakeWithdrawal = TxBodyWithdrawal
-      { stakeAddress = Loans.negotiationBeaconStakeAddress Testnet
+      { stakeAddress = Loans.negotiationBeaconStakeAddress network
       , lovelace = 0
       , stakeCredential = ScriptCredential Loans.negotiationBeaconScriptHash
       , stakingScriptInfo = mintInfoToStakingInfo <$> negotiationMint
@@ -542,6 +555,7 @@ addOfferAcceptanceToBody txBody (_,OfferAcceptance{..}) =
       & #invalidBefore ?~ posixTimeToSlot slotConfig currentTime
       -- Invalid hereafter must be set to the offer expiration if one is set.
       & #invalidHereafter .~ upperBound
+      & #network .~ network
   where
     upperBound :: Maybe Slot
     upperBound = case targetOfferDatum ^. #offerExpiration of
@@ -726,7 +740,10 @@ addLoanPaymentToBody txBody (_,LoanPayment{..}) =
       & #invalidHereafter ?~ upperBound
       -- Add the payment observer execution.
       & #withdrawals %~ (paymentObserverStakeWithdrawal:)
+      & #network .~ network
   where
+    targetActiveDatum@Loans.ActiveDatum{..} = fromMaybe def $ loanUTxOActiveDatum activeUTxO
+
     upperBound :: Slot
     upperBound = 
       -- The node can only specify invalidHereafter for 1.5 days into the future due to the
@@ -754,8 +771,6 @@ addLoanPaymentToBody txBody (_,LoanPayment{..}) =
     toNativeAssetQuantity asset@NativeAsset{policyId}
       | policyId == "" = Nothing
       | otherwise = Just asset
-
-    targetActiveDatum@Loans.ActiveDatum{..} = fromMaybe def $ loanUTxOActiveDatum activeUTxO
 
     nextDeadline = case (+lastCompounding) <$> compoundFrequency of
       Nothing -> loanExpiration
@@ -835,12 +850,88 @@ addLoanPaymentToBody txBody (_,LoanPayment{..}) =
 
     paymentObserverStakeWithdrawal :: TxBodyWithdrawal
     paymentObserverStakeWithdrawal = TxBodyWithdrawal
-      { stakeAddress = Loans.paymentObserverStakeAddress Testnet
+      { stakeAddress = Loans.paymentObserverStakeAddress network
       , lovelace = 0
       , stakeCredential = ScriptCredential Loans.paymentObserverScriptHash
       , stakingScriptInfo = Just $ StakingScriptInfo
           { scriptWitness = ReferenceWitness $ Loans.getScriptRef network Loans.PaymentObserverScript
           , redeemer = toRedeemer Loans.ObservePayment
+          , executionBudget = def
+          }
+      }
+
+addInterestApplicationToBody :: TxBody -> (Int,InterestApplication) -> TxBody
+addInterestApplicationToBody txBody (_,InterestApplication{..}) =
+    txBody 
+      -- Add the collateral input to the input list.
+      & #inputs %~ (<> [newCollateralInput])
+      -- Add the updated collateral output to the list.
+      & #outputs %~ (<> [newCollateralOutput])
+      -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
+      -- instance of `TxBody`. They will also be sorted.
+      & #requiredWitnesses %~ maybe id (:) requiredWitness
+      -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
+      -- instance of `TxBody`. They will also be sorted.
+      & #keyWitnesses %~ maybe id (:) requiredWitness
+      -- Invalid hereafter must be set to loan expiration.
+      & #invalidHereafter ?~ upperBound
+      -- Add the interest observer execution.
+      & #withdrawals %~ (interestObserverStakeWithdrawal:)
+      & #network .~ network
+  where
+    Loans.ActiveDatum{..} = activeDatum
+
+    upperBound :: Slot
+    upperBound = 
+      -- The node can only specify invalidHereafter for 1.5 days into the future due to the
+      -- possibility for epoch lengths and slot lengths to change. Using a tighter bound will not
+      -- change the behavior of the protocol.
+      min (posixTimeToSlot slotConfig loanExpiration) (129600 + posixTimeToSlot slotConfig currentTime)
+
+    slotConfig :: SlotConfig
+    slotConfig = case network of
+      Mainnet -> mainnetSlotConfig
+      Testnet -> testnetSlotConfig
+
+    -- The lender must approve the transaction.
+    requiredWitness :: Maybe KeyWitness
+    requiredWitness = case borrowerCredential of
+      ScriptCredential _ -> Nothing
+      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+
+    postApplicationDatum = 
+      Loans.createPostInterestActiveDatum requiredApplicationCount activeDatum
+
+    newCollateralInput :: TxBodyInput
+    newCollateralInput = TxBodyInput
+      { utxoRef = utxoRef
+      , spendingScriptInfo = Just $ SpendingScriptInfo
+          { datum = InputDatum
+          , redeemer = toRedeemer $ 
+              Loans.ApplyInterest (unLovelace extraDeposit) requiredApplicationCount
+          , scriptWitness = ReferenceWitness $ Loans.getScriptRef network Loans.LoanScript
+          , executionBudget = def
+          , scriptHash = Loans.loanScriptHash
+          }
+      }
+
+    newCollateralOutput :: TxBodyOutput
+    newCollateralOutput = TxBodyOutput
+      { paymentAddress = loanAddress
+      , lovelace = lovelace + extraDeposit
+      , nativeAssets = nativeAssets
+      , datum = OutputDatum $ toDatum postApplicationDatum
+      }
+
+    interestObserverStakeWithdrawal :: TxBodyWithdrawal
+    interestObserverStakeWithdrawal = TxBodyWithdrawal
+      { stakeAddress = Loans.interestObserverStakeAddress network
+      , lovelace = 0
+      , stakeCredential = ScriptCredential Loans.paymentObserverScriptHash
+      , stakingScriptInfo = Just $ StakingScriptInfo
+          { scriptWitness = 
+              ReferenceWitness $ Loans.getScriptRef network Loans.InterestObserverScript
+          , redeemer = toRedeemer Loans.ObserveInterest
           , executionBudget = def
           }
       }

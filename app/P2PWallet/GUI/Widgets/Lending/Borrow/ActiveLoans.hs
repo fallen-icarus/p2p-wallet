@@ -156,7 +156,7 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
           (buttonEvt,buttonTip,buttonIcon,buttonEnabled)
             | currentTime >= nextPaymentDueDate && currentTime < expiration =
                 -- A rollover is required to apply the interest and penalties.
-                ( LendingEvent $ BorrowEvent $ RolloverLoan u
+                ( LendingEvent $ BorrowEvent $ RolloverLoan $ StartProcess $ Just u
                 , "Rollover loan into next payment period"
                 , rolloverLoanIcon
                 , True

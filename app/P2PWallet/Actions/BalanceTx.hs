@@ -71,6 +71,7 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ loanBuilderModel ^. #offerUpdates
       , assetBalancesForChange $ loanBuilderModel ^. #offerAcceptances
       , assetBalancesForChange $ loanBuilderModel ^. #loanPayments
+      , assetBalancesForChange $ loanBuilderModel ^. #interestApplications
       ]
 
     newChange :: ChangeOutput
@@ -100,6 +101,7 @@ balanceTx tx@TxBuilderModel{..} =
       , loanBuilderModel ^. #offerUpdates /= []
       , loanBuilderModel ^. #offerAcceptances /= []
       , loanBuilderModel ^. #loanPayments /= []
+      , loanBuilderModel ^. #interestApplications /= []
       ]
 
     -- What kind of transaction this is.
@@ -127,4 +129,5 @@ balanceTx tx@TxBuilderModel{..} =
       , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #offerCloses
       , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #offerAcceptances
       , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #loanPayments
+      , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #interestApplications
       ]

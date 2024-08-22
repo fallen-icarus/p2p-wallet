@@ -424,6 +424,57 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
   CloseInspectedActiveLoanHistory -> 
     [ Model $ model & #lendingModel % #borrowModel % #inspectedLoan .~ Nothing ]
 
+  -----------------------------------------------
+  -- Add Interest Application to Builder
+  -----------------------------------------------
+  RolloverLoan modal -> case modal of
+    StartProcess mLoan -> 
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (LendingEvent . BorrowEvent . RolloverLoan . ProcessResults) $ do
+          loanUTxO <- fromJustOrAppError "Interest application UTxO is Nothing" mLoan
+
+          let LoanWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
+                lendingModel ^. #selectedWallet
+              newInput@InterestApplication{borrowerCredential} = loanUTxOToInterestApplication 
+                network 
+                alias 
+                stakeCredential 
+                stakeKeyDerivation 
+                (config ^. #currentTime)
+                loanUTxO
+
+          fromRightOrAppError $ 
+            checkIsSameLoanUserCredential borrowerCredential (txBuilderModel ^. #loanBuilderModel)
+
+          -- There should only be one output in the `TxBody` for this action.
+          minUTxOValue <- 
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
+                -- Use a blank loanBuilderModel to calculate the minUTxOValue for the new interest
+                -- application.
+                (emptyLoanBuilderModel & #interestApplications .~ [(0,newInput)])
+
+          return $ updateInterestDeposit newInput minUTxOValue
+      ]
+    ProcessResults verifiedInterestApplication ->
+      -- Get the index for the new ask creation.
+      let newIdx = length $ txBuilderModel ^. #loanBuilderModel % #interestApplications 
+      in  [ Model $ model 
+              & #waitingStatus % #addingToBuilder .~ False
+              & #txBuilderModel % #loanBuilderModel % #interestApplications %~ 
+                  flip snoc (newIdx,verifiedInterestApplication)
+              & #txBuilderModel % #loanBuilderModel % #userCredential ?~
+                  verifiedInterestApplication ^. #borrowerCredential
+              & #txBuilderModel %~ balanceTx
+          , Task $ return $ Alert $ unlines
+              [ "Successfully added to builder!"
+              , ""
+              , createInterestDepositMsg verifiedInterestApplication
+              ]
+          ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------

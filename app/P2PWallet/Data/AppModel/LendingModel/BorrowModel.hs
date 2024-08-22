@@ -89,7 +89,7 @@ data BorrowEvent
   -- | Add a new offer acceptance to the builder.
   | AcceptLoanOffer AcceptOfferEvent
   -- | Apply the interest/penalties to a loan.
-  | RolloverLoan LoanUTxO
+  | RolloverLoan (ProcessEvent LoanUTxO InterestApplication)
   -- | Make a loan payment.
   | MakeLoanPayment (AddEvent LoanUTxO LoanPayment)
   -- | Claim the lost collateral.

@@ -90,6 +90,7 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskClose
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskCreation
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.InterestApplication
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LoanPayment
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferAcceptance
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferClose
@@ -202,6 +203,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCloses
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCreations
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.InterestApplications
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.LoanPayments
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferAcceptances
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCloses

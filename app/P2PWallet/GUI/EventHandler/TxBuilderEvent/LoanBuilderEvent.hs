@@ -398,3 +398,14 @@ handleLoanBuilderEvent model@AppModel{..} evt = case evt of
           , createLoanPaymentDepositMsg verifiedNewPayment
           ]
       ]
+
+  -----------------------------------------------
+  -- Remove Interest Application from Builder
+  -----------------------------------------------
+  RemoveSelectedInterestApplication idx ->
+    [ Model $ model 
+        & #txBuilderModel % #loanBuilderModel % #interestApplications %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
