@@ -85,6 +85,17 @@ beaconCurrencySymbol = scriptHashToPolicyId beaconScriptHash
 --
 -- The scripts are deliberately stored with an invalid datum so that they are locked forever.
 
+getScriptRef :: Network -> ScriptHash -> TxOutRef
+getScriptRef network scriptHash = (referenceScriptMap Map.! network) Map.! scriptHash
+
+referenceScriptMap :: Map.Map Network (Map.Map ScriptHash TxOutRef)
+referenceScriptMap = Map.fromList
+  [ (Testnet, Map.fromList
+        [ (swapScriptHash, swapScriptTestnetRef)
+        , (beaconScriptHash, beaconScriptTestnetRef)
+        ])
+  ]
+
 swapScriptTestnetRef :: TxOutRef
 swapScriptTestnetRef = 
   fromJust $ parseTxOutRef "115c9ebb9928b8ec6e0c9d1420c43421cfb323639dd9fdcf1e7155e73bec13c5#0"
