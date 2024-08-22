@@ -31,9 +31,6 @@ data LoanPayment = LoanPayment
   -- | The amount of each collateral asset being left.
   , collateralBalances :: [NativeAsset]
   -- | The calculated collateral deposit.
-  , calculatedCollateralDeposit :: Lovelace
-  -- | The extra minUTxOValue amount of ada required for the new active UTxO, relative to the
-  -- input collateral UTxO.
   , collateralDeposit :: Lovelace
   -- | The minUTxOValue amount of ada required for the lender payment output.
   , paymentDeposit :: Lovelace
@@ -54,12 +51,19 @@ instance AssetBalancesForChange (a,LoanPayment) where
   assetBalancesForChange xs =
       ( sum 
           [ sum $ map (view $ _2 % #activeUTxO % #lovelace) xs
-          , sum $ map (negate . view (_2 % #calculatedCollateralDeposit)) xs
-          , sum $ map (negate . view (_2 % #paymentDeposit)) xs
+          -- Ada could be specified as collateral.
+          , sum $ map (Lovelace . negate . view #quantity) $
+              filter ((== "") . view #policyId) $ 
+                concatMap (view $ _2 % #collateralBalances) xs
+          -- Some extra ada could still be required for the collateral deposit.
+          , sum $ map (negate . view (_2 % #collateralDeposit)) xs
+          -- Ada could be the payment asset.
           , sum $ for xs $ \(_,payment) -> 
               if payment ^. #paymentAmount % #policyId == "" then
                 Lovelace $ negate $ payment ^. #paymentAmount % #quantity
               else 0
+          -- Ada is required for the payment output deposit.
+          , sum $ map (negate . view (_2 % #paymentDeposit)) xs
           ]
       , filterOutBeacons $ sumNativeAssets $ mconcat
           [ concatMap (view $ _2 % #activeUTxO % #nativeAssets) xs
@@ -162,9 +166,6 @@ verifyNewLoanPayment
   -> NewLoanPayment 
   -> Either Text LoanPayment
 verifyNewLoanPayment reverseTickerMap tickerMap currentTime NewLoanPayment{..} = do
-    -- Check that the assets are valid. Returns the first error, if any.
-    verifiedCollateral <- mapM (parseNativeAssets tickerMap mempty) $ lines collateralBalances
-
     -- Check that the payment amount is valid. No fingerprints can be used.
     verifiedPaymentAmount <-
       first (const $ parseErrorMsg paymentAmount) $ parseNativeAssets tickerMap mempty paymentAmount
@@ -179,12 +180,20 @@ verifyNewLoanPayment reverseTickerMap tickerMap currentTime NewLoanPayment{..} =
       , "'."
       ]
 
+    let startingBalance = toRational loanOutstanding
+        payment = toRational $ verifiedPaymentAmount ^. #quantity
+        isFullPayment = payment >= startingBalance
+
+    -- Check that the assets are valid. Returns the first error, if any.
+    verifiedCollateral <-
+      if isFullPayment 
+      then return [] -- This can mess with the balancing if the field is not actually empty.
+      else mapM (parseNativeAssets tickerMap mempty) $ lines collateralBalances
+
     let LoanUTxO{lovelace,nativeAssets} = activeUTxO
         startingCollateralValue = relativeCollateral $
           (lovelaceAsNativeAsset & #quantity .~ unLovelace lovelace) : nativeAssets
         endingCollateralValue = relativeCollateral verifiedCollateral
-        startingBalance = toRational loanOutstanding
-        payment = toRational $ verifiedPaymentAmount ^. #quantity
         collateralRatio = 
           abs (startingCollateralValue - endingCollateralValue) / startingCollateralValue
         paymentRatio = payment / startingBalance
@@ -202,7 +211,6 @@ verifyNewLoanPayment reverseTickerMap tickerMap currentTime NewLoanPayment{..} =
     return $ LoanPayment
       { collateralBalances = verifiedCollateral
       , paymentAmount = verifiedPaymentAmount
-      , calculatedCollateralDeposit = 0 -- This will be set later.
       , collateralDeposit = 0 -- This will be set later.
       , paymentDeposit = 0 -- This will be set later.
       , activeUTxO = activeUTxO
@@ -210,7 +218,7 @@ verifyNewLoanPayment reverseTickerMap tickerMap currentTime NewLoanPayment{..} =
       , stakeKeyDerivation = stakeKeyDerivation
       , network = network
       , alias = alias
-      , isFullPayment = payment >= startingBalance
+      , isFullPayment = isFullPayment
       , currentTime = toPlutusTime currentTime
       }
   where
@@ -289,14 +297,12 @@ updateLoanPaymentDeposits minValues loanPayment reverseTickerMap = do
 
           return $ loanPayment
             & #collateralDeposit .~ 0
-            & #calculatedCollateralDeposit .~ 0
             & #paymentDeposit .~ 0
         else
           -- The loan payment is not ADA which means the minUTxO must be included in addition
           -- to the loan payment.
           return $ loanPayment
             & #collateralDeposit .~ 0
-            & #calculatedCollateralDeposit .~ 0
             & #paymentDeposit .~ paymentDeposit
 
       [paymentDeposit, collateralDeposit] -> do
@@ -319,52 +325,70 @@ updateLoanPaymentDeposits minValues loanPayment reverseTickerMap = do
 
           return $ loanPayment
             & #collateralDeposit .~ requiredCollateralDeposit collateralDeposit adaCollateral
-            & #calculatedCollateralDeposit .~ collateralDeposit
             & #paymentDeposit .~ 0
         else
           -- The loan payment is not ADA which means the minUTxO must be included in addition
           -- to the loan payment.
           return $ loanPayment
             & #collateralDeposit .~ requiredCollateralDeposit collateralDeposit adaCollateral
-            & #calculatedCollateralDeposit .~ collateralDeposit
             & #paymentDeposit .~ paymentDeposit
 
       _ -> Left "calculateMinUTxOValue returned wrong results"
   where
     -- | Calculate the extra required ada deposit for the collateral UTxO.
     requiredCollateralDeposit :: Lovelace -> NativeAsset -> Lovelace
-    requiredCollateralDeposit calculatedDeposit adaValue =
-      calculatedDeposit - Lovelace (adaValue ^. #quantity)
+    requiredCollateralDeposit calculatedDeposit adaValue
+      | difference <= 0 = 0
+      | otherwise = difference
+      where difference = calculatedDeposit - Lovelace (adaValue ^. #quantity)
+
+-- | When ada is used as collateral, it must at least cover the minUTxOValue.
+paymentAdaCollateralCheck :: LoanPayment -> Either Text ()
+paymentAdaCollateralCheck LoanPayment{collateralDeposit,activeUTxO} = do
+  when (collateralDeposit > 0 && usesAdaAsCollateral) $
+    Left $ unwords
+      [ "The collateral UTxO must be stored with at least " <> display collateralDeposit <> " in order"
+      , "to satisfy the minUTxOValue requirement.\n\n"
+      , "Since Cardano forces all UTxOs to contain ada and this lender is willing to accept ada"
+      , "as collateral, please leave at least " <> display collateralDeposit <> " as collateral"
+      , "so that the minUTxOValue deposit will count towards your collateral.\n\n"
+      , "Take another unlocked collateral asset instead. If ada is the only asset left, you will"
+      , "not be able to fully reclaim it until the loan is fully paid off."
+      ]
+  where
+    usesAdaAsCollateral = any (\(asset,price) -> asset == Loans.Asset ("","") && price > 0)
+                        $ view (#collateralization % #unCollateralization)
+                        $ fromMaybe def
+                        $ loanUTxOActiveDatum activeUTxO
 
 -- | Create the deposit message for the new loan payment.
 createLoanPaymentDepositMsg :: LoanPayment -> Text
 createLoanPaymentDepositMsg LoanPayment{..} = unlines $ intersperse "" $ filter (/= "")
-    [ collateralDepositMsg
-    , collateralChangeMsg
+    [ collateralMsg
     , paymentMsg
     ]
   where
-    collateralDepositMsg 
-      | calculatedCollateralDeposit == 0 = mconcat
-          [ "This is a full payment so all collateral and their deposit will be reclaimed." ]
+    usesAdaAsCollateral = any ((== Loans.Asset ("","")) . fst)
+                        $ view (#collateralization % #unCollateralization)
+                        $ fromMaybe def
+                        $ loanUTxOActiveDatum activeUTxO
+    collateralMsg 
+      | isFullPayment =
+          "This is a full payment so all remaining collateral and the deposit will be reclaimed."
+      -- This path can only be taken if it is a partial payment and there is enough ada collateral
+      -- to cover the deposit.
+      | collateralDeposit == 0 =
+          "The remaining ada collateral covers the required deposit."
       | otherwise = mconcat
           [ "The new collateral UTxO requires a deposit of: "
-          , display calculatedCollateralDeposit
-          , "."
-          ]
-    collateralChangeMsg
-      | collateralDeposit == 0 = ""
-      | collateralDeposit < 0 = mconcat
-          [ "The deposit used for the previous collateral UTxO can be reused, and "
-          , "you can reclaim the extra amount amount of: "
-          , display $ abs collateralDeposit
-          , "."
-          ]
-      | otherwise = mconcat
-          [ "The deposit used for the previous collateral UTxO can be reused, but "
-          , "you will need to cover the additional amount of: "
           , display collateralDeposit
           , "."
+          , if usesAdaAsCollateral then mconcat
+              [ "\n\nWARNING: This loan considers ada as collateral! Make sure to factor in the "
+              , "required minUTxOValue for the collateral UTxO when deciding which unlocked "
+              , "collateral to reclaim."
+              ]
+            else "\n\nThe deposit used for the previous collateral UTxO can be reused."
           ]
     paymentMsg
       | paymentDeposit == 0 = ""

@@ -48,7 +48,7 @@ instance AssetBalancesForChange (a,OfferAcceptance) where
       ( sum 
           [ sum $ map (view $ _2 % #offerUTxO % #lovelace) xs
           , sum $ map (view $ _2 % #askUTxO % #lovelace) xs
-          , sum $ map (negate . view (_2 % #deposit)) xs
+          , sum $ map (negate . requiredDeposit . view _2) xs
           , sum $ for xs $ \accept ->
               maybe 0 (Lovelace . negate) $ 
                 accept ^? _2 % #offerUTxO % #loanDatum % _Just % _OfferDatum % #offerDeposit
@@ -56,7 +56,7 @@ instance AssetBalancesForChange (a,OfferAcceptance) where
       , filterOutBeacons $ sumNativeAssets $ mconcat
           [ concatMap (view $ _2 % #offerUTxO % #nativeAssets) xs
           , concatMap (view $ _2 % #askUTxO % #nativeAssets) xs
-          , map (over #quantity negate) $
+          , filter ((/= "") . view #policyId) $ map (over #quantity negate) $
               concatMap (view $ _2 % #collateralAmounts) xs
           ]
       )
@@ -64,6 +64,16 @@ instance AssetBalancesForChange (a,OfferAcceptance) where
       filterOutBeacons :: [NativeAsset] -> [NativeAsset]
       filterOutBeacons = filter $ \NativeAsset{policyId} -> 
         policyId /= Loans.negotiationBeaconCurrencySymbol
+
+      -- Since ada could be the collateral, the additional ada for the
+      -- collateral minUTxOValue may not be necessary.
+      requiredDeposit :: OfferAcceptance -> Lovelace
+      requiredDeposit OfferAcceptance{deposit, collateralAmounts} =
+        let collateralLovelace = Lovelace 
+                               $ view #quantity 
+                               $ fromMaybe lovelaceAsNativeAsset 
+                               $ find ((=="") . view #policyId) collateralAmounts
+         in if deposit - collateralLovelace <= 0 then collateralLovelace else deposit
 
 -------------------------------------------------
 -- New Offer Acceptance
@@ -181,3 +191,54 @@ toNewOfferAcceptance reverseTickerMap OfferAcceptance{..} = NewOfferAcceptance
   , network = network
   , alias = alias
   }
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | When ada is used as collateral, it must at least cover the minUTxOValue.
+acceptanceAdaCollateralCheck :: OfferAcceptance -> Either Text ()
+acceptanceAdaCollateralCheck OfferAcceptance{offerUTxO, deposit, collateralAmounts} = do
+  when (requiredDeposit > 0 && usesAdaAsCollateral) $
+    Left $ unwords
+      [ "The collateral UTxO must be stored with at least " <> display deposit <> " in order"
+      , "to satisfy the minUTxOValue requirement.\n\n"
+      , "Since Cardano forces all UTxOs to contain ada and this lender is willing to accept ada"
+      , "as collateral, please use at least " <> display deposit <> " as collateral"
+      , "so that the minUTxOValue deposit will count towards your collateral."
+      ]
+  where
+    collateralLovelace = Lovelace 
+                       $ view #quantity 
+                       $ fromMaybe lovelaceAsNativeAsset 
+                       $ find ((=="") . view #policyId) collateralAmounts
+
+    usesAdaAsCollateral = any (\(asset,price) -> asset == Loans.Asset ("","") && price > 0)
+                        $ view (#collateralization % #unCollateralization)
+                        $ fromMaybe def
+                        $ loanUTxOOfferDatum offerUTxO
+
+    -- Since ada could be the collateral, the additional ada for the
+    -- collateral minUTxOValue may not be necessary.
+    requiredDeposit :: Lovelace
+    requiredDeposit = deposit - collateralLovelace
+
+-- | Create the message for the offer acceptance, accounting for whether the ada collateral
+-- covers the minUTxOValue requirement.
+createAcceptanceDepositMsg :: OfferAcceptance -> Text
+createAcceptanceDepositMsg OfferAcceptance{deposit, collateralAmounts}
+  | requiredDeposit > 0 = unwords
+      [ "This new collateral output requires a deposit of: " <> display deposit <> "."
+      , "This deposit is in addition to the collateral since all Cardano UTxOs must contain"
+      , "a minimum amount of ada based on the size of the UTxO."
+      ]
+  | otherwise = "The ada collateral covers the deposit requirement."
+  where
+    collateralLovelace = Lovelace 
+                       $ view #quantity 
+                       $ fromMaybe lovelaceAsNativeAsset 
+                       $ find ((=="") . view #policyId) collateralAmounts
+
+    -- Since ada could be the collateral, the additional ada for the
+    -- collateral minUTxOValue may not be necessary.
+    requiredDeposit :: Lovelace
+    requiredDeposit = deposit - collateralLovelace

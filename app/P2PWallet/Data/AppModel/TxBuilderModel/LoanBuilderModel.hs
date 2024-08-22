@@ -583,7 +583,13 @@ addOfferAcceptanceToBody txBody (_,OfferAcceptance{..}) =
 
     targetAskDatum = fromMaybe def $ loanUTxOAskDatum askUTxO
 
-    collateralLovelace = deposit + sum (map lovelaceQuantity collateralAmounts)
+    collateralLovelace 
+      -- The collateral covers the minUTxOValue
+      | deposit - adaCollateral <= 0 = adaCollateral 
+      -- Extra ada is needed to cover the minUTxOValue. The value can never be less than
+      -- the deposit amount.
+      | otherwise = deposit
+      where adaCollateral = sum (map lovelaceQuantity collateralAmounts)
     
     lenderPaymentLovelace = Lovelace $ targetOfferDatum ^. #offerDeposit
 
@@ -838,4 +844,3 @@ addLoanPaymentToBody txBody (_,LoanPayment{..}) =
           , executionBudget = def
           }
       }
-
