@@ -909,6 +909,14 @@ collateralAmountsMsg = unlines
   , "3. '# ADA' - if the asset is ada."
   , ""
   , "Fingerprints are not supported."
+  , ""
+  , unwords
+      [ "WARNING: All Cardano UTxOs require a minimum amount of ada. If ada can be used as collateral,"
+      , "it must be used so that the minimum ada deposit will count towards the collateral."
+      , "You will not be able to fully reclaim the ada until after the loan is fully paid off! It does"
+      , "not matter if there are still other assets left as collateral; the collateral UTxO must"
+      , "always contain ada."
+      ]
   ]
 
 paymentCollateralAmountsMsg :: Text
@@ -924,6 +932,14 @@ paymentCollateralAmountsMsg = unlines
   , "3. '# ADA' - if the asset is ada."
   , ""
   , "Fingerprints are not supported."
+  , ""
+  , unwords
+      [ "WARNING: All Cardano UTxOs require a minimum amount of ada. If ada can be used as collateral,"
+      , "it must be used so that the minimum ada deposit will count towards the collateral."
+      , "You will not be able to fully reclaim the ada until after the loan is fully paid off! It does"
+      , "not matter if there are still other assets left as collateral or if the collateral is"
+      , "technically \"unlocked\" by cardano-loans; the collateral UTxO must always contain ada."
+      ]
   ]
 
 paymentAmountMsg :: Text

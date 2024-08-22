@@ -318,7 +318,11 @@ handleLoanBuilderEvent model@AppModel{..} evt = case evt of
                 -- Use a blank loanBuilderModel to calculate the minUTxOValue for the new acceptance.
                 (emptyLoanBuilderModel & #offerAcceptances .~ [(0,verifiedOfferAcceptance)])
 
-          return $ (idx, verifiedOfferAcceptance & #deposit .~ minUTxOValue)
+          let updatedVerifiedOfferAcceptance = verifiedOfferAcceptance & #deposit .~ minUTxOValue
+
+          fromRightOrAppError $ acceptanceAdaCollateralCheck updatedVerifiedOfferAcceptance
+
+          return (idx, updatedVerifiedOfferAcceptance)
       ]
     AddResult (idx,verifiedOfferAcceptance) ->
       [ Model $ model 
@@ -330,8 +334,7 @@ handleLoanBuilderEvent model@AppModel{..} evt = case evt of
       , Task $ return $ Alert $ unlines
           [ "Successfully added to builder!"
           , ""
-          , "This new collateral output requires a deposit of: " <> 
-              display (verifiedOfferAcceptance ^. #deposit)
+          , createAcceptanceDepositMsg verifiedOfferAcceptance
           ]
       ]
 
@@ -377,6 +380,8 @@ handleLoanBuilderEvent model@AppModel{..} evt = case evt of
 
           updatedVerifiedPayment <- fromRightOrAppError $
             updateLoanPaymentDeposits minValues verifiedNewPayment reverseTickerMap
+
+          fromRightOrAppError $ paymentAdaCollateralCheck updatedVerifiedPayment
 
           return (idx,updatedVerifiedPayment)
       ]
