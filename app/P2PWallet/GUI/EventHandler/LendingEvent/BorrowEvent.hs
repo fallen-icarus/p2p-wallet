@@ -358,6 +358,13 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
             fromJustOrAppError "Nothing set for `newPayment`" $ 
               lendingModel ^. #borrowModel % #newLoanPayment
 
+          -- Verify that the new utxo is not already being spent.
+          flip whenJust (const $ throwIO $ AppError "This loan UTxO is already being spent.") $
+            find (== newPayment ^. #activeUTxO % #utxoRef) (concat
+              [ map (view $ _2 % #activeUTxO % #utxoRef) $ 
+                  txBuilderModel ^. #loanBuilderModel % #loanPayments
+              ])
+
           verifiedNewPayment <- fromRightOrAppError $ 
             verifyNewLoanPayment reverseTickerMap tickerMap (config ^. #currentTime) newPayment
 
@@ -433,6 +440,13 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
       , Task $ runActionOrAlert (LendingEvent . BorrowEvent . RolloverLoan . ProcessResults) $ do
           loanUTxO <- fromJustOrAppError "Interest application UTxO is Nothing" mLoan
 
+          -- Verify that the new utxo is not already being spent.
+          flip whenJust (const $ throwIO $ AppError "This loan UTxO is already being spent.") $
+            find (== loanUTxO ^. #utxoRef) (concat
+              [ map (view $ _2 % #utxoRef) $ 
+                  txBuilderModel ^. #loanBuilderModel % #interestApplications
+              ])
+
           let LoanWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
                 lendingModel ^. #selectedWallet
               newInput@InterestApplication{borrowerCredential} = loanUTxOToInterestApplication 
@@ -459,21 +473,26 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
           return $ updateInterestDeposit newInput minUTxOValue
       ]
     ProcessResults verifiedInterestApplication ->
-      -- Get the index for the new ask creation.
-      let newIdx = length $ txBuilderModel ^. #loanBuilderModel % #interestApplications 
-      in  [ Model $ model 
-              & #waitingStatus % #addingToBuilder .~ False
-              & #txBuilderModel % #loanBuilderModel % #interestApplications %~ 
-                  flip snoc (newIdx,verifiedInterestApplication)
-              & #txBuilderModel % #loanBuilderModel % #userCredential ?~
-                  verifiedInterestApplication ^. #borrowerCredential
-              & #txBuilderModel %~ balanceTx
-          , Task $ return $ Alert $ unlines
-              [ "Successfully added to builder!"
-              , ""
-              , createInterestDepositMsg verifiedInterestApplication
-              ]
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          -- Add the new payment with a dummy index.
+          & #txBuilderModel % #loanBuilderModel % #interestApplications %~ 
+              flip snoc (0,verifiedInterestApplication)
+          -- Sort the interest applications by the active UTxO. This is required to generate 
+          -- the outputs in the proper order.
+          & #txBuilderModel % #loanBuilderModel % #interestApplications %~ 
+              sortOn (view $ _2 % #utxoRef)
+          -- Reindex the acceptances after sorting.
+          & #txBuilderModel % #loanBuilderModel % #interestApplications %~ reIndex
+          & #txBuilderModel % #loanBuilderModel % #userCredential ?~
+              verifiedInterestApplication ^. #borrowerCredential
+          & #txBuilderModel %~ balanceTx
+      , Task $ return $ Alert $ unlines
+          [ "Successfully added to builder!"
+          , ""
+          , createInterestDepositMsg verifiedInterestApplication
           ]
+      ]
 
 -------------------------------------------------
 -- Helper Functions
