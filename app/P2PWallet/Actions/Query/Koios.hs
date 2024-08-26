@@ -224,7 +224,7 @@ runQueryPaymentWalletInfo wallet@PaymentWallet{..} = do
           bimap show concat . sequence <$> 
             mapConcurrently 
               (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
-              (groupInto 50 hashes)
+              (groupInto 70 hashes)
 
 -- | Sync the latest information for the stake wallet. Try to do as much concurrently as possible.
 runQueryStakeWalletInfo :: StakeWallet -> IO (Either Text StakeWallet)
@@ -409,7 +409,7 @@ runQueryDexWallet dexWallet@DexWallet{..} = do
           bimap show concat . sequence <$> 
             mapConcurrently 
               (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
-              (groupInto 50 hashes)
+              (groupInto 70 hashes)
 
 -- | Get all information for a particular loan wallet.
 runQueryLoanWallet :: LoanWallet -> IO (Either Text LoanWallet)
@@ -489,7 +489,7 @@ runQueryLoanWallet loanWallet@LoanWallet{..} = do
           bimap show concat . sequence <$> 
             mapConcurrently 
               (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
-              (groupInto 50 hashes)
+              (groupInto 70 hashes)
 
 -- | Get the current open loan asks. Optionally filter the asks by loan asset and collateral.
 runQueryLoanAsks :: Network -> LoanAskConfiguration -> IO (Either Text [LoanUTxO])

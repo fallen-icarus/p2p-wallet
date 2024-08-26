@@ -82,7 +82,17 @@ instance ToJSON PaymentAddressesAfterBlock where
 newtype TxHashes = TxHashes [Text] deriving (Show)
 
 instance ToJSON TxHashes where
-  toJSON (TxHashes txs) = object [ "_tx_hashes" .= txs ]
+  toJSON (TxHashes txs) = 
+    object [ "_tx_hashes" .= txs 
+           , "_inputs" .= True -- always return inputs.
+           , "_metadata" .= False -- never return metadata.
+           , "_assets" .= True -- always return assets.
+           , "_withdrawals" .= True -- always return withdrawals.
+           , "_certs" .= True -- always return certificates.
+           , "_scripts" .= True -- always return scripts.
+           , "_bytecode" .= False -- never return the script bytecode.
+           , "_governance" .= False -- don't return for now.
+           ]
 
 instance FromJSON TxHashes where
   parseJSON = 

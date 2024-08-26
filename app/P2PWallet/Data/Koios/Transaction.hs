@@ -83,7 +83,7 @@ instance Display CertificateType where
   display TreasuryMirCertificate = "Treasury MIR"
 
 parseCertificateType :: Text -> Maybe CertificateType
-parseCertificateType "delegation" = Just DelegationCertificate
+parseCertificateType "pool_delegation" = Just DelegationCertificate
 parseCertificateType "stake_registration" = Just StakeRegistrationCertificate
 parseCertificateType "stake_deregistration" = Just StakeDeregistrationCertificate
 parseCertificateType "pool_update" = Just PoolUpdateCertificate
@@ -94,7 +94,7 @@ parseCertificateType "param_proposal" = Just ParamProposalCertificate
 parseCertificateType _ = Nothing
 
 showCertificateType :: CertificateType -> Text
-showCertificateType DelegationCertificate = "delegation"
+showCertificateType DelegationCertificate = "pool_delegation"
 showCertificateType StakeRegistrationCertificate = "stake_registration"
 showCertificateType StakeDeregistrationCertificate = "stake_deregistration"
 showCertificateType PoolUpdateCertificate = "pool_update"
