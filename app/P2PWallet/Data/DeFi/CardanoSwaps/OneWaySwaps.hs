@@ -65,6 +65,9 @@ genAskBeaconName (AskAsset NativeAsset{policyId,tokenName}) =
 swapScript :: SerialisedScript
 swapScript = parseScriptFromCBOR $ blueprints Map.! "one_way_swap.swap_script"
 
+swapScriptSize :: Integer
+swapScriptSize = getScriptSize swapScript
+
 -- | The hash of the one-way swap script.
 swapScriptHash :: ScriptHash
 swapScriptHash = hashScript swapScript
@@ -75,6 +78,9 @@ beaconScript =
   applyArguments
     (parseScriptFromCBOR $ blueprints Map.! "one_way_swap.beacon_script")
     [PlutusTx.toData swapScriptHash]
+
+beaconScriptSize :: Integer
+beaconScriptSize = getScriptSize beaconScript
 
 -- | The hash of the one-way swap beacon minting policy.
 beaconScriptHash :: ScriptHash
@@ -92,14 +98,14 @@ beaconCurrencySymbol = scriptHashToPolicyId beaconScriptHash
 --
 -- The scripts are deliberately stored with an invalid datum so that they are locked forever.
 
-getScriptRef :: Network -> ScriptHash -> TxOutRef
+getScriptRef :: Network -> ScriptHash -> (TxOutRef,Integer)
 getScriptRef network scriptHash = (referenceScriptMap Map.! network) Map.! scriptHash
 
-referenceScriptMap :: Map.Map Network (Map.Map ScriptHash TxOutRef)
+referenceScriptMap :: Map.Map Network (Map.Map ScriptHash (TxOutRef,Integer))
 referenceScriptMap = Map.fromList
   [ (Testnet, Map.fromList
-        [ (swapScriptHash, swapScriptTestnetRef)
-        , (beaconScriptHash, beaconScriptTestnetRef)
+        [ (swapScriptHash, (swapScriptTestnetRef,swapScriptSize))
+        , (beaconScriptHash, (beaconScriptTestnetRef,beaconScriptSize))
         ])
   ]
 

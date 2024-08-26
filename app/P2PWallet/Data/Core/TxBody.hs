@@ -101,11 +101,14 @@ instance ToJSON ExecutionBudget where
 -------------------------------------------------
 -- | Whether the script will be executed as a reference script or a normal script.
 data ScriptWitness
-  -- | The script will be executed as a reference script.
-  = ReferenceWitness TxOutRef
+  -- | The script will be executed as a reference script. The integer is its script size
+  -- in bytes.
+  = ReferenceWitness (TxOutRef, Integer)
   -- | The script will be included in the transaction and executed normally.
   | NormalWitness SerialisedScript
   deriving (Show,Eq,Ord)
+
+makePrisms ''ScriptWitness
 
 -- | Export a plutus contract. The file name is the hash of the script.
 exportScriptWitness :: ScriptWitness -> IO ()
@@ -149,7 +152,7 @@ makeFieldLabelsNoPrefix ''SpendingScriptInfo
 
 instance ToBuildCmdField SpendingScriptInfo where
   toBuildCmdField tmpDir SpendingScriptInfo{..} = case scriptWitness of
-    ReferenceWitness ref -> unwords $ filter (/= "")
+    ReferenceWitness (ref, _) -> unwords $ filter (/= "")
       [ "--spending-tx-in-reference " <> display ref
       , "--spending-plutus-script-v2"
       , unwords 
@@ -297,7 +300,7 @@ makeFieldLabelsNoPrefix ''StakingScriptInfo
 
 instance ToBuildCmdField StakingScriptInfo where
   toBuildCmdField tmpDir StakingScriptInfo{..} = case scriptWitness of
-    ReferenceWitness ref -> unwords $ filter (/= "")
+    ReferenceWitness (ref, _) -> unwords $ filter (/= "")
       [ "--withdrawal-tx-in-reference " <> display ref
       , "--withdrawal-plutus-script-v2"
       , unwords 
@@ -394,7 +397,7 @@ instance ToBuildCmdField [TxBodyMint] where
           , "--mint-redeemer-file " <> toText (redeemerFilePath tmpDir $ hashRedeemer redeemer)
           , "--mint-execution-units " <> display executionBudget
           ]
-        ReferenceWitness utxoRef -> unwords
+        ReferenceWitness (utxoRef, _) -> unwords
           [ "--mint-tx-in-reference " <> display utxoRef
           , "--mint-plutus-script-v2"
           , "--policy-id " <> show mintingPolicyHash
@@ -585,3 +588,19 @@ instance ExportContractFiles TxBody where
 class AddToTxBody a where
   -- Some highlevel actions impact multiple parts of the transaction.
   addToTxBody :: TxBody -> a -> TxBody
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | Calculate the total size of all reference scripts being used in the transaction. This
+-- number is needed to calculate the transaction fee.
+calcTotalReferenceScriptSize :: TxBody -> Integer
+calcTotalReferenceScriptSize TxBody{..} = Map.foldl' (+) 0 referenceMap
+  where
+    -- Build up a map from TxOutRef to size so that references are only counted once.
+    referenceMap :: Map.Map TxOutRef Integer
+    referenceMap = Map.fromList $ mconcat
+      [ mapMaybe (preview $ #spendingScriptInfo % _Just % #scriptWitness % _ReferenceWitness) inputs
+      , mapMaybe (preview $ #stakingScriptInfo % _Just % #scriptWitness % _ReferenceWitness) withdrawals
+      , mapMaybe (preview $ #scriptWitness % _ReferenceWitness) mints
+      ]

@@ -281,6 +281,7 @@ estimateTxFee tmpDir builderLogFile paramsFile txBodyFile certificateFiles tx@Tx
       , "--protocol-params-file " <> toText paramsFile
       , "--tx-in-count " <> show numberOfInputs
       , "--tx-out-count " <> show numberOfOutputs
+      , "--reference-script-size " <> show (calcTotalReferenceScriptSize tx)
       , unwords 
           [ "--witness-count " <> show (length keyWitnesses) <> ")"
           , "| cut -d' ' -f1"
@@ -293,7 +294,7 @@ buildRawCmd :: TmpDirectory -> ParamsFile -> TxBodyFile -> [CertificateFile] -> 
 buildRawCmd tmpDir paramsFile outFile certificateFiles TxBody{..} = 
   -- Filter out unused fields.
   unwords $ filter (/= "")
-    [ "cardano-cli transaction build-raw"
+    [ "cardano-cli conway transaction build-raw"
     , unwords $ map (toBuildCmdField tmpDir) inputs
     , unwords $ map (toBuildCmdField tmpDir) outputs
     , toBuildCmdField tmpDir mints

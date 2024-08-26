@@ -26,7 +26,7 @@ data PersonalUTxO = PersonalUTxO
   , lovelace :: Lovelace
   , datumHash :: Maybe Text
   , inlineDatum :: Maybe Value
-  , referenceScriptHash :: Maybe Text
+  , referenceScript :: Maybe ReferenceScript
   , nativeAssets :: [NativeAsset]
   , blockTime :: POSIXTime
   , blockHeight :: Integer
@@ -41,7 +41,7 @@ instance ToJSON PersonalUTxO where
            , "lovelace" .= lovelace
            , "datum_hash" .= datumHash
            , "inline_datum" .= inlineDatum
-           , "reference_script_hash" .= referenceScriptHash
+           , "reference_script" .= referenceScript
            , "native_assets" .= nativeAssets
            , "block_time" .= blockTime
            , "block_height" .= blockHeight
@@ -54,7 +54,7 @@ instance FromJSON PersonalUTxO where
       <*> o .: "lovelace"
       <*> o .: "datum_hash"
       <*> o .: "inline_datum"
-      <*> o .: "reference_script_hash"
+      <*> o .: "reference_script"
       <*> o .: "native_assets"
       <*> o .: "block_time"
       <*> o .: "block_height"
@@ -66,7 +66,7 @@ instance FromAddressUTxO PersonalUTxO where
     , lovelace = lovelace
     , datumHash = datumHash
     , inlineDatum = inlineDatum
-    , referenceScriptHash = referenceScriptHash
+    , referenceScript = referenceScript
     , nativeAssets = nativeAssets
     , blockTime = blockTime
     , blockHeight = blockHeight

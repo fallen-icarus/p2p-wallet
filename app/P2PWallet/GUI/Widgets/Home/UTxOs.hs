@@ -181,7 +181,7 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap,config} =
                             ]
                       , spacer_ [width 3]
                       ]
-                , widgetIf (isJust referenceScriptHash) $ 
+                , widgetIf (isJust referenceScript) $ 
                     tooltip_ "Reference Script" [tooltipDelay 0] $ label scriptIcon
                       `styleBasic` 
                         [ textSize 10
@@ -253,8 +253,8 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap,config} =
         , vstack
             [ copyableLabelFor 8 "Block Height:" (show @Text blockHeight)
                   `styleBasic` [padding 2]
-            , widgetMaybe referenceScriptHash $ \hash ->
-                copyableLabelFor 8 "Reference Script Hash:" hash
+            , widgetMaybe referenceScript $ \ReferenceScript{scriptHash} ->
+                copyableLabelFor 8 "Reference Script Hash:" scriptHash
                   `styleBasic` [padding 2]
             , widgetMaybe datumHash $ \hash ->
                 copyableLabelFor 8 "Datum Hash:" hash
@@ -610,7 +610,7 @@ orderer = \case
 filterer :: UTxOFilterModel -> [PersonalUTxO] -> [PersonalUTxO]
 filterer UTxOFilterModel{..} us = do
   u@PersonalUTxO{..} <- us
-  guard $ maybe True (isJust referenceScriptHash ==) hasReferenceScript
+  guard $ maybe True (isJust (referenceScript ^? _Just % #scriptHash) ==) hasReferenceScript
   guard $ maybe True (isJust datumHash ==) hasDatum
   guard $ maybe True (not (null nativeAssets) ==) hasNativeAssets
   return u
@@ -626,7 +626,7 @@ searchFilter :: ReverseTickerMap -> Text -> [PersonalUTxO] -> [PersonalUTxO]
 searchFilter reverseTickerMap searchTarget !xs
   | searchTarget == "" = xs
   | otherwise = flip filter xs $ \p -> or
-      [ p ^. #referenceScriptHash == Just searchTarget
+      [ p ^? #referenceScript % _Just % #scriptHash == Just searchTarget
       , p ^. #datumHash == Just searchTarget
       , Text.isPrefixOf searchTarget $ display $ p ^. #utxoRef
       , flip any (p ^. #nativeAssets) $ \NativeAsset{..} -> or

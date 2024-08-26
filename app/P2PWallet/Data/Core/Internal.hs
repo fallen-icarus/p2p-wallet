@@ -18,6 +18,7 @@ module P2PWallet.Data.Core.Internal
   , module P2PWallet.Data.Core.Internal.Notification
   , module P2PWallet.Data.Core.Internal.PoolID
   , module P2PWallet.Data.Core.Internal.PrimaryKeys
+  , module P2PWallet.Data.Core.Internal.ReferenceScript
   , module P2PWallet.Data.Core.Internal.RegistrationStatus
   , module P2PWallet.Data.Core.Internal.TxCBOR
   ) where
@@ -34,5 +35,6 @@ import P2PWallet.Data.Core.Internal.Network
 import P2PWallet.Data.Core.Internal.Notification
 import P2PWallet.Data.Core.Internal.PoolID
 import P2PWallet.Data.Core.Internal.PrimaryKeys
+import P2PWallet.Data.Core.Internal.ReferenceScript
 import P2PWallet.Data.Core.Internal.RegistrationStatus
 import P2PWallet.Data.Core.Internal.TxCBOR
