@@ -26,7 +26,7 @@ data AddressUTxO = AddressUTxO
   , lovelace :: Lovelace
   , datumHash :: Maybe Text
   , inlineDatum :: Maybe Value
-  , referenceScriptHash :: Maybe Text
+  , referenceScript :: Maybe ReferenceScript
   , nativeAssets :: [NativeAsset]
   , blockTime :: POSIXTime
   , blockHeight :: Integer
@@ -46,8 +46,7 @@ instance FromJSON AddressUTxO where
           <*> o .: "datum_hash"
           <*> (o .: "inline_datum" >>= 
                 maybe (return Nothing) (withObject "inlineDatum" $ \i -> i .: "value"))
-          <*> (o .: "reference_script" >>= 
-                maybe (return Nothing) (withObject "referenceScript" $ \i -> i .: "hash"))
+          <*> o .: "reference_script"
           <*> o .: "asset_list"
           <*> o .: "block_time"
           <*> o .: "block_height"

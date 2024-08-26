@@ -67,6 +67,7 @@ module P2PWallet.Plutus
   , hashRedeemer
   , hashDatum
   , applyArguments
+  , getScriptSize
 
     -- * Serialization
   , decodeData
@@ -274,6 +275,9 @@ applyArguments p args =
   let termArgs = fmap (PLC.mkConstant ()) args
       applied t = PLC.mkIterAppNoAnn t termArgs
   in PV1.serialiseUPLC $ Lens.over UPLC.progTerm applied $ PV1.uncheckedDeserialiseUPLC p
+
+getScriptSize :: PV2.SerialisedScript -> Integer
+getScriptSize = UPLC.serialisedSize
 
 ------------------------------------------------
 -- Serialization

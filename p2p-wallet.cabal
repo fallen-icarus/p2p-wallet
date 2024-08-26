@@ -121,6 +121,7 @@ executable p2p-wallet
       P2PWallet.Data.Core.Internal.Notification
       P2PWallet.Data.Core.Internal.PrimaryKeys
       P2PWallet.Data.Core.Internal.PoolID
+      P2PWallet.Data.Core.Internal.ReferenceScript
       P2PWallet.Data.Core.Internal.RegistrationStatus
       P2PWallet.Data.Core.Internal.TxCBOR
       P2PWallet.Data.Core.Profile

@@ -23,19 +23,26 @@ module P2PWallet.Data.DeFi.CardanoLoans
 
     -- * Smart Contracts
   , proxyScript
+  , proxyScriptSize
   , proxyScriptHash
   , loanScript
+  , loanScriptSize
   , loanScriptHash
   , paymentObserverScript
+  , paymentObserverScriptSize
   , paymentObserverScriptHash
   , interestObserverScript
+  , interestObserverScriptSize
   , interestObserverScriptHash
   , addressUpdateObserverScript
+  , addressUpdateObserverScriptSize
   , addressUpdateObserverScriptHash
   , activeBeaconScript
+  , activeBeaconScriptSize
   , activeBeaconScriptHash
   , activeBeaconCurrencySymbol
   , negotiationBeaconScript
+  , negotiationBeaconScriptSize
   , negotiationBeaconScriptHash
   , negotiationBeaconCurrencySymbol
   
@@ -513,6 +520,9 @@ PlutusTx.unstableMakeIsData ''ActiveBeaconsRedeemer
 proxyScript :: SerialisedScript
 proxyScript = parseScriptFromCBOR $ blueprints Map.! "cardano_loans.proxy_script"
 
+proxyScriptSize :: Integer
+proxyScriptSize = getScriptSize proxyScript
+
 -- | The hash of the proxy script.
 proxyScriptHash :: ScriptHash
 proxyScriptHash = hashScript proxyScript
@@ -520,6 +530,9 @@ proxyScriptHash = hashScript proxyScript
 -- | The loan spending script. All borrower addresses use this script for the payment credential.
 loanScript :: SerialisedScript
 loanScript = parseScriptFromCBOR $ blueprints Map.! "cardano_loans.loan_script"
+
+loanScriptSize :: Integer
+loanScriptSize = getScriptSize loanScript
 
 -- | The hash of the loan script.
 loanScriptHash :: ScriptHash
@@ -532,6 +545,9 @@ paymentObserverScript =
     (parseScriptFromCBOR $ blueprints Map.! "cardano_loans.payment_observer_script")
     [PV2.toData loanScriptHash]
 
+paymentObserverScriptSize :: Integer
+paymentObserverScriptSize = getScriptSize paymentObserverScript
+
 -- | The hash of the payment observer script.
 paymentObserverScriptHash :: ScriptHash
 paymentObserverScriptHash = hashScript paymentObserverScript
@@ -542,6 +558,9 @@ interestObserverScript =
   applyArguments
     (parseScriptFromCBOR $ blueprints Map.! "cardano_loans.interest_observer_script")
     [PV2.toData loanScriptHash]
+
+interestObserverScriptSize :: Integer
+interestObserverScriptSize = getScriptSize interestObserverScript
 
 -- | The hash of the interest observer script.
 interestObserverScriptHash :: ScriptHash
@@ -555,6 +574,9 @@ addressUpdateObserverScript =
     [ PV2.toData proxyScriptHash
     , PV2.toData loanScriptHash
     ]
+
+addressUpdateObserverScriptSize :: Integer
+addressUpdateObserverScriptSize = getScriptSize addressUpdateObserverScript
 
 -- | The hash of the address update observer script.
 addressUpdateObserverScriptHash :: ScriptHash
@@ -570,6 +592,9 @@ activeBeaconScript =
     , PV2.toData interestObserverScriptHash
     , PV2.toData addressUpdateObserverScriptHash
     ]
+
+activeBeaconScriptSize :: Integer
+activeBeaconScriptSize = getScriptSize activeBeaconScript
 
 -- | The hash of the active beacon script.
 activeBeaconScriptHash :: ScriptHash
@@ -588,6 +613,10 @@ negotiationBeaconScript =
     , PV2.toData loanScriptHash
     , PV2.toData activeBeaconScriptHash
     ]
+
+-- | The beacon script responsible for the negotation phase beacons.
+negotiationBeaconScriptSize :: Integer
+negotiationBeaconScriptSize = getScriptSize negotiationBeaconScript
 
 -- | The hash of the negotation beacon script.
 negotiationBeaconScriptHash :: ScriptHash
@@ -887,18 +916,18 @@ data LoanScriptType
   | ActiveScript
   deriving (Eq,Ord)
 
-getScriptRef :: Network -> LoanScriptType -> TxOutRef
+getScriptRef :: Network -> LoanScriptType -> (TxOutRef,Integer)
 getScriptRef network scriptType = (referenceScriptMap Map.! network) Map.! scriptType
 
-referenceScriptMap :: Map.Map Network (Map.Map LoanScriptType TxOutRef)
+referenceScriptMap :: Map.Map Network (Map.Map LoanScriptType (TxOutRef,Integer))
 referenceScriptMap = Map.fromList
   [ (Testnet, Map.fromList
-        [ (LoanScript, loanScriptTestnetRef)
-        , (PaymentObserverScript, paymentObserverScriptTestnetRef)
-        , (InterestObserverScript, interestObserverScriptTestnetRef)
-        , (AddressObserverScript, addressUpdateObserverScriptTestnetRef)
-        , (NegotiationScript, negotiationBeaconScriptTestnetRef)
-        , (ActiveScript, activeBeaconScriptTestnetRef)
+        [ (LoanScript, (loanScriptTestnetRef, loanScriptSize))
+        , (PaymentObserverScript, (paymentObserverScriptTestnetRef, paymentObserverScriptSize))
+        , (InterestObserverScript, (interestObserverScriptTestnetRef, interestObserverScriptSize))
+        , (AddressObserverScript, (addressUpdateObserverScriptTestnetRef, addressUpdateObserverScriptSize))
+        , (NegotiationScript, (negotiationBeaconScriptTestnetRef, negotiationBeaconScriptSize))
+        , (ActiveScript, (activeBeaconScriptTestnetRef, activeBeaconScriptSize))
         ])
   ]
 

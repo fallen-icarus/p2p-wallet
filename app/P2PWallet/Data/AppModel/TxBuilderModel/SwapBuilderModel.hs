@@ -160,15 +160,16 @@ addSwapCreationToBody txBody (_,SwapCreation{..}) =
     adjustPrice :: Rational -> Rational -> Rational
     adjustPrice fee originalPrice = originalPrice * (1 - fee)
 
-    (beaconRedeemer :: Redeemer, beaconReference :: TxOutRef) = case swapType of
-      LimitOrder -> 
-        ( toRedeemer OneWay.CreateOrCloseSwaps
-        , OneWay.getScriptRef network OneWay.beaconScriptHash
-        )
-      LiquiditySwap -> 
-        ( toRedeemer TwoWay.CreateOrCloseSwaps
-        , TwoWay.getScriptRef network TwoWay.beaconScriptHash
-        )
+    (beaconRedeemer :: Redeemer, beaconWitness :: (TxOutRef,Integer)) = 
+      case swapType of
+        LimitOrder -> 
+          ( toRedeemer OneWay.CreateOrCloseSwaps
+          , OneWay.getScriptRef network OneWay.beaconScriptHash
+          )
+        LiquiditySwap -> 
+          ( toRedeemer TwoWay.CreateOrCloseSwaps
+          , TwoWay.getScriptRef network TwoWay.beaconScriptHash
+          )
 
     (swapDatum :: Datum , beacons :: [NativeAsset] , beaconSym :: CurrencySymbol) = 
       case swapType of
@@ -230,7 +231,7 @@ addSwapCreationToBody txBody (_,SwapCreation{..}) =
           -- Increase the quantity by the total number of required outputs.
           sumNativeAssets $ concat $ replicate count beacons
       , redeemer = beaconRedeemer
-      , scriptWitness = ReferenceWitness beaconReference
+      , scriptWitness = ReferenceWitness beaconWitness
       , executionBudget = def -- These must be calculated during the build step.
       }
 
@@ -249,7 +250,7 @@ addSwapCloseToBody txBody (_,SwapClose{..}) =
       & #keyWitnesses %~ maybe id (:) requiredWitness
       & #network .~ network
   where
-    (spendingRedeemer :: Redeemer,spendingReference :: TxOutRef,spendingScriptHash :: ScriptHash) = 
+    (swapRedeemer :: Redeemer, swapWitness :: (TxOutRef,Integer), swapHash :: ScriptHash) = 
       case swapType of
         LimitOrder -> 
           ( toRedeemer OneWay.SpendWithMint
@@ -262,15 +263,16 @@ addSwapCloseToBody txBody (_,SwapClose{..}) =
           , TwoWay.swapScriptHash
           )
 
-    (beaconRedeemer :: Redeemer, beaconReference :: TxOutRef) = case swapType of
-      LimitOrder -> 
-        ( toRedeemer OneWay.CreateOrCloseSwaps
-        , OneWay.getScriptRef network OneWay.beaconScriptHash
-        )
-      LiquiditySwap -> 
-        ( toRedeemer TwoWay.CreateOrCloseSwaps
-        , TwoWay.getScriptRef network TwoWay.beaconScriptHash
-        )
+    (beaconRedeemer :: Redeemer, beaconWitness :: (TxOutRef,Integer)) = 
+      case swapType of
+        LimitOrder -> 
+          ( toRedeemer OneWay.CreateOrCloseSwaps
+          , OneWay.getScriptRef network OneWay.beaconScriptHash
+          )
+        LiquiditySwap -> 
+          ( toRedeemer TwoWay.CreateOrCloseSwaps
+          , TwoWay.getScriptRef network TwoWay.beaconScriptHash
+          )
 
     (beacons :: [NativeAsset], beaconSym :: CurrencySymbol) = 
       case swapDatum of
@@ -309,10 +311,10 @@ addSwapCloseToBody txBody (_,SwapClose{..}) =
       { utxoRef = utxoRef
       , spendingScriptInfo = Just $ SpendingScriptInfo
           { datum = InputDatum
-          , redeemer = spendingRedeemer
-          , scriptWitness = ReferenceWitness spendingReference
+          , redeemer = swapRedeemer
+          , scriptWitness = ReferenceWitness swapWitness
           , executionBudget = def
-          , scriptHash = spendingScriptHash
+          , scriptHash = swapHash
           }
       }
 
@@ -331,7 +333,7 @@ addSwapCloseToBody txBody (_,SwapClose{..}) =
       { mintingPolicyHash = policyIdToScriptHash beaconSym
       , nativeAssets = beacons
       , redeemer = beaconRedeemer
-      , scriptWitness = ReferenceWitness beaconReference
+      , scriptWitness = ReferenceWitness beaconWitness
       , executionBudget = def -- These must be calculated during the build step.
       }
 
@@ -344,7 +346,7 @@ addSwapExecutionToBody txBody (_,SwapExecution{..}) =
       & #outputs %~ flip snoc newOutput
       & #network .~ network
   where
-    (spendingRedeemer :: Redeemer,spendingReference :: TxOutRef,spendingScriptHash :: ScriptHash) = 
+    (swapRedeemer :: Redeemer, swapWitness :: (TxOutRef,Integer), swapHash :: ScriptHash) = 
       case swapType of
         LimitOrder -> 
           ( toRedeemer OneWay.Swap
@@ -362,10 +364,10 @@ addSwapExecutionToBody txBody (_,SwapExecution{..}) =
       { utxoRef = utxoRef
       , spendingScriptInfo = Just $ SpendingScriptInfo
           { datum = InputDatum
-          , redeemer = spendingRedeemer
-          , scriptWitness = ReferenceWitness spendingReference
+          , redeemer = swapRedeemer
+          , scriptWitness = ReferenceWitness swapWitness
           , executionBudget = def
-          , scriptHash = spendingScriptHash
+          , scriptHash = swapHash
           }
       }
 

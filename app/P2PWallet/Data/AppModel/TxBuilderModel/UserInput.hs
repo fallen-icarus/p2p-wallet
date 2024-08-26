@@ -72,13 +72,13 @@ personalUTxOToUserInput
   -> Maybe DerivationInfo
   -> PersonalUTxO 
   -> UserInput
-personalUTxOToUserInput alias paymentAddress mKeyInfo PersonalUTxO{utxoRef,lovelace,nativeAssets} = 
+personalUTxOToUserInput alias paymentAddress mKeyInfo utxo =
   UserInput
-    { utxoRef = utxoRef
+    { utxoRef = utxo ^. #utxoRef
     , paymentAddress = paymentAddress
     , paymentKeyDerivation = mKeyInfo
-    , lovelace = lovelace
-    , nativeAssets = nativeAssets
+    , lovelace = utxo ^. #lovelace
+    , nativeAssets = utxo ^. #nativeAssets
     , showDetails = False
     , walletAlias = alias
     }
