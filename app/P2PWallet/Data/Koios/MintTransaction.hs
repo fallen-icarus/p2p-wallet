@@ -27,7 +27,7 @@ instance FromJSON MintTransaction where
   parseJSON = withObject "MintTransaction" $ \o ->
       MintTransaction
         <$> o .: "tx_hash"
-        <*> o .: "quantity"
+        <*> (o .: "quantity" >>= maybe mzero return . readMaybe)
 
 -- | This type is used to unwrap the koios response.
 newtype MintTransactions = MintTransactions { unMintTransactions :: [MintTransaction] }

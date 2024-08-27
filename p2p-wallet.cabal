@@ -187,6 +187,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Lending
       P2PWallet.GUI.Widgets.Lending.Borrow
       P2PWallet.GUI.Widgets.Lending.Borrow.ActiveLoans
+      P2PWallet.GUI.Widgets.Lending.Borrow.CreditHistory
       P2PWallet.GUI.Widgets.Lending.Borrow.LenderOffers
       P2PWallet.GUI.Widgets.Lending.Borrow.OpenAsks
       P2PWallet.GUI.Widgets.Lending.Lend

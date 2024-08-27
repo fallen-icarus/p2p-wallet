@@ -10,6 +10,7 @@ import P2PWallet.GUI.Colors
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Lending.Borrow.ActiveLoans
+import P2PWallet.GUI.Widgets.Lending.Borrow.CreditHistory
 import P2PWallet.GUI.Widgets.Lending.Borrow.LenderOffers
 import P2PWallet.GUI.Widgets.Lending.Borrow.OpenAsks
 import P2PWallet.Prelude
@@ -27,6 +28,8 @@ borrowWidget model@AppModel{lendingModel} = do
               `nodeVisible` (lendingModel ^. #borrowModel % #scene == CurrentOffers)
           , box_ [mergeRequired reqUpdate] (activeLoansWidget model)
               `nodeVisible` (lendingModel ^. #borrowModel % #scene == ActiveLoans)
+          , box_ [mergeRequired reqUpdate] (creditHistoryWidget model)
+              `nodeVisible` (lendingModel ^. #borrowModel % #scene == CreditHistory)
           ]
         -- The inspected loan is here since only one loan can be inspected at a time.
         -- It doesn't make sense to move to other borrower scenes while inspecting a loan.

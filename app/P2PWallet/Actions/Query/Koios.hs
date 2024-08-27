@@ -18,6 +18,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryLoanWallet
   , runQueryLoanAsks
   , runQueryLoanHistory
+  , runQueryBorrowerCreditHistory
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
@@ -418,14 +419,18 @@ runQueryLoanWallet loanWallet@LoanWallet{..} = do
       concurrently queryTxsConcurrently $ 
         concurrently queryLoansWithRedundancies queryOffersWithRedundancies
 
-    case (,,) <$> txRes <*> loansRes <*> offerRes of
-      Right (txs,loanUTxOs,offers) -> do
+    creditHistoryRes <- 
+      runQueryBorrowerCreditHistory network $ Loans.genBorrowerId stakeCredential
+
+    case (,,,) <$> txRes <*> loansRes <*> offerRes <*> creditHistoryRes of
+      Right (txs,loanUTxOs,offers,history) -> do
         return $ Right $ loanWallet
           & #lovelace .~ sum (map (view #lovelace) loanUTxOs)
           & #utxos .~ map fromAddressUTxO loanUTxOs
           & populateNativeAssets
           & #transactions %~ mappend (map P2P.toTransaction txs)
           & #offerUTxOs .~ map fromAddressUTxO offers
+          & #creditHistory .~ history
       Left err -> return $ Left err
   where
     -- | Aggregate all native assets located at the wallet.
@@ -509,11 +514,19 @@ runQueryLoanAsks network loanAskCfg = do
       first show <$> 
         handleTimeoutError (runClientM (queryLoanAsks loanAskCfg) env)
 
+-- | Query the event history for a particular loan.
 runQueryLoanHistory :: Network -> Loans.LoanId -> IO (Either Text [LoanEvent])
 runQueryLoanHistory network loanId = do
   manager <- newManager customTlsSettings
   let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
   first show <$> handleTimeoutError (runClientM (queryLoanTxHistory loanId) env)
+
+-- | Query the credit history for a particular borrower.
+runQueryBorrowerCreditHistory :: Network -> Loans.BorrowerId -> IO (Either Text [LoanResult])
+runQueryBorrowerCreditHistory network borrowerId = do
+  manager <- newManager customTlsSettings
+  let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+  first show <$> handleTimeoutError (runClientM (queryBorrowerCreditHistory borrowerId) env)
 
 -------------------------------------------------
 -- Low-Level API
@@ -1080,6 +1093,25 @@ queryLoanTxHistory i@(Loans.LoanId loanId) = do
     info <- queryAssetTxHashes Loans.activeBeaconCurrencySymbol loanId >>= 
       eventTxInfoApi select "block_height.asc" . TxHashes
     return $ mapMaybe (toLoanEvent i) info
+  where
+    select = SelectParam $ toText $ intercalate ","
+      [ "tx_hash"
+      , "tx_timestamp"
+      , "block_height"
+      , "inputs"
+      , "outputs"
+      , "assets_minted"
+      , "plutus_contracts"
+      ]
+
+queryBorrowerCreditHistory :: Loans.BorrowerId -> ClientM [LoanResult]
+queryBorrowerCreditHistory b@(Loans.BorrowerId borrowerId) = do
+    txs <- concatMap unMintTransactions <$>
+      mintHistoryApi "minting_txs" Loans.activeBeaconCurrencySymbol borrowerId
+    let processedTxs = map (view #txHash) -- Get the tx hash.
+                     $ filter ((<0) . view #quantity) txs -- Get only burn transactions.
+    info <- eventTxInfoApi select "block_height.desc" $ TxHashes processedTxs
+    return $ mapMaybe (toLoanResult b) info
   where
     select = SelectParam $ toText $ intercalate ","
       [ "tx_hash"
