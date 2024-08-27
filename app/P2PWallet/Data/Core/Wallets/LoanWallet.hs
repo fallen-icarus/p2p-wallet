@@ -166,6 +166,35 @@ loanUTxOLenderAddress LoanUTxO{loanDatum} = case loanDatum of
   Just (ActiveDatum Loans.ActiveDatum{lenderAddress}) -> Just lenderAddress
   _ -> Nothing
 
+-- | Get the next deadline from a LoanUTxO.
+loanUTxONextDeadline :: LoanUTxO -> Maybe PlutusTime
+loanUTxONextDeadline LoanUTxO{loanDatum} = case loanDatum of
+  Just (ActiveDatum Loans.ActiveDatum{..}) -> 
+    case (+lastCompounding) <$> compoundFrequency of
+      Nothing -> Just loanExpiration
+      Just nextCompounding -> Just $ min nextCompounding loanExpiration
+  _ -> Nothing
+
+-- | Get the next required payment from a LoanUTxO.
+loanUTxORequiredPayment :: LoanUTxO -> Maybe NativeAsset
+loanUTxORequiredPayment LoanUTxO{loanDatum} = case loanDatum of
+  Just (ActiveDatum Loans.ActiveDatum{..}) -> 
+    let amountDue = minPayment - totalEpochPayments in
+      if minPayment == 0 then 
+        Just $ toNativeAsset loanAsset & #quantity .~ roundUp (toRational loanOutstanding)
+      else if amountDue < 0 then
+        Just $ toNativeAsset loanAsset
+      else
+        Just $ toNativeAsset loanAsset & #quantity .~ amountDue
+  _ -> Nothing
+
+-- | Get the outstanding balance from a LoanUTxO.
+loanUTxOLoanBalance :: LoanUTxO -> Maybe NativeAsset
+loanUTxOLoanBalance LoanUTxO{loanDatum} = case loanDatum of
+  Just (ActiveDatum Loans.ActiveDatum{loanAsset,loanOutstanding}) -> 
+    Just $ toNativeAsset loanAsset & #quantity .~ roundUp (toRational loanOutstanding)
+  _ -> Nothing
+
 -------------------------------------------------
 -- Loan Event
 -------------------------------------------------

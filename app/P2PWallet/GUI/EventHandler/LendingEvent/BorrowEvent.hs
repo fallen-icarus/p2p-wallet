@@ -204,7 +204,7 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
       Left err ->
         [ Model $ model
             & #lendingModel % #borrowModel % #showOpenAsksFilter .~ True -- keep it open
-        , Task $ runActionOrAlert (const AppInit) $ throwIO $ AppError err
+        , Event $ Alert err
         ]
 
   CheckLenderOffersFilterModel ->
@@ -213,7 +213,16 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
       Left err ->
         [ Model $ model
             & #lendingModel % #borrowModel % #showLenderOffersFilter .~ True -- keep it open
-        , Task $ runActionOrAlert (const AppInit) $ throwIO $ AppError err
+        , Event $ Alert err
+        ]
+
+  CheckActiveLoansFilterModel ->
+    case checkActiveLoansFilterModel tickerMap $ lendingModel ^. #borrowModel % #activeLoansFilterModel of
+      Right () -> [Event AppInit]
+      Left err ->
+        [ Model $ model
+            & #lendingModel % #borrowModel % #showActiveLoansFilter .~ True -- keep it open
+        , Event $ Alert err
         ]
 
   -----------------------------------------------
@@ -227,6 +236,11 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
   ResetLenderOffersFilters -> 
     [ Model $ model 
         & #lendingModel % #borrowModel % #lenderOffersFilterModel .~ def
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
+  ResetActiveLoansFilters -> 
+    [ Model $ model 
+        & #lendingModel % #borrowModel % #activeLoansFilterModel .~ def
         & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
 

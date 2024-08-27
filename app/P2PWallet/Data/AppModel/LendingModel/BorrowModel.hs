@@ -16,11 +16,13 @@ module P2PWallet.Data.AppModel.LendingModel.BorrowModel
   , AcceptOfferEvent(..)
   , AcceptOfferScene(..)
 
+  , module P2PWallet.Data.AppModel.LendingModel.BorrowModel.ActiveLoansFilterModel
   , module P2PWallet.Data.AppModel.LendingModel.BorrowModel.LenderOffersFilterModel
   , module P2PWallet.Data.AppModel.LendingModel.BorrowModel.OpenAsksFilterModel
   )where
 
 import P2PWallet.Data.AppModel.Common
+import P2PWallet.Data.AppModel.LendingModel.BorrowModel.ActiveLoansFilterModel
 import P2PWallet.Data.AppModel.LendingModel.BorrowModel.LenderOffersFilterModel
 import P2PWallet.Data.AppModel.LendingModel.BorrowModel.OpenAsksFilterModel
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
@@ -98,6 +100,10 @@ data BorrowEvent
   | InspectActiveLoanHistory Loans.LoanId
   -- | Stop inspecting the loan's history.
   | CloseInspectedActiveLoanHistory
+  -- | Verify the active loans filter model has valid information.
+  | CheckActiveLoansFilterModel
+  -- | Reset the active loans fitler model.
+  | ResetActiveLoansFilters
 
 -------------------------------------------------
 -- Borrow State
@@ -128,6 +134,8 @@ data BorrowModel = BorrowModel
   , inspectedLoan :: Maybe Loans.LoanId
   -- | Whether to show the filter widget for active loans.
   , showActiveLoansFilter :: Bool
+  -- | The active loans filter model.
+  , activeLoansFilterModel :: ActiveLoansFilterModel
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''BorrowModel
@@ -146,4 +154,5 @@ instance Default BorrowModel where
     , newLoanPayment = Nothing
     , inspectedLoan = Nothing
     , showActiveLoansFilter = False
+    , activeLoansFilterModel = def
     }

@@ -74,6 +74,7 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.HomeModel
       P2PWallet.Data.AppModel.LendingModel
       P2PWallet.Data.AppModel.LendingModel.BorrowModel
+      P2PWallet.Data.AppModel.LendingModel.BorrowModel.ActiveLoansFilterModel
       P2PWallet.Data.AppModel.LendingModel.BorrowModel.LenderOffersFilterModel
       P2PWallet.Data.AppModel.LendingModel.BorrowModel.OpenAsksFilterModel
       P2PWallet.Data.AppModel.LendingModel.LendModel

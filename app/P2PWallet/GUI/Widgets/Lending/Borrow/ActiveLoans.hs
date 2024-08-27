@@ -24,7 +24,7 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
     zstack
       [ mainWidget
       , makePaymentWidget model `nodeVisible` isJust (borrowModel ^. #newLoanPayment)
-      -- , offersFilterWidget model `nodeVisible` (borrowModel ^. #showLenderOffersFilter)
+      , activeLoansFilterWidget model `nodeVisible` (borrowModel ^. #showActiveLoansFilter)
       ]
   where
     Config{currentTime} = config
@@ -44,7 +44,10 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
       show (length sample) <> "/" <> show (length allActives)
 
     sample :: [LoanUTxO]
-    sample = allActives
+    sample = orderer (borrowModel ^. #activeLoansFilterModel % #sortingDirection) 
+           . sorter (borrowModel ^. #activeLoansFilterModel % #sortingMethod) 
+           . filterer currentTime reverseTickerMap (borrowModel ^. #activeLoansFilterModel) 
+           $ allActives
 
     mainWidget :: AppNode
     mainWidget =
@@ -54,7 +57,7 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
                 `styleBasic` [textFont "Italics", textSize 14]
             , tooltip_ "Sort/Filter" [tooltipDelay 0] $
                 toggleButton_ menuSearchIcon
-                  (toLensVL $ #lendingModel % #borrowModel % #showLenderOffersFilter)
+                  (toLensVL $ #lendingModel % #borrowModel % #showActiveLoansFilter)
                   [toggleButtonOffStyle toggleOffStyle]
                   `styleBasic`
                     [ border 0 transparent
@@ -529,6 +532,346 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
             , radius 5
             , border 1 black
             ]
+
+activeLoansFilterWidget :: AppModel -> AppNode
+activeLoansFilterWidget AppModel{lendingModel=LendingModel{..}} = do
+  let offStyle = def 
+        `styleBasic` [ bgColor customGray1 , textColor white ]
+        `styleHover` [ textColor lightGray, border 1 customBlue ]
+      rootLens = #lendingModel % #borrowModel
+      filterScene = borrowModel ^. #activeLoansFilterModel % #scene
+  vstack
+    [  centerWidget $ vstack
+        [ hstack
+            [ hgrid
+                [ optionButton_ "Filter" FilterScene 
+                    (toLensVL $ rootLens % #activeLoansFilterModel % #scene) 
+                    [optionButtonOffStyle offStyle]
+                    `styleBasic` 
+                      [ bgColor customGray3
+                      , textColor customBlue
+                      , radiusTL 10
+                      , radiusBL 0
+                      , radiusTR 0
+                      , radiusBR 0
+                      , border 1 black
+                      ]
+                , optionButton_ "Sort" SortScene 
+                    (toLensVL $ rootLens % #activeLoansFilterModel % #scene) 
+                    [optionButtonOffStyle offStyle]
+                    `styleBasic` 
+                      [ bgColor customGray3
+                      , textColor customBlue
+                      , radius 0
+                      , border 1 black
+                      ]
+                ]
+            , filler
+            ]
+        , vstack
+            [ vstack 
+                [ zstack
+                    [ widgetIf (filterScene == FilterScene) filterWidget
+                    , widgetIf (filterScene == SortScene) sortWidget
+                    ]
+                , spacer
+                , hstack 
+                    [ filler
+                    , button "Reset" $ LendingEvent $ BorrowEvent ResetActiveLoansFilters
+                    , spacer
+                    , toggleButton_ "Confirm" (toLensVL $ rootLens % #showActiveLoansFilter)
+                        [onClick $ LendingEvent $ BorrowEvent CheckActiveLoansFilterModel]
+                    ] `styleBasic` [padding 10]
+                ] `styleBasic`
+                    [ bgColor customGray3
+                    , radiusTL 0
+                    , radiusTR 10
+                    , radiusBR 10
+                    , radiusBL 10
+                    , border 1 black
+                    ]
+            , filler
+            ]
+        ]
+    ] `styleBasic` 
+        [ bgColor $ black & #a .~ 0.4
+        , paddingT 50
+        , paddingB 50
+        , paddingL 30
+        , paddingR 30
+        , radius 10
+        ]
+  where
+    filterWidget :: AppNode
+    filterWidget = do
+      let rootLens = #lendingModel % #borrowModel % #activeLoansFilterModel
+          offStyle = def 
+            `styleBasic` [ bgColor customGray1 , textColor white ]
+            `styleHover` [ bgColor customBlue ]
+          choiceButton caption field targetLens =
+            centerWidgetV $ optionButton_ caption field targetLens
+              [optionButtonOffStyle offStyle]
+              `styleBasic` 
+                [ bgColor customBlue
+                , textColor white
+                , radius 10
+                , border 1 black
+                , paddingT 2
+                , paddingB 2
+                , paddingL 7
+                , paddingR 7
+                , textSize 12
+                ]
+      centerWidget $ vstack
+        [ spacer
+        , box_ [alignMiddle] $
+            label "Filter Settings"
+              `styleBasic` [textSize 14, textFont "Italics"]
+        , spacer
+        , centerWidgetH $ hstack
+            [ box_ [alignMiddle, onClick $ Alert askCfgLoanAmountMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Loan Asset:"
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL $ rootLens % #loanAsset) 
+                  [placeholder "ADA"] 
+                `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            ]
+        , spacer
+        , centerWidgetH $ hstack
+            [ box_ [alignMiddle, onClick $ Alert askCfgMinDurationMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Minimum Duration (Days):"
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL $ rootLens % #minDuration) 
+                  [placeholder "10"] 
+                `styleBasic` [textSize 10, width 50, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            , filler
+            , box_ [alignMiddle, onClick $ Alert askCfgMaxDurationMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Maximum Duration (Days):"
+                `styleBasic` [textSize 10]
+            , spacer
+            , textField_ (toLensVL $ rootLens % #maxDuration) 
+                  [placeholder "100"] 
+                `styleBasic` [textSize 10, width 50, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            ]
+        , spacer
+        , centerWidgetH $ hstack
+            [ box_ [alignMiddle, onClick $ Alert "Whether the payment phase of the loan has expired."] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Loan is Expired:"
+                `styleBasic` [textSize 10]
+            , spacer_ [width 2]
+            , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #loanExpired)
+            , choiceButton "No" (Just False) (toLensVL $ rootLens % #loanExpired)
+            , choiceButton "Either" Nothing (toLensVL $ rootLens % #loanExpired)
+            , filler
+            , box_ [alignMiddle, onClick $ Alert "Whether the lender's claim period has expired."] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Claim is Expired:"
+                `styleBasic` [textSize 10]
+            , spacer_ [width 2]
+            , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #claimExpired)
+            , choiceButton "No" (Just False) (toLensVL $ rootLens % #claimExpired)
+            , choiceButton "Either" Nothing (toLensVL $ rootLens % #claimExpired)
+            ]
+        , spacer
+        , separatorLine `styleBasic` [fgColor darkGray]
+        , spacer
+        , hstack
+            [ box_ [alignMiddle, onClick $ Alert askCfgCollateralMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Collateral Assets (separated with newlines)"
+                `styleBasic` [textSize 10]
+            ]
+        , spacer
+        , textArea (toLensVL $ rootLens % #collateral)
+            `styleBasic` [textSize 10, bgColor customGray1]
+            `styleFocus` [border 1 customBlue]
+        ]
+
+    sortWidget :: AppNode
+    sortWidget = do
+      let innerDormantStyle = 
+            def `styleBasic` [textSize 12, bgColor customGray2, border 1 black]
+                `styleHover` [textSize 12, bgColor customGray1, border 1 black]
+          innerFocusedStyle = 
+            def `styleFocus` [textSize 12, bgColor customGray2, border 1 customBlue]
+                `styleFocusHover` [textSize 12, bgColor customGray1, border 1 customBlue]
+          possibleSortingMethods = enumFrom ActiveLoansLexicographically
+          rootLens = #lendingModel % #borrowModel % #activeLoansFilterModel
+      vstack
+        [ spacer
+        , box_ [alignMiddle] $
+            label "Sort Settings"
+              `styleBasic` [textSize 14, textFont "Italics"]
+        , spacer
+        , hstack
+            [ spacer_ [width 40]
+            , label "Method:" `styleBasic` [textSize 14]
+            , spacer
+            , textDropdown_
+                  (toLensVL $ rootLens % #sortingMethod) 
+                  possibleSortingMethods
+                  display 
+                  [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+                `styleBasic` 
+                  [ bgColor customGray2
+                  , width 200
+                  , border 1 black
+                  , textSize 12
+                  ]
+                `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , box_ [onClick $ Alert activeLoansSortMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , padding 5
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            ]
+        , spacer
+        , hstack
+            [ spacer_ [width 40]
+            , label "Order:" `styleBasic` [textSize 14]
+            , spacer
+            , textDropdown_
+                  (toLensVL $ rootLens % #sortingDirection) 
+                  sortingDirections
+                  display 
+                  [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+                `styleBasic` 
+                  [ bgColor customGray2
+                  , width 150
+                  , border 1 black
+                  , textSize 12
+                  ]
+                `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+            ]
+        ]
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+orderer :: SortDirection -> [LoanUTxO] -> [LoanUTxO]
+orderer = \case
+  SortAscending -> id
+  SortDescending -> reverse
+
+sorter :: ActiveLoansSortMethod -> [LoanUTxO] -> [LoanUTxO]
+sorter sortingMethod = 
+  case sortingMethod of
+    ActiveLoansLexicographically -> sortOn (view #utxoRef)
+    ActiveLoansTime -> sortOn (view #blockTime)
+    ActiveLoansBalance -> sortOn loanUTxOLoanBalance
+    ActiveLoansInterest -> sortOn loanUTxOLoanInterest
+    ActiveLoansDeadline -> sortOn loanUTxONextDeadline
+    ActiveLoansRequiredPayment -> sortOn loanUTxORequiredPayment
+
+filterer :: POSIXTime -> ReverseTickerMap -> ActiveLoansFilterModel -> [LoanUTxO] -> [LoanUTxO]
+filterer currentTime reverseTickerMap ActiveLoansFilterModel{..} us = do
+    u <- us
+    let activeDatum@Loans.ActiveDatum{loanTerm,loanExpiration,claimExpiration} = 
+          fromMaybe def $ loanUTxOActiveDatum u
+        utxoCollateral = map (toNativeAsset . fst)
+                       $ activeDatum ^. #collateralization % #unCollateralization
+    guard $ maybe True (\d -> calcDaysInPosixPeriod (fromPlutusTime loanTerm) >= d) $ 
+      readMaybe $ toString minDuration
+    guard $ maybe True (\d -> calcDaysInPosixPeriod (fromPlutusTime loanTerm) <= d) $ 
+      readMaybe $ toString maxDuration
+    guard $ matchesAsset [toNativeAsset $ activeDatum ^. #loanAsset] loanAsset
+    guard $ all (matchesAsset utxoCollateral) $ lines collateral
+    guard $ maybe True ((toPlutusTime currentTime > loanExpiration) ==) loanExpired
+    guard $ maybe True ((toPlutusTime currentTime > claimExpiration) ==) claimExpired
+    return u
+  where
+    matchesAsset :: [NativeAsset] -> Text -> Bool
+    matchesAsset xs searchTarget
+      | searchTarget == "" = True
+      | otherwise = flip any xs $ \NativeAsset{..} -> or
+          [ display policyId <> "." <> display tokenName == searchTarget
+          , Just searchTarget ==
+              fmap (display . fst) (Map.lookup (policyId,tokenName) reverseTickerMap) 
+          , policyId == "" && searchTarget == "ADA"
+          ]
 
 -------------------------------------------------
 -- Helper Widgets
