@@ -961,3 +961,11 @@ paymentAmountMsg = unlines
       , "by the loan."
       ]
   ]
+
+creditScoreMsg :: Text
+creditScoreMsg = unlines
+  [ "The credit score is calculated by:"
+  , "number of loans successfully repaid / number of loans"
+  , ""
+  , "An undefined score means this credential has not finished any loans yet."
+  ]

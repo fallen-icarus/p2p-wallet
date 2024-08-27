@@ -178,7 +178,8 @@ data LoanEvent = LoanEvent
   -- | The state at the time of the event. This is the state _before_ the event occurs.
   -- When the loan is first started, the state will be `Nothing`.
   , state :: Maybe Loans.ActiveDatum
-  -- | The action taken.
+  -- | The action taken. Creating an active loan requires minting while all other actions involve
+  -- spending the active loan input.
   , event :: Either Loans.ActiveBeaconsRedeemer Loans.LoanRedeemer
   } deriving (Show,Eq,Generic,FromJSON,ToJSON)
 
@@ -236,21 +237,61 @@ toLoanEvent loanId Koios.EventTransaction{..} = do
 -------------------------------------------------
 -- | The credit history for the borrower is a list of loan results.
 data LoanResult = LoanResult
-  -- | The loan this result is for.
-  { loanId :: Loans.LoanId
   -- | Whether the loan was defaulted on.
-  , isDefault :: Bool
+  { isDefault :: Bool
   -- | The remaining lovelace balance. This is only relevent for defaults.
   , remainingLovelace :: Lovelace
   -- | The remaining native assets. This is only relevent for defaults.
   , remainingNativeAssets :: [NativeAsset]
+  -- | The loan terms.
+  , terms :: Loans.ActiveDatum
   } deriving (Show,Eq,Generic,FromJSON,ToJSON)
 
 makeFieldLabelsNoPrefix ''LoanResult
 
 instance Ord LoanResult where
-  res1 <= res2 = res1 ^. #loanId <= res2 ^. #loanId
+  res1 <= res2 = res1 ^. #terms % #loanId <= res2 ^. #terms % #loanId
 
+toLoanResult :: Loans.BorrowerId -> Koios.EventTransaction -> Maybe LoanResult
+toLoanResult borrowerId Koios.EventTransaction{..} = do
+    maybeHead $ mapMaybe proccessEvent plutusContracts
+  where
+    proccessEvent :: Koios.TransactionPlutusContract -> Maybe LoanResult
+    proccessEvent Koios.TransactionPlutusContract{..} = do
+      parsedDatum@Loans.ActiveDatum{loanOutstanding} <- 
+        maybe Nothing (decodeData @Loans.ActiveDatum) datum
+
+      -- This execution must be for the specified borrower id. 
+      when (parsedDatum ^. #borrowerId /= borrowerId) $ Nothing
+
+      parsedRedeemer <- decodeData @Loans.LoanRedeemer redeemer
+      Koios.TransactionUTxO{lovelace,nativeAssets} <- 
+        find (\Koios.TransactionUTxO{inlineDatum} -> inlineDatum == datum) inputs
+      case parsedRedeemer of
+        Loans.MakePayment{paymentAmount} -> 
+          if toRational paymentAmount < toRational loanOutstanding then Nothing else
+            return $ LoanResult
+              { isDefault = False
+              , remainingLovelace = lovelace
+              , remainingNativeAssets = nativeAssets
+              , terms = parsedDatum
+              }
+        Loans.SpendWithKeyNFT -> 
+          return $ LoanResult
+            { isDefault = True
+            , remainingLovelace = lovelace
+            , remainingNativeAssets = nativeAssets
+            , terms = parsedDatum
+            }
+        Loans.Unlock -> 
+          return $ LoanResult
+            { isDefault = True
+            , remainingLovelace = lovelace
+            , remainingNativeAssets = nativeAssets
+            , terms = parsedDatum
+            }
+        _ -> Nothing
+  
 -------------------------------------------------
 -- Loan Wallet
 -------------------------------------------------
@@ -283,10 +324,9 @@ data LoanWallet = LoanWallet
   , utxos :: [LoanUTxO]
   , lovelace :: Lovelace
   , nativeAssets :: [NativeAsset]
-  -- | The transaction history for this loan address.
+  -- | The transaction history for this loan address. This includes transactions initiated
+  -- by lenders making/closing offers.
   , transactions :: [Transaction]
-  -- | All loan events taken.
-  , loanEvents :: [LoanEvent]
   -- | The wallet's credit history.
   , creditHistory :: [LoanResult]
   -- | Offer UTxOs for this staking credential used as a lender id. Only offer UTxOs are tracked.
@@ -317,7 +357,6 @@ instance Default LoanWallet where
     , lovelace = 0
     , nativeAssets = []
     , transactions = []
-    , loanEvents = []
     , creditHistory = []
     , offerUTxOs = []
     , offerTransactions = []
@@ -344,7 +383,6 @@ instance Creatable LoanWallet where
         , "lovelace INTEGER NOT NULL"
         , "native_assets BLOB"
         , "transactions BLOB"
-        , "loan_events BLOB"
         , "credit_history BLOB"
         , "offer_utxos BLOB"
         , "offer_transactions BLOB"
@@ -371,13 +409,12 @@ instance Insertable LoanWallet where
         , "lovelace"
         , "native_assets"
         , "transactions"
-        , "loan_events"
         , "credit_history"
         , "offer_utxos"
         , "offer_transactions"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 instance Notify LoanWallet where

@@ -151,7 +151,6 @@ processNewLoanWallet loanWalletId StakeWallet{..} = do
     , lovelace = 0
     , nativeAssets = []
     , transactions = []
-    , loanEvents = []
     , creditHistory = []
     , offerUTxOs = []
     , offerTransactions = []
