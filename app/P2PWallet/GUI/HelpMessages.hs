@@ -969,3 +969,25 @@ creditScoreMsg = unlines
   , ""
   , "An undefined score means this credential has not finished any loans yet."
   ]
+
+lenderOffersSortMsg :: Text
+lenderOffersSortMsg = unlines
+  [ "Loan offers can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Based on the offered loan amount"
+  , "3. Based on the loan's duration"
+  , "4. Chronologically based on the time the offer was created"
+  , "5. Based on the loan's interest rate"
+  ]
+
+activeLoansSortMsg :: Text
+activeLoansSortMsg = unlines
+  [ "Active loans can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Based on the outstanding loan balance"
+  , "3. Chronologically based on the time the UTxO was created"
+  , "4. Based on the loan's interest rate"
+  , "5. Based on the loan's next payment deadline"
+  , "6. Based on the loan's amount still owed before the next deadline"
+  ]
+

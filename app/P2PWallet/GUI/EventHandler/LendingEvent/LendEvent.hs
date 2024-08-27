@@ -109,8 +109,8 @@ handleLendEvent model@AppModel{..} evt = case evt of
           mPaymentWallet = maybeHead $ model ^. #knownWallets % #paymentWallets
        in case mPaymentWallet of
             Nothing -> 
-              [ Task $ runActionOrAlert (const AppInit) $ throwIO $ 
-                  AppError "You must first track a payment wallet before you can create an offer."
+              [ Event $ 
+                  Alert "You must first track a payment wallet before you can create an offer."
               ]
             Just paymentWallet ->
               [ Model $ model
