@@ -508,6 +508,16 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
           ]
       ]
 
+  -----------------------------------------------
+  -- Reset Filters
+  -----------------------------------------------
+  ResetBorrowTxFilters -> 
+    let newDefault = def & #dateRange % _1 ?~ addDays (-30) (config ^. #currentDay) in
+    [ Model $ model 
+        & #lendingModel % #borrowModel % #txFilterModel .~ newDefault 
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------

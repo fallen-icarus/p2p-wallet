@@ -15,6 +15,7 @@ module P2PWallet.Data.AppModel.LendingModel.BorrowModel
   , BorrowModel(..)
   , AcceptOfferEvent(..)
   , AcceptOfferScene(..)
+  , BorrowTxFilterModel(..)
 
   , module P2PWallet.Data.AppModel.LendingModel.BorrowModel.ActiveLoansFilterModel
   , module P2PWallet.Data.AppModel.LendingModel.BorrowModel.LenderOffersFilterModel
@@ -104,7 +105,23 @@ data BorrowEvent
   | CheckActiveLoansFilterModel
   -- | Reset the active loans fitler model.
   | ResetActiveLoansFilters
+  -- | Reset borrow tx filters.
+  | ResetBorrowTxFilters
 
+-------------------------------------------------
+-- Transaction Filter Model
+-------------------------------------------------
+data BorrowTxFilterModel = BorrowTxFilterModel
+  -- | The date range for displaying transactions.
+  { dateRange :: (Maybe Day, Maybe Day)
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''BorrowTxFilterModel
+
+instance Default BorrowTxFilterModel where
+  def = BorrowTxFilterModel
+    { dateRange = (Nothing,Nothing)
+    }
 -------------------------------------------------
 -- Borrow State
 -------------------------------------------------
@@ -136,6 +153,12 @@ data BorrowModel = BorrowModel
   , showActiveLoansFilter :: Bool
   -- | The active loans filter model.
   , activeLoansFilterModel :: ActiveLoansFilterModel
+  -- | Whether to show the filter widget for transactions.
+  , showTransactionFilter :: Bool
+  -- | The transaction filter model.
+  , txFilterModel :: BorrowTxFilterModel
+  -- | The transaction filter model scene.
+  , txFilterScene :: FilterScene
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''BorrowModel
@@ -155,4 +178,7 @@ instance Default BorrowModel where
     , inspectedLoan = Nothing
     , showActiveLoansFilter = False
     , activeLoansFilterModel = def
+    , showTransactionFilter = False
+    , txFilterModel = def
+    , txFilterScene = FilterScene
     }
