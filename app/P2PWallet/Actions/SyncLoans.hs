@@ -2,6 +2,7 @@ module P2PWallet.Actions.SyncLoans
   (
     syncLoanAsks
   , syncLoanHistory
+  , syncBorrowerInfo
   ) where
 
 import Data.Map.Strict qualified as Map
@@ -9,7 +10,7 @@ import Data.Map.Strict qualified as Map
 import P2PWallet.Actions.Query.Koios
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel.LendingModel
-import P2PWallet.Data.Core.Internal.Network
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Prelude
 
@@ -32,3 +33,17 @@ syncLoanHistory network loanId currentCache = do
 
   return $ currentCache
     & Map.insert loanId history
+
+syncBorrowerInfo 
+  :: Network 
+  -> Loans.BorrowerId 
+  -> PaymentAddress
+  -> CachedBorrowerInfo
+  -> IO CachedBorrowerInfo
+syncBorrowerInfo network borrowerId borrowerAddr currentCache = do
+  info <- runQueryBorrowerInformation network borrowerId borrowerAddr >>= 
+    -- Throw an error if syncing failed.
+    fromRightOrAppError
+
+  return $ currentCache
+    & Map.insert borrowerId info

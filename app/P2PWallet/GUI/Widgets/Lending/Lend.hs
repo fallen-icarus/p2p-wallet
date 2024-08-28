@@ -15,14 +15,32 @@ import P2PWallet.Prelude
 
 lendWidget :: AppModel -> AppNode
 lendWidget model@AppModel{lendingModel} = do
-    vstack 
-      [ spacer
-      , centerWidgetH lendSceneMenu
-      , spacer
-      , box_ [mergeRequired reqUpdate] (openOffersWidget model)
-          `nodeVisible` (lendingModel ^. #lendModel % #scene == OpenOffers)
-      , box_ [mergeRequired reqUpdate] (viewLoanRequestsWidget model)
-          `nodeVisible` (lendingModel ^. #lendModel % #scene == ViewLoanRequests)
+    zstack
+      [ vstack 
+          [ spacer
+          , centerWidgetH lendSceneMenu
+          , spacer
+          , box_ [mergeRequired reqUpdate] (openOffersWidget model)
+              `nodeVisible` (lendingModel ^. #lendModel % #scene == OpenOffers)
+          , box_ [mergeRequired reqUpdate] (viewLoanRequestsWidget model)
+              `nodeVisible` (lendingModel ^. #lendModel % #scene == ViewLoanRequests)
+          ]
+      -- The inspected borrower is here since only one borrower can be inspected at a time.
+      -- It doesn't make sense to move to other lend scenes while inspecting a borrower.
+      , inspectBorrowerWidget model
+          `nodeVisible` and
+            [ isJust $ lendingModel ^. #lendModel % #inspectedBorrower
+            -- Hide until after syncing is complete.
+            , not $ model ^. #waitingStatus % #syncingBorrowerInfo
+            ]
+      -- The inspected loan is here since only one loan can be inspected at a time.
+      -- It doesn't make sense to move to other borrower scenes while inspecting a loan.
+      , inspectLoanWidget model
+          `nodeVisible` and
+            [ isJust $ lendingModel ^. #lendModel % #inspectedLoan
+            -- Hide until after syncing is complete.
+            , not $ model ^. #waitingStatus % #syncingLoanHistory
+            ]
       ]
   where
     lendSceneButton :: Text -> LendScene -> AppNode

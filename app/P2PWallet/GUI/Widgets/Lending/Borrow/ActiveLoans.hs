@@ -428,8 +428,24 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
               label "Event History For Loan ID"
                 `styleBasic` [textFont "Italics", textColor customBlue]
           , spacer
-          , copyableLabelSelf (display targetId) lightGray 12
-          , spacer
+          , centerWidgetH $ hstack
+              [ copyableLabelSelf (display targetId) lightGray 12
+              , spacer_ [width 3]
+              , tooltip_ "Resync History" [tooltipDelay 0] $
+                  box_ [alignMiddle, onClick $ LendingEvent $ LookupLoanHistory $ StartProcess $ Just targetId] $
+                    label refreshIcon
+                      `styleBasic` 
+                        [ border 0 transparent
+                        , radius 20
+                        , bgColor transparent
+                        , textColor customBlue
+                        , textMiddle
+                        , textFont "Remix"
+                        , padding 3
+                        , textSize 12
+                        ]
+                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+              ]
           , flip styleBasic [padding 5] $ box $ vscroll_ [wheelRate 50] $ 
               vstack_ [childSpacing] (map eventRow history)
           , filler

@@ -13,6 +13,7 @@ module P2PWallet.Data.AppModel.LendingModel
   ( LendingScene(..)
   , LendingEvent(..)
   , LendingModel(..)
+  , CachedBorrowerInfo
   , CachedLoanHistories
 
   , module P2PWallet.Data.AppModel.LendingModel.BorrowModel
@@ -24,6 +25,8 @@ import Data.Map.Strict qualified as Map
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.LendingModel.BorrowModel
 import P2PWallet.Data.AppModel.LendingModel.LendModel
+import P2PWallet.Data.Core.BorrowerInformation
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Prelude
@@ -33,6 +36,12 @@ import P2PWallet.Prelude
 -------------------------------------------------
 -- | A type alias for a map from LoanId to loan event history.
 type CachedLoanHistories = Map.Map Loans.LoanId [LoanEvent]
+
+-------------------------------------------------
+-- Cached Borrower Information
+-------------------------------------------------
+-- | A type alias for a map from BorrowerId to BorrowerInformation.
+type CachedBorrowerInfo = Map.Map Loans.BorrowerId BorrowerInformation
 
 -------------------------------------------------
 -- Lending Scenes and Overlays
@@ -66,6 +75,8 @@ data LendingEvent
   | LendEvent LendEvent
   -- | Lookup a specific loan's event history.
   | LookupLoanHistory (ProcessEvent Loans.LoanId CachedLoanHistories)
+  -- | Lookup a specific borrower's information.
+  | LookupBorrowerInformation (ProcessEvent (Loans.BorrowerId,PaymentAddress) CachedBorrowerInfo)
 
 -------------------------------------------------
 -- Lending State
@@ -90,6 +101,8 @@ data LendingModel = LendingModel
   , lendModel :: LendModel
   -- | The cached loan histories.
   , cachedLoanHistories :: CachedLoanHistories
+  -- | The cached borrower information.
+  , cachedBorrowerInfo :: CachedBorrowerInfo
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''LendingModel
@@ -105,4 +118,5 @@ instance Default LendingModel where
     , borrowModel = def
     , lendModel = def
     , cachedLoanHistories = mempty
+    , cachedBorrowerInfo = mempty
     }

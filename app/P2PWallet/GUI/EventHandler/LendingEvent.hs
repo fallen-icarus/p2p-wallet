@@ -129,6 +129,23 @@ handleLendingEvent model@AppModel{..} evt = case evt of
           & #lendingModel % #cachedLoanHistories .~ newCachedLoanHistories
       ]
 
+  -----------------------------------------------
+  -- Sync Borrower Info
+  -----------------------------------------------
+  LookupBorrowerInformation modal -> case modal of
+    StartProcess mInfo ->
+      [ Model $ model & #waitingStatus % #syncingBorrowerInfo .~ True
+      , Task $ runActionOrAlert (LendingEvent . LookupBorrowerInformation . ProcessResults) $ do
+          (borrowerId, borrowerAddr) <- fromJustOrAppError "mInfo is Nothing"  mInfo
+          syncBorrowerInfo (config ^. #network) borrowerId borrowerAddr $ 
+            lendingModel ^. #cachedBorrowerInfo
+      ]
+    ProcessResults newCachedBorrowerInfo ->
+      [ Model $ model 
+          & #waitingStatus % #syncingBorrowerInfo .~ False
+          & #lendingModel % #cachedBorrowerInfo .~ newCachedBorrowerInfo
+      ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------

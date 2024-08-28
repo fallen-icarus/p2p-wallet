@@ -90,8 +90,8 @@ makeFieldLabelsNoPrefix ''LenderId
 -------------------------------------------------
 -- | A wrapper around the token name for a borrower id.
 newtype BorrowerId = BorrowerId { unBorrowerId :: TokenName }
-  deriving (Show,Eq)
-  deriving newtype (Display,ToData,FromData,UnsafeFromData,ToField,FromField,IsString)
+  deriving (Show)
+  deriving newtype (Eq,Ord,Display,ToData,FromData,UnsafeFromData,ToField,FromField,IsString)
 
 instance ToJSON BorrowerId where
   toJSON = toJSON . display

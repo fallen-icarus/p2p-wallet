@@ -27,7 +27,9 @@ import P2PWallet.Data.AppModel.LendingModel.LendModel.OpenOffersFilterModel
 import P2PWallet.Data.AppModel.LendingModel.LendModel.RequestsFilterModel
 import P2PWallet.Data.AppModel.LendingModel.LoanAskConfiguration
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -71,6 +73,14 @@ data LendEvent
   | CheckOpenOffersFilterModel
   -- | Reset the open offers fitler model.
   | ResetOpenOffersFilters
+  -- | Lookup borrower information.
+  | InspectProspectiveBorrowerInformation (Loans.BorrowerId, PaymentAddress)
+  -- | Stop inspecting the borrower's information.
+  | CloseInspectedProspectiveBorrowerInformation
+  -- | Inspect Target Loan's history.
+  | InspectTargetLoanHistory Loans.LoanId
+  -- | Stop inspecting the loan's history.
+  | CloseInspectedTargetLoanHistory
 
 -------------------------------------------------
 -- Lend Model
@@ -96,6 +106,10 @@ data LendModel = LendModel
   , openOffersFilterModel :: OpenOffersFilterModel
   -- | The new offer update.
   , newOfferUpdate :: Maybe (LoanUTxO,NewOfferCreation)
+  -- | Focused borrower.
+  , inspectedBorrower :: Maybe (Loans.BorrowerId,PaymentAddress)
+  -- | Focused loan history.
+  , inspectedLoan :: Maybe Loans.LoanId
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''LendModel
@@ -112,4 +126,6 @@ instance Default LendModel where
     , showOpenOffersFilter = False
     , openOffersFilterModel = def
     , newOfferUpdate = Nothing
+    , inspectedBorrower = Nothing
+    , inspectedLoan = Nothing
     }
