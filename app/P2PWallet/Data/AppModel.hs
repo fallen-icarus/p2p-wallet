@@ -90,6 +90,8 @@ data WaitingStatus = WaitingStatus
   , syncingLoanAsks :: Bool
   -- | The app is syncing the loan history for the selected loan.
   , syncingLoanHistory :: Bool
+  -- | The app is syncing the borrower's information.
+  , syncingBorrowerInfo :: Bool
   -- | The app is building the transaction.
   , building :: Bool
   -- | The app is loading the profile.
@@ -111,6 +113,7 @@ instance Default WaitingStatus where
     , syncingOrderBook = False
     , syncingLoanAsks = False
     , syncingLoanHistory = False
+    , syncingBorrowerInfo = False
     , building = False
     , loadingProfile = False
     , submitting = False

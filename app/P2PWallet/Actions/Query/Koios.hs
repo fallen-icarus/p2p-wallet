@@ -19,6 +19,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryLoanAsks
   , runQueryLoanHistory
   , runQueryBorrowerCreditHistory
+  , runQueryBorrowerInformation
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
@@ -45,6 +46,7 @@ import UnliftIO.Async (mapConcurrently,concurrently)
 
 import P2PWallet.Data.AppModel.LendingModel.LoanAskConfiguration
 import P2PWallet.Data.AppModel.LendingModel.LoanOfferConfiguration
+import P2PWallet.Data.Core.BorrowerInformation
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Koios.AddressUTxO
 import P2PWallet.Data.Koios.AssetTransaction
@@ -527,6 +529,57 @@ runQueryBorrowerCreditHistory network borrowerId = do
   manager <- newManager customTlsSettings
   let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
   first show <$> handleTimeoutError (runClientM (queryBorrowerCreditHistory borrowerId) env)
+
+runQueryBorrowerInformation 
+  :: Network 
+  -> Loans.BorrowerId 
+  -> PaymentAddress
+  -> IO (Either Text BorrowerInformation)
+runQueryBorrowerInformation network borrowerId borrowerAddress = do
+    (addrRes, historyRes) <- 
+      concurrently queryLoansWithRedundancies (runQueryBorrowerCreditHistory network borrowerId)
+
+    case (,) <$> addrRes <*> historyRes of
+      Right (addrUTxOs,history) -> do
+        let loanUTxOs = map fromAddressUTxO addrUTxOs
+            hasBeacon targetPolicy targetName = 
+              any $ \NativeAsset{policyId,tokenName} -> 
+                policyId == targetPolicy && tokenName == targetName
+            beaconCheck targetPolicy targetName = 
+              hasBeacon targetPolicy targetName . view #nativeAssets
+        return $ Right $ BorrowerInformation
+          { borrowerId = borrowerId
+          , loanAddress = borrowerAddress
+          , openAsks = 
+              filter (beaconCheck Loans.negotiationBeaconCurrencySymbol Loans.askBeaconName) $ 
+                filter (isJust . preview (#loanDatum % _Just % _AskDatum)) loanUTxOs
+          , currentOffers = 
+              filter (beaconCheck Loans.negotiationBeaconCurrencySymbol Loans.offerBeaconName) $ 
+                filter (isJust . preview (#loanDatum % _Just % _OfferDatum)) loanUTxOs
+          , activeLoans = 
+              filter (beaconCheck Loans.activeBeaconCurrencySymbol Loans.activeBeaconName) $ 
+                filter (isJust . preview (#loanDatum % _Just % _ActiveDatum)) loanUTxOs
+          , creditHistory = history
+          , showCreditHistory = False
+          , showOpenAsks = False
+          , showCurrentOffers = False
+          , showActiveLoans = False
+          }
+      Left err -> return $ Left err
+  where
+    -- Try to query the loan address' utxos.
+    fetchLoanUTxOs :: IO (Either Text [AddressUTxO])
+    fetchLoanUTxOs = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryAddressUTxOs [borrowerAddress]) env)
+
+    -- Since Koios instances may occassionally return incorrect UTxOs if they are not
+    -- close enough to the chain tip, this would mess with the wallet's notifications.
+    -- To account for this, the UTxOs are queried three times and compared. At least
+    -- two responses must match to move on. The redundant queries occur concurrently.
+    queryLoansWithRedundancies :: IO (Either Text [AddressUTxO])
+    queryLoansWithRedundancies = queryWithRedundancies fetchLoanUTxOs
 
 -------------------------------------------------
 -- Low-Level API

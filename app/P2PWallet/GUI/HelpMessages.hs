@@ -967,7 +967,10 @@ creditScoreMsg = unlines
   [ "The credit score is calculated by:"
   , "number of loans successfully repaid / number of loans"
   , ""
-  , "An undefined score means this credential has not finished any loans yet."
+  , unwords
+      [ "Current active loans are not included in this calculation, and an undefined"
+      , "score means this credential has not finished any loans yet."
+      ]
   ]
 
 lenderOffersSortMsg :: Text

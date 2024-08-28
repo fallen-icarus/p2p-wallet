@@ -332,6 +332,30 @@ handleLendEvent model@AppModel{..} evt = case evt of
               ]
           ]
 
+  -----------------------------------------------
+  -- Inspecting Borrower Info
+  -----------------------------------------------
+  InspectProspectiveBorrowerInformation borrower@(borrowerId,_) -> 
+    [ Model $ model & #lendingModel % #lendModel % #inspectedBorrower ?~ borrower 
+    , Event $ case Map.lookup borrowerId (lendingModel ^. #cachedBorrowerInfo) of
+        Nothing -> LendingEvent $ LookupBorrowerInformation $ StartProcess $ Just borrower
+        Just _ -> AppInit
+    ]
+  CloseInspectedProspectiveBorrowerInformation -> 
+    [ Model $ model & #lendingModel % #lendModel % #inspectedBorrower .~ Nothing ]
+
+  -----------------------------------------------
+  -- Inspecting Target Loan Histories
+  -----------------------------------------------
+  InspectTargetLoanHistory loanId -> 
+    [ Model $ model & #lendingModel % #lendModel % #inspectedLoan ?~ loanId 
+    , Event $ case Map.lookup loanId (lendingModel ^. #cachedLoanHistories) of
+        Nothing -> LendingEvent $ LookupLoanHistory $ StartProcess $ Just loanId
+        Just _ -> AppInit
+    ]
+  CloseInspectedTargetLoanHistory -> 
+    [ Model $ model & #lendingModel % #lendModel % #inspectedLoan .~ Nothing ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------

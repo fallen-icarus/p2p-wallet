@@ -109,6 +109,7 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.TxBuilderModel.UserWithdrawal
       P2PWallet.Data.Core.AddressBook
       P2PWallet.Data.Core.AssetMaps
+      P2PWallet.Data.Core.BorrowerInformation
       P2PWallet.Data.Core.Internal
       P2PWallet.Data.Core.Internal.AppError
       P2PWallet.Data.Core.Internal.Assets
