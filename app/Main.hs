@@ -43,6 +43,7 @@ main = do
               & #config % #currentTime .~ currentTime
               & #homeModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
               & #dexModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
+              & #lendingModel % #borrowModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
     startApp initModel handleEvent buildUI $ appCfg AppInit
 
   where
