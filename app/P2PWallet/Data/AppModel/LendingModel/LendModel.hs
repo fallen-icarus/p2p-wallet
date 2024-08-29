@@ -14,6 +14,7 @@ module P2PWallet.Data.AppModel.LendingModel.LendModel
   , LendScene(..)
   , LendEvent(..)
   , LendModel(..)
+  , LendTxFilterModel(..)
 
   , module P2PWallet.Data.AppModel.LendingModel.LendModel.OpenOffersFilterModel
   , module P2PWallet.Data.AppModel.LendingModel.LendModel.RequestsFilterModel
@@ -81,6 +82,29 @@ data LendEvent
   | InspectTargetLoanHistory Loans.LoanId
   -- | Stop inspecting the loan's history.
   | CloseInspectedTargetLoanHistory
+  -- | Reset lend tx filters.
+  | ResetLendTxFilters
+
+-------------------------------------------------
+-- Transaction Filter Model
+-------------------------------------------------
+data LendTxFilterModel = LendTxFilterModel
+  -- | The date range for displaying transactions.
+  { dateRange :: (Maybe Day, Maybe Day)
+  -- | The offer must offer the specified loan asset.
+  , loanAsset :: Text
+  -- | The offer must include these collateral assets. They are separated by newlines.
+  , collateral :: Text
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''LendTxFilterModel
+
+instance Default LendTxFilterModel where
+  def = LendTxFilterModel
+    { dateRange = (Nothing,Nothing)
+    , loanAsset = ""
+    , collateral = ""
+    }
 
 -------------------------------------------------
 -- Lend Model
@@ -110,6 +134,12 @@ data LendModel = LendModel
   , inspectedBorrower :: Maybe (Loans.BorrowerId,PaymentAddress)
   -- | Focused loan history.
   , inspectedLoan :: Maybe Loans.LoanId
+  -- | Whether to show the filter widget for transactions.
+  , showTransactionFilter :: Bool
+  -- | The transaction filter model.
+  , txFilterModel :: LendTxFilterModel
+  -- | The transaction filter model scene.
+  , txFilterScene :: FilterScene
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''LendModel
@@ -128,4 +158,7 @@ instance Default LendModel where
     , newOfferUpdate = Nothing
     , inspectedBorrower = Nothing
     , inspectedLoan = Nothing
+    , txFilterModel = def
+    , txFilterScene = FilterScene
+    , showTransactionFilter = False
     }

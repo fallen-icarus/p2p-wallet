@@ -122,6 +122,7 @@ instance Default BorrowTxFilterModel where
   def = BorrowTxFilterModel
     { dateRange = (Nothing,Nothing)
     }
+
 -------------------------------------------------
 -- Borrow State
 -------------------------------------------------

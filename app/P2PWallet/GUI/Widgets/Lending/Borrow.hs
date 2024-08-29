@@ -96,6 +96,11 @@ borrowWidget model@AppModel{lendingModel} = do
           lenderOffersFilterModelRequiresUpdate 
               (oldLending ^. #borrowModel % #lenderOffersFilterModel)
               (newLending ^. #borrowModel % #lenderOffersFilterModel)
+      | oldLending ^. #borrowModel % #txFilterModel /=
+        newLending ^. #borrowModel % #txFilterModel =
+          borrowerTxsRequiresUpdate
+              (oldLending ^. #borrowModel % #txFilterModel)
+              (newLending ^. #borrowModel % #txFilterModel)
       | otherwise = True
 
 -- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
@@ -120,4 +125,10 @@ lenderOffersFilterModelRequiresUpdate old new
   | old ^. #minDuration /= new ^. #minDuration = False
   | old ^. #maxDuration /= new ^. #maxDuration = False
   | old ^. #collateral /= new ^. #collateral = False
+  | otherwise = True
+
+-- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
+borrowerTxsRequiresUpdate :: BorrowTxFilterModel -> BorrowTxFilterModel -> Bool
+borrowerTxsRequiresUpdate old new
+  | old ^. #dateRange /= new ^. #dateRange = False
   | otherwise = True

@@ -1,4 +1,4 @@
-module P2PWallet.GUI.Widgets.Lending.Borrow.Transactions 
+module P2PWallet.GUI.Widgets.Lending.Lend.OfferHistory 
   ( 
     transactionsWidget
   ) where
@@ -8,6 +8,7 @@ import Data.Map.Strict qualified as Map
 import Data.Time.Format qualified as Time
 
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.AssetMaps
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets.LoanWallet
 import P2PWallet.Data.Core.Transaction
@@ -17,16 +18,17 @@ import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 transactionsWidget :: AppModel -> AppNode
 transactionsWidget model@AppModel{lendingModel} = do
     zstack 
-      [ noTransactions `nodeVisible` null transactions
-      , mainWidget model `nodeVisible` (transactions /= [])
+      [ noTransactions `nodeVisible` null offerTransactions
+      , mainWidget model `nodeVisible` (offerTransactions /= [])
       ]
   where
-    LoanWallet{transactions} = lendingModel ^. #selectedWallet 
+    LoanWallet{offerTransactions} = lendingModel ^. #selectedWallet 
 
     noTransactions :: AppNode
     noTransactions = centerWidget $
@@ -47,7 +49,7 @@ mainWidget model@AppModel{lendingModel=LendingModel{..},config,reverseTickerMap}
               , spacer_ [width 5]
               , tooltip_ "Filter/Search" [tooltipDelay 0] $
                   toggleButton_ menuSearchIcon
-                    (toLensVL $ #lendingModel % #borrowModel % #showTransactionFilter)
+                    (toLensVL $ #lendingModel % #lendModel % #showTransactionFilter)
                     [toggleButtonOffStyle toggleOffStyle]
                     `styleBasic`
                       [ border 0 transparent
@@ -71,7 +73,7 @@ mainWidget model@AppModel{lendingModel=LendingModel{..},config,reverseTickerMap}
                 label "No transactions found"
                  `styleBasic` [textFont "Italics"]
           ]
-      , txFilterWidget model `nodeVisible` (borrowModel ^. #showTransactionFilter)
+      , txFilterWidget model `nodeVisible` (model ^. #lendingModel % #lendModel % #showTransactionFilter)
       ]
   where
     toggleOffStyle :: Style
@@ -85,7 +87,7 @@ mainWidget model@AppModel{lendingModel=LendingModel{..},config,reverseTickerMap}
     today :: Day
     today = config ^. #currentDay
 
-    (mLowerDay,mUpperDay) = borrowModel ^. #txFilterModel % #dateRange
+    (mLowerDay,mUpperDay) = lendModel ^. #txFilterModel % #dateRange
 
     startTime :: POSIXTime
     startTime = maybe 0 (localTimeToPosixTime timeZone . beginningOfDay) mLowerDay
@@ -106,54 +108,36 @@ mainWidget model@AppModel{lendingModel=LendingModel{..},config,reverseTickerMap}
     withinDateRange Transaction{blockTime} =
       blockTime >= startTime && blockTime <= endTime
 
-    LoanWallet{loanAddress,transactions} = selectedWallet
+    LoanWallet{stakeCredential,offerTransactions} = selectedWallet
+    lenderId = Loans.genLenderId stakeCredential
 
     sample :: [Transaction]
-    sample = --applySearchFilter selectedWallet reverseTickerMap txFilterModel 
-      filter withinDateRange transactions
-
-    txAssetFluxWidget :: NativeAsset -> AppNode
-    txAssetFluxWidget NativeAsset{..} = do
-      let (fluxIcon,color)
-            | quantity < 0 = (upArrowIcon, customRed)
-            | otherwise = (downArrowIcon, customBlue)
-          (name,formattedQuantity) = case Map.lookup (policyId,tokenName) reverseTickerMap of
-            Nothing -> (display fingerprint, show quantity)
-            Just (tckr,decimal) -> (display tckr, show $ formatQuantity decimal quantity)
-      hstack_ [childSpacing_ 3]
-        [ label fluxIcon 
-            `styleBasic` 
-              [ textFont "Remix"
-              , textSize 8
-              , bgColor color
-              , padding 1
-              , radius 20
-              , textMiddle
-              ]
-        , copyableLabelSelf name 8 lightGray customBlue
-        , label formattedQuantity
-            `styleBasic` 
-              [ textSize 8, padding 3, radius 3, bgColor customGray3, textColor color]
-        ] `styleBasic` [bgColor customGray4, paddingT 2, paddingB 2, paddingL 2, paddingR 0]
+    sample = applySearchFilter reverseTickerMap lenderId (lendModel ^. #txFilterModel)
+           $ filter withinDateRange offerTransactions
 
     txRow :: Transaction -> AppNode
     txRow tx@Transaction{..} = do
-      let (adaFlux,assetFlux) = txValueFromWallet loanAddress tx
-          adaValueColor
-            | adaFlux >= 0 = customBlue
-            | otherwise = customRed
+      let (closedCount,createdCount,acceptedCount) = offerActionCount lenderId tx
       vstack
         [ hstack 
             [ copyableLabelSelf txHash 10 customBlue lightGray
+            -- , spacer_ [width 2]
+            -- , widgetIf (executedCount > 0) $ tooltip_ "Inspect Swap Executions" [tooltipDelay 0] $
+            --     button inspectIcon (DexEvent $ InspectDexTransaction tx)
+            --       `styleBasic` 
+            --         [ textSize 10
+            --         , textColor customBlue
+            --         , textFont "Remix"
+            --         , textMiddle
+            --         , padding 0
+            --         , paddingL 2
+            --         , paddingR 2
+            --         , bgColor transparent
+            --         , border 0 transparent
+            --         ]
+            --       `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             , filler
-            , label (display adaFlux)
-                `styleBasic` 
-                  [ textSize 10
-                  , textColor adaValueColor
-                  ]
-            ]
-        , hstack
-            [ label calendarIcon
+            , label calendarIcon
                 `styleBasic` 
                   [ textSize 10
                   , textColor customBlue
@@ -164,9 +148,9 @@ mainWidget model@AppModel{lendingModel=LendingModel{..},config,reverseTickerMap}
             , label (showLocalDate (config ^. #timeZone) blockTime)
                 `styleBasic` 
                   [ textSize 10
-                  , textColor lightGray
+                  , textColor white
                   ]
-            , spacer
+            , spacer_ [width 5]
             , label clockIcon
                 `styleBasic` 
                   [ textSize 10
@@ -178,18 +162,34 @@ mainWidget model@AppModel{lendingModel=LendingModel{..},config,reverseTickerMap}
             , label (showLocalTime (config ^. #timeZone) blockTime)
                 `styleBasic` 
                   [ textSize 10
+                  , textColor white
+                  ]
+            ]
+        , hstack
+            [ label (show closedCount <> " Offer(s) Closed")
+                `styleBasic` 
+                  [ textSize 10
+                  , textColor lightGray
+                  ]
+            , spacer_ [width 5]
+            , label "/"
+                `styleBasic` 
+                  [ textSize 10
+                  , textColor lightGray
+                  ]
+            , spacer_ [width 5]
+            , label (show createdCount <> " Offer(s) Created")
+                `styleBasic` 
+                  [ textSize 10
                   , textColor lightGray
                   ]
             , filler
-            , label (unwords ["Fee:", display fee])
+            , label (show acceptedCount <> " Offer(s) Accepted")
                 `styleBasic` 
-                  [ textSize 8
+                  [ textSize 10
                   , textColor lightGray
                   ]
-           ] 
-        , widgetIf (not $ null assetFlux) $ vstack_ [childSpacing_ 3] $ 
-            for (groupInto 2 assetFlux) $ \assetRow -> 
-              hstack_ [childSpacing_ 3] $ [filler] <> map txAssetFluxWidget assetRow
+            ]
         ] `styleBasic` 
             [ padding 10
             , bgColor customGray2
@@ -199,7 +199,7 @@ mainWidget model@AppModel{lendingModel=LendingModel{..},config,reverseTickerMap}
 
 txFilterWidget :: AppModel -> AppNode
 txFilterWidget model = do
-  let currentScene = model ^. #lendingModel % #borrowModel % #txFilterScene
+  let currentScene = model ^. #lendingModel % #lendModel % #txFilterScene
       offStyle = def 
         `styleBasic` [ bgColor customGray1 , textColor white ]
         `styleHover` [ textColor lightGray, border 1 customBlue ]
@@ -207,7 +207,7 @@ txFilterWidget model = do
     [ centerWidget $ hstack
         [ vstack
             [ vgrid
-                [ optionButton_ "Filter" FilterScene (toLensVL $ #lendingModel % #borrowModel % #txFilterScene) 
+                [ optionButton_ "Filter" FilterScene (toLensVL $ #lendingModel % #lendModel % #txFilterScene) 
                     [optionButtonOffStyle offStyle]
                     `styleBasic` 
                       [ bgColor customGray3
@@ -218,20 +218,32 @@ txFilterWidget model = do
                       , radiusBR 0
                       , border 1 black
                       ]
-                ] `styleBasic` [height 50]
+                , optionButton_ "Search" SearchScene (toLensVL $ #lendingModel % #lendModel % #txFilterScene) 
+                    [optionButtonOffStyle offStyle]
+                    `styleBasic` 
+                      [ bgColor customGray3
+                      , textColor customBlue
+                      , radiusBL 10
+                      , radiusTL 0
+                      , radiusTR 0
+                      , radiusBR 0
+                      , border 1 black
+                      ]
+                ] `styleBasic` [height 100]
             , filler
             ]
         , vstack
             [ vstack 
                 [ zstack
                     [ widgetIf (currentScene == FilterScene) filterWidget
+                    , widgetIf (currentScene == SearchScene) searchWidget
                     ]
                 , spacer
                 , hstack 
                     [ filler
-                    , button "Reset" $ LendingEvent $ BorrowEvent ResetBorrowTxFilters
+                    , button "Reset" $ LendingEvent $ LendEvent ResetLendTxFilters
                     , spacer
-                    , toggleButton "Confirm" (toLensVL $ #lendingModel % #borrowModel % #showTransactionFilter)
+                    , toggleButton "Confirm" (toLensVL $ #lendingModel % #lendModel % #showTransactionFilter)
                     ] `styleBasic` [padding 10]
                 ] `styleBasic`
                     [ bgColor customGray3
@@ -255,7 +267,7 @@ txFilterWidget model = do
   where
     filterWidget :: AppNode
     filterWidget = do
-      let rootLens = #lendingModel % #borrowModel % #txFilterModel
+      let rootLens = #lendingModel % #lendModel % #txFilterModel
       vstack
         [ spacer
         , box_ [alignMiddle] $
@@ -303,54 +315,169 @@ txFilterWidget model = do
             ]
         ]
 
--------------------------------------------------
--- Helper Lens
--------------------------------------------------
-lowerBoundText :: Lens' BorrowTxFilterModel Text
-lowerBoundText = lens getLowerBoundText setLowerBoundText
-  where
-    getLowerBoundText :: BorrowTxFilterModel -> Text
-    getLowerBoundText tx = 
-      maybe "" (toText . Time.formatTime Time.defaultTimeLocale "%m-%d-%Y") $ tx ^. #dateRange % _1
-
-    setLowerBoundText :: BorrowTxFilterModel -> Text -> BorrowTxFilterModel
-    setLowerBoundText tx date = 
-      tx & #dateRange % _1 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
-
-upperBoundText :: Lens' BorrowTxFilterModel Text
-upperBoundText = lens getLowerBoundText setLowerBoundText
-  where
-    getLowerBoundText :: BorrowTxFilterModel -> Text
-    getLowerBoundText tx = 
-      maybe "" (toText . Time.formatTime Time.defaultTimeLocale "%m-%d-%Y") $ tx ^. #dateRange % _2
-
-    setLowerBoundText :: BorrowTxFilterModel -> Text -> BorrowTxFilterModel
-    setLowerBoundText tx date = 
-      tx & #dateRange % _2 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
+    searchWidget :: AppNode
+    searchWidget = do
+      cushionWidgetH $ vstack
+        [ spacer
+        , box_ [alignMiddle] $
+            label "Search Settings"
+              `styleBasic` [textSize 14, textFont "Italics"]
+        , spacer
+        , hstack
+            [ box_ [alignMiddle, onClick $ Alert filterOfferTxByLoanAssetMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Loan Asset:"
+                `styleBasic` [textSize 12]
+            , spacer_ [width 5]
+            , textField_ (toLensVL $ #lendingModel % #lendModel % #txFilterModel % #loanAsset)
+                  [placeholder "ADA"]
+                `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            ]
+        , spacer
+        , hstack
+            [ box_ [alignMiddle, onClick $ Alert filterOfferTxByCollateralMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 3]
+            , label "Collateral Assets (separated with newlines)"
+                `styleBasic` [textSize 12]
+            ]
+        , spacer
+        , textArea (toLensVL $ #lendingModel % #lendModel % #txFilterModel % #collateral)
+            `styleBasic` [height 180, textSize 10, bgColor customGray1]
+            `styleFocus` [border 1 customBlue]
+        ]
 
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
--- | Calculate the net asset flux from this address in the transaction.
-txValueFromWallet :: PaymentAddress -> Transaction -> (Ada,[NativeAsset])
-txValueFromWallet addr Transaction{inputs,outputs} = 
-  let isFromAddress x = x ^. #paymentAddress == addr
-      addressInputs = filter isFromAddress inputs
-      addressOutputs = filter isFromAddress outputs
-      (spentLoves,spentAssets) = 
-        ( sum $ map (view #lovelace) addressInputs
-        , concatMap (map (over #quantity negate) . view #nativeAssets) addressInputs
-        )
-      (receivedLoves,receivedAssets) = 
-        ( sum $ map (view #lovelace) addressOutputs
-        , concatMap (view #nativeAssets) addressOutputs
-        )
-      noBeacons = \NativeAsset{policyId} -> and
-        [ policyId /= Loans.negotiationBeaconCurrencySymbol
-        , policyId /= Loans.activeBeaconCurrencySymbol
-        ]
-      assetChange = filter noBeacons $ sumNativeAssets $ spentAssets <> receivedAssets
-  in (toAda $ receivedLoves - spentLoves, assetChange)
+-- | (# Offers Closed, # Offers Created, # Offers Accepted).
+offerActionCount :: Loans.LenderId -> Transaction -> (Int,Int,Int)
+offerActionCount lenderId Transaction{plutusContracts,outputs} =
+    (closedCount, createdCount, acceptedCount)
+  where
+    checkSpend :: (Int,Int) -> TransactionPlutusContract -> (Int,Int)
+    checkSpend acc@(closed,accepted) TransactionPlutusContract{..} =
+     case decodeData @Loans.LoanRedeemer redeemer of
+        Nothing -> acc
+        Just r -> case r of
+          Loans.CloseOrUpdateOffer -> 
+            case datum >>= decodeData @Loans.OfferDatum of
+              Nothing -> acc
+              Just offerDatum -> 
+                if lenderId == offerDatum ^. #lenderId then
+                  (closed + 1, accepted)
+                else 
+                  acc
+          Loans.AcceptOffer ->
+            case datum >>= decodeData @Loans.OfferDatum of
+              Nothing -> acc
+              Just offerDatum -> 
+                if lenderId == offerDatum ^. #lenderId then
+                  (closed, accepted + 1)
+                else 
+                  acc
+          _ -> acc
+
+    (closedCount, acceptedCount) = foldl' checkSpend (0,0) plutusContracts
+
+    checkCreation :: Int -> TransactionUTxO -> Int
+    checkCreation acc TransactionUTxO{nativeAssets} =
+      let hasLenderId = flip any nativeAssets $ \NativeAsset{policyId,tokenName} -> and
+            [ policyId == Loans.negotiationBeaconCurrencySymbol
+            , tokenName == Loans.unLenderId lenderId
+            ]
+       in if hasLenderId then acc + 1 else acc
+
+    createdCount = foldl' checkCreation 0 outputs
+
+matchesUTxO 
+  :: ReverseTickerMap 
+  -> Loans.LenderId
+  -> LendTxFilterModel
+  -> TransactionUTxO 
+  -> Bool
+matchesUTxO reverseTickerMap lenderId LendTxFilterModel{..} TransactionUTxO{..} = 
+    and
+      [ matchesAsset [actualLoanAsset] loanAsset
+      , matchesAsset actualCollateral collateral
+      , offerDatum ^. #lenderId == lenderId 
+      ]
+  where
+    matchesAsset :: [NativeAsset] -> Text -> Bool
+    matchesAsset xs searchTarget
+      | searchTarget == "" = True
+      | otherwise = flip any xs $ \NativeAsset{..} -> or
+          [ display policyId <> "." <> display tokenName == searchTarget
+          , Just searchTarget ==
+              fmap (display . fst) (Map.lookup (policyId,tokenName) reverseTickerMap) 
+          , policyId == "" && searchTarget == "ADA"
+          ]
+
+    offerDatum = fromMaybe def $ inlineDatum >>= decodeData @Loans.OfferDatum
+
+    actualLoanAsset = toNativeAsset $ offerDatum ^. #loanAsset
+    actualCollateral =
+      map (toNativeAsset . fst) $ Loans.unCollateralization $ offerDatum ^. #collateralization 
+
+applySearchFilter 
+  :: ReverseTickerMap 
+  -> Loans.LenderId
+  -> LendTxFilterModel 
+  -> [Transaction] 
+  -> [Transaction]
+applySearchFilter reverseTickerMap lenderId filterModel xs
+  | filterModel ^. #loanAsset == "" && filterModel ^. #collateral == "" = xs
+  | otherwise = flip filter xs $ \Transaction{..} -> or
+      [ any (matchesUTxO reverseTickerMap lenderId filterModel) inputs
+      , any (matchesUTxO reverseTickerMap lenderId filterModel) outputs
+      ]
+
+-------------------------------------------------
+-- Helper Lens
+-------------------------------------------------
+lowerBoundText :: Lens' LendTxFilterModel Text
+lowerBoundText = lens getLowerBoundText setLowerBoundText
+  where
+    getLowerBoundText :: LendTxFilterModel -> Text
+    getLowerBoundText tx = 
+      maybe "" (toText . Time.formatTime Time.defaultTimeLocale "%m-%d-%Y") $ tx ^. #dateRange % _1
+
+    setLowerBoundText :: LendTxFilterModel -> Text -> LendTxFilterModel
+    setLowerBoundText tx date = 
+      tx & #dateRange % _1 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
+
+upperBoundText :: Lens' LendTxFilterModel Text
+upperBoundText = lens getLowerBoundText setLowerBoundText
+  where
+    getLowerBoundText :: LendTxFilterModel -> Text
+    getLowerBoundText tx = 
+      maybe "" (toText . Time.formatTime Time.defaultTimeLocale "%m-%d-%Y") $ tx ^. #dateRange % _2
+
+    setLowerBoundText :: LendTxFilterModel -> Text -> LendTxFilterModel
+    setLowerBoundText tx date = 
+      tx & #dateRange % _2 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
 
 -------------------------------------------------
 -- Helper Widgets
