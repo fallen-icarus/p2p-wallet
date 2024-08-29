@@ -421,11 +421,13 @@ runQueryLoanWallet loanWallet@LoanWallet{..} = do
       concurrently queryTxsConcurrently $ 
         concurrently queryLoansWithRedundancies queryOffersWithRedundancies
 
-    creditHistoryRes <- 
-      runQueryBorrowerCreditHistory network $ Loans.genBorrowerId stakeCredential
+    (creditHistoryRes, offerTxsRes) <- 
+      concurrently 
+        (runQueryBorrowerCreditHistory network $ Loans.genBorrowerId stakeCredential)
+        queryOfferTxsConcurrently
 
-    case (,,,) <$> txRes <*> loansRes <*> offerRes <*> creditHistoryRes of
-      Right (txs,loanUTxOs,offers,history) -> do
+    case (,,,,) <$> txRes <*> loansRes <*> offerRes <*> creditHistoryRes <*> offerTxsRes of
+      Right (txs,loanUTxOs,offers,history, offerTxs) -> do
         return $ Right $ loanWallet
           & #lovelace .~ sum (map (view #lovelace) loanUTxOs)
           & #utxos .~ map fromAddressUTxO loanUTxOs
@@ -433,6 +435,7 @@ runQueryLoanWallet loanWallet@LoanWallet{..} = do
           & #transactions %~ mappend (map P2P.toTransaction txs)
           & #offerUTxOs .~ map fromAddressUTxO offers
           & #creditHistory .~ history
+          & #offerTransactions %~ mappend (map P2P.toTransaction offerTxs)
       Left err -> return $ Left err
   where
     -- | Aggregate all native assets located at the wallet.
@@ -444,6 +447,11 @@ runQueryLoanWallet loanWallet@LoanWallet{..} = do
     -- Koios will return any transactions for that block or later.
     afterBlock :: Integer
     afterBlock = (+1) $ maybe 0 (view #blockHeight) $ maybeHead transactions
+
+    -- Add one to the blockHeight for the most recently recorded transaction for this wallet.
+    -- Koios will return any transactions for that block or later.
+    afterOfferBlock :: Maybe Integer
+    afterOfferBlock = (+1) . view #blockHeight <$> maybeHead offerTransactions
 
     -- Try to query the loan address' utxos.
     fetchLoanUTxOs :: IO (Either Text [AddressUTxO])
@@ -489,6 +497,31 @@ runQueryLoanWallet loanWallet@LoanWallet{..} = do
     queryTxsConcurrently :: IO (Either Text [Transaction])
     queryTxsConcurrently = do
       fetchTxHashes >>= \case
+        Left err -> return $ Left $ show err
+        Right hashes -> do
+          manager <- newManager customTlsSettings
+          let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+          bimap show concat . sequence <$> 
+            mapConcurrently 
+              (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
+              (groupInto 70 hashes)
+
+    -- Try to query the offer tx hashes since last time. If a timeout error occurs, just try 
+    -- again.
+    fetchOfferTxHashes :: IO (Either Text [Text])
+    fetchOfferTxHashes = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+          lenderId = Loans.unLenderId $ Loans.genLenderId stakeCredential
+          negotiationId = Loans.negotiationBeaconCurrencySymbol
+      first show <$> 
+        handleTimeoutError (runClientM (queryAssetTxHashes negotiationId lenderId afterOfferBlock) env)
+
+    -- Try to query the transaction info concurrently. The transactions are grouped together,
+    -- 50 per response, since some transactions can be quite large.
+    queryOfferTxsConcurrently :: IO (Either Text [Transaction])
+    queryOfferTxsConcurrently = do
+      fetchOfferTxHashes >>= \case
         Left err -> return $ Left $ show err
         Right hashes -> do
           manager <- newManager customTlsSettings
@@ -692,6 +725,7 @@ type KoiosApi
      :> QueryParam' '[Required] "_asset_policy" CurrencySymbol
      :> QueryParam' '[Required] "_asset_name" TokenName
      :> QueryParam' '[Required] "_history" Bool
+     :> QueryParam "_after_block_height" Integer
      :> Get '[JSON] [AssetTransaction]
 
   -- A version of asset_utxos that supports filtering AskUTxOs by what is in the datum.
@@ -1125,14 +1159,14 @@ queryLoanOffers LoanOfferConfiguration{..} = queryApi 0 []
       ]
 
 -- Query all transactions involving a given asset.
-queryAssetTxHashes :: CurrencySymbol -> TokenName -> ClientM [Text]
-queryAssetTxHashes policyId name = queryHashes 0 []
+queryAssetTxHashes :: CurrencySymbol -> TokenName -> Maybe Integer -> ClientM [Text]
+queryAssetTxHashes policyId name mAfterBlock = queryHashes 0 []
   where
     queryHashes :: OffsetParam -> [Text] -> ClientM [Text]
     queryHashes offset !acc = do
       hashes <- map (view #txHash) <$>
         -- Only fetch the "tx_hash" column.
-        assetTxHistoryApi "tx_hash" policyId name True
+        assetTxHistoryApi "tx_hash" policyId name True mAfterBlock
       if length hashes == 1000 then 
         -- Query again since there may be more.
         queryHashes (offset + 1000) $ acc <> hashes
@@ -1143,7 +1177,7 @@ queryAssetTxHashes policyId name = queryHashes 0 []
 -- | Query all transactions for a specific loan id.
 queryLoanTxHistory :: Loans.LoanId -> ClientM [LoanEvent]
 queryLoanTxHistory i@(Loans.LoanId loanId) = do
-    info <- queryAssetTxHashes Loans.activeBeaconCurrencySymbol loanId >>= 
+    info <- queryAssetTxHashes Loans.activeBeaconCurrencySymbol loanId Nothing >>= 
       eventTxInfoApi select "block_height.asc" . TxHashes
     return $ mapMaybe (toLoanEvent i) info
   where

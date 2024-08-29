@@ -994,3 +994,29 @@ activeLoansSortMsg = unlines
   , "6. Based on the loan's amount still owed before the next deadline"
   ]
 
+filterOfferTxByLoanAssetMsg :: Text
+filterOfferTxByLoanAssetMsg = unlines
+  [ "Show only transactions with offers for the specified loan asset."
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+filterOfferTxByCollateralMsg :: Text
+filterOfferTxByCollateralMsg = unlines
+  [ unwords
+      [ "Show only transactions with offers using the specified collateral asset."
+      , "The names must be separated by newlines."
+      ]
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]

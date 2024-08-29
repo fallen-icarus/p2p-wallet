@@ -9,6 +9,7 @@ import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.GUI.Widgets.Lending.Lend.OfferHistory
 import P2PWallet.GUI.Widgets.Lending.Lend.OpenOffers
 import P2PWallet.GUI.Widgets.Lending.Lend.ViewLoanRequests
 import P2PWallet.Prelude
@@ -24,6 +25,8 @@ lendWidget model@AppModel{lendingModel} = do
               `nodeVisible` (lendingModel ^. #lendModel % #scene == OpenOffers)
           , box_ [mergeRequired reqUpdate] (viewLoanRequestsWidget model)
               `nodeVisible` (lendingModel ^. #lendModel % #scene == ViewLoanRequests)
+          , box_ [mergeRequired reqUpdate] (transactionsWidget model)
+              `nodeVisible` (lendingModel ^. #lendModel % #scene == OfferHistory)
           ]
       -- The inspected borrower is here since only one borrower can be inspected at a time.
       -- It doesn't make sense to move to other lend scenes while inspecting a borrower.
@@ -82,6 +85,11 @@ lendWidget model@AppModel{lendingModel} = do
           openOffersFilterModelRequiresUpdate 
               (oldLending ^. #lendModel % #openOffersFilterModel)
               (newLending ^. #lendModel % #openOffersFilterModel)
+      | oldLending ^. #lendModel % #txFilterModel /=
+        newLending ^. #lendModel % #txFilterModel =
+          offerHistoryRequiresUpdate
+              (oldLending ^. #lendModel % #txFilterModel)
+              (newLending ^. #lendModel % #txFilterModel)
       | otherwise = True
 
 -- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
@@ -95,4 +103,12 @@ openOffersFilterModelRequiresUpdate old new
   | old ^. #minDuration /= new ^. #minDuration = False
   | old ^. #maxDuration /= new ^. #maxDuration = False
   | old ^. #collateral /= new ^. #collateral = False
+  | otherwise = True
+
+-- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
+offerHistoryRequiresUpdate :: LendTxFilterModel -> LendTxFilterModel -> Bool
+offerHistoryRequiresUpdate old new
+  | old ^. #loanAsset /= new ^. #loanAsset = False
+  | old ^. #collateral /= new ^. #collateral = False
+  | old ^. #dateRange /= new ^. #dateRange = False
   | otherwise = True

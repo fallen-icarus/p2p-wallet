@@ -356,6 +356,16 @@ handleLendEvent model@AppModel{..} evt = case evt of
   CloseInspectedTargetLoanHistory -> 
     [ Model $ model & #lendingModel % #lendModel % #inspectedLoan .~ Nothing ]
 
+  -----------------------------------------------
+  -- Reset Filters
+  -----------------------------------------------
+  ResetLendTxFilters -> 
+    let newDefault = def & #dateRange % _1 ?~ addDays (-30) (config ^. #currentDay) in
+    [ Model $ model 
+        & #lendingModel % #lendModel % #txFilterModel .~ newDefault 
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
