@@ -409,3 +409,80 @@ handleLoanBuilderEvent model@AppModel{..} evt = case evt of
     , Task $ return $ Alert "Successfully removed from builder!"
     ]
 
+  -----------------------------------------------
+  -- Remove Expired Claim from Builder
+  -----------------------------------------------
+  RemoveSelectedExpiredClaim idx ->
+    [ Model $ model 
+        & #txBuilderModel % #loanBuilderModel % #expiredClaims %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Remove Loan Key Burn from Builder
+  -----------------------------------------------
+  RemoveSelectedLoanKeyBurn idx ->
+    [ Model $ model 
+        & #txBuilderModel % #loanBuilderModel % #keyBurns %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Remove Lender Address Update from Builder
+  -----------------------------------------------
+  RemoveSelectedLenderAddressUpdate idx ->
+    [ Model $ model 
+        & #txBuilderModel % #loanBuilderModel % #addressUpdates %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Edit the Lender Address Update
+  -----------------------------------------------
+  EditSelectedLenderAddressUpdate modal -> case modal of
+    StartAdding mTarget ->
+      [ Model $ model & #txBuilderModel % #loanBuilderModel % #targetAddressUpdate .~ 
+          fmap (fmap toNewLenderAddressUpdate) mTarget
+      ]
+    CancelAdding ->
+      [ Model $ model & #txBuilderModel % #loanBuilderModel % #targetAddressUpdate .~ Nothing ]
+    ConfirmAdding ->
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (loanBuilderEvent . EditSelectedLenderAddressUpdate . AddResult) $ do
+          (idx,newUpdate) <-
+            fromJustOrAppError "Nothing set for `targetAddressUpdate`" $ 
+              txBuilderModel ^. #loanBuilderModel % #targetAddressUpdate
+
+          verifiedUpdate <- fromRightOrAppError $ 
+            verifyNewLenderAddressUpdate (config ^. #currentTime) newUpdate
+
+          -- There will be two outputs for this action: the collateral output and the lender
+          -- output with the new Key NFT. The first value in the list is for the collateral
+          -- output. 
+          minValues <- calculateMinUTxOValue 
+            (config ^. #network) 
+            (txBuilderModel ^? #parameters % _Just % _1) 
+            -- Use a blank loanBuilderModel to calculate the minUTxOValue for the new payment.
+            (emptyLoanBuilderModel & #addressUpdates .~ [(0,verifiedUpdate)])
+
+          updatedVerifiedUpdate <- fromRightOrAppError $ 
+            updateLenderAddressDeposit verifiedUpdate minValues
+
+          return (idx,updatedVerifiedUpdate)
+      ]
+    AddResult (idx,verifiedUpdate) ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          & #txBuilderModel % #loanBuilderModel % #addressUpdates % ix idx % _2 .~ 
+              verifiedUpdate
+          & #txBuilderModel % #loanBuilderModel % #targetAddressUpdate .~ Nothing
+          & #txBuilderModel %~ balanceTx
+      , Event $ Alert $ unlines
+          [ "Successfully added to builder!"
+          , ""
+          , createLenderAddressDepositMsg verifiedUpdate
+          ]
+      ]

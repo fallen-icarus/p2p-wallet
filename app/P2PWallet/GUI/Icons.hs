@@ -197,3 +197,9 @@ paymentIcon = remixSecurePaymentLine
 
 claimCollateralIcon :: Text
 claimCollateralIcon = remixSafeLine
+
+burnIcon :: Text
+burnIcon = remixEraserLine
+
+updatePaymentAddressIcon :: Text
+updatePaymentAddressIcon = remixShareForwardLine

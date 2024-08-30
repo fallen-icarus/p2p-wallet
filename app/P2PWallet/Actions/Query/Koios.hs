@@ -17,7 +17,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryDexWallet
   , runQueryLoanWallet
   , runQueryLoanAsks
-  , runQueryLoanHistory
+  , runQuerySpecificLoan
   , runQueryBorrowerCreditHistory
   , runQueryBorrowerInformation
   ) where
@@ -550,11 +550,29 @@ runQueryLoanAsks network loanAskCfg = do
         handleTimeoutError (runClientM (queryLoanAsks loanAskCfg) env)
 
 -- | Query the event history for a particular loan.
-runQueryLoanHistory :: Network -> Loans.LoanId -> IO (Either Text [LoanEvent])
-runQueryLoanHistory network loanId = do
-  manager <- newManager customTlsSettings
-  let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
-  first show <$> handleTimeoutError (runClientM (queryLoanTxHistory loanId) env)
+runQuerySpecificLoan 
+  :: Network 
+  -> Loans.LoanId 
+  -> IO (Either Text ([LoanEvent], Maybe LoanUTxO))
+runQuerySpecificLoan network loanId = do
+    (historyRes, stateRes) <- concurrently fetchEventHistory
+      (fmap (fmap fromAddressUTxO) . fmap maybeHead <$> fetchLoanState)
+
+    return $ (,) <$> historyRes <*> stateRes
+  where
+    -- Try to query the loan event history.
+    fetchEventHistory :: IO (Either Text [LoanEvent])
+    fetchEventHistory = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryLoanTxHistory loanId) env)
+
+    -- Try to query the current loan state.
+    fetchLoanState :: IO (Either Text [AddressUTxO])
+    fetchLoanState = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (querySpecificLoanUTxO loanId) env)
 
 -- | Query the credit history for a particular borrower.
 runQueryBorrowerCreditHistory :: Network -> Loans.BorrowerId -> IO (Either Text [LoanResult])
@@ -1208,4 +1226,50 @@ queryBorrowerCreditHistory b@(Loans.BorrowerId borrowerId) = do
       , "outputs"
       , "assets_minted"
       , "plutus_contracts"
+      ]
+
+querySpecificLoanUTxO :: Loans.LoanId -> ClientM [AddressUTxO]
+querySpecificLoanUTxO (Loans.LoanId loanId) = queryApi 0 []
+  where
+    activeBeaconTarget = mkNativeAsset Loans.activeBeaconCurrencySymbol Loans.activeBeaconName
+
+    assetFilter :: Maybe AssetListFilterParam
+    assetFilter = Just 
+                $ AssetListFilterParam 
+                $ "cs." <> assetToQueryParam activeBeaconTarget
+
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- assetUTxOsApi select offset "eq.false" assetFilter $ 
+        AssetList [(Loans.activeBeaconCurrencySymbol, loanId)]
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+    assetToQueryParam :: NativeAsset -> Text
+    assetToQueryParam NativeAsset{policyId,tokenName} = mconcat
+      [ "[{\"policy_id\":\""
+      , display policyId
+      , "\",\"asset_name\":\""
+      , display tokenName
+      , "\"}]"
+      ]
+
+    select :: SelectParam
+    select = fromString $ intercalate ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
       ]

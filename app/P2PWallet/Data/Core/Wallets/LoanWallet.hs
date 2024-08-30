@@ -214,6 +214,14 @@ data LoanEvent = LoanEvent
 
 makeFieldLabelsNoPrefix ''LoanEvent
 
+instance Default LoanEvent where
+  def = LoanEvent
+    { loanId = ""
+    , timeStamp = 0
+    , state = Nothing
+    , event = Right Loans.AcceptOffer
+    }
+
 instance Ord LoanEvent where
   event1 <= event2
     | event1 ^. #loanId == event2 ^. #loanId = event1 ^. #timeStamp <= event2 ^. #timeStamp
@@ -448,30 +456,18 @@ instance Insertable LoanWallet where
 
 instance Notify LoanWallet where
   notify oldState newState
-    | asksOnly (oldState ^. #utxos) /= asksOnly (newState ^. #utxos) = Just $ Notification
-        { notificationType = LoanNotification
-        , alias = oldState ^. #alias
-        , message = "Ask statuses have changed."
-        , markedAsRead = False
-        }
-    | offersOnly (oldState ^. #utxos) /= offersOnly (newState ^. #utxos) = Just $ Notification
-        { notificationType = LoanNotification
-        , alias = oldState ^. #alias
-        , message = "Offers from lenders have changed."
-        , markedAsRead = False
-        }
-    | activeOnly (oldState ^. #utxos) /= activeOnly (newState ^. #utxos) = Just $ Notification
-        { notificationType = LoanNotification
-        , alias = oldState ^. #alias
-        , message = "Active loan statuses have changed."
-        , markedAsRead = False
-        }
-    | oldState ^. #offerUTxOs /= newState ^. #offerUTxOs = Just $ Notification
-        { notificationType = LoanNotification
-        , alias = oldState ^. #alias
-        , message = "Offers to borrowers have changed."
-        , markedAsRead = False
-        }
+    | oldState ^. #utxos /= newState ^. #utxos || oldState ^. #offerUTxOs /= newState ^. #offerUTxOs =
+        Just $ Notification
+          { notificationType = LoanNotification
+          , alias = oldState ^. #alias
+          , message = unlines $ filter (/= "") 
+              [ asksMsg
+              , borrowerOffersMsg
+              , lenderOffersMsg
+              , activesMsg
+              ]
+          , markedAsRead = False
+          }
     | otherwise = Nothing
     where
       asksOnly :: [LoanUTxO] -> [TxOutRef]
@@ -482,3 +478,27 @@ instance Notify LoanWallet where
 
       activeOnly :: [LoanUTxO] -> [TxOutRef]
       activeOnly = map (view #utxoRef) . filter (isJust . preview (#loanDatum % _Just % _ActiveDatum))
+
+      asksMsg :: Text
+      asksMsg
+        | asksOnly (oldState ^. #utxos) /= asksOnly (newState ^. #utxos) = 
+            "Ask statuses have changed."
+        | otherwise = ""
+
+      borrowerOffersMsg :: Text
+      borrowerOffersMsg
+        | offersOnly (oldState ^. #utxos) /= offersOnly (newState ^. #utxos) = 
+            "Offers from lenders have changed."
+        | otherwise = ""
+
+      activesMsg :: Text
+      activesMsg
+        | activeOnly (oldState ^. #utxos) /= activeOnly (newState ^. #utxos) = 
+            "Active loan statuses have changed."
+        | otherwise = ""
+
+      lenderOffersMsg :: Text
+      lenderOffersMsg
+        | oldState ^. #offerUTxOs /= newState ^. #offerUTxOs = 
+            "Offers to borrowers have changed."
+        | otherwise = ""

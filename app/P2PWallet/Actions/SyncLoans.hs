@@ -27,12 +27,12 @@ syncLoanAsks network askCfg currentCache = do
 
 syncLoanHistory :: Network -> Loans.LoanId -> CachedLoanHistories -> IO CachedLoanHistories
 syncLoanHistory network loanId currentCache = do
-  history <- runQueryLoanHistory network loanId >>= 
+  (history,mUTxO) <- runQuerySpecificLoan network loanId >>= 
     -- Throw an error if syncing failed.
     fromRightOrAppError
 
   return $ currentCache
-    & Map.insert loanId history
+    & Map.insert loanId (history, mUTxO)
 
 syncBorrowerInfo 
   :: Network 

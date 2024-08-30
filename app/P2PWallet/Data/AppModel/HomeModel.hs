@@ -12,9 +12,11 @@ The Home scene is dedicated to `PaymentWallet`s.
 module P2PWallet.Data.AppModel.HomeModel where
 
 import P2PWallet.Data.AppModel.Common
+import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LenderAddressUpdate
 import P2PWallet.Data.Core.Internal.Bech32Address
 import P2PWallet.Data.Core.Transaction
 import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -71,6 +73,16 @@ data HomeEvent
   | AddSelectedCollateralInput PersonalUTxO
   -- | Add the selected change address to the tx builder.
   | AddSelectedChangeAddress PaymentAddress
+  -- | Inspect loan for corresponding key nft.
+  | InspectCorrespondingLoan Loans.LoanId
+  -- | Stop inspecting the loan's history.
+  | CloseInspectedCorrespondingLoan
+  -- | Claim collateral from an expired loan.
+  | ClaimExpiredCollateral LoanUTxO
+  -- | Burn leftover Key NFT.
+  | BurnLoanKeyNFT Loans.LoanId
+  -- | Update lender payment address.
+  | UpdateLenderPaymentAddress (AddEvent LoanUTxO LenderAddressUpdate)
 
 -------------------------------------------------
 -- UTxO Filter Model
@@ -123,9 +135,16 @@ instance Default UTxOFilterModel where
 -------------------------------------------------
 -- Asset Filter Model
 -------------------------------------------------
-newtype AssetFilterModel = AssetFilterModel
+-- | The types of Key NFTs.
+data KeyNftType
+  = LoanKey
+  | OptionsKey
+  deriving (Show,Eq)
+
+data AssetFilterModel = AssetFilterModel
   -- | The targets to search for.
   { search :: Text
+  , keyNftType :: Maybe KeyNftType
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''AssetFilterModel
@@ -133,6 +152,7 @@ makeFieldLabelsNoPrefix ''AssetFilterModel
 instance Default AssetFilterModel where
   def = AssetFilterModel
     { search = ""
+    , keyNftType = Nothing
     }
 
 -------------------------------------------------
@@ -191,6 +211,10 @@ data HomeModel = HomeModel
   , txFilterScene :: FilterScene
   -- | The text field where new aliases are entered.
   , newAliasField :: Text
+  -- | Focused loan history.
+  , inspectedLoan :: Maybe Loans.LoanId
+  -- | The new loan address update.
+  , newLenderAddressUpdate :: Maybe NewLenderAddressUpdate
   } deriving (Eq,Show)
 
 instance Default HomeModel where
@@ -212,6 +236,8 @@ instance Default HomeModel where
     , showTransactionFilter = False
     , txFilterScene = FilterScene
     , newAliasField = ""
+    , inspectedLoan = Nothing
+    , newLenderAddressUpdate = Nothing
     }
 
 makeFieldLabelsNoPrefix ''HomeModel

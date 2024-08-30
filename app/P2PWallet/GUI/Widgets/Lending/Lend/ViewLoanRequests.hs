@@ -1661,7 +1661,7 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
     targetId = fromMaybe "" $ lendModel ^. #inspectedLoan
 
     history :: [LoanEvent]
-    history = fromMaybe [] $ Map.lookup targetId cachedLoanHistories
+    history = maybe [] fst $ Map.lookup targetId cachedLoanHistories
 
     explainEvent :: LoanEvent -> Text
     explainEvent LoanEvent{state=eventState, event, timeStamp} =

@@ -10,9 +10,11 @@ import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.MonomerOptics()
+import P2PWallet.GUI.Widgets.Home.NativeAssets.LoanKeys
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
@@ -88,6 +90,12 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
                  `styleBasic` [textFont "Italics"]
           ]
       , assetFilterWidget model `nodeVisible` (homeModel ^. #showAssetFilter)
+      , inspectLoanWidget model
+          `nodeVisible` and
+            [ isJust $ homeModel ^. #inspectedLoan
+            -- Hide until after syncing is complete.
+            , not $ model ^. #waitingStatus % #syncingLoanHistory
+            ]
       ]
   where
     wallet :: PaymentWallet
@@ -116,7 +124,13 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
           `styleHover`
             [ bgColor lightGray ]
 
-    AssetFilterModel{search=searchTarget} = homeModel ^. #assetFilterModel
+    AssetFilterModel{search=searchTarget,keyNftType} = homeModel ^. #assetFilterModel
+
+    keyNftFilter :: [NativeAsset] -> [NativeAsset]
+    keyNftFilter xs = case keyNftType of
+      Nothing -> xs
+      Just LoanKey -> filter ((Loans.activeBeaconCurrencySymbol==) . view #policyId) xs
+      Just OptionsKey -> xs
 
     searchFilter :: [NativeAsset] -> [NativeAsset]
     searchFilter xs
@@ -130,7 +144,7 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
           ]
 
     sample :: [NativeAsset]
-    sample = searchFilter allAssets
+    sample = keyNftFilter $ searchFilter allAssets
 
     -- This is the actual asset information.
     assetRow :: NativeAsset -> AppNode
@@ -139,10 +153,31 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
           utxoCount = length 
                     $ filter (elem fingerprint . map (view #fingerprint) . view #nativeAssets) 
                     $ wallet ^. #utxos
+          loanHistoryEvt = HomeEvent $ InspectCorrespondingLoan (Loans.LoanId tokenName)
       vstack
         [ hstack 
             [ copyableLabelMain (display fingerprint)
                 `styleBasic` [textSize 10]
+            , widgetIf (policyId == Loans.activeBeaconCurrencySymbol) $ hstack
+                [ spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ 
+                    tooltip_ ("Loan ID: " <> display tokenName) [tooltipDelay 0] $
+                      box_ [alignMiddle , onClick loanHistoryEvt] $
+                        label idCardIcon
+                          `styleBasic` 
+                            [ bgColor black
+                            , textMiddle
+                            , textFont "Remix"
+                            , textSize 8
+                            , textColor customBlue
+                            , paddingT 1
+                            , paddingB 1
+                            , paddingL 3
+                            , paddingR 3
+                            , radius 5
+                            ]
+                          `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                ]
             , filler
               -- Show the asset name with the ticker if set. Do not use the fingerprint otherwise.
             , label (showAssetBalance False reverseTickerMap a)
@@ -175,13 +210,50 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
 
 assetFilterWidget :: AppModel -> AppNode
 assetFilterWidget _ = do
+  let rootLens = #homeModel % #assetFilterModel
+      offStyle = def 
+        `styleBasic` [ bgColor customGray1 , textColor white ]
+        `styleHover` [ bgColor customBlue ]
+      choiceButton caption field targetLens =
+        centerWidgetV $ optionButton_ caption field targetLens
+          [optionButtonOffStyle offStyle]
+          `styleBasic` 
+            [ bgColor customBlue
+            , textColor white
+            , radius 10
+            , border 1 black
+            , paddingT 2
+            , paddingB 2
+            , paddingL 7
+            , paddingR 7
+            , textSize 12
+            ]
   vstack
     [ centerWidget $ vstack
-        [ centerWidget $ label "DeFi Filters - Finding Key NFTs for p2p protocols"
-        , filler
+        [ spacer_ [width 30]
+        , centerWidgetH $ label "DeFi Filters - Finding Key NFTs for p2p protocols"
+        , spacer
+        , centerWidgetH $ hstack_ [childSpacing]
+            [ label "Key NFT:"
+            , choiceButton "Loan" (Just LoanKey) (toLensVL $ rootLens % #keyNftType)
+            , choiceButton "Options" (Just OptionsKey) (toLensVL $ rootLens % #keyNftType)
+            , choiceButton "Any" Nothing (toLensVL $ rootLens % #keyNftType)
+            , mainButton helpIcon (Alert "Is the asset a Key NFT and if so, what kind?")
+                `styleBasic`
+                  [ border 0 transparent
+                  , radius 20
+                  , bgColor transparent
+                  , textColor customBlue
+                  , textMiddle
+                  , textFont "Remix"
+                  , padding 0
+                  ]
+                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            ] `styleBasic` [height 30]
+        , spacer_ [width 30]
         , hstack 
             [ filler
-            , button "Reset" $ HomeEvent ResetUTxOFilters
+            , button "Reset" $ HomeEvent ResetAssetFilters
             , spacer
             , toggleButton "Confirm" (toLensVL $ #homeModel % #showAssetFilter)
             ] `styleBasic` [padding 10]

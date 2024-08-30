@@ -4,9 +4,11 @@ module P2PWallet.GUI.EventHandler.HomeEvent
   ) where
 
 import Monomer
+import Data.Map.Strict qualified as Map
 
 import P2PWallet.Actions.AddWallet
 import P2PWallet.Actions.BalanceTx
+import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
@@ -324,6 +326,119 @@ handleHomeEvent model@AppModel{..} evt = case evt of
         , Task $ return $ Alert "Successfully added to builder!"
         ]
 
+  -----------------------------------------------
+  -- Inspecting Correpsonding Loan
+  -----------------------------------------------
+  InspectCorrespondingLoan loanId -> 
+    [ Model $ model & #homeModel % #inspectedLoan ?~ loanId 
+    , Event $ case Map.lookup loanId (lendingModel ^. #cachedLoanHistories) of
+        Nothing -> LendingEvent $ LookupLoanHistory $ StartProcess $ Just loanId
+        Just _ -> AppInit
+    ]
+  CloseInspectedCorrespondingLoan -> 
+    [ Model $ model & #homeModel % #inspectedLoan .~ Nothing ]
+
+  -----------------------------------------------
+  -- Add Expired Collateral claim to builder
+  -----------------------------------------------
+  ClaimExpiredCollateral loanUTxO ->
+    let PaymentWallet{network,alias} = homeModel ^. #selectedWallet
+        newInput = loanUTxOToExpiredClaim 
+          network 
+          alias 
+          Nothing 
+          Nothing 
+          (config ^. #currentTime) 
+          loanUTxO
+     in case processNewExpiredClaim newInput txBuilderModel of
+          Left err -> [ Task $ return $ Alert err ]
+          Right newTxModel -> 
+            if hasOnlyOneActiveBeaconAction $ newTxModel ^. #loanBuilderModel then
+              [ Model $ model & #txBuilderModel .~ newTxModel
+              , Task $ return $ Alert "Successfully added to builder!"
+              ]
+            else
+              [ Event $ Alert onlyOneActiveBeaconActionError ]
+
+  -----------------------------------------------
+  -- Add Loan Key Burn to builder
+  -----------------------------------------------
+  BurnLoanKeyNFT loanId ->
+    let PaymentWallet{network,alias} = homeModel ^. #selectedWallet
+        newInput = loanIdToLoanKeyBurn network alias loanId
+     in case processNewLoanKeyBurn newInput txBuilderModel of
+          Left err -> [ Task $ return $ Alert err ]
+          Right newTxModel -> 
+            if hasOnlyOneActiveBeaconAction $ newTxModel ^. #loanBuilderModel then
+              [ Model $ model & #txBuilderModel .~ newTxModel
+              , Task $ return $ Alert "Successfully added to builder!"
+              ]
+            else
+              [ Event $ Alert onlyOneActiveBeaconActionError ]
+
+  -----------------------------------------------
+  -- Change Loan Payment Address
+  -----------------------------------------------
+  UpdateLenderPaymentAddress modal -> case modal of
+    StartAdding mLoanUTxO -> 
+      let PaymentWallet{network,paymentAddress} = homeModel ^. #selectedWallet
+          newInput = 
+            createNewLenderAddressUpdate network paymentAddress $ fromMaybe def mLoanUTxO
+       in [ Model $ model 
+              & #homeModel % #newLenderAddressUpdate ?~ newInput
+          ]
+    CancelAdding -> 
+      [ Model $ model 
+          & #homeModel % #newLenderAddressUpdate .~ Nothing 
+      ]
+    ConfirmAdding -> 
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (HomeEvent . UpdateLenderPaymentAddress . AddResult) $ do
+          newUpdate <- fromJustOrAppError "newLenderAddressUpdate is Nothing" $ 
+            homeModel ^. #newLenderAddressUpdate
+
+          -- Verify that the loan is not already being updated.
+          fromRightOrAppError $
+            maybeToLeft () $ "This loan address is already being updated." <$
+              find (== newUpdate ^. #loanUTxO) (concat
+                [ map (view $ _2 % #loanUTxO) $ 
+                    txBuilderModel ^. #loanBuilderModel % #addressUpdates
+                ])
+
+          verifiedUpdate <- fromRightOrAppError $ 
+            verifyNewLenderAddressUpdate (config ^. #currentTime) newUpdate
+
+          -- There will be two outputs for this action: the collateral output and the lender
+          -- output with the new Key NFT. The first value in the list is for the collateral
+          -- output. 
+          minValues <- calculateMinUTxOValue 
+            (config ^. #network) 
+            (txBuilderModel ^? #parameters % _Just % _1) 
+            -- Use a blank loanBuilderModel to calculate the minUTxOValue for the new payment.
+            (emptyLoanBuilderModel & #addressUpdates .~ [(0,verifiedUpdate)])
+
+          fromRightOrAppError $ updateLenderAddressDeposit verifiedUpdate minValues
+      ]
+    AddResult verifiedUpdate ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          & #homeModel % #newLenderAddressUpdate .~ Nothing
+          -- Add the new payment with a dummy index.
+          & #txBuilderModel % #loanBuilderModel % #addressUpdates %~ 
+              flip snoc (0,verifiedUpdate)
+          -- Sort the interest applications by the active UTxO. This is required to generate 
+          -- the outputs in the proper order.
+          & #txBuilderModel % #loanBuilderModel % #addressUpdates %~ 
+              sortOn (view $ _2 % #loanUTxO % #utxoRef)
+          -- Reindex after sorting.
+          & #txBuilderModel % #loanBuilderModel % #addressUpdates %~ reIndex
+          & #txBuilderModel %~ balanceTx
+      , Task $ return $ Alert $ unlines $ intersperse "" $ filter (/= "")
+          [ "Successfully added to builder!"
+          , createLenderAddressDepositMsg verifiedUpdate
+          ]
+      ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
@@ -360,3 +475,43 @@ processNewCollateralInput u@CollateralInput{..} model@TxBuilderModel{userInputs}
 
   -- Add the new input to the end of the list of user inputs.
   return $ balanceTx $ model & #collateralInput ?~ u
+
+-- | Validate the new expired claim and add it to the builder. Balance the transaction after.
+processNewExpiredClaim :: ExpiredClaim -> TxBuilderModel -> Either Text TxBuilderModel
+processNewExpiredClaim claim model@TxBuilderModel{loanBuilderModel=LoanBuilderModel{..}} = do
+  -- All actions must be for the same user.
+  whenJust (claim ^. #borrowerCredential) $ \cred ->
+    checkIsSameLoanUserCredential cred (model ^. #loanBuilderModel)
+
+  -- Verify that the loan UTxO is not already being spent.
+  maybeToLeft () $ "This collateral UTxO is already being claimed." <$
+    find (== claim ^. #loanUTxO) (concat
+      [ map (view $ _2 % #loanUTxO) expiredClaims
+      ])
+
+  -- Get the input's new index.
+  let newIdx = length expiredClaims
+
+  -- Add the new close to the end of the list of ask closes.
+  return $ balanceTx $ model 
+    & #loanBuilderModel % #expiredClaims %~ flip snoc (newIdx,claim)
+    & #loanBuilderModel % #userCredential %~ 
+        if isJust (claim ^. #borrowerCredential) 
+        then const (claim ^. #borrowerCredential)
+        else id
+
+-- | Validate the new loan key burn and add it to the builder. Balance the transaction after.
+processNewLoanKeyBurn :: LoanKeyBurn -> TxBuilderModel -> Either Text TxBuilderModel
+processNewLoanKeyBurn newBurn model@TxBuilderModel{loanBuilderModel=LoanBuilderModel{..}} = do
+  -- Verify that the loan id is not already being burned.
+  maybeToLeft () $ "This loan Key is already being burned." <$
+    find (== newBurn ^. #loanIdAsset) (concat
+      [ map (view $ _2 % #loanIdAsset) keyBurns
+      ])
+
+  -- Get the input's new index.
+  let newIdx = length keyBurns
+
+  -- Add the new close to the end of the list of ask closes.
+  return $ balanceTx $ model 
+    & #loanBuilderModel % #keyBurns %~ flip snoc (newIdx,newBurn)

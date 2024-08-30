@@ -5,12 +5,7 @@ module P2PWallet.GUI.Widgets.TxBuilder.StatusBar
   , collateralInfoPopup
   ) where
 
-import Monomer hiding 
-  ( popupAnchor
-  , alignTop
-  , popupAlignToOuterV
-  , popupAlignToOuterH
-  )
+import Monomer
 import Prettyprinter (pretty, align, vsep)
 
 import P2PWallet.Data.AppModel
@@ -19,7 +14,6 @@ import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Internal.Custom
-import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.Prelude
 
 statusBar :: AppModel -> AppNode
@@ -130,7 +124,7 @@ changeInfoPopup AppModel{txBuilderModel,reverseTickerMap} = do
               , textFont "Remix"
               ]
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-  customPopup_ (toLensVL $ #txBuilderModel % #showChangePopup) 
+  popup_ (toLensVL $ #txBuilderModel % #showChangePopup) 
     [popupAnchor anchor, alignBottom, popupAlignToOuterV] $
     vstack
       [ hstack 
@@ -193,7 +187,7 @@ collateralInfoPopup AppModel{txBuilderModel=txBuilderModel@TxBuilderModel{fee}} 
               , textSize 14
               ]
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-  customPopup_ (toLensVL $ #txBuilderModel % #showCollateralPopup) 
+  popup_ (toLensVL $ #txBuilderModel % #showCollateralPopup) 
     [popupAnchor anchor, alignBottom, popupAlignToOuterV] $
     vstack
       [ hstack 
