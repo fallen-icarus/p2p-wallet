@@ -70,6 +70,7 @@ module P2PWallet.Data.DeFi.CardanoLoans
   , createPostAddressUpdateActiveDatum
 
     -- * Protocol Addresses
+  , isValidLoanPaymentAddress
   , genLoanAddress
   , isLoanAddress
   , genProxyAddress
@@ -837,6 +838,14 @@ createPostAddressUpdateActiveDatum = set #lenderAddress
 -------------------------------------------------
 -- Protocol Addresses
 -------------------------------------------------
+-- | Check whether the address is a valid lender payment address.
+isValidLoanPaymentAddress :: Address -> Bool
+isValidLoanPaymentAddress (Address (PubKeyCredential _) _) = True
+isValidLoanPaymentAddress (Address (ScriptCredential cred) mStakeCred) =
+  cred == proxyScriptHash && case mStakeCred of
+    Just (StakingHash _) -> True
+    _ -> False
+
 -- | Create the loan address for the stake credential.
 genLoanAddress :: Network -> Maybe Credential -> Either Text PaymentAddress
 genLoanAddress network mStakeCred = fmap fst $ plutusToBech32 network $ Address

@@ -105,6 +105,7 @@ txBuilderWidget model@AppModel{..} = do
               , isNothing (loanBuilderModel ^. #targetOfferUpdate)
               , isNothing (loanBuilderModel ^. #targetOfferAcceptance)
               , isNothing (loanBuilderModel ^. #targetLoanPayment)
+              , isNothing (loanBuilderModel ^. #targetAddressUpdate)
               , not addingChangeOutput
               , not addingExternalUserOutput
               , not addingTestMint
@@ -131,6 +132,8 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (loanBuilderModel ^. #targetOfferAcceptance)
       , editLoanPaymentWidget model
           `nodeVisible` isJust (loanBuilderModel ^. #targetLoanPayment)
+      , editLenderAddressUpdateWidget
+          `nodeVisible` isJust (loanBuilderModel ^. #targetAddressUpdate)
       , addExternalUserOutputWidget
           `nodeVisible` addingExternalUserOutput
       , addChangeOutputWidget
@@ -280,6 +283,9 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
         , offerAcceptancesList reverseTickerMap $ loanBuilderModel ^. #offerAcceptances
         , loanPaymentsList reverseTickerMap $ loanBuilderModel ^. #loanPayments
         , interestApplicationsList $ loanBuilderModel ^. #interestApplications
+        , expiredClaimsList $ loanBuilderModel ^. #expiredClaims
+        , loanKeyBurnsList $ loanBuilderModel ^. #keyBurns
+        , lenderAddressUpdatesList $ loanBuilderModel ^. #addressUpdates
         , userCertificatesList userCertificates
         , userWithdrawalsList userWithdrawals
         , maybe [] (pure . testMintRow reverseTickerMap) testMint

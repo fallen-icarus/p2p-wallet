@@ -12,7 +12,7 @@ import P2PWallet.Actions.SyncLoans
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
-import P2PWallet.Data.Core.Wallets.LoanWallet
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
 
 handleLendEvent :: AppModel -> LendEvent -> [AppEventResponse AppModel AppEvent]
@@ -369,7 +369,7 @@ handleLendEvent model@AppModel{..} evt = case evt of
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
--- | Validate the new ask close and add it to the builder. Balance the transaction after.
+-- | Validate the new offer close and add it to the builder. Balance the transaction after.
 processNewOfferClose :: OfferClose -> TxBuilderModel -> Either Text TxBuilderModel
 processNewOfferClose u@OfferClose{utxoRef} model@TxBuilderModel{loanBuilderModel=LoanBuilderModel{..}} = do
   -- Verify that the new utxo is not already being spent.

@@ -82,7 +82,6 @@ loanUTxOToInterestApplication network alias stakeCredential mKeyInfo currentTime
       , requiredApplicationCount = toInteger $
           -- The GUI should prevent applying interests/penalties on loans with no compoundFrequency.
           (toPlutusTime currentTime - lastCompounding) `div` fromJust compoundFrequency 
-
       }
   where 
     Loans.ActiveDatum{lastCompounding, compoundFrequency} = 

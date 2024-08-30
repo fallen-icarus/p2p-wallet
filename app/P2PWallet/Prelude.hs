@@ -35,6 +35,7 @@ module P2PWallet.Prelude
   , showValue
   , valueAsByteString
   , maybeHead
+  , maybeLast
   , groupInto
   , mkScaleFactor
   , formatQuantity
@@ -99,6 +100,11 @@ valueAsByteString = toStrict . Aeson.encodingToLazyByteString . Aeson.value
 maybeHead :: [a] -> Maybe a
 maybeHead [] = Nothing
 maybeHead (x:_) = Just x
+
+maybeLast :: [a] -> Maybe a
+maybeLast [] = Nothing
+maybeLast (x:[]) = Just x
+maybeLast (_:xs) = maybeLast xs
 
 -- | Break a list into sublists of the specified length.
 groupInto :: Int -> [a] -> [[a]]

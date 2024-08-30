@@ -34,8 +34,8 @@ import P2PWallet.Prelude
 -------------------------------------------------
 -- Cached Loan Event History
 -------------------------------------------------
--- | A type alias for a map from LoanId to loan event history.
-type CachedLoanHistories = Map.Map Loans.LoanId [LoanEvent]
+-- | A type alias for a map from LoanId to loan event history as well as its current status.
+type CachedLoanHistories = Map.Map Loans.LoanId ([LoanEvent],Maybe LoanUTxO)
 
 -------------------------------------------------
 -- Cached Borrower Information
