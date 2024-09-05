@@ -88,6 +88,8 @@ data WaitingStatus = WaitingStatus
   , syncingOrderBook :: Bool
   -- | The app is syncing the loan asks for the selected ask configuration.
   , syncingLoanAsks :: Bool
+  -- | The app is syncing the loan offers for the selected offer configuration.
+  , syncingLoanOffers :: Bool
   -- | The app is syncing the loan history for the selected loan.
   , syncingLoanHistory :: Bool
   -- | The app is syncing the borrower's information.
@@ -112,6 +114,7 @@ instance Default WaitingStatus where
     , syncingPools = False
     , syncingOrderBook = False
     , syncingLoanAsks = False
+    , syncingLoanOffers = False
     , syncingLoanHistory = False
     , syncingBorrowerInfo = False
     , building = False

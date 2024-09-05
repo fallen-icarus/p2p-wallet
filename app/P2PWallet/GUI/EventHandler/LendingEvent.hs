@@ -14,6 +14,7 @@ import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.GUI.EventHandler.LendingEvent.BorrowEvent
 import P2PWallet.GUI.EventHandler.LendingEvent.LendEvent
+import P2PWallet.GUI.EventHandler.LendingEvent.ResearchEvent
 import P2PWallet.Prelude
 
 handleLendingEvent :: AppModel -> LendingEvent -> [AppEventResponse AppModel AppEvent]
@@ -112,6 +113,11 @@ handleLendingEvent model@AppModel{..} evt = case evt of
   -- Lend Event
   ---------------------------------------------
   LendEvent lendEvt -> handleLendEvent model lendEvt
+
+  ---------------------------------------------
+  -- Research Event
+  ---------------------------------------------
+  LoanResearchEvent researchEvt -> handleResearchEvent model researchEvt
 
   -----------------------------------------------
   -- Sync Loan History

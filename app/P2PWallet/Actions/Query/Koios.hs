@@ -17,6 +17,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryDexWallet
   , runQueryLoanWallet
   , runQueryLoanAsks
+  , runQueryLoanOffers
   , runQuerySpecificLoan
   , runQueryBorrowerCreditHistory
   , runQueryBorrowerInformation
@@ -472,9 +473,7 @@ runQueryLoanWallet loanWallet@LoanWallet{..} = do
     fetchOfferUTxOs = do
       manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
-          offerCfg = LoanOfferConfiguration
-            { lenderCredential = Just stakeCredential
-            }
+          offerCfg = def & #lenderCredential ?~ stakeCredential
       first show <$> handleTimeoutError (runClientM (queryLoanOffers offerCfg) env)
 
     -- Since Koios instances may occassionally return incorrect UTxOs if they are not
@@ -632,6 +631,24 @@ runQueryBorrowerInformation network borrowerId borrowerAddress = do
     queryLoansWithRedundancies :: IO (Either Text [AddressUTxO])
     queryLoansWithRedundancies = queryWithRedundancies fetchLoanUTxOs
 
+-- | Get the current loan offers that match the desired configuration.
+runQueryLoanOffers :: Network -> LoanOfferConfiguration -> IO (Either Text [LoanUTxO])
+runQueryLoanOffers network loanOfferCfg = do
+    offerRes <- fetchOffers
+
+    case offerRes of
+      Right offers -> do
+        return $ Right $ sortOn loanUTxOLoanAmount $ map fromAddressUTxO offers
+      Left err -> return $ Left err
+  where
+    -- Try to query the offers.
+    fetchOffers :: IO (Either Text [AddressUTxO])
+    fetchOffers = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> 
+        handleTimeoutError (runClientM (queryLoanOffers loanOfferCfg) env)
+
 -------------------------------------------------
 -- Low-Level API
 -------------------------------------------------
@@ -768,6 +785,10 @@ type KoiosApi
      :> QueryParam' '[Required] "select" SelectParam
      :> QueryParam' '[Required] "offset" OffsetParam
      :> QueryParam' '[Required] "is_spent" IsSpentParam
+     -- The minimum loan duration.
+     :> QueryParam "inline_datum->value->fields->8->int" InlineDatumFilterParam
+     -- The maximum loan duration.
+     :> QueryParam "inline_datum->value->fields->8->int" InlineDatumFilterParam
      :> QueryParam "asset_list" AssetListFilterParam
      :> ReqBody '[JSON] AssetList
      :> Post '[JSON] [AddressUTxO]
@@ -1121,9 +1142,27 @@ queryLoanOffers LoanOfferConfiguration{..} = queryApi 0 []
         let (Loans.LenderId lenderId) = Loans.genLenderId cred
          in [Loans.Asset (Loans.negotiationBeaconCurrencySymbol, lenderId)]
 
+    minDurationFilter :: Maybe InlineDatumFilterParam
+    minDurationFilter = 
+      minDuration <&> 
+        InlineDatumFilterParam . ("gte." <>) . display . toPlutusTime . convertDaysToPosixPeriod
+
+    maxDurationFilter :: Maybe InlineDatumFilterParam
+    maxDurationFilter = 
+      maxDuration <&> 
+        InlineDatumFilterParam . ("lte." <>) . display . toPlutusTime . convertDaysToPosixPeriod
+
+    assetBeaconAsAsset :: [Loans.Asset]
+    assetBeaconAsAsset = case loanAsset of
+      Nothing -> []
+      Just asset -> 
+        let (Loans.AssetBeaconId assetBeacon) = 
+              Loans.genLoanAssetBeaconName $ fromNativeAsset asset
+         in [Loans.Asset (Loans.negotiationBeaconCurrencySymbol, assetBeacon)]
+
     -- Assets that must be present, besides the Offer beacon.
     requiredExtraAssets :: [Loans.Asset]
-    requiredExtraAssets = lenderIdAsAsset
+    requiredExtraAssets = lenderIdAsAsset <> assetBeaconAsAsset
 
     extraAssetFilter :: Maybe AssetListFilterParam
     extraAssetFilter
@@ -1141,6 +1180,8 @@ queryLoanOffers LoanOfferConfiguration{..} = queryApi 0 []
         select 
         offset 
         "eq.false" 
+        minDurationFilter 
+        maxDurationFilter
         extraAssetFilter 
         targetBeacon
       if length res == 1000 then
