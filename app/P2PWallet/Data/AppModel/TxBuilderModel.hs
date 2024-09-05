@@ -307,4 +307,5 @@ hasInputs TxBuilderModel{..} = or
   , loanBuilderModel ^. #offerAcceptances /= []
   , loanBuilderModel ^. #loanPayments /= []
   , loanBuilderModel ^. #interestApplications /= []
+  , loanBuilderModel ^. #expiredClaims /= []
   ]

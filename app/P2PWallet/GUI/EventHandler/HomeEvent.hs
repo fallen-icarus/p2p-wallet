@@ -492,7 +492,7 @@ processNewExpiredClaim claim model@TxBuilderModel{loanBuilderModel=LoanBuilderMo
   -- Get the input's new index.
   let newIdx = length expiredClaims
 
-  -- Add the new close to the end of the list of ask closes.
+  -- Add the new close to the end of the list of claims.
   return $ balanceTx $ model 
     & #loanBuilderModel % #expiredClaims %~ flip snoc (newIdx,claim)
     & #loanBuilderModel % #userCredential %~ 
