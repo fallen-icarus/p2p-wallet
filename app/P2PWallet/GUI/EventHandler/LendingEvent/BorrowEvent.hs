@@ -521,6 +521,29 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
         & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
 
+  -----------------------------------------------
+  -- Add Lost Collateral claim to builder
+  -----------------------------------------------
+  ClaimLostCollateral loanUTxO ->
+    let LoanWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
+          lendingModel ^. #selectedWallet
+        newInput = loanUTxOToExpiredClaim 
+          network 
+          alias 
+          (Just stakeCredential) 
+          stakeKeyDerivation
+          (config ^. #currentTime) 
+          loanUTxO
+     in case processNewLostClaim newInput txBuilderModel of
+          Left err -> [ Task $ return $ Alert err ]
+          Right newTxModel -> 
+            if hasOnlyOneActiveBeaconAction $ newTxModel ^. #loanBuilderModel then
+              [ Model $ model & #txBuilderModel .~ newTxModel
+              , Task $ return $ Alert "Successfully added to builder!"
+              ]
+            else
+              [ Event $ Alert onlyOneActiveBeaconActionError ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
@@ -545,3 +568,27 @@ processNewAskClose u@AskClose{utxoRef} model@TxBuilderModel{loanBuilderModel=Loa
   return $ balanceTx $ model 
     & #loanBuilderModel % #askCloses %~ flip snoc (newIdx,u)
     & #loanBuilderModel % #userCredential ?~ u ^. #borrowerCredential
+
+-- | Validate the new expired claim and add it to the builder. Balance the transaction after.
+processNewLostClaim :: ExpiredClaim -> TxBuilderModel -> Either Text TxBuilderModel
+processNewLostClaim claim model@TxBuilderModel{loanBuilderModel=LoanBuilderModel{..}} = do
+  -- All actions must be for the same user.
+  whenJust (claim ^. #borrowerCredential) $ \cred ->
+    checkIsSameLoanUserCredential cred (model ^. #loanBuilderModel)
+
+  -- Verify that the loan UTxO is not already being spent.
+  maybeToLeft () $ "This collateral UTxO is already being claimed." <$
+    find (== claim ^. #loanUTxO) (concat
+      [ map (view $ _2 % #loanUTxO) expiredClaims
+      ])
+
+  -- Get the input's new index.
+  let newIdx = length expiredClaims
+
+  -- Add the new close to the end of the list of claims.
+  return $ balanceTx $ model 
+    & #loanBuilderModel % #expiredClaims %~ flip snoc (newIdx,claim)
+    & #loanBuilderModel % #userCredential %~ 
+        if isJust (claim ^. #borrowerCredential) 
+        then const (claim ^. #borrowerCredential)
+        else id

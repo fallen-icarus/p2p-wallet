@@ -7,9 +7,7 @@
 module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LoanKeyBurn where
 
 import P2PWallet.Data.Core.Internal
-import P2PWallet.Data.Core.Wallets.LoanWallet
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
-import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------
