@@ -1099,7 +1099,7 @@ openAsksField :: AppModel -> AppNode
 openAsksField AppModel{..} = do
     vstack
       [ hstack
-          [ label "Current Loan Requests"
+          [ label "Current Loan Requests:"
               `styleBasic` [textSize 12]
           , spacer
           , toggleButton_ horizontalMoreIcon 
@@ -1119,7 +1119,10 @@ openAsksField AppModel{..} = do
                 , border 0 transparent
                 ]
               `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-              `nodeVisible` (creditHistory /= [])
+              `nodeVisible` (openAsks /= [])
+          , label "none" 
+              `styleBasic` [textColor white, textSize 12]
+              `nodeVisible` (openAsks == [])
           ]
       , widgetIf showOpenAsks $
           vstack_ [childSpacing] (map askRow openAsks)
@@ -1212,7 +1215,7 @@ currentOffersField :: AppModel -> AppNode
 currentOffersField AppModel{..} = do
     vstack
       [ hstack
-          [ label "Current Offers"
+          [ label "Current Offers:"
               `styleBasic` [textSize 12]
           , spacer
           , toggleButton_ horizontalMoreIcon 
@@ -1232,7 +1235,10 @@ currentOffersField AppModel{..} = do
                 , border 0 transparent
                 ]
               `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-              `nodeVisible` (creditHistory /= [])
+              `nodeVisible` (currentOffers /= [])
+          , label "none" 
+              `styleBasic` [textColor white, textSize 12]
+              `nodeVisible` (currentOffers == [])
           ]
       , widgetIf showCurrentOffers $
           vstack_ [childSpacing] (map offerRow currentOffers)
@@ -1409,7 +1415,7 @@ activeLoansField :: AppModel -> AppNode
 activeLoansField AppModel{..} = do
     vstack
       [ hstack
-          [ label "Active Loans"
+          [ label "Active Loans:"
               `styleBasic` [textSize 12]
           , spacer
           , toggleButton_ horizontalMoreIcon 
@@ -1429,7 +1435,10 @@ activeLoansField AppModel{..} = do
                 , border 0 transparent
                 ]
               `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-              `nodeVisible` (creditHistory /= [])
+              `nodeVisible` (activeLoans /= [])
+          , label "none" 
+              `styleBasic` [textColor white, textSize 12]
+              `nodeVisible` (activeLoans == [])
           ]
       , widgetIf showActiveLoans $
           vstack_ [childSpacing] (map activeRow activeLoans)

@@ -106,6 +106,9 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
     offerRow u@LoanUTxO{utxoRef,blockTime} = do
       let Loans.OfferDatum{..} = fromMaybe def $ loanUTxOOfferDatum u
           loanAmount = toNativeAsset loanAsset & #quantity .~ loanPrincipal
+          borrowerId = Loans.genBorrowerId 
+                     $ fromRight (PubKeyCredential "") 
+                     $ paymentAddressStakeCredential loanAddress
           duration = calcDaysInPosixPeriod $ fromPlutusTime loanTerm
           collateralPrices = map (over _1 toNativeAsset . over _2 toRational) 
                            $ collateralization ^. #unCollateralization
@@ -152,6 +155,9 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
             , maybe ":" ((<> ":") . view #alias) mTargetWallet
             , display payToAddress
             ]
+          lookupEvt = LendingEvent 
+                    $ LendEvent 
+                    $ InspectProspectiveBorrowerInformation (borrowerId, loanAddress)
       hstack
         [ vstack
             [ hstack
@@ -216,7 +222,7 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
                 , spacer_ [width 5]
                 , flip styleBasic [textSize 10] $ 
                     tooltip_ "Lookup Borrower Information" [tooltipDelay 0] $
-                      box_ [alignMiddle , onClick AppInit] $
+                      box_ [alignMiddle , onClick lookupEvt] $
                         label idCardIcon
                           `styleBasic` 
                             [ bgColor black
