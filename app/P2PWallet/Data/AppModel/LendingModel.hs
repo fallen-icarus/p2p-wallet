@@ -18,6 +18,7 @@ module P2PWallet.Data.AppModel.LendingModel
 
   , module P2PWallet.Data.AppModel.LendingModel.BorrowModel
   , module P2PWallet.Data.AppModel.LendingModel.LendModel
+  , module P2PWallet.Data.AppModel.LendingModel.ResearchModel
   ) where
 
 import Data.Map.Strict qualified as Map
@@ -25,6 +26,7 @@ import Data.Map.Strict qualified as Map
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.LendingModel.BorrowModel
 import P2PWallet.Data.AppModel.LendingModel.LendModel
+import P2PWallet.Data.AppModel.LendingModel.ResearchModel
 import P2PWallet.Data.Core.BorrowerInformation
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
@@ -73,6 +75,8 @@ data LendingEvent
   | BorrowEvent BorrowEvent
   -- | An event for the LendModel.
   | LendEvent LendEvent
+  -- | An event for the LoanResearchModel.
+  | LoanResearchEvent LoanResearchEvent
   -- | Lookup a specific loan's event history.
   | LookupLoanHistory (ProcessEvent Loans.LoanId CachedLoanHistories)
   -- | Lookup a specific borrower's information.
@@ -99,6 +103,8 @@ data LendingModel = LendingModel
   , borrowModel :: BorrowModel
   -- | The lend model.
   , lendModel :: LendModel
+  -- | The research model.
+  , researchModel :: LoanResearchModel
   -- | The cached loan histories.
   , cachedLoanHistories :: CachedLoanHistories
   -- | The cached borrower information.
@@ -117,6 +123,7 @@ instance Default LendingModel where
     , showMorePopup = False
     , borrowModel = def
     , lendModel = def
+    , researchModel = def
     , cachedLoanHistories = mempty
     , cachedBorrowerInfo = mempty
     }

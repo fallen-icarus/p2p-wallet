@@ -14,6 +14,7 @@ import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.GUI.Widgets.Lending.Borrow
 import P2PWallet.GUI.Widgets.Lending.Lend
+import P2PWallet.GUI.Widgets.Lending.Research
 import P2PWallet.Prelude
 
 lendingWidget :: AppModel -> AppNode
@@ -64,6 +65,7 @@ mainWidget model@AppModel{scene=_,..} =
       , spacer_ [width 5]
       , borrowWidget model `nodeVisible` (lendingModel ^. #scene == BorrowScene)
       , lendWidget model `nodeVisible` (lendingModel ^. #scene == LendScene)
+      , researchWidget model `nodeVisible` (lendingModel ^. #scene == ResearchLoansScene)
       ] 
   where
     loansMainSceneButton :: Text -> LendingScene -> AppNode

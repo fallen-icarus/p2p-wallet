@@ -3,6 +3,7 @@ module P2PWallet.Actions.SyncLoans
     syncLoanAsks
   , syncLoanHistory
   , syncBorrowerInfo
+  , syncLoanOffers
   ) where
 
 import Data.Map.Strict qualified as Map
@@ -47,3 +48,13 @@ syncBorrowerInfo network borrowerId borrowerAddr currentCache = do
 
   return $ currentCache
     & Map.insert borrowerId info
+
+-- | This function gets all current loan offers that match the specified configuration.
+syncLoanOffers :: Network -> LoanOfferConfiguration -> CachedLoanOffers -> IO CachedLoanOffers
+syncLoanOffers network offerCfg currentCache = do
+    allOffers <- runQueryLoanOffers network offerCfg >>= 
+      -- Throw an error if syncing failed.
+      fromRightOrAppError
+
+    -- Update the cached.
+    return $ insertIntoCachedOffers offerCfg allOffers currentCache
