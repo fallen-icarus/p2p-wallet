@@ -18,6 +18,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryLoanWallet
   , runQueryLoanAsks
   , runQueryLoanOffers
+  , runQueryActiveLoans
   , runQuerySpecificLoan
   , runQueryBorrowerCreditHistory
   , runQueryBorrowerInformation
@@ -45,6 +46,7 @@ import Data.Aeson.Types qualified as Aeson
 import Data.Text qualified as Text
 import UnliftIO.Async (mapConcurrently,concurrently)
 
+import P2PWallet.Data.AppModel.LendingModel.ActiveLoanConfiguration
 import P2PWallet.Data.AppModel.LendingModel.LoanAskConfiguration
 import P2PWallet.Data.AppModel.LendingModel.LoanOfferConfiguration
 import P2PWallet.Data.Core.BorrowerInformation
@@ -649,6 +651,24 @@ runQueryLoanOffers network loanOfferCfg = do
       first show <$> 
         handleTimeoutError (runClientM (queryLoanOffers loanOfferCfg) env)
 
+-- | Get the current active loans that match the desired configuration.
+runQueryActiveLoans :: Network -> ActiveLoanConfiguration -> IO (Either Text [LoanUTxO])
+runQueryActiveLoans network cfg = do
+    activeRes <- fetchActiveLoans
+
+    case activeRes of
+      Right activeLoans -> do
+        return $ Right $ sortOn loanUTxOLoanAmount $ map fromAddressUTxO activeLoans
+      Left err -> return $ Left err
+  where
+    -- Try to query the offers.
+    fetchActiveLoans :: IO (Either Text [AddressUTxO])
+    fetchActiveLoans = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> 
+        handleTimeoutError (runClientM (queryActiveLoans cfg) env)
+
 -------------------------------------------------
 -- Low-Level API
 -------------------------------------------------
@@ -780,7 +800,7 @@ type KoiosApi
      :> Post '[JSON] [AddressUTxO]
 
   -- A version of asset_utxos that supports filtering OfferUTxOs by what is in the datum.
-  -- The inline datum is VERY specific to Ask UTxOs so this cannot be used with other UTxOs.
+  -- The inline datum is VERY specific to Offer UTxOs so this cannot be used with other UTxOs.
   :<|>  "asset_utxos"
      :> QueryParam' '[Required] "select" SelectParam
      :> QueryParam' '[Required] "offset" OffsetParam
@@ -789,6 +809,20 @@ type KoiosApi
      :> QueryParam "inline_datum->value->fields->8->int" InlineDatumFilterParam
      -- The maximum loan duration.
      :> QueryParam "inline_datum->value->fields->8->int" InlineDatumFilterParam
+     :> QueryParam "asset_list" AssetListFilterParam
+     :> ReqBody '[JSON] AssetList
+     :> Post '[JSON] [AddressUTxO]
+
+  -- A version of asset_utxos that supports filtering ActiveUTxOs by what is in the datum.
+  -- The inline datum is VERY specific to Active UTxOs so this cannot be used with other UTxOs.
+  :<|>  "asset_utxos"
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "offset" OffsetParam
+     :> QueryParam' '[Required] "is_spent" IsSpentParam
+     -- The minimum loan duration.
+     :> QueryParam "inline_datum->value->fields->11->int" InlineDatumFilterParam
+     -- The maximum loan duration.
+     :> QueryParam "inline_datum->value->fields->11->int" InlineDatumFilterParam
      :> QueryParam "asset_list" AssetListFilterParam
      :> ReqBody '[JSON] AssetList
      :> Post '[JSON] [AddressUTxO]
@@ -810,6 +844,7 @@ submitApi
   :<|> assetTxHistoryApi
   :<|> askUTxOsApi
   :<|> offerUTxOsApi
+  :<|> activeUTxOsApi
   = client (Proxy :: Proxy KoiosApi)
 
 -- Query all UTxOs for a list of payment addresses.
@@ -1298,6 +1333,84 @@ querySpecificLoanUTxO (Loans.LoanId loanId) = queryApi 0 []
       , display tokenName
       , "\"}]"
       ]
+
+    select :: SelectParam
+    select = fromString $ intercalate ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]
+
+queryActiveLoans :: ActiveLoanConfiguration -> ClientM [AddressUTxO]
+queryActiveLoans ActiveLoanConfiguration{..} = queryApi 0 []
+  where
+    minDurationFilter :: Maybe InlineDatumFilterParam
+    minDurationFilter = 
+      minDuration <&> 
+        InlineDatumFilterParam . ("gte." <>) . display . toPlutusTime . convertDaysToPosixPeriod
+
+    maxDurationFilter :: Maybe InlineDatumFilterParam
+    maxDurationFilter = 
+      maxDuration <&> 
+        InlineDatumFilterParam . ("lte." <>) . display . toPlutusTime . convertDaysToPosixPeriod
+
+    assetBeaconAsAsset :: [Loans.Asset]
+    assetBeaconAsAsset = case loanAsset of
+      Nothing -> []
+      Just asset -> 
+        let (Loans.AssetBeaconId assetBeacon) = 
+              Loans.genLoanAssetBeaconName $ fromNativeAsset asset
+         in [Loans.Asset (Loans.activeBeaconCurrencySymbol, assetBeacon)]
+
+    -- Assets that must be present, besides the Offer beacon.
+    requiredExtraAssets :: [Loans.Asset]
+    requiredExtraAssets = assetBeaconAsAsset
+
+    extraAssetFilter :: Maybe AssetListFilterParam
+    extraAssetFilter
+      | null requiredExtraAssets = Nothing
+      | otherwise = Just 
+                  $ AssetListFilterParam 
+                  $ assetToQueryParam requiredExtraAssets
+
+    targetBeacon :: AssetList
+    targetBeacon = AssetList [(Loans.activeBeaconCurrencySymbol, Loans.activeBeaconName)]
+
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- activeUTxOsApi 
+        select 
+        offset 
+        "eq.false" 
+        minDurationFilter 
+        maxDurationFilter
+        extraAssetFilter 
+        targetBeacon
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+    assetToQueryParam :: [Loans.Asset] -> Text
+    assetToQueryParam assets = "cs.[" <> mconcat (intersperse "," (go assets)) <> "]"
+      where
+        go :: [Loans.Asset] -> [Text]
+        go [] = []
+        go (Loans.Asset (currSym,tokName):xs) = 
+          let policyId = display currSym
+              assetName = display tokName
+           in ("{\"policy_id\":\"" <> policyId <> "\",\"asset_name\":\"" <> assetName <> "\"}") : go xs
 
     select :: SelectParam
     select = fromString $ intercalate ","

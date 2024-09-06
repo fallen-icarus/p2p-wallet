@@ -607,7 +607,7 @@ offersFilterWidget AppModel{lendingModel=LendingModel{..}} = do
                   ]
                 `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             , spacer_ [width 3]
-            , box_ [onClick $ Alert openAsksSortMsg] $
+            , box_ [onClick $ Alert lenderOffersSortMsg] $
                 label helpIcon
                   `styleBasic`
                     [ border 0 transparent
@@ -866,7 +866,7 @@ creditHistoryField AppModel{..} = do
             , flip styleBasic [textSize 10] $ 
                 tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
                   box_ [alignMiddle , onClick loanHistoryEvt] $
-                    label idCardIcon
+                    label historyIcon
                       `styleBasic` 
                         [ bgColor black
                         , textMiddle
@@ -1410,7 +1410,7 @@ activeLoansField AppModel{..} = do
             , flip styleBasic [textSize 10] $ 
                 tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
                   box_ [alignMiddle , onClick loanHistoryEvt] $
-                    label idCardIcon
+                    label historyIcon
                       `styleBasic` 
                         [ bgColor black
                         , textMiddle

@@ -58,6 +58,7 @@ buildUI _ model@AppModel{..} = do
     , waitingOverlay "Syncing Order Book..." `nodeVisible` waitingStatus ^. #syncingOrderBook
     , waitingOverlay "Syncing Loan Requests..." `nodeVisible` waitingStatus ^. #syncingLoanAsks
     , waitingOverlay "Syncing Loan Offers..." `nodeVisible` waitingStatus ^. #syncingLoanOffers
+    , waitingOverlay "Syncing Active Loans..." `nodeVisible` waitingStatus ^. #syncingActiveLoans
     , waitingOverlay "Syncing Loan History..." `nodeVisible` waitingStatus ^. #syncingLoanHistory
     , waitingOverlay "Syncing Borrower Info..." `nodeVisible` waitingStatus ^. #syncingBorrowerInfo
     ] `styleBasic` [bgColor customGray4]

@@ -719,11 +719,6 @@ askCfgCollateralMsg = unlines
   , "3. 'ADA' - if the asset is ada."
   , ""
   , "Fingerprints are not supported."
-  , ""
-  , unwords
-      [ "Only the loan requests offering to using ALL of the specified collaterall assets will"
-      , "be shown."
-      ]
   ]
 
 openAsksSortMsg :: Text
@@ -1020,3 +1015,14 @@ filterOfferTxByCollateralMsg = unlines
   , ""
   , "Fingerprints are not supported."
   ]
+
+activeLoansResearchSortMsg :: Text
+activeLoansResearchSortMsg = unlines
+  [ "Active loans can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Based on the outstanding loan balance"
+  , "3. Based on the loan's duration"
+  , "4. Chronologically based on the time the UTxO was created"
+  , "5. Based on the loan's interest rate"
+  ]
+

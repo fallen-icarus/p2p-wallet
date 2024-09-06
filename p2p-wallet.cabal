@@ -80,6 +80,7 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.LendingModel.LendModel
       P2PWallet.Data.AppModel.LendingModel.LendModel.OpenOffersFilterModel
       P2PWallet.Data.AppModel.LendingModel.LendModel.RequestsFilterModel
+      P2PWallet.Data.AppModel.LendingModel.ActiveLoanConfiguration
       P2PWallet.Data.AppModel.LendingModel.LoanAskConfiguration
       P2PWallet.Data.AppModel.LendingModel.LoanOfferConfiguration
       P2PWallet.Data.AppModel.LendingModel.ResearchModel
@@ -204,6 +205,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Lending.Lend.OpenOffers
       P2PWallet.GUI.Widgets.Lending.Lend.ViewLoanRequests
       P2PWallet.GUI.Widgets.Lending.Research
+      P2PWallet.GUI.Widgets.Lending.Research.Actives
       P2PWallet.GUI.Widgets.Lending.Research.Offers
       P2PWallet.GUI.Widgets.MainMenu
       P2PWallet.GUI.Widgets.Networks

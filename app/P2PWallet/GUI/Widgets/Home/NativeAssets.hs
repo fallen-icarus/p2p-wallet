@@ -163,7 +163,7 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
                 , flip styleBasic [textSize 10] $ 
                     tooltip_ ("Loan ID: " <> display tokenName) [tooltipDelay 0] $
                       box_ [alignMiddle , onClick loanHistoryEvt] $
-                        label idCardIcon
+                        label historyIcon
                           `styleBasic` 
                             [ bgColor black
                             , textMiddle
