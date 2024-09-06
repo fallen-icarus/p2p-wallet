@@ -9,6 +9,7 @@ import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.GUI.Widgets.Lending.Research.Actives
 import P2PWallet.GUI.Widgets.Lending.Research.Offers
 import P2PWallet.Prelude
 
@@ -21,6 +22,8 @@ researchWidget model@AppModel{lendingModel} = do
           , spacer
           , box_ [mergeRequired reqUpdate] (researchOffersWidget model)
               `nodeVisible` (lendingModel ^. #researchModel % #scene == ResearchLoanOffers)
+          , box_ [mergeRequired reqUpdate] (researchActivesWidget model)
+              `nodeVisible` (lendingModel ^. #researchModel % #scene == ResearchActiveLoans)
           ]
       -- The inspected borrower is here since only one borrower can be inspected at a time.
       -- It doesn't make sense to move to other scenes while inspecting a borrower.
@@ -75,6 +78,11 @@ researchWidget model@AppModel{lendingModel} = do
           offersFilterModelRequiresUpdate 
             (oldLending ^. #researchModel % #offersFilterModel)
             (newLending ^. #researchModel % #offersFilterModel)
+      | oldLending ^. #researchModel % #activesFilterModel /=
+        newLending ^. #researchModel % #activesFilterModel =
+          activesFilterModelRequiresUpdate 
+            (oldLending ^. #researchModel % #activesFilterModel)
+            (newLending ^. #researchModel % #activesFilterModel)
       | otherwise = True
 
 -- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
@@ -87,4 +95,16 @@ offersFilterModelRequiresUpdate old new
   | old ^. #newLoanOfferConfiguration % #minDuration /= new ^. #newLoanOfferConfiguration % #minDuration = False
   | old ^. #newLoanOfferConfiguration % #maxDuration /= new ^. #newLoanOfferConfiguration % #maxDuration = False
   | old ^. #newLoanOfferConfiguration % #collateral /= new ^. #newLoanOfferConfiguration % #collateral = False
+  | otherwise = True
+
+-- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
+activesFilterModelRequiresUpdate :: ActiveResearchFilterModel -> ActiveResearchFilterModel -> Bool
+activesFilterModelRequiresUpdate old new
+  | old ^. #scene /= new ^. #scene = True
+  | old ^. #sortingMethod /= new ^. #sortingMethod = True
+  | old ^. #sortingDirection /= new ^. #sortingDirection = True
+  | old ^. #newActiveLoanConfiguration % #loanAsset /= new ^. #newActiveLoanConfiguration % #loanAsset = False
+  | old ^. #newActiveLoanConfiguration % #minDuration /= new ^. #newActiveLoanConfiguration % #minDuration = False
+  | old ^. #newActiveLoanConfiguration % #maxDuration /= new ^. #newActiveLoanConfiguration % #maxDuration = False
+  | old ^. #newActiveLoanConfiguration % #collateral /= new ^. #newActiveLoanConfiguration % #collateral = False
   | otherwise = True

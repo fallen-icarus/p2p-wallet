@@ -203,3 +203,6 @@ burnIcon = remixEraserLine
 
 updatePaymentAddressIcon :: Text
 updatePaymentAddressIcon = remixShareForwardLine
+
+historyIcon :: Text
+historyIcon = remixFileHistoryLine
