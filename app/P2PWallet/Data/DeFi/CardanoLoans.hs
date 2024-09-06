@@ -912,6 +912,7 @@ addressUpdateObserverStakeAddress network =
 -------------------------------------------------
 -- The reference scripts are locked at the loan address without any staking credential.
 -- For testnet, that address is: 
+-- addr_test1wrv3ff2vrjj3rujdnggeap27r69w763dkauumks70jngeysem97wj
 --
 -- The scripts are deliberately stored with an invalid datum so that they are locked forever.
 
@@ -923,6 +924,7 @@ data LoanScriptType
   | AddressObserverScript
   | NegotiationScript
   | ActiveScript
+  | ProxyScript
   deriving (Eq,Ord)
 
 getScriptRef :: Network -> LoanScriptType -> (TxOutRef,Integer)
@@ -937,29 +939,34 @@ referenceScriptMap = Map.fromList
         , (AddressObserverScript, (addressUpdateObserverScriptTestnetRef, addressUpdateObserverScriptSize))
         , (NegotiationScript, (negotiationBeaconScriptTestnetRef, negotiationBeaconScriptSize))
         , (ActiveScript, (activeBeaconScriptTestnetRef, activeBeaconScriptSize))
+        , (ProxyScript, (proxyScriptTestnetRef, proxyScriptSize))
         ])
   ]
 
 loanScriptTestnetRef :: TxOutRef
 loanScriptTestnetRef = 
-  TxOutRef "28d63d363fcfdb340fa6f5f146c73c9bf57e334147700597f6ccf8943ccab84f" 0
+  TxOutRef "80069bfaaa4a10c7319a545d10bd5fbb4df735f84fbc008e24483412cfcfab3a" 0
 
 negotiationBeaconScriptTestnetRef :: TxOutRef
 negotiationBeaconScriptTestnetRef = 
-  TxOutRef "dd0e2977d8ea2af53c9d1cd5fea19e09f15eef356b91314835316f649375c1c8" 0
+  TxOutRef "00b5bfe1e150d0885cd448f4ecabf68dd64d2954346e3a421cad73e12d52eb58" 0
 
 activeBeaconScriptTestnetRef :: TxOutRef
 activeBeaconScriptTestnetRef = 
-  TxOutRef "394c2bdf2550165e3523f3032eb0b3c68b610af9b4f576d03d8c9c9a8b0edc08" 0
+  TxOutRef "b9d98aa9d66df40506725fbd548052a638f79656d97b39ba2de8d924e4cd0a06" 0
 
 paymentObserverScriptTestnetRef :: TxOutRef
 paymentObserverScriptTestnetRef = 
-  TxOutRef "a96248cd1788c4b435b8ff9268236f8fa5d62faaa6cb73d600de869e7361be40" 0
+  TxOutRef "d097731fd4dbd9690ec14d3822121d60c549b700a320c9fbe7b4320d6879219d" 0
 
 interestObserverScriptTestnetRef :: TxOutRef
 interestObserverScriptTestnetRef = 
-  TxOutRef "e4b1b6d9849c6274e1eaf9840a7d5803c3864ec691459bd75f988f3dcc2c528c" 0
+  TxOutRef "2191eb43d4fdce09735d52d815b4bbfb0a8abcfed50ed7be0e9b6a969ec0b339" 0
 
 addressUpdateObserverScriptTestnetRef :: TxOutRef
 addressUpdateObserverScriptTestnetRef = 
-  TxOutRef "52bd1a5ff860cc87490c85c717def5a1cf732b4671ca7bb031eb7928c5159bbf" 0
+  TxOutRef "19600902dd39afd60fee4963396d76064740e53b948f960f169f6aad12bbe0f8" 0
+
+proxyScriptTestnetRef :: TxOutRef
+proxyScriptTestnetRef = 
+  TxOutRef "45dfa4701657ae47a3a45e7941f038f2958ee2fd74321e87064ff2aca283bfb7" 0
