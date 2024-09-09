@@ -17,6 +17,7 @@ import P2PWallet.GUI.Widgets.Lending
 import P2PWallet.GUI.Widgets.MainMenu
 import P2PWallet.GUI.Widgets.Networks
 import P2PWallet.GUI.Widgets.Notifications
+import P2PWallet.GUI.Widgets.Options
 import P2PWallet.GUI.Widgets.Profiles
 import P2PWallet.GUI.Widgets.Settings
 import P2PWallet.GUI.Widgets.TickerRegistry
@@ -44,6 +45,7 @@ buildUI _ model@AppModel{..} = do
             , tickerRegistryWidget model `nodeVisible` (TickerRegistryScene == scene)
             , dexWidget model `nodeVisible` (DexScene == scene)
             , lendingWidget model `nodeVisible` (LendingScene == scene)
+            , optionsWidget model `nodeVisible` (OptionsScene == scene)
             , notificationsWidget model `nodeVisible` (NotificationsScene == scene)
             ]
         ] `nodeVisible` isJust selectedProfile

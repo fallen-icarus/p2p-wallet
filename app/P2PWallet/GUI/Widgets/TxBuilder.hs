@@ -21,6 +21,7 @@ import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder
+import P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder
 import P2PWallet.GUI.Widgets.TxBuilder.StatusBar
 import P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder
 import P2PWallet.GUI.Widgets.TxBuilder.TestMint
@@ -106,6 +107,8 @@ txBuilderWidget model@AppModel{..} = do
               , isNothing (loanBuilderModel ^. #targetOfferAcceptance)
               , isNothing (loanBuilderModel ^. #targetLoanPayment)
               , isNothing (loanBuilderModel ^. #targetAddressUpdate)
+              , isNothing (optionsBuilderModel ^. #targetProposalCreation)
+              , isNothing (optionsBuilderModel ^. #targetProposalUpdate)
               , not addingChangeOutput
               , not addingExternalUserOutput
               , not addingTestMint
@@ -134,6 +137,10 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (loanBuilderModel ^. #targetLoanPayment)
       , editLenderAddressUpdateWidget
           `nodeVisible` isJust (loanBuilderModel ^. #targetAddressUpdate)
+      , editProposalCreationWidget model
+          `nodeVisible` isJust (optionsBuilderModel ^. #targetProposalCreation)
+      , editProposalUpdateWidget model
+          `nodeVisible` isJust (optionsBuilderModel ^. #targetProposalUpdate)
       , addExternalUserOutputWidget
           `nodeVisible` addingExternalUserOutput
       , addChangeOutputWidget
@@ -258,22 +265,26 @@ txBuilderWidget model@AppModel{..} = do
         ] `styleBasic` [padding 0]
 
 actionsList :: AppModel -> AppNode
-actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
+actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap,config} = do
   let numActions = length userOutputs
                  + length userCertificates
                  + length userWithdrawals
                  + maybe 0 (const 1) testMint
                  + swapsActionCount swapBuilderModel
                  + loanActionCount loanBuilderModel
+                 + optionsActionCount optionsBuilderModel
   vstack
     [ label ("Actions " <> show (tupled [pretty numActions]))
         `styleBasic` [textSize 12]
     , flip styleBasic [padding 10] $ vstack_ [childSpacing_ 5] $ mconcat
+        -- Normal outputs
         [ userOutputsList reverseTickerMap userOutputs
+        -- Swaps
         , swapCreationsList reverseTickerMap $ swapBuilderModel ^. #swapCreations
         , swapClosesList reverseTickerMap $ swapBuilderModel ^. #swapCloses
         , swapUpdatesList reverseTickerMap $ swapBuilderModel ^. #swapUpdates
         , swapExecutionsList reverseTickerMap $ swapBuilderModel ^. #swapExecutions
+        -- Loans
         , askCreationsList reverseTickerMap $ loanBuilderModel ^. #askCreations
         , askClosesList reverseTickerMap $ loanBuilderModel ^. #askCloses
         , askUpdatesList reverseTickerMap $ loanBuilderModel ^. #askUpdates
@@ -286,8 +297,18 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap} = do
         , expiredClaimsList $ loanBuilderModel ^. #expiredClaims
         , loanKeyBurnsList $ loanBuilderModel ^. #keyBurns
         , lenderAddressUpdatesList $ loanBuilderModel ^. #addressUpdates
+        -- Options
+        , proposalCreationsList reverseTickerMap (config ^. #timeZone) $ 
+            optionsBuilderModel ^. #proposalCreations
+        , proposalClosesList reverseTickerMap (config ^. #timeZone) $ 
+            optionsBuilderModel ^. #proposalCloses
+        , proposalUpdatesList reverseTickerMap (config ^. #timeZone) $ 
+            optionsBuilderModel ^. #proposalUpdates
+        -- Certificates
         , userCertificatesList userCertificates
+        -- Withdrawals
         , userWithdrawalsList userWithdrawals
+        -- Test mints
         , maybe [] (pure . testMintRow reverseTickerMap) testMint
         ]
     ] `styleBasic` [padding 5]

@@ -24,6 +24,8 @@ syncWallets databaseFile network ws@Wallets{..} = do
       
     -- These are queried separately to minimize the chance of exceeding Koios' burst limit.
     (updatedDexWallets, updatedLoanWallets) <- concurrently fetchDexWallets fetchLoanWallets
+
+    updatedOptionsWallets <- fetchOptionsWallets
     
     -- Save the new payment wallet states and throw an error if there is an issue saving.
     forM_ updatedPaymentWallets $ \paymentWallet -> do
@@ -41,6 +43,10 @@ syncWallets databaseFile network ws@Wallets{..} = do
     forM_ updatedLoanWallets $ \loanWallet -> do
       insertLoanWallet databaseFile loanWallet >>= fromRightOrAppError
 
+    -- Save the new options wallet states and throw an error if there is an issue saving.
+    forM_ updatedOptionsWallets $ \optionsWallet -> do
+      insertOptionsWallet databaseFile optionsWallet >>= fromRightOrAppError
+
     let newNotifications = catMaybes $ mconcat
           [ zipWith notify paymentWallets updatedPaymentWallets
           , zipWith notify stakeWallets updatedStakeWallets
@@ -54,6 +60,7 @@ syncWallets databaseFile network ws@Wallets{..} = do
       & #stakeWallets .~ updatedStakeWallets
       & #dexWallets .~ updatedDexWallets
       & #loanWallets .~ updatedLoanWallets
+      & #optionsWallets .~ updatedOptionsWallets
   where
     fetchPaymentWallets :: IO [PaymentWallet]
     fetchPaymentWallets =
@@ -76,6 +83,12 @@ syncWallets databaseFile network ws@Wallets{..} = do
     fetchLoanWallets :: IO [LoanWallet]
     fetchLoanWallets =
       pooledMapConcurrently runQueryLoanWallet loanWallets >>= 
+        -- Throw an error if syncing failed.
+        mapM fromRightOrAppError
+
+    fetchOptionsWallets :: IO [OptionsWallet]
+    fetchOptionsWallets =
+      pooledMapConcurrently runQueryOptionsWallet optionsWallets >>= 
         -- Throw an error if syncing failed.
         mapM fromRightOrAppError
 

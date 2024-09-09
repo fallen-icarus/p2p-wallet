@@ -16,6 +16,7 @@ import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
 import P2PWallet.GUI.EventHandler.TxBuilderEvent.LoanBuilderEvent
+import P2PWallet.GUI.EventHandler.TxBuilderEvent.OptionsBuilderEvent
 import P2PWallet.GUI.EventHandler.TxBuilderEvent.SwapBuilderEvent
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -37,6 +38,11 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -- Run loan event
   -----------------------------------------------
   LoanBuilderEvent loanEvent -> handleLoanBuilderEvent model loanEvent
+
+  -----------------------------------------------
+  -- Run options event
+  -----------------------------------------------
+  OptionsBuilderEvent optionsEvent -> handleOptionsBuilderEvent model optionsEvent
 
   -----------------------------------------------
   -- Open the Add Popup

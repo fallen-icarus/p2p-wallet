@@ -131,12 +131,12 @@ updateLenderAddressDeposit i@LenderAddressUpdate{loanUTxO=LoanUTxO{lovelace}} ca
         return $ i 
           & #extraDeposit .~ 0
           & #keyDeposit .~ keyDeposit
-    _ -> Left $ "calculateMinUTxOValue did not return exactly two results"
+    _ -> Left "calculateMinUTxOValue did not return exactly two results"
 
 -- | Generate the deposit message.
 createLenderAddressDepositMsg :: LenderAddressUpdate -> Text
 createLenderAddressDepositMsg LenderAddressUpdate{keyDeposit,extraDeposit} =
-    unlines $ intersperse "" $ filter (/= "") $
+    unlines $ intersperse "" $ filter (/= "")
       [ keyDepositMsg
       , extraDepositMsg
       ]

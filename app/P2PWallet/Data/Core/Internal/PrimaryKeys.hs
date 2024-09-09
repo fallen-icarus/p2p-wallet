@@ -57,3 +57,10 @@ newtype DexWalletId = DexWalletId { unDexWalletId :: Int }
   deriving newtype (Eq,Ord,Num,ToField,FromField)
 
 makeFieldLabelsNoPrefix ''DexWalletId
+
+-- | The row id for the options_wallets sqlite table.
+newtype OptionsWalletId = OptionsWalletId { unOptionsWalletId :: Int }
+  deriving (Show)
+  deriving newtype (Eq,Ord,Num,ToField,FromField)
+
+makeFieldLabelsNoPrefix ''OptionsWalletId

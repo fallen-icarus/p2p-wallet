@@ -83,6 +83,7 @@ module P2PWallet.Data.DeFi.CardanoLoans
     -- * Reference Scripts Output References
   , LoanScriptType(..)
   , getScriptRef
+  , proxyScriptTestnetRef
 
     -- * Re-exports
   , module P2PWallet.Data.DeFi.CardanoLoans.Internal

@@ -400,10 +400,9 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           -- Verify that the loan is not already being updated.
           fromRightOrAppError $
             maybeToLeft () $ "This loan address is already being updated." <$
-              find (== newUpdate ^. #loanUTxO) (concat
-                [ map (view $ _2 % #loanUTxO) $ 
-                    txBuilderModel ^. #loanBuilderModel % #addressUpdates
-                ])
+              find (== newUpdate ^. #loanUTxO)
+                (map (view $ _2 % #loanUTxO) $ 
+                    txBuilderModel ^. #loanBuilderModel % #addressUpdates)
 
           verifiedUpdate <- fromRightOrAppError $ 
             verifyNewLenderAddressUpdate (config ^. #currentTime) newUpdate
@@ -485,9 +484,7 @@ processNewExpiredClaim claim model@TxBuilderModel{loanBuilderModel=LoanBuilderMo
 
   -- Verify that the loan UTxO is not already being spent.
   maybeToLeft () $ "This collateral UTxO is already being claimed." <$
-    find (== claim ^. #loanUTxO) (concat
-      [ map (view $ _2 % #loanUTxO) expiredClaims
-      ])
+    find (== claim ^. #loanUTxO) (map (view $ _2 % #loanUTxO) expiredClaims)
 
   -- Get the input's new index.
   let newIdx = length expiredClaims
@@ -505,9 +502,7 @@ processNewLoanKeyBurn :: LoanKeyBurn -> TxBuilderModel -> Either Text TxBuilderM
 processNewLoanKeyBurn newBurn model@TxBuilderModel{loanBuilderModel=LoanBuilderModel{..}} = do
   -- Verify that the loan id is not already being burned.
   maybeToLeft () $ "This loan Key is already being burned." <$
-    find (== newBurn ^. #loanIdAsset) (concat
-      [ map (view $ _2 % #loanIdAsset) keyBurns
-      ])
+    find (== newBurn ^. #loanIdAsset) (map (view $ _2 % #loanIdAsset) keyBurns)
 
   -- Get the input's new index.
   let newIdx = length keyBurns

@@ -30,7 +30,7 @@ data AskClose = AskClose
   , askDatum :: Maybe AskDatum
   -- | Wallet this UTxO is from.
   , walletAlias :: Text
-  -- | Which network the swaps are for. This is used internally to figure out which reference
+  -- | Which network this is for. This is used internally to figure out which reference
   -- scripts to use.
   , network :: Network
   } deriving (Show,Eq)

@@ -16,6 +16,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel
   , module P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
   , module P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
+  , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel
   , module P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
   , module P2PWallet.Data.AppModel.TxBuilderModel.TestMint
   , module P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
@@ -28,6 +29,7 @@ import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
 import P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
+import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel
 import P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
 import P2PWallet.Data.AppModel.TxBuilderModel.TestMint
 import P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
@@ -79,6 +81,8 @@ data TxBuilderEvent
   | SwapBuilderEvent SwapBuilderEvent
   -- | Builder events for loans.
   | LoanBuilderEvent LoanBuilderEvent
+  -- | Builder events for options.
+  | OptionsBuilderEvent OptionsBuilderEvent
   -- | Build the transaction while also estimating the execution budgets and tx fee. Return the
   -- updated TxBuilderModel.
   | BuildTx (ProcessEvent () TxBuilderModel)
@@ -156,6 +160,8 @@ data TxBuilderModel = TxBuilderModel
   , swapBuilderModel :: SwapBuilderModel
   -- | The loans builder sub model for loans related builder information.
   , loanBuilderModel :: LoanBuilderModel
+  -- | The options builder sub model for options related builder information.
+  , optionsBuilderModel :: OptionsBuilderModel
   -- | The transaction fee for the built transaction.
   , fee :: Lovelace
   -- | A list of required witnesses. This is used to determine whether the transaction can be signed
@@ -211,6 +217,7 @@ instance Default TxBuilderModel where
     , addingTestMint = False
     , swapBuilderModel = def
     , loanBuilderModel = def
+    , optionsBuilderModel = def
     , fee = 0
     , keyWitnesses = []
     , txType = PairedTx -- This is set so the default GUI button is to submit.
@@ -242,6 +249,7 @@ isEmptyBuilder TxBuilderModel{..} = and
   , isNothing collateralInput
   , isEmptySwapBuilderModel swapBuilderModel
   , isEmptyLoanBuilderModel loanBuilderModel
+  , isEmptyOptionsBuilderModel optionsBuilderModel
   ]
 
 -- | Convert the `TxBuilderModel` to a `TxBody`.
@@ -266,6 +274,8 @@ convertToTxBody TxBuilderModel{..} =
     , addToTxBody mempty swapBuilderModel
     -- Add any loan actions.
     , addToTxBody mempty loanBuilderModel
+    -- Add any options actions.
+    , addToTxBody mempty optionsBuilderModel
     -- Add the collateral and the fee to the transaction. This is done together because
     -- the amount of collateral required depends on the fee.
     , let txWithFee = mempty & #fee .~ fee in
@@ -308,4 +318,6 @@ hasInputs TxBuilderModel{..} = or
   , loanBuilderModel ^. #loanPayments /= []
   , loanBuilderModel ^. #interestApplications /= []
   , loanBuilderModel ^. #expiredClaims /= []
+  , optionsBuilderModel ^. #proposalCloses /= []
+  , optionsBuilderModel ^. #proposalUpdates /= []
   ]

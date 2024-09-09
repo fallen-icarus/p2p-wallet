@@ -637,8 +637,7 @@ addOfferAcceptanceToBody txBody (_,OfferAcceptance{..}) =
       | otherwise = Just asset
 
     lenderPayemntAddress :: PaymentAddress
-    lenderPayemntAddress = fromRight ""
-                         $ fmap fst
+    lenderPayemntAddress = either (const "") fst
                          $ plutusToBech32 network 
                          $ targetOfferDatum ^. #lenderAddress
 
@@ -718,7 +717,7 @@ addOfferAcceptanceToBody txBody (_,OfferAcceptance{..}) =
       { paymentAddress = lenderPayemntAddress
       , lovelace = lenderPaymentLovelace
       , nativeAssets = lenderPaymentBeacons -- Add the beacons to the output.
-      , datum = OutputDatum $ toDatum $ Loans.PaymentDatum $ 
+      , datum = OutputDatum $ toDatum $ Loans.PaymentDatum
           ( Loans.activeBeaconCurrencySymbol
           , activeDatum ^. #loanId % #unLoanId
           )
@@ -829,8 +828,7 @@ addLoanPaymentToBody txBody (_,LoanPayment{..}) =
       Loans.createPostPaymentActiveDatum (paymentAmount ^. #quantity) targetActiveDatum
 
     lenderPayemntAddress :: PaymentAddress
-    lenderPayemntAddress = fromRight ""
-                         $ fmap fst
+    lenderPayemntAddress = either (const "") fst
                          $ plutusToBech32 network 
                          $ targetActiveDatum ^. #lenderAddress
 
@@ -880,7 +878,7 @@ addLoanPaymentToBody txBody (_,LoanPayment{..}) =
       { paymentAddress = lenderPayemntAddress
       , lovelace = lenderPaymentLovelace
       , nativeAssets = lenderNativeAssets
-      , datum = OutputDatum $ toDatum $ Loans.PaymentDatum $ 
+      , datum = OutputDatum $ toDatum $ Loans.PaymentDatum
           ( Loans.activeBeaconCurrencySymbol
           , targetActiveDatum ^. #loanId % #unLoanId
           )
@@ -1069,7 +1067,7 @@ addLoanKeyBurnToBody txBody (_,LoanKeyBurn{..}) =
     newMint = TxBodyMint
       { mintingPolicyHash = policyIdToScriptHash Loans.activeBeaconCurrencySymbol
       , nativeAssets = [loanIdAsset]
-      , redeemer = toRedeemer $ Loans.BurnActiveBeacons
+      , redeemer = toRedeemer Loans.BurnActiveBeacons
       , scriptWitness = ReferenceWitness $ Loans.getScriptRef network Loans.ActiveScript
       , executionBudget = def -- These must be calculated during the build step.
       }
@@ -1138,7 +1136,7 @@ addAddressUpdateToBody txBody (_,LenderAddressUpdate{..}) =
           [ mkNativeAsset Loans.activeBeaconCurrencySymbol (loanId ^. #unLoanId)
               & #quantity .~ 1
           ]
-      , datum = OutputDatum $ toDatum $ Loans.PaymentDatum $ 
+      , datum = OutputDatum $ toDatum $ Loans.PaymentDatum
           ( Loans.activeBeaconCurrencySymbol
           , loanId ^. #unLoanId
           )

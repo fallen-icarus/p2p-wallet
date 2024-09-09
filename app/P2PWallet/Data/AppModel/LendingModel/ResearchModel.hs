@@ -51,7 +51,7 @@ type CachedLoanOffers = Map.Map LoanOfferConfiguration [LoanUTxO]
 -- | Not all of the fields in `LoanOfferConfiguration` are relevant for looking in the cache. This
 -- function handles those fields.
 lookupCachedOffers :: LoanOfferConfiguration -> CachedLoanOffers -> Maybe [LoanUTxO]
-lookupCachedOffers offerCfg cache = Map.lookup correctedCfg cache
+lookupCachedOffers offerCfg = Map.lookup correctedCfg
   where
     correctedCfg = offerCfg 
       & #collateral .~ []
@@ -63,7 +63,7 @@ insertIntoCachedOffers
   -> [LoanUTxO] 
   -> CachedLoanOffers 
   -> CachedLoanOffers
-insertIntoCachedOffers offerCfg result cache = Map.insert correctedCfg result cache
+insertIntoCachedOffers offerCfg = Map.insert correctedCfg
   where
     correctedCfg = offerCfg 
       & #collateral .~ []
@@ -77,7 +77,7 @@ type CachedActiveLoans = Map.Map ActiveLoanConfiguration [LoanUTxO]
 -- | Not all of the fields in `ActiveLoanConfiguration` are relevant for looking in the cache. This
 -- function handles those fields.
 lookupCachedActiveLoans :: ActiveLoanConfiguration -> CachedActiveLoans -> Maybe [LoanUTxO]
-lookupCachedActiveLoans activeCfg cache = Map.lookup correctedCfg cache
+lookupCachedActiveLoans activeCfg = Map.lookup correctedCfg
   where
     correctedCfg = activeCfg 
       & #collateral .~ []
@@ -89,7 +89,7 @@ insertIntoCachedActiveLoans
   -> [LoanUTxO] 
   -> CachedActiveLoans
   -> CachedActiveLoans
-insertIntoCachedActiveLoans activeCfg result cache = Map.insert correctedCfg result cache
+insertIntoCachedActiveLoans activeCfg = Map.insert correctedCfg
   where
     correctedCfg = activeCfg 
       & #collateral .~ []

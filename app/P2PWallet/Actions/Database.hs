@@ -46,6 +46,12 @@ module P2PWallet.Actions.Database
   , insertLoanWallet
   , deleteLoanWallet
   , getNextLoanWalletId
+
+    -- * Options Wallets
+  , loadOptionsWallets
+  , insertOptionsWallet
+  , deleteOptionsWallet
+  , getNextOptionsWalletId
   ) where
 
 import System.Directory qualified as Dir
@@ -78,6 +84,7 @@ initializeDatabase dbFile = do
       create @TickerInfo dbFile
       create @DexWallet dbFile
       create @LoanWallet dbFile
+      create @OptionsWallet dbFile
       return $ Right ()
 
 -------------------------------------------------
@@ -127,6 +134,7 @@ deleteProfile dbFile (ProfileId profileId) =
         , tableName @AddressEntry
         , tableName @DexWallet
         , tableName @LoanWallet
+        , tableName @OptionsWallet
         -- The ticker registry is global (it applies to all profiles and networks).
         ]
   where
@@ -230,6 +238,7 @@ deleteStakeWallet dbFile (StakeWalletId stakeWalletId) =
         [ tableName @StakeWallet
         , tableName @DexWallet
         , tableName @LoanWallet
+        , tableName @OptionsWallet
         ]
   where
     deleteStmt :: Text -> Query
@@ -246,6 +255,7 @@ changeDeFiWalletAliases dbFile (StakeWalletId stakeWalletId) newAlias =
       Right <$> mapM_ (update dbFile . updateStmt)
         [ tableName @DexWallet
         , tableName @LoanWallet
+        , tableName @OptionsWallet
         ]
   where
     updateStmt :: Text -> Query
@@ -274,11 +284,15 @@ loadWallets dbFile Profile{..} = do
     -- Load the loan wallets.
     loanWallets <- loadLoanWallets dbFile profileId >>= fromRightOrAppError
 
+    -- Load the options wallets.
+    optionsWallets <- loadOptionsWallets dbFile profileId >>= fromRightOrAppError
+
     return $ Right $ Wallets
       { paymentWallets = paymentWallets
       , stakeWallets = stakeWallets
       , dexWallets = dexWallets
       , loanWallets = loanWallets
+      , optionsWallets = optionsWallets
       }
 
 -------------------------------------------------
@@ -459,5 +473,55 @@ getNextLoanWalletId dbFile =
       [ "SELECT loan_wallet_id FROM"
       , tableName @LoanWallet
       , "ORDER BY loan_wallet_id DESC"
+      , "LIMIT 1;"
+      ]
+
+-------------------------------------------------
+-- Options Wallet
+-------------------------------------------------
+-- | Load the options wallets for the specified profile.
+loadOptionsWallets :: FilePath -> ProfileId -> IO (Either Text [OptionsWallet])
+loadOptionsWallets dbFile (ProfileId profileId) = do
+    handle @SomeException (return . Left . ("Could not load options wallets: " <>) . show) $
+      Right <$> query dbFile queryStmt
+  where
+    queryStmt :: Query
+    queryStmt = Query $ unwords
+      [ "SELECT * FROM " <> tableName @OptionsWallet
+      , "WHERE profile_id = " <> show profileId
+      , "ORDER BY options_wallet_id ASC;"
+      ]
+
+-- | Add a new options wallet to the database. This also updates options wallets.
+insertOptionsWallet :: FilePath -> OptionsWallet -> IO (Either Text ())
+insertOptionsWallet dbFile optionsWallet = do
+  handle @SomeException (return . Left . ("Failed to insert options wallet: " <>) . show) $
+    Right <$> insert @OptionsWallet dbFile optionsWallet
+
+-- | Delete a options wallet and all of its entries across the database.
+deleteOptionsWallet :: FilePath -> OptionsWalletId -> IO (Either Text ())
+deleteOptionsWallet dbFile (OptionsWalletId optionsWalletId) = 
+    handle @SomeException (return . Left . ("Failed to delete options wallet: " <>) . show) $ do
+      Right <$> mapM_ (delete dbFile . deleteStmt)
+        [ tableName @OptionsWallet
+        ]
+  where
+    deleteStmt :: Text -> Query
+    deleteStmt table = Query $ unwords
+      [ "DELETE FROM " <> table
+      , "WHERE options_wallet_id = " <> show optionsWalletId
+      ]
+
+getNextOptionsWalletId :: FilePath -> IO (Either Text OptionsWalletId)
+getNextOptionsWalletId dbFile =
+    handle @SomeException (return . Left . ("Could not get next options wallet id: " <>) . show) $
+      -- If the result is the empty list, this is the first entry.
+      maybe (Right 0) (Right . OptionsWalletId . (+1) . Sqlite.fromOnly) . maybeHead <$> 
+        query dbFile stmt
+  where
+    stmt = Sqlite.Query $ mconcat $ intersperse " "
+      [ "SELECT options_wallet_id FROM"
+      , tableName @OptionsWallet
+      , "ORDER BY options_wallet_id DESC"
       , "LIMIT 1;"
       ]
