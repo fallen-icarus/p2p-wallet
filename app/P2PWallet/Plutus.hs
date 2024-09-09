@@ -303,7 +303,7 @@ fromCardanoScriptData = PV1.dataToBuiltinData . toPlutusData . Api.getScriptData
 
 decodeData :: (PV1.FromData a) => Aeson.Value -> Maybe a
 decodeData = either (const Nothing) (PV1.fromBuiltinData . fromCardanoScriptData)
-            . Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema
+           . Api.scriptDataFromJson Api.ScriptDataJsonDetailedSchema
 
 encodeData :: (PV1.ToData a) => a -> Value
 encodeData = toJSONValue

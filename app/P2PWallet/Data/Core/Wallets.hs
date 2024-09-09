@@ -12,6 +12,7 @@ module P2PWallet.Data.Core.Wallets
 
   , module P2PWallet.Data.Core.Wallets.DexWallet
   , module P2PWallet.Data.Core.Wallets.LoanWallet
+  , module P2PWallet.Data.Core.Wallets.OptionsWallet
   , module P2PWallet.Data.Core.Wallets.PaymentWallet
   , module P2PWallet.Data.Core.Wallets.StakeWallet
   ) where
@@ -19,6 +20,7 @@ module P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.Core.Internal.PrimaryKeys
 import P2PWallet.Data.Core.Wallets.DexWallet
 import P2PWallet.Data.Core.Wallets.LoanWallet
+import P2PWallet.Data.Core.Wallets.OptionsWallet
 import P2PWallet.Data.Core.Wallets.PaymentWallet
 import P2PWallet.Data.Core.Wallets.StakeWallet
 import P2PWallet.Prelude
@@ -28,6 +30,7 @@ data Wallets = Wallets
   , stakeWallets :: [StakeWallet]
   , dexWallets :: [DexWallet]
   , loanWallets :: [LoanWallet]
+  , optionsWallets :: [OptionsWallet]
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''Wallets
@@ -38,6 +41,7 @@ instance Default Wallets where
     , stakeWallets = []
     , dexWallets = []
     , loanWallets = []
+    , optionsWallets = []
     }
 
 -------------------------------------------------
@@ -50,6 +54,7 @@ updateStakeIdAliases stakeWalletId newAlias wallets =
       & #stakeWallets %~ update
       & #dexWallets %~ update
       & #loanWallets %~ update
+      & #optionsWallets %~ update
   where
     update 
       :: ( Default a
@@ -70,6 +75,7 @@ deleteStakeIdWallets stakeWalletId wallets =
       & #stakeWallets %~ delete
       & #dexWallets %~ delete
       & #loanWallets %~ delete
+      & #optionsWallets %~ delete
   where
     delete 
       :: (Default a , LabelOptic "stakeWalletId" A_Lens a a StakeWalletId StakeWalletId) 

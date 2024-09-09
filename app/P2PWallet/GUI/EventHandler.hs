@@ -18,6 +18,7 @@ import P2PWallet.GUI.EventHandler.DelegationEvent
 import P2PWallet.GUI.EventHandler.DexEvent
 import P2PWallet.GUI.EventHandler.HomeEvent
 import P2PWallet.GUI.EventHandler.LendingEvent
+import P2PWallet.GUI.EventHandler.OptionsEvent
 import P2PWallet.GUI.EventHandler.ProfileEvent
 import P2PWallet.GUI.EventHandler.TickerRegistryEvent
 import P2PWallet.GUI.EventHandler.TxBuilderEvent
@@ -123,6 +124,11 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   LendingEvent modal -> handleLendingEvent model modal
 
   -----------------------------------------------
+  -- Options Events
+  -----------------------------------------------
+  OptionsEvent modal -> handleOptionsEvent model modal
+
+  -----------------------------------------------
   -- TxBuilder Events
   -----------------------------------------------
   TxBuilderEvent modal -> handleTxBuilderEvent model modal
@@ -176,6 +182,9 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
           loanTarget = model ^. #lendingModel % #selectedWallet % #loanWalletId
           updatedLoanTarget = 
             fromMaybe def $ find (\w -> w ^. #loanWalletId == loanTarget) loanWallets
+          optionsTarget = model ^. #optionsModel % #selectedWallet % #optionsWalletId
+          updatedOptionsTarget = 
+            fromMaybe def $ find (\w -> w ^. #optionsWalletId == optionsTarget) optionsWallets
       in  [ Model $ model 
               & #waitingStatus % #syncingWallets .~ False
               & #knownWallets .~ resp
@@ -183,6 +192,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
               & #delegationModel % #selectedWallet .~ updatedStakeTarget
               & #dexModel % #selectedWallet .~ updatedDexTarget
               & #lendingModel % #selectedWallet .~ updatedLoanTarget
+              & #optionsModel % #selectedWallet .~ updatedOptionsTarget
               & #txBuilderModel % #parameters ?~ networkParams
               & #fingerprintMap .~ 
                   toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)

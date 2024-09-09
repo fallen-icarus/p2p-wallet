@@ -296,10 +296,10 @@ toLoanResult borrowerId Koios.EventTransaction{..} = do
     proccessEvent :: Koios.TransactionPlutusContract -> Maybe LoanResult
     proccessEvent Koios.TransactionPlutusContract{..} = do
       parsedDatum@Loans.ActiveDatum{loanOutstanding} <- 
-        maybe Nothing (decodeData @Loans.ActiveDatum) datum
+        datum >>= decodeData @Loans.ActiveDatum
 
       -- This execution must be for the specified borrower id. 
-      when (parsedDatum ^. #borrowerId /= borrowerId) $ Nothing
+      when (parsedDatum ^. #borrowerId /= borrowerId) Nothing
 
       parsedRedeemer <- decodeData @Loans.LoanRedeemer redeemer
       Koios.TransactionUTxO{lovelace,nativeAssets} <- 
@@ -456,28 +456,34 @@ instance Insertable LoanWallet where
 
 instance Notify LoanWallet where
   notify oldState newState
-    | oldState ^. #utxos /= newState ^. #utxos || oldState ^. #offerUTxOs /= newState ^. #offerUTxOs =
+    | msg /= [] =
         Just $ Notification
           { notificationType = LoanNotification
           , alias = oldState ^. #alias
-          , message = unlines $ filter (/= "") 
-              [ asksMsg
-              , borrowerOffersMsg
-              , lenderOffersMsg
-              , activesMsg
-              ]
+          , message = unlines msg
           , markedAsRead = False
           }
     | otherwise = Nothing
     where
+      msg :: [Text]
+      msg = filter (/= "")
+        [ asksMsg
+        , borrowerOffersMsg
+        , lenderOffersMsg
+        , activesMsg
+        ]
+
       asksOnly :: [LoanUTxO] -> [TxOutRef]
-      asksOnly = map (view #utxoRef) . filter (isJust . preview (#loanDatum % _Just % _AskDatum))
+      asksOnly = sort
+               . map (view #utxoRef) . filter (isJust . preview (#loanDatum % _Just % _AskDatum))
 
       offersOnly :: [LoanUTxO] -> [TxOutRef]
-      offersOnly = map (view #utxoRef) . filter (isJust . preview (#loanDatum % _Just % _OfferDatum))
+      offersOnly = sort
+                 . map (view #utxoRef) . filter (isJust . preview (#loanDatum % _Just % _OfferDatum))
 
       activeOnly :: [LoanUTxO] -> [TxOutRef]
-      activeOnly = map (view #utxoRef) . filter (isJust . preview (#loanDatum % _Just % _ActiveDatum))
+      activeOnly = sort 
+                 . map (view #utxoRef) . filter (isJust . preview (#loanDatum % _Just % _ActiveDatum))
 
       asksMsg :: Text
       asksMsg

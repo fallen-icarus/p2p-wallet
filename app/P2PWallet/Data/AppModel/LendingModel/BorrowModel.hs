@@ -111,7 +111,7 @@ data BorrowEvent
 -------------------------------------------------
 -- Transaction Filter Model
 -------------------------------------------------
-data BorrowTxFilterModel = BorrowTxFilterModel
+newtype BorrowTxFilterModel = BorrowTxFilterModel
   -- | The date range for displaying transactions.
   { dateRange :: (Maybe Day, Maybe Day)
   } deriving (Show,Eq)

@@ -47,10 +47,10 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (LendingEvent . BorrowEvent . CreateNewAsk . AddResult) $ do
           when (hasOfferActions $ txBuilderModel ^. #loanBuilderModel) $
-            throwIO $ AppError $ borrowAndLendError
+            throwIO $ AppError borrowAndLendError
 
           when ([] /= txBuilderModel ^. #loanBuilderModel % #offerAcceptances) $
-            throwIO $ AppError $ acceptAndNegotiateError
+            throwIO $ AppError acceptAndNegotiateError
 
           verifiedAskCreation <- fromRightOrAppError $
             verifyNewAskCreation tickerMap $ fromMaybe def $ 
@@ -135,10 +135,10 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (LendingEvent . BorrowEvent . AddSelectedAskUpdate . AddResult) $ do
           when (hasOfferActions $ txBuilderModel ^. #loanBuilderModel) $ 
-            throwIO $ AppError $ borrowAndLendError
+            throwIO $ AppError borrowAndLendError
 
           when ([] /= txBuilderModel ^. #loanBuilderModel % #offerAcceptances) $
-            throwIO $ AppError $ acceptAndNegotiateError
+            throwIO $ AppError acceptAndNegotiateError
 
           let LoanWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
                 lendingModel ^. #selectedWallet
@@ -292,7 +292,7 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
       , Task $ runActionOrAlert (LendingEvent . BorrowEvent . AcceptLoanOffer . AddNewAcceptance) $ do
           let loanBuilderModel = txBuilderModel ^. #loanBuilderModel
           when (hasAskActions loanBuilderModel || hasOfferActions loanBuilderModel) $
-            throwIO $ AppError $ acceptAndNegotiateError
+            throwIO $ AppError acceptAndNegotiateError
 
           unless (hasOnlyOneActiveBeaconAction loanBuilderModel) $
             throwIO $ AppError onlyOneActiveBeaconActionError
@@ -377,10 +377,9 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
 
           -- Verify that the new utxo is not already being spent.
           flip whenJust (const $ throwIO $ AppError "This loan UTxO is already being spent.") $
-            find (== newPayment ^. #activeUTxO % #utxoRef) (concat
-              [ map (view $ _2 % #activeUTxO % #utxoRef) $ 
-                  txBuilderModel ^. #loanBuilderModel % #loanPayments
-              ])
+            find (== newPayment ^. #activeUTxO % #utxoRef) $
+              map (view $ _2 % #activeUTxO % #utxoRef) $ 
+                txBuilderModel ^. #loanBuilderModel % #loanPayments
 
           verifiedNewPayment <- fromRightOrAppError $ 
             verifyNewLoanPayment reverseTickerMap tickerMap (config ^. #currentTime) newPayment
@@ -392,7 +391,7 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
 
           -- Full loan payments cannot happen in the same transaction where offers are accepted.
           when (verifiedNewPayment ^. #isFullPayment) $
-            unless (txBuilderModel ^. #loanBuilderModel % #offerAcceptances == []) $
+            unless (null $ txBuilderModel ^. #loanBuilderModel % #offerAcceptances) $
               throwIO $ AppError acceptAndFullPaymentError
 
           -- There will be two outputs for this action: the collateral output and the lender
@@ -459,10 +458,9 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
 
           -- Verify that the new utxo is not already being spent.
           flip whenJust (const $ throwIO $ AppError "This loan UTxO is already being spent.") $
-            find (== loanUTxO ^. #utxoRef) (concat
-              [ map (view $ _2 % #utxoRef) $ 
-                  txBuilderModel ^. #loanBuilderModel % #interestApplications
-              ])
+            find (== loanUTxO ^. #utxoRef) $
+              map (view $ _2 % #utxoRef) $ 
+                txBuilderModel ^. #loanBuilderModel % #interestApplications
 
           let LoanWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
                 lendingModel ^. #selectedWallet
@@ -578,9 +576,7 @@ processNewLostClaim claim model@TxBuilderModel{loanBuilderModel=LoanBuilderModel
 
   -- Verify that the loan UTxO is not already being spent.
   maybeToLeft () $ "This collateral UTxO is already being claimed." <$
-    find (== claim ^. #loanUTxO) (concat
-      [ map (view $ _2 % #loanUTxO) expiredClaims
-      ])
+    find (== claim ^. #loanUTxO) (map (view $ _2 % #loanUTxO) expiredClaims)
 
   -- Get the input's new index.
   let newIdx = length expiredClaims

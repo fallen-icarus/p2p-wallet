@@ -18,6 +18,7 @@ module P2PWallet.Data.AppModel
   , configureSelectedDeFiWallets
   , swapBuilderEvent
   , loanBuilderEvent
+  , optionsBuilderEvent
 
     -- * Re-exports
   , module P2PWallet.Data.AppModel.AddressBookModel
@@ -26,6 +27,7 @@ module P2PWallet.Data.AppModel
   , module P2PWallet.Data.AppModel.DexModel
   , module P2PWallet.Data.AppModel.HomeModel
   , module P2PWallet.Data.AppModel.LendingModel
+  , module P2PWallet.Data.AppModel.OptionsModel
   , module P2PWallet.Data.AppModel.ProfileModel
   , module P2PWallet.Data.AppModel.TickerRegistryModel
   , module P2PWallet.Data.AppModel.TxBuilderModel
@@ -39,6 +41,7 @@ import P2PWallet.Data.AppModel.DelegationModel
 import P2PWallet.Data.AppModel.DexModel
 import P2PWallet.Data.AppModel.HomeModel
 import P2PWallet.Data.AppModel.LendingModel
+import P2PWallet.Data.AppModel.OptionsModel
 import P2PWallet.Data.AppModel.ProfileModel
 import P2PWallet.Data.AppModel.TickerRegistryModel
 import P2PWallet.Data.AppModel.TxBuilderModel
@@ -163,6 +166,8 @@ data AppEvent
   | DexEvent DexEvent 
   -- | An event for the Loans page.
   | LendingEvent LendingEvent 
+  -- | An event for the Options page.
+  | OptionsEvent OptionsEvent 
   -- | An event for the Tx Builder page.
   | TxBuilderEvent TxBuilderEvent 
   -- | Submit a signed transaction.
@@ -207,6 +212,8 @@ data AppModel = AppModel
   , dexModel :: DexModel
   -- | The lending model.
   , lendingModel :: LendingModel
+  -- | The options model.
+  , optionsModel :: OptionsModel
   -- | The model for the tx builder scene.
   , txBuilderModel :: TxBuilderModel
   -- | The address book for this profile.
@@ -242,6 +249,7 @@ instance Default AppModel where
     , tickerRegistryModel = def
     , dexModel = def
     , lendingModel = def
+    , optionsModel = def
     , txBuilderModel = def
     , addressBook = []
     , tickerMap = mempty
@@ -267,6 +275,7 @@ configureSelectedDeFiWallets model@AppModel{..} =
     & #delegationModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #stakeWallets)
     & #dexModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #dexWallets)
     & #lendingModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #loanWallets)
+    & #optionsModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #optionsWallets)
 
 -- | This is a useful alias for conciseness.
 swapBuilderEvent :: SwapBuilderEvent -> AppEvent
@@ -275,3 +284,7 @@ swapBuilderEvent = TxBuilderEvent . SwapBuilderEvent
 -- | This is a useful alias for conciseness.
 loanBuilderEvent :: LoanBuilderEvent -> AppEvent
 loanBuilderEvent = TxBuilderEvent . LoanBuilderEvent
+
+-- | This is a useful alias for conciseness.
+optionsBuilderEvent :: OptionsBuilderEvent -> AppEvent
+optionsBuilderEvent = TxBuilderEvent . OptionsBuilderEvent

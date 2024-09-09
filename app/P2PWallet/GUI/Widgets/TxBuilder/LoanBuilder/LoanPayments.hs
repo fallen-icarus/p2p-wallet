@@ -96,7 +96,7 @@ editLoanPaymentWidget AppModel{..} = do
         startingBalance = toRational $ roundUp $ toRational loanOutstanding
         mPaymentRatio = (/ startingBalance) <$> mPaymentAmount
         prettyRatio = (<> "%") $ show @_ @Decimal $ (*100) $ realFracToDecimal 10
-                    $ (fromMaybe 0 mPaymentRatio)
+                    $ fromMaybe 0 mPaymentRatio
         helpButton msg = box_ [alignMiddle, onClick $ Alert msg] $
           label helpIcon
             `styleBasic`

@@ -140,8 +140,7 @@ createNewLoanPayment reverseTickerMap activeUTxO@LoanUTxO{lovelace,nativeAssets}
       | otherwise = toNativeAsset loanAsset -- quantity 0
 
     adaIsCollateral :: Bool
-    adaIsCollateral = any (== Loans.Asset ("","")) 
-                    $ map fst 
+    adaIsCollateral = any ((== Loans.Asset ("","")) . fst)
                     $ Loans.unCollateralization collateralization
 
     allAssets
@@ -281,7 +280,7 @@ updateLoanPaymentDeposits minValues loanPayment reverseTickerMap = do
     case minValues of
       [paymentDeposit] -> do
         unless isFullPayment $
-          Left $ "calculateMinUTxOValue returned one result when it should return two"
+          Left "calculateMinUTxOValue returned one result when it should return two"
 
         if paymentAmount ^. #policyId == "" then do
           -- The loan payment is ADA which means the minUTxOValue should be covered by the
@@ -289,7 +288,7 @@ updateLoanPaymentDeposits minValues loanPayment reverseTickerMap = do
           when (paymentAmount ^. #quantity < unLovelace paymentDeposit) $ 
             Left $ unwords
               [ "The payment to the lender requires a minimum deposit of"
-              , (showAssetBalance True reverseTickerMap $ paymentAmount & #quantity .~ 
+              , showAssetBalance True reverseTickerMap (paymentAmount & #quantity .~ 
                   unLovelace paymentDeposit) <> "."
               , "Make sure the loan payment is at least that amount so the deposit counts towards"
               , "your loan payment."
@@ -307,7 +306,7 @@ updateLoanPaymentDeposits minValues loanPayment reverseTickerMap = do
 
       [paymentDeposit, collateralDeposit] -> do
         when isFullPayment $
-          Left $ "calculateMinUTxOValue returned two results when it should only return one"
+          Left "calculateMinUTxOValue returned two results when it should only return one"
 
         let adaCollateral = fromMaybe lovelaceAsNativeAsset 
                           $ find ((== "") . view #policyId) collateralBalances
@@ -317,7 +316,7 @@ updateLoanPaymentDeposits minValues loanPayment reverseTickerMap = do
           when (paymentAmount ^. #quantity < unLovelace paymentDeposit) $ 
             Left $ unwords
               [ "The payment to the lender requires a minimum deposit of"
-              , (showAssetBalance True reverseTickerMap $ paymentAmount & #quantity .~ 
+              , showAssetBalance True reverseTickerMap (paymentAmount & #quantity .~ 
                   unLovelace paymentDeposit) <> "."
               , "Make sure the loan payment is at least that amount so the deposit counts towards"
               , "your loan payment."

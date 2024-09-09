@@ -53,3 +53,8 @@ source-repository-package
     type: git
     location: https://github.com/fallen-icarus/cardano-loans
     tag: main
+
+source-repository-package
+    type: git
+    location: https://github.com/fallen-icarus/cardano-options
+    tag: 086594a457536b414b3dae49a24cb010b577fb86

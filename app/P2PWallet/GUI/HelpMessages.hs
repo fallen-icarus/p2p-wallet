@@ -1026,3 +1026,137 @@ activeLoansResearchSortMsg = unlines
   , "5. Based on the loan's interest rate"
   ]
 
+proposalOfferAmountMsg :: Text
+proposalOfferAmountMsg = unlines
+  [ "What asset will you give upon contract execution?"
+  , ""
+  , "The asset quantity must be in one of the following formats:"
+  , "1. '# policy_id.asset_name'"
+  , "2. '# ticker' - if in Ticker Registry"
+  , "3. '# ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+proposalAskAssetMsg :: Text
+proposalAskAssetMsg = unlines
+  [ "What asset do you want upon contract execution?"
+  , ""
+  , "The asset quantity must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+proposalPremiumAssetMsg :: Text
+proposalPremiumAssetMsg = unlines
+  [ "What asset do you want the premium to be paid in?"
+  , ""
+  , "The asset quantity must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+proposalTermsMsg :: Text
+proposalTermsMsg = unlines
+  [ "What terms are you offering?"
+  , ""
+  , "The terms must be in the following format:"
+  , "premium, strike price, expiration (mm/dd/yy)"
+  , ""
+  , "Do not specify units! Here is an example:"
+  , "10.000000, 2.1, 12/02/24"
+  , ""
+  , "The premium is the amount of the premium asset to be paid upon purchase of the proposal."
+  , ""
+  , unwords
+      [ "The strike price is the ratio of the ask asset that must be paid in order to take"
+      , "the offer amount. The units for the strike price is always ask asset / offer asset."
+      ]
+  , ""
+  , "The date is the expiration for the contract. The contract expires at the end of the day (ie, midnight)."
+  , ""
+  , "You can specify multiple possible terms by seperating them with newlines:"
+  , "10.000000, 2.1, 12/02/24"
+  , "13.000000, 2.5, 12/21/24"
+  , "15.000000, 2.7, 01/01/25"
+  , ""
+  , "The buyer of the proposal will choose one of the lines, and those terms will then be enforced."
+  ]
+
+proposalPaymentAddressMsg :: Text
+proposalPaymentAddressMsg = unlines
+  [ "What address should payments be made to?"
+  , ""
+  , unwords
+      [ "When the proposal is purchased, the buyer will deposit the premium to this address."
+      , "Then, when the contract is executed, the ask asset will also be deposit to this address."
+      , "This address can be changed at any time during the life of the contract."
+      ]
+  ]
+
+proposalFilterOfferAssetMsg :: Text
+proposalFilterOfferAssetMsg = unlines
+  [ "What asset will be given upon contract execution?"
+  , ""
+  , "The asset quantity must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+proposalFilterAskAssetMsg :: Text
+proposalFilterAskAssetMsg = unlines
+  [ "What asset will be deposited upon contract execution?"
+  , ""
+  , "The asset quantity must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+proposalFilterPremiumAssetMsg :: Text
+proposalFilterPremiumAssetMsg = unlines
+  [ "What asset will the premium be paid in?"
+  , ""
+  , "The asset quantity must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+proposalFilterSortMsg :: Text
+proposalFilterSortMsg = unlines
+  [ "Open options proposals can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Chronologically based on the time the UTxO was created"
+  , "3. Based on the amount of the offer asset"
+  , "4. Based on the premiums"
+  , "5. Based on the stike prices"
+  , "6. Based on the expirations"
+  , ""
+  , "Option 3 is only available when the offer asset is set in the filter settings."
+  , ""
+  , unwords
+      [ "Option 5 is only available when both the offer asset and the ask asset are set in"
+      , "the filter settings."
+      ]
+  , ""
+  , unwords
+      [ "For options 4, 5, and 6, the smallest term will be used when the contracts are sorting in"
+      , "ascending order. Meanwhile the largest term will be used when the contracts are sorted in"
+      , "descending order."
+      ]
+  ]
+

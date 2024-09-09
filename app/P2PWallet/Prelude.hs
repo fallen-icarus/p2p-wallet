@@ -1,5 +1,11 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module P2PWallet.Prelude
   ( -- * Text
     T.replace
@@ -11,6 +17,7 @@ module P2PWallet.Prelude
   , localTimeToPosixTime
   , Time.POSIXTime
   , Time.TimeZone
+  , Time.TimeLocale(..)
   , showLocalTime
   , showLocalDate
   , Time.getCurrentTimeZone
@@ -103,7 +110,7 @@ maybeHead (x:_) = Just x
 
 maybeLast :: [a] -> Maybe a
 maybeLast [] = Nothing
-maybeLast (x:[]) = Just x
+maybeLast [x] = Just x
 maybeLast (_:xs) = maybeLast xs
 
 -- | Break a list into sublists of the specified length.
@@ -170,6 +177,8 @@ getTemporaryDirectory = do
 -------------------------------------------------
 -- Time
 -------------------------------------------------
+makeFieldLabelsNoPrefix ''Time.TimeLocale
+
 -- | Convert `Time.POSIXTime` to the user's local date. Formatting: "Feb 13, 2024"
 showLocalDate :: Time.TimeZone -> Time.POSIXTime -> Text
 showLocalDate zone t = 

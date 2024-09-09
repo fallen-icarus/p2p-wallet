@@ -345,7 +345,7 @@ txValueFromWallet addr Transaction{inputs,outputs} =
         ( sum $ map (view #lovelace) addressOutputs
         , concatMap (view #nativeAssets) addressOutputs
         )
-      noBeacons = \NativeAsset{policyId} -> and
+      noBeacons NativeAsset{policyId} = and
         [ policyId /= Loans.negotiationBeaconCurrencySymbol
         , policyId /= Loans.activeBeaconCurrencySymbol
         ]

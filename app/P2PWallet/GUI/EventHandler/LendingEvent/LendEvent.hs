@@ -125,10 +125,10 @@ handleLendEvent model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (LendingEvent . LendEvent . CreateNewOffer . AddResult) $ do
           when (hasAskActions $ txBuilderModel ^. #loanBuilderModel) $
-            throwIO $ AppError $ borrowAndLendError
+            throwIO $ AppError borrowAndLendError
 
           when ([] /= txBuilderModel ^. #loanBuilderModel % #offerAcceptances) $
-            throwIO $ AppError $ acceptAndNegotiateError
+            throwIO $ AppError acceptAndNegotiateError
 
           newOffer <- fromJustOrAppError "newOfferCreation is Nothing" $
             lendingModel ^. #lendModel % #newOfferCreation
@@ -260,10 +260,10 @@ handleLendEvent model@AppModel{..} evt = case evt of
       [ Model $ model & #waitingStatus % #addingToBuilder .~ True
       , Task $ runActionOrAlert (LendingEvent . LendEvent . AddSelectedOfferUpdate . AddResult) $ do
           when (hasAskActions $ txBuilderModel ^. #loanBuilderModel) $ 
-            throwIO $ AppError $ borrowAndLendError
+            throwIO $ AppError borrowAndLendError
 
           when ([] /= txBuilderModel ^. #loanBuilderModel % #offerAcceptances) $
-            throwIO $ AppError $ acceptAndNegotiateError
+            throwIO $ AppError acceptAndNegotiateError
 
           let LoanWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
                 lendingModel ^. #selectedWallet

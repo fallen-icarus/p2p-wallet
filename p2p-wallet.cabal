@@ -84,6 +84,9 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.LendingModel.LoanAskConfiguration
       P2PWallet.Data.AppModel.LendingModel.LoanOfferConfiguration
       P2PWallet.Data.AppModel.LendingModel.ResearchModel
+      P2PWallet.Data.AppModel.OptionsModel
+      P2PWallet.Data.AppModel.OptionsModel.WriterModel
+      P2PWallet.Data.AppModel.OptionsModel.WriterModel.OpenProposalsFilterModel
       P2PWallet.Data.AppModel.ProfileModel
       P2PWallet.Data.AppModel.TickerRegistryModel
       P2PWallet.Data.AppModel.TxBuilderModel
@@ -102,6 +105,10 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferClose
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferCreation
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalClose
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalCreation
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalUpdate
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
@@ -138,10 +145,13 @@ executable p2p-wallet
       P2PWallet.Data.Core.Wallets
       P2PWallet.Data.Core.Wallets.DexWallet
       P2PWallet.Data.Core.Wallets.LoanWallet
+      P2PWallet.Data.Core.Wallets.OptionsWallet
       P2PWallet.Data.Core.Wallets.PaymentWallet
       P2PWallet.Data.Core.Wallets.StakeWallet
       P2PWallet.Data.DeFi.CardanoLoans
       P2PWallet.Data.DeFi.CardanoLoans.Internal
+      P2PWallet.Data.DeFi.CardanoOptions
+      P2PWallet.Data.DeFi.CardanoOptions.Internal
       P2PWallet.Data.DeFi.CardanoSwaps.Common
       P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps
       P2PWallet.Data.DeFi.CardanoSwaps.TwoWaySwaps
@@ -167,10 +177,13 @@ executable p2p-wallet
       P2PWallet.GUI.EventHandler.LendingEvent.BorrowEvent
       P2PWallet.GUI.EventHandler.LendingEvent.LendEvent
       P2PWallet.GUI.EventHandler.LendingEvent.ResearchEvent
+      P2PWallet.GUI.EventHandler.OptionsEvent
+      P2PWallet.GUI.EventHandler.OptionsEvent.WriterEvent
       P2PWallet.GUI.EventHandler.ProfileEvent
       P2PWallet.GUI.EventHandler.TickerRegistryEvent
       P2PWallet.GUI.EventHandler.TxBuilderEvent
       P2PWallet.GUI.EventHandler.TxBuilderEvent.LoanBuilderEvent
+      P2PWallet.GUI.EventHandler.TxBuilderEvent.OptionsBuilderEvent
       P2PWallet.GUI.EventHandler.TxBuilderEvent.SwapBuilderEvent
       P2PWallet.GUI.HelpMessages
       P2PWallet.GUI.Icons
@@ -210,6 +223,9 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.MainMenu
       P2PWallet.GUI.Widgets.Networks
       P2PWallet.GUI.Widgets.Notifications
+      P2PWallet.GUI.Widgets.Options
+      P2PWallet.GUI.Widgets.Options.Writer
+      P2PWallet.GUI.Widgets.Options.Writer.OpenProposals
       P2PWallet.GUI.Widgets.Profiles
       P2PWallet.GUI.Widgets.Settings
       P2PWallet.GUI.Widgets.TickerRegistry
@@ -228,6 +244,10 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCloses
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCreations
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalCloses
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalCreations
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalUpdates
       P2PWallet.GUI.Widgets.TxBuilder.StatusBar
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCloses
@@ -276,6 +296,7 @@ executable p2p-wallet
       , containers
       , cardano-swaps
       , cardano-loans
+      , cardano-options
       , relude
       , vector
       , sqlite-simple

@@ -79,7 +79,7 @@ editLenderAddressUpdateWidget :: AppNode
 editLenderAddressUpdateWidget = do
   let maybeLens' = maybeLens (def,def) $ #txBuilderModel % #loanBuilderModel % #targetAddressUpdate
   centerWidget $ vstack
-    [ centerWidgetH $ label ("Where would you like future loan payments to go?")
+    [ centerWidgetH $ label "Where would you like future loan payments to go?"
     , spacer_ [width 20]
     , hstack
         [ label "Address:"

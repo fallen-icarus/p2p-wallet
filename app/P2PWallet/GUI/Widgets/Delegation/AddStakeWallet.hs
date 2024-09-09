@@ -137,7 +137,7 @@ watchStakeWidget = do
               [ label "Stake Address:"
               , spacer
               , textField (toLensVL $ #delegationModel % #newStakeWallet % #stakeAddress)
-                  `styleBasic` [bgColor customGray1]
+                  `styleBasic` [textSize 12, bgColor customGray1]
                   `styleFocus` [border 1 customBlue]
               ]
           ]

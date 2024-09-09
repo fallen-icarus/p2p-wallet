@@ -1122,7 +1122,7 @@ openAsksField AppModel{..} = do
               `nodeVisible` (openAsks /= [])
           , label "none" 
               `styleBasic` [textColor white, textSize 12]
-              `nodeVisible` (openAsks == [])
+              `nodeVisible` null openAsks
           ]
       , widgetIf showOpenAsks $
           vstack_ [childSpacing] (map askRow openAsks)
@@ -1238,7 +1238,7 @@ currentOffersField AppModel{..} = do
               `nodeVisible` (currentOffers /= [])
           , label "none" 
               `styleBasic` [textColor white, textSize 12]
-              `nodeVisible` (currentOffers == [])
+              `nodeVisible` null currentOffers
           ]
       , widgetIf showCurrentOffers $
           vstack_ [childSpacing] (map offerRow currentOffers)
@@ -1438,7 +1438,7 @@ activeLoansField AppModel{..} = do
               `nodeVisible` (activeLoans /= [])
           , label "none" 
               `styleBasic` [textColor white, textSize 12]
-              `nodeVisible` (activeLoans == [])
+              `nodeVisible` null activeLoans
           ]
       , widgetIf showActiveLoans $
           vstack_ [childSpacing] (map activeRow activeLoans)
@@ -1674,15 +1674,19 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
 
     explainEvent :: LoanEvent -> Text
     explainEvent LoanEvent{state=eventState, event, timeStamp} =
-      let Loans.ActiveDatum{loanAsset, claimExpiration} = fromMaybe def eventState 
+      let Loans.ActiveDatum{loanOutstanding, loanAsset, claimExpiration} = fromMaybe def eventState 
           loanNativeAsset = toNativeAsset loanAsset
        in case event of
             Left (Loans.CreateActive _) -> "Loan started."
-            Right (Loans.MakePayment amount) -> mconcat
-              [ "Made payment of "
-              , showAssetBalance True reverseTickerMap $ loanNativeAsset & #quantity .~ amount
-              , "."
-              ]
+            Right (Loans.MakePayment amount) -> 
+              let finalStmt
+                    | toRational amount >= toRational loanOutstanding = "final "
+                    | otherwise = ""
+               in mconcat
+                    [ "Made " <> finalStmt <> "payment of "
+                    , showAssetBalance True reverseTickerMap $ loanNativeAsset & #quantity .~ amount
+                    , "."
+                    ]
             Right (Loans.ApplyInterest deposit times) -> mconcat
               [ "Applied interest "
               , show times
@@ -1693,8 +1697,8 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
             Right Loans.SpendWithKeyNFT -> "Defaulted collateral claimed by lender."
             Right (Loans.UpdateLenderAddress newAddress deposit) -> mconcat
               [ "Lender changed the required payment address to "
-              , display $ fromRight "" $ 
-                  fmap fst $ plutusToBech32 (config ^. #network) newAddress
+              , display $ either (const "") fst $ 
+                  plutusToBech32 (config ^. #network) newAddress
               , " with deposit increase of "
               , display $ Lovelace deposit
               , "."

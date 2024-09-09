@@ -47,6 +47,7 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ swapBuilderModel ^. #swapCloses
       , assetBalancesForChange $ loanBuilderModel ^. #askCloses
       , assetBalancesForChange $ loanBuilderModel ^. #offerCloses
+      , assetBalancesForChange $ optionsBuilderModel ^. #proposalCloses
       ]
 
     -- The amount of ADA and native assets from the output sources. All quantities in this list must
@@ -57,6 +58,7 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ swapBuilderModel ^. #swapCreations
       , assetBalancesForChange $ loanBuilderModel ^. #askCreations
       , assetBalancesForChange $ loanBuilderModel ^. #offerCreations
+      , assetBalancesForChange $ optionsBuilderModel ^. #proposalCreations
       , (-requiredDeposits, [])
       , (-fee, [])
       ]
@@ -75,6 +77,7 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ loanBuilderModel ^. #expiredClaims
       , assetBalancesForChange $ loanBuilderModel ^. #keyBurns
       , assetBalancesForChange $ loanBuilderModel ^. #addressUpdates
+      , assetBalancesForChange $ optionsBuilderModel ^. #proposalUpdates
       ]
 
     newChange :: ChangeOutput
@@ -108,6 +111,9 @@ balanceTx tx@TxBuilderModel{..} =
       , loanBuilderModel ^. #expiredClaims /= []
       , loanBuilderModel ^. #keyBurns /= []
       , loanBuilderModel ^. #addressUpdates /= []
+      , optionsBuilderModel ^. #proposalCreations /= []
+      , optionsBuilderModel ^. #proposalCloses /= []
+      , optionsBuilderModel ^. #proposalUpdates /= []
       ]
 
     -- What kind of transaction this is.
@@ -137,4 +143,6 @@ balanceTx tx@TxBuilderModel{..} =
       , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #loanPayments
       , map (view $ _2 % #stakeKeyDerivation) $ loanBuilderModel ^. #interestApplications
       , map (view $ _2 % #borrowerStakeKeyDerivation) $ loanBuilderModel ^. #expiredClaims
+      , map (view $ _2 % #stakeKeyDerivation) $ optionsBuilderModel ^. #proposalCloses
+      , map (view $ _2 % #oldProposal % #stakeKeyDerivation) $ optionsBuilderModel ^. #proposalUpdates
       ]

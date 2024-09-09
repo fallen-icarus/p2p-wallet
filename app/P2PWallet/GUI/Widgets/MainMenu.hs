@@ -6,6 +6,7 @@ module P2PWallet.GUI.Widgets.MainMenu
 import Monomer
 
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Internal.Network
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
@@ -13,14 +14,17 @@ import P2PWallet.Prelude
 
 -- | A side bar for switching between the main app scenes.
 mainMenuWidget :: AppModel -> AppNode
-mainMenuWidget model@AppModel{txBuilderModel} = do
+mainMenuWidget model@AppModel{txBuilderModel,config} = do
     vstack 
       [ changeSceneButton "Home" homeIcon HomeScene
       , changeSceneButton "Staking" delegationCenterIcon DelegationScene
-      , changeSceneButton "DEX" dexIcon DexScene
-      , changeSceneButton "Lending" loansIcon LendingScene
-      , changeSceneButton "Options" optionsIcon OptionsScene
-      , changeSceneButton "Reseller" aftermarketIcon AftermarketScene
+      -- The p2p-DeFi protocols are currently only configured for testnet.
+      , vstack
+          [ changeSceneButton "DEX" dexIcon DexScene
+          , changeSceneButton "Lending" loansIcon LendingScene
+          , changeSceneButton "Options" optionsIcon OptionsScene
+          , changeSceneButton "Reseller" aftermarketIcon AftermarketScene
+          ] `nodeVisible` (config ^. #network /= Mainnet)
       , changeSceneButton "Contacts" contactsBookIcon AddressBookScene
       , changeSceneButton "Tickers" tickersIcon TickerRegistryScene
       , txBuilderButton

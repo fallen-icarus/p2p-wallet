@@ -96,7 +96,7 @@ updateInterestDeposit i@InterestApplication{lovelace} calculatedDeposit
 -- | Generate the deposit message.
 createInterestDepositMsg :: InterestApplication -> Text
 createInterestDepositMsg InterestApplication{requiredApplicationCount,extraDeposit} =
-    unlines $ intersperse "" $ filter (/= "") $
+    unlines $ intersperse "" $ filter (/= "")
       [ applicationCountMsg
       , extraDepositMsg
       ]
