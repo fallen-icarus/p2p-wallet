@@ -387,11 +387,12 @@ offerAssetMsg = unlines
   , "The asset name must be in one of the following formats:"
   , "1. 'policy_id.asset_name'"
   , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
   , ""
   , unwords
       [ "Fingerprints are not supported because there is no way for the p2p-wallet to know"
       , "which asset the fingerprint corresponds to unless it knows the asset in advance."
-      , "Due to the composability of cardano-swaps, users may not always have the offer asset"
+      , "Due to the composability of these DeFi protocols, users may not always have the offer asset"
       , "in question."
       ]
   ]
@@ -403,6 +404,7 @@ askAssetMsg = unlines
   , "The asset name must be in one of the following formats:"
   , "1. 'policy_id.asset_name'"
   , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
   , ""
   , unwords
       [ "Fingerprints are not supported because there is no way for the p2p-wallet to know"
@@ -1158,5 +1160,45 @@ proposalFilterSortMsg = unlines
       , "ascending order. Meanwhile the largest term will be used when the contracts are sorted in"
       , "descending order."
       ]
+  ]
+
+premiumAssetMsg :: Text
+premiumAssetMsg = unlines
+  [ "Which asset do you want to use for the premium? Leave blank for any asset."
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , unwords
+      [ "Fingerprints are not supported because there is no way for the p2p-wallet to know"
+      , "which asset the fingerprint corresponds to unless it knows the asset in advance."
+      , "Due to the composability of these DeFi protocols, users may not always have the offer asset"
+      , "in question."
+      ]
+  ]
+
+allProposalFilterSortMsg :: Text
+allProposalFilterSortMsg = unlines
+  [ "Options proposals can be sorted based off one of the following methods:"
+  , "1. Based on the amount of the offer asset"
+  , "2. Based on the premiums"
+  , "3. Based on the stike prices"
+  , "4. Based on the expirations"
+  , ""
+  , "Option 2 is only available when a premium asset is set while entering the trading pair to lookup."
+  ]
+
+optionsProposalsMsg :: Text
+optionsProposalsMsg = unwords
+  [ "Options proposals are options contracts that have not been purchased yet."
+  , "These contracts cannot be executed until after they are purchased."
+  ]
+
+activeOptionsMsg :: Text
+activeOptionsMsg = unwords
+  [ "These are only the active options contracts that were sold by you. Options contracts you"
+  , "purchased can be found though the Home page by looking for all Options Key NFTs you own."
   ]
 

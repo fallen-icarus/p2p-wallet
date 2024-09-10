@@ -52,7 +52,20 @@ openProposalsWidget model@AppModel{knownWallets,optionsModel=OptionsModel{..},re
     mainWidget =
       cushionWidgetH $ vstack
         [ hstack 
-            [ label ("Proposals (" <> fractionShown <> ")")
+            [ box_ [alignMiddle, onClick $ Alert optionsProposalsMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            , spacer_ [width 5]
+            , label ("Proposals (" <> fractionShown <> ")")
                 `styleBasic` [textFont "Italics", textSize 14]
             , spacer_ [width 5]
             , tooltip_ "Create New Proposal" [tooltipDelay 0] $

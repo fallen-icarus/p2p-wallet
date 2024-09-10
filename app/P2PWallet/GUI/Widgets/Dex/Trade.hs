@@ -60,7 +60,7 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap} = do
                 , label askAssetName
                     `styleBasic` [textSize 12, textFont "Italics", textColor customBlue]
                 ] `styleBasic` [padding 5 , radius 5]
-                  `styleHover` [bgColor customGray1]
+                  `styleHover` [bgColor customGray1, cursorIcon CursorHand]
         , separatorLine `styleBasic` [paddingL 75, paddingR 75, fgColor gray]
         , spacer
         , hgrid

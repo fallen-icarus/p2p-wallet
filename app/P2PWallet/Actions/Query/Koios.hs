@@ -23,6 +23,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryBorrowerCreditHistory
   , runQueryBorrowerInformation
   , runQueryOptionsWallet
+  , runQueryOptionsProposals
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
@@ -64,10 +65,11 @@ import P2PWallet.Data.Koios.Transaction
 import P2PWallet.Data.Core.Transaction qualified as P2P
 import P2PWallet.Data.Core.StakeReward qualified as P2P
 import P2PWallet.Data.Core.Wallets
-import P2PWallet.Data.DeFi.CardanoSwaps.Common
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
+import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
+import P2PWallet.Data.DeFi.CardanoSwaps.Common qualified as Swaps
 import P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps qualified as OneWay
 import P2PWallet.Data.DeFi.CardanoSwaps.TwoWaySwaps qualified as TwoWay
-import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
@@ -314,7 +316,7 @@ runQueryAllRegisteredPools network = do
 
 -- | Get the current order-book for a specific trading pair. This queries both one-way and two-way
 -- swaps. Ask and offer queries are _not_ supported.
-runQuerySwaps :: Network -> OfferAsset -> AskAsset -> IO (Either Text [SwapUTxO])
+runQuerySwaps :: Network -> Swaps.OfferAsset -> Swaps.AskAsset -> IO (Either Text [SwapUTxO])
 runQuerySwaps network offerAsset askAsset = do
     (oneWayRes,twoWayRes) <- concurrently fetchOneWaySwaps fetchTwoWaySwaps
 
@@ -731,6 +733,29 @@ runQueryOptionsWallet optionsWallet@OptionsWallet{..} = do
               (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
               (groupInto 70 hashes)
 
+-- | Get the current options contracts for sale. Optionally filter them by premium asset.
+runQueryOptionsProposals
+  :: Network 
+  -> Options.OfferAsset 
+  -> Options.AskAsset 
+  -> Maybe Options.PremiumAsset 
+  -> IO (Either Text [OptionsUTxO])
+runQueryOptionsProposals network offerAsset askAsset mPremiumAsset = do
+    proposalRes <- fetchProposals
+
+    case proposalRes of
+      Right proposals -> do
+        return $ Right $ sortOn optionsUTxOOfferAmount $ map fromAddressUTxO proposals
+      Left err -> return $ Left err
+  where
+    -- Try to query the open asks.
+    fetchProposals :: IO (Either Text [AddressUTxO])
+    fetchProposals = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> 
+        handleTimeoutError (runClientM (queryOptionsProposals offerAsset askAsset mPremiumAsset) env)
+
 -------------------------------------------------
 -- Low-Level API
 -------------------------------------------------
@@ -1050,14 +1075,14 @@ queryPoolIds offset !acc = do
     -- That should be the last of the results.
     return $ acc <> poolIds
 
-queryOneWaySwaps :: OfferAsset -> AskAsset -> ClientM [AddressUTxO]
+queryOneWaySwaps :: Swaps.OfferAsset -> Swaps.AskAsset -> ClientM [AddressUTxO]
 queryOneWaySwaps offerAsset askAsset = queryApi 0 []
   where
     offerFilter :: Maybe AssetListFilterParam
     offerFilter 
       | offerAsset ^. #unOfferAsset % #policyId == "" = Nothing
       | otherwise = Just $ AssetListFilterParam $ 
-          "cs." <> assetToQueryParam (unOfferAsset offerAsset)
+          "cs." <> assetToQueryParam (Swaps.unOfferAsset offerAsset)
 
     queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
     queryApi offset !acc = do
@@ -1095,8 +1120,8 @@ queryOneWaySwaps offerAsset askAsset = queryApi 0 []
       , "block_height"
       ]
 
-queryTwoWaySwaps :: OfferAsset -> AskAsset -> ClientM [AddressUTxO]
-queryTwoWaySwaps (OfferAsset offerAsset) (AskAsset askAsset) = queryApi 0 []
+queryTwoWaySwaps :: Swaps.OfferAsset -> Swaps.AskAsset -> ClientM [AddressUTxO]
+queryTwoWaySwaps (Swaps.OfferAsset offerAsset) (Swaps.AskAsset askAsset) = queryApi 0 []
   where
     offerFilter :: Maybe AssetListFilterParam
     offerFilter 
@@ -1473,6 +1498,62 @@ queryActiveLoans ActiveLoanConfiguration{..} = queryApi 0 []
           let policyId = display currSym
               assetName = display tokName
            in ("{\"policy_id\":\"" <> policyId <> "\",\"asset_name\":\"" <> assetName <> "\"}") : go xs
+
+    select :: SelectParam
+    select = fromString $ intercalate ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]
+
+queryOptionsProposals 
+  :: Options.OfferAsset 
+  -> Options.AskAsset 
+  -> Maybe Options.PremiumAsset 
+  -> ClientM [AddressUTxO]
+queryOptionsProposals offerAsset askAsset mPremiumAsset = queryApi 0 []
+  where
+    mPremiumBeacon :: Maybe NativeAsset
+    mPremiumBeacon = mkNativeAsset Options.proposalBeaconCurrencySymbol 
+                   . Options.unPremiumBeacon 
+                   . Options.genPremiumBeaconName
+                 <$> mPremiumAsset
+
+    premiumFilter :: Maybe AssetListFilterParam
+    premiumFilter = 
+      AssetListFilterParam . ("cs." <>) . assetToQueryParam <$> mPremiumBeacon
+    
+    tradingPairBeacon = 
+      Options.unTradingPairBeacon $ Options.genTradingPairBeaconName offerAsset askAsset
+
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- assetUTxOsApi select offset "eq.false" premiumFilter $ 
+        AssetList [(Options.proposalBeaconCurrencySymbol, tradingPairBeacon)]
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+    assetToQueryParam :: NativeAsset -> Text
+    assetToQueryParam NativeAsset{policyId,tokenName} = mconcat
+      [ "[{\"policy_id\":\""
+      , display policyId
+      , "\",\"asset_name\":\""
+      , display tokenName
+      , "\"}]"
+      ]
 
     select :: SelectParam
     select = fromString $ intercalate ","

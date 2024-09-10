@@ -304,6 +304,8 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap,config} 
             optionsBuilderModel ^. #proposalCloses
         , proposalUpdatesList reverseTickerMap (config ^. #timeZone) $ 
             optionsBuilderModel ^. #proposalUpdates
+        , proposalPurchasesList reverseTickerMap (config ^. #timeZone) $ 
+            optionsBuilderModel ^. #proposalPurchases
         -- Certificates
         , userCertificatesList userCertificates
         -- Withdrawals

@@ -118,7 +118,7 @@ handleWriterEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   AddSelectedProposalUpdate modal -> case modal of
     StartAdding mTarget ->
-      let OptionsWallet{alias,stakeCredential,stakeKeyDerivation} = optionsModel ^. #selectedWallet
+      let OptionsWallet{alias} = optionsModel ^. #selectedWallet
           Config{network,timeZone} = config
           payToAddress = maybe "" (either (const "") fst . plutusToBech32 network) 
                        $ mTarget >>= optionsUTxOPaymentAddress
@@ -130,8 +130,6 @@ handleWriterEvent model@AppModel{..} evt = case evt of
           toNewCreation = optionsUTxOToNewProposalCreation 
             network
             alias 
-            stakeCredential 
-            stakeKeyDerivation 
             reverseTickerMap 
             (fromMaybe def mStartingWallet)
             timeZone

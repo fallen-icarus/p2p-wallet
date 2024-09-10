@@ -12,6 +12,7 @@ import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
+import P2PWallet.GUI.Widgets.Options.Buyer
 import P2PWallet.GUI.Widgets.Options.Writer
 import P2PWallet.Prelude
 
@@ -62,6 +63,7 @@ mainWidget model@AppModel{scene=_,..} =
           ]
       , spacer_ [width 5]
       , writerWidget model `nodeVisible` (optionsModel ^. #scene == OptionsWriterScene)
+      , buyerWidget model `nodeVisible` (optionsModel ^. #scene == OptionsBuyerScene)
       ] 
   where
     optionsMainSceneButton :: Text -> OptionsScene -> AppNode

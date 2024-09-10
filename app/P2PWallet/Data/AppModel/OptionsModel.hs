@@ -14,17 +14,26 @@ module P2PWallet.Data.AppModel.OptionsModel
   , OptionsEvent(..)
   , OptionsModel(..)
 
+  , CachedOptionsProposals
+
+  , module P2PWallet.Data.AppModel.OptionsModel.BuyerModel
   , module P2PWallet.Data.AppModel.OptionsModel.WriterModel
   ) where
 
 import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.AppModel.Common
+import P2PWallet.Data.AppModel.OptionsModel.BuyerModel
 import P2PWallet.Data.AppModel.OptionsModel.WriterModel
-import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
-import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
+import P2PWallet.Data.DeFi.CardanoOptions as Options
 import P2PWallet.Prelude
+
+-------------------------------------------------
+-- Cached Options Proposals
+-------------------------------------------------
+-- | A type alias for a map from trading pair to known proposals.
+type CachedOptionsProposals = Map.Map (OfferAsset, AskAsset, Maybe PremiumAsset) [OptionsUTxO]
 
 -------------------------------------------------
 -- Options Scenes and Overlays
@@ -54,6 +63,10 @@ data OptionsEvent
   | ShowOptionsMorePopup
   -- | Sell Options Event.
   | OptionsWriterEvent OptionsWriterEvent
+  -- | Buy Options Event.
+  | OptionsBuyerEvent OptionsBuyerEvent
+  -- | Sync the proposals for the selected contract assets.
+  | SyncOptionsProposals (ProcessEvent (OfferAsset, AskAsset, Maybe PremiumAsset) CachedOptionsProposals)
 
 -------------------------------------------------
 -- Options State
@@ -74,6 +87,10 @@ data OptionsModel = OptionsModel
   , showMorePopup :: Bool
   -- | The sell model.
   , writerModel :: OptionsWriterModel
+  -- | The buy model.
+  , buyerModel :: OptionsBuyerModel
+  -- | Cached proposal contracts.
+  , cachedProposals :: CachedOptionsProposals
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''OptionsModel
@@ -87,4 +104,6 @@ instance Default OptionsModel where
     , deletingWallet = False
     , showMorePopup = False
     , writerModel = def
+    , buyerModel = def
+    , cachedProposals = mempty
     }

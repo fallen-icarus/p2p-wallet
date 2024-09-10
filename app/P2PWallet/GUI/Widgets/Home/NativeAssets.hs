@@ -11,6 +11,7 @@ import P2PWallet.Data.Core.AssetMaps
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
+import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.MonomerOptics()
@@ -130,7 +131,7 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
     keyNftFilter xs = case keyNftType of
       Nothing -> xs
       Just LoanKey -> filter ((Loans.activeBeaconCurrencySymbol==) . view #policyId) xs
-      Just OptionsKey -> xs
+      Just OptionsKey -> filter ((Options.activeBeaconCurrencySymbol==) . view #policyId) xs
 
     searchFilter :: [NativeAsset] -> [NativeAsset]
     searchFilter xs
