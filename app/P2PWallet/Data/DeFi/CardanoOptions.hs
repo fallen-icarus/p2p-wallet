@@ -8,6 +8,7 @@ module P2PWallet.Data.DeFi.CardanoOptions
   ( -- * Datums
     ProposalDatum(..)
   , ActiveDatum(..)
+  , PaymentDatum(..)
 
     -- * Redeemers
   , OptionsRedeemer(..)
@@ -45,6 +46,7 @@ module P2PWallet.Data.DeFi.CardanoOptions
     -- * Creating Datums
   , NewProposalInfo(..)
   , createProposalDatum
+  , createActiveDatumFromProposal
 
     -- * Protocol Addresses
   , isValidOptionsPaymentAddress
@@ -64,6 +66,7 @@ module P2PWallet.Data.DeFi.CardanoOptions
 
 import qualified Data.Map.Strict as Map
 import Data.Aeson
+import Data.List ((!!))
 
 import qualified PlutusTx
 import qualified PlutusTx.Prelude as PlutusTx
@@ -458,6 +461,28 @@ createProposalDatum NewProposalInfo{..} = ProposalDatum
   , paymentAddress = paymentAddress
   , possibleTerms = possibleTerms
   }
+
+-- | Create an ActiveDatum from a ProposalDatum, its output reference, and the desiredTermsIndex.
+createActiveDatumFromProposal :: Integer -> TxOutRef -> ProposalDatum -> ActiveDatum
+createActiveDatumFromProposal termsIndex proposalId ProposalDatum{..} = ActiveDatum
+    { proposalBeaconId = proposalBeaconId
+    , activeBeaconId = activeBeaconId
+    , addressObserverHash = addressObserverScriptHash
+    , offerAsset = offerAsset
+    , offerQuantity = offerQuantity
+    , askAsset = askAsset
+    , tradingPairBeacon = tradingPairBeacon
+    , offerBeacon = offerBeacon
+    , askBeacon = askBeacon
+    , strikePrice = view #strikePrice desiredTerms
+    , expiration = view #expiration desiredTerms
+    , contractDeposit = contractDeposit
+    , paymentAddress = paymentAddress
+    , contractId = genContractId proposalId
+    }
+  where
+    desiredTerms :: Terms
+    desiredTerms = possibleTerms !! fromIntegral termsIndex
 
 -------------------------------------------------
 -- Protocol Addresses

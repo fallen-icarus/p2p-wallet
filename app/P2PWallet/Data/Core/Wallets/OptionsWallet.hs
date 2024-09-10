@@ -129,6 +129,15 @@ optionsUTxOPaymentAddress OptionsUTxO{optionsDatum} = case optionsDatum of
   Just (OptionsActiveDatum Options.ActiveDatum{paymentAddress}) -> Just paymentAddress
   _ -> Nothing
 
+-- | Get the loan amount from a LoanUTxO. The loan principle is the quantity.
+optionsUTxOOfferAmount :: OptionsUTxO -> Maybe NativeAsset
+optionsUTxOOfferAmount OptionsUTxO{optionsDatum} = case optionsDatum of
+  Just (OptionsProposalDatum Options.ProposalDatum{offerAsset,offerQuantity}) -> 
+    Just $ toNativeAsset offerAsset & #quantity .~ offerQuantity
+  Just (OptionsActiveDatum Options.ActiveDatum{offerAsset,offerQuantity}) -> 
+    Just $ toNativeAsset offerAsset & #quantity .~ offerQuantity
+  _ -> Nothing
+
 -------------------------------------------------
 -- Options Wallet
 -------------------------------------------------

@@ -78,6 +78,7 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ loanBuilderModel ^. #keyBurns
       , assetBalancesForChange $ loanBuilderModel ^. #addressUpdates
       , assetBalancesForChange $ optionsBuilderModel ^. #proposalUpdates
+      , assetBalancesForChange $ optionsBuilderModel ^. #proposalPurchases
       ]
 
     newChange :: ChangeOutput
@@ -114,6 +115,7 @@ balanceTx tx@TxBuilderModel{..} =
       , optionsBuilderModel ^. #proposalCreations /= []
       , optionsBuilderModel ^. #proposalCloses /= []
       , optionsBuilderModel ^. #proposalUpdates /= []
+      , optionsBuilderModel ^. #proposalPurchases /= []
       ]
 
     -- What kind of transaction this is.

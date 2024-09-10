@@ -6,11 +6,13 @@ module P2PWallet.GUI.EventHandler.OptionsEvent
 import Monomer
 
 import P2PWallet.Actions.Database
+import P2PWallet.Actions.SyncOptions
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
+import P2PWallet.GUI.EventHandler.OptionsEvent.BuyerEvent
 import P2PWallet.GUI.EventHandler.OptionsEvent.WriterEvent
 import P2PWallet.Prelude
 
@@ -105,6 +107,29 @@ handleOptionsEvent model@AppModel{..} evt = case evt of
   -- Writer Event
   ---------------------------------------------
   OptionsWriterEvent writerEvt -> handleWriterEvent model writerEvt
+
+  ---------------------------------------------
+  -- Buyer Event
+  ---------------------------------------------
+  OptionsBuyerEvent buyerEvt -> handleBuyerEvent model buyerEvt
+
+  -----------------------------------------------
+  -- Sync Proposals
+  -----------------------------------------------
+  SyncOptionsProposals modal -> case modal of
+    StartProcess mTargetAssets ->
+      [ Model $ model & #waitingStatus % #syncingOptionsProposals .~ True
+      , Task $ runActionOrAlert (OptionsEvent . SyncOptionsProposals . ProcessResults) $ do
+          targetAssets <- 
+            fromJustOrAppError "mTargetAssets is Nothing" mTargetAssets
+
+          syncOptionsProposals (config ^. #network) targetAssets $ optionsModel ^. #cachedProposals
+      ]
+    ProcessResults newCache ->
+      [ Model $ model 
+          & #waitingStatus % #syncingOptionsProposals .~ False
+          & #optionsModel % #cachedProposals .~ newCache
+      ]
 
 -------------------------------------------------
 -- Helper Functions

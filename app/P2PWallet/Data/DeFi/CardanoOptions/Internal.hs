@@ -125,7 +125,7 @@ instance FromJSON Fraction where
 -- | A wrapper around the offer asset's full name (policy id, token name). It uses
 -- a custom data encoding since Aiken uses a different encoding for it.
 newtype OfferAsset = OfferAsset { unOfferAsset :: (PV2.CurrencySymbol,PV2.TokenName) }
-  deriving (Show,Eq)
+  deriving (Ord,Show,Eq)
 
 instance PV2.ToData OfferAsset where
   toBuiltinData (OfferAsset (sym,name)) = 
@@ -161,6 +161,9 @@ instance ToNativeAsset OfferAsset where
 instance FromNativeAsset OfferAsset where
   fromNativeAsset asset = OfferAsset (asset ^. #policyId, asset ^. #tokenName)
 
+instance Default OfferAsset where
+  def = fromNativeAsset lovelaceAsNativeAsset
+
 makeFieldLabelsNoPrefix ''OfferAsset
 
 -------------------------------------------------
@@ -169,7 +172,7 @@ makeFieldLabelsNoPrefix ''OfferAsset
 -- | A wrapper around the ask asset's full name (policy id, token name). It uses
 -- a custom data encoding since Aiken uses a different encoding for it.
 newtype AskAsset = AskAsset { unAskAsset :: (PV2.CurrencySymbol,PV2.TokenName) }
-  deriving (Show,Eq)
+  deriving (Ord,Show,Eq)
 
 instance PV2.ToData AskAsset where
   toBuiltinData (AskAsset (sym,name)) = 
@@ -205,6 +208,9 @@ instance ToNativeAsset AskAsset where
 instance FromNativeAsset AskAsset where
   fromNativeAsset asset = AskAsset (asset ^. #policyId, asset ^. #tokenName)
 
+instance Default AskAsset where
+  def = fromNativeAsset lovelaceAsNativeAsset
+
 makeFieldLabelsNoPrefix ''AskAsset
 
 -------------------------------------------------
@@ -213,7 +219,7 @@ makeFieldLabelsNoPrefix ''AskAsset
 -- | A wrapper around the premium asset's full name (policy id, token name). It uses
 -- a custom data encoding since Aiken uses a different encoding for it.
 newtype PremiumAsset = PremiumAsset { unPremiumAsset :: (PV2.CurrencySymbol,PV2.TokenName) }
-  deriving (Show,Eq)
+  deriving (Ord,Show,Eq)
 
 instance PV2.ToData PremiumAsset where
   toBuiltinData (PremiumAsset (sym,name)) = 

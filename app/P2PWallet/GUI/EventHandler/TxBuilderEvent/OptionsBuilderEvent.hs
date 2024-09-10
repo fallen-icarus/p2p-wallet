@@ -9,6 +9,7 @@ import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Prelude
 
 handleOptionsBuilderEvent :: AppModel -> OptionsBuilderEvent -> [AppEventResponse AppModel AppEvent]
@@ -173,5 +174,47 @@ handleOptionsBuilderEvent model@AppModel{..} evt = case evt of
           [ "Successfully updated builder!"
           , ""
           , "The new proposal requires a deposit of: " <> display (verifiedProposal ^. #deposit)
+          ]
+      ]
+
+  -----------------------------------------------
+  -- Remove Proposal Purchase from Builder
+  -----------------------------------------------
+  RemoveSelectedProposalPurchase idx ->
+    [ Model $ model 
+        & #txBuilderModel % #optionsBuilderModel % #proposalPurchases %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Edit the selected proposal purchase
+  -----------------------------------------------
+  EditSelectedProposalPurchase modal -> case modal of
+    StartProcess mNewPurchase ->
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (optionsBuilderEvent . EditSelectedProposalPurchase . ProcessResults) $ do
+          let Config{network} = config
+          (idx,newPurchase) <- fromJustOrAppError "options purchase mTarget is Nothing" mNewPurchase
+
+          -- There should be two results, the first is for the premium payment output and the
+          -- second is for the new Active contract UTxO.
+          minUTxOValues <- 
+            calculateMinUTxOValue 
+              network 
+              (txBuilderModel ^? #parameters % _Just % _1) 
+              -- Use a blank optionsBuilderModel to calculate the minUTxOValues for the purchase.
+              (emptyOptionsBuilderModel & #proposalPurchases .~ [(0,newPurchase)])
+
+          (idx,) <$> fromRightOrAppError (updateOptionsPurchaseDeposits newPurchase minUTxOValues)
+      ]
+    ProcessResults info@(idx,verifiedPurchase) ->
+      [ Model $ model 
+          & #txBuilderModel % #optionsBuilderModel % #proposalPurchases % ix idx .~ info
+          & #txBuilderModel %~ balanceTx
+      , Task $ return $ Alert $ unlines
+          [ "Successfully updated builder!"
+          , ""
+          , createOptionsPurchaseDepositMsg verifiedPurchase
           ]
       ]

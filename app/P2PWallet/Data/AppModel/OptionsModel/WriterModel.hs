@@ -21,7 +21,6 @@ import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.OptionsModel.WriterModel.OpenProposalsFilterModel
 import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel
 import P2PWallet.Data.Core.Wallets
-import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -67,7 +66,7 @@ data OptionsWriterModel = OptionsWriterModel
   , newProposalUpdate :: Maybe (OptionsUTxO,NewProposalCreation)
   -- | Whether to show the filter widget for proposals.
   , showProposalFilter :: Bool
-  -- | The open asks filter model.
+  -- | The open proposals filter model.
   , proposalsFilterModel :: OpenProposalsFilterModel
   } deriving (Show,Eq)
 

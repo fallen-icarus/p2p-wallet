@@ -40,8 +40,6 @@ instance AssetBalancesForChange (a,ProposalUpdate) where
 optionsUTxOToNewProposalCreation 
   :: Network 
   -> Text 
-  -> Credential 
-  -> Maybe DerivationInfo 
   -> ReverseTickerMap 
   -- | Either the first wallet in the tracked payment wallet list or the
   -- payment wallet already associated with the offer.
@@ -49,7 +47,7 @@ optionsUTxOToNewProposalCreation
   -> TimeZone
   -> OptionsUTxO 
   -> NewProposalCreation
-optionsUTxOToNewProposalCreation network alias writerCred keyDeriveInfo reverseTickerMap wallet timeZone u = 
+optionsUTxOToNewProposalCreation network alias reverseTickerMap wallet timeZone u = 
     NewProposalCreation
       { optionsAddress = optionsAddress
       , offerAsset = showAssetBalance True reverseTickerMap offerAmount

@@ -13,18 +13,20 @@ module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel
 
   , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalClose
   , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalCreation
+  , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalPurchase
   , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalUpdate
   ) where
 
-import Data.List (minimum)
+import Data.List (minimum,(!!))
 
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalClose
 import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalCreation
+import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalPurchase
 import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalUpdate
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
-import P2PWallet.Data.Core.Wallets.OptionsWallet
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -47,6 +49,11 @@ data OptionsBuilderEvent
   | RemoveSelectedProposalUpdate Int
   -- | Edit selected proposal update.
   | EditSelectedProposalUpdate (AddEvent (Int,ProposalUpdate) (Int,ProposalCreation))
+  -- | Remove the selected proposal purchase from the builder.
+  | RemoveSelectedProposalPurchase Int
+  -- | Edit selected proposal purchase. This can only change the selected terms. The `Int` is
+  -- the index into `proposalPurchases` and the `Integer` is the new desired terms index.
+  | EditSelectedProposalPurchase (ProcessEvent (Int,ProposalPurchase) (Int,ProposalPurchase))
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -61,6 +68,7 @@ data OptionsBuilderModel = OptionsBuilderModel
   , proposalUpdates :: [(Int,ProposalUpdate)]
   -- | The `Int` is the index into `proposalUpdates`.
   , targetProposalUpdate :: Maybe (Int,NewProposalCreation)
+  , proposalPurchases :: [(Int,ProposalPurchase)]
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''OptionsBuilderModel
@@ -72,6 +80,7 @@ instance Default OptionsBuilderModel where
     , proposalCloses = []
     , proposalUpdates = []
     , targetProposalUpdate = Nothing
+    , proposalPurchases = []
     }
 
 -- | This is just an alias for `def`. The name is more clear what it is.
@@ -83,6 +92,7 @@ isEmptyOptionsBuilderModel OptionsBuilderModel{..} = and
   [ null proposalCreations
   , null proposalCloses
   , null proposalUpdates
+  , null proposalPurchases
   , isNothing targetProposalCreation
   , isNothing targetProposalUpdate
   ]
@@ -100,6 +110,8 @@ instance AddToTxBody OptionsBuilderModel where
         & flip (foldl' addProposalCloseToBody) proposalCloses
         -- Add the proposal updates.
         & flip (foldl' addProposalUpdateToBody) proposalUpdates
+        -- Add the proposal purchases.
+        & flip (foldl' addProposalPurchaseToBody) proposalPurchases
         -- Merge any beacon mints so that there is only one `TxBodyMint` per minting policy.
         & #mints %~ mergeTxBodyMints
         -- Adjust any executions based on whether all mints canceled out.
@@ -293,3 +305,117 @@ addProposalUpdateToBody txBody (idx,ProposalUpdate{..}) =
     & flip addProposalCreationToBody (idx,newProposal)
     & flip addProposalCloseToBody (idx,oldProposal)
 
+addProposalPurchaseToBody :: TxBody -> (Int,ProposalPurchase) -> TxBody
+addProposalPurchaseToBody txBody (_,ProposalPurchase{..}) = 
+    txBody
+      -- Add the proposal input to the list of inputs.
+      & #inputs %~ (<> [newProposalInput])
+      -- Add the output and preserve ordering of the output list.
+      & #outputs %~ (<> [newPremiumOutput, newContractOutput])
+      -- Add the new beacons to be minted. 
+      & #mints %~ (<> [newActiveMint,newProposalBurn])
+      & #network .~ network
+
+  where
+    OptionsUTxO{..} = proposalUTxO
+    proposalDatum@Options.ProposalDatum{..} = 
+      fromMaybe def $ optionsUTxOProposalDatum proposalUTxO
+    Options.Terms{premium} = possibleTerms !! fromIntegral desiredTerms
+    activeDatum = Options.createActiveDatumFromProposal desiredTerms utxoRef proposalDatum
+    premiumAsNativeAsset = toNativeAsset premiumAsset & #quantity .~ premium
+
+    writerPayemntAddress :: PaymentAddress
+    writerPayemntAddress = either (const "") fst
+                         $ plutusToBech32 network paymentAddress
+
+    premiumLovelace
+      | premiumAsNativeAsset ^. #policyId == "" = Lovelace premium + premiumDeposit
+      | otherwise = premiumDeposit
+
+    premiumNativeAssets
+      | premiumAsNativeAsset ^. #policyId == "" = []
+      | otherwise = [premiumAsNativeAsset]
+
+    contractNativeAssets = 
+      filter ((/= Options.proposalBeaconCurrencySymbol) . view #policyId) nativeAssets <> 
+        contractUTxOBeacons
+
+    proposalBeaconBurns =
+      -- One Ask Beacon.
+      [ NativeAsset Options.proposalBeaconCurrencySymbol (askBeacon ^. #unAskBeacon) "" (-1)
+      -- One Offer Beacon.
+      , NativeAsset Options.proposalBeaconCurrencySymbol (offerBeacon ^. #unOfferBeacon) "" (-1)
+      -- One premium beacon.
+      , NativeAsset Options.proposalBeaconCurrencySymbol (premiumBeacon ^. #unPremiumBeacon) "" (-1)
+      -- One tradingPair beacon.
+      , NativeAsset Options.proposalBeaconCurrencySymbol (tradingPairBeacon ^. #unTradingPairBeacon) "" (-1)
+      ]
+
+    contractUTxOBeacons =
+      -- One Ask Beacon.
+      [ NativeAsset Options.activeBeaconCurrencySymbol (askBeacon ^. #unAskBeacon) "" 1
+      -- One Offer Beacon.
+      , NativeAsset Options.activeBeaconCurrencySymbol (offerBeacon ^. #unOfferBeacon) "" 1
+      -- One Contract IDs beacon.
+      , NativeAsset Options.activeBeaconCurrencySymbol (activeDatum ^. #contractId % #unContractId) "" 1
+      -- One tradingPair beacon.
+      , NativeAsset Options.activeBeaconCurrencySymbol (tradingPairBeacon ^. #unTradingPairBeacon) "" 1
+      ]
+
+    -- Must mint one more contract id in addition to what gets stored with the contract UTxO.
+    activeBeaconMints = sumNativeAssets $ (:contractUTxOBeacons) $
+      NativeAsset Options.activeBeaconCurrencySymbol (activeDatum ^. #contractId % #unContractId) "" 1
+
+    newProposalInput :: TxBodyInput
+    newProposalInput = TxBodyInput
+      { utxoRef = utxoRef
+      , spendingScriptInfo = Just $ SpendingScriptInfo
+          { datum = InputDatum
+          , redeemer = toRedeemer $ Options.PurchaseContract desiredTerms
+          , scriptWitness = 
+              ReferenceWitness $ Options.getScriptRef network Options.optionsScriptHash
+          , executionBudget = def
+          , scriptHash = Options.optionsScriptHash
+          }
+      }
+
+    newPremiumOutput :: TxBodyOutput
+    newPremiumOutput = TxBodyOutput
+      { paymentAddress = writerPayemntAddress
+      , lovelace = premiumLovelace
+      , nativeAssets = premiumNativeAssets
+      , datum = OutputDatum $ toDatum $ Options.PaymentDatum
+          ( Options.ActiveBeaconId $ Options.activeBeaconCurrencySymbol
+          , activeDatum ^. #contractId
+          )
+      }
+
+    newContractOutput :: TxBodyOutput
+    newContractOutput = TxBodyOutput
+      { paymentAddress = optionsAddress
+      , lovelace = lovelace + extraContractDeposit
+      , nativeAssets = contractNativeAssets
+      , datum = OutputDatum $ toDatum activeDatum
+      }
+
+    newProposalBurn :: TxBodyMint
+    newProposalBurn = TxBodyMint
+      { mintingPolicyHash = policyIdToScriptHash Options.proposalBeaconCurrencySymbol
+      , nativeAssets = proposalBeaconBurns
+      , redeemer = 
+          -- BurnProposalBeacons would be cheaper, but this redeemer is easier to work with when
+          -- creating composed transactions.
+          toRedeemer Options.CreateCloseOrUpdateProposals
+      , scriptWitness = ReferenceWitness $ Options.getScriptRef network Options.proposalBeaconScriptHash
+      , executionBudget = def -- These must be calculated during the build step.
+      }
+
+    newActiveMint :: TxBodyMint
+    newActiveMint = TxBodyMint
+      { mintingPolicyHash = policyIdToScriptHash Options.activeBeaconCurrencySymbol
+      , nativeAssets = activeBeaconMints
+      , redeemer = toRedeemer 
+                 $ Options.PurchaseExecuteOrCloseExpiredContracts Options.proposalBeaconCurrencySymbol
+      , scriptWitness = ReferenceWitness $ Options.getScriptRef network Options.activeBeaconScriptHash
+      , executionBudget = def -- These must be calculated during the build step.
+      }
