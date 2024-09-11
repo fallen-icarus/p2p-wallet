@@ -101,6 +101,8 @@ data WaitingStatus = WaitingStatus
   , syncingBorrowerInfo :: Bool
   -- | The app is syncing the proposal contracts for the selected assets.
   , syncingOptionsProposals :: Bool
+  -- | The app is syncing the options contracts for the selected contract id.
+  , syncingOptionsContract :: Bool
   -- | The app is building the transaction.
   , building :: Bool
   -- | The app is loading the profile.
@@ -126,6 +128,7 @@ instance Default WaitingStatus where
     , syncingLoanHistory = False
     , syncingBorrowerInfo = False
     , syncingOptionsProposals = False
+    , syncingOptionsContract = False
     , building = False
     , loadingProfile = False
     , submitting = False

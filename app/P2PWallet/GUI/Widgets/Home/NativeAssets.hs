@@ -16,6 +16,7 @@ import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Home.NativeAssets.LoanKeys
+import P2PWallet.GUI.Widgets.Home.NativeAssets.OptionsKeys
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
@@ -97,6 +98,12 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
             -- Hide until after syncing is complete.
             , not $ model ^. #waitingStatus % #syncingLoanHistory
             ]
+      , inspectOptionsContractWidget model
+          `nodeVisible` and
+            [ isJust $ homeModel ^. #inspectedOptionsContract
+            -- Hide until after syncing is complete.
+            , not $ model ^. #waitingStatus % #syncingOptionsContract
+            ]
       ]
   where
     wallet :: PaymentWallet
@@ -155,6 +162,8 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
                     $ filter (elem fingerprint . map (view #fingerprint) . view #nativeAssets) 
                     $ wallet ^. #utxos
           loanHistoryEvt = HomeEvent $ InspectCorrespondingLoan (Loans.LoanId tokenName)
+          optionsKeyEvt = 
+            HomeEvent $ InspectCorrespondingOptionsContract (Options.ContractId tokenName)
       vstack
         [ hstack 
             [ copyableLabelMain (display fingerprint)
@@ -165,6 +174,26 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
                     tooltip_ ("Loan ID: " <> display tokenName) [tooltipDelay 0] $
                       box_ [alignMiddle , onClick loanHistoryEvt] $
                         label historyIcon
+                          `styleBasic` 
+                            [ bgColor black
+                            , textMiddle
+                            , textFont "Remix"
+                            , textSize 8
+                            , textColor customBlue
+                            , paddingT 1
+                            , paddingB 1
+                            , paddingL 3
+                            , paddingR 3
+                            , radius 5
+                            ]
+                          `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                ]
+            , widgetIf (policyId == Options.activeBeaconCurrencySymbol) $ hstack
+                [ spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ 
+                    tooltip_ ("Options Contract ID: " <> display tokenName) [tooltipDelay 0] $
+                      box_ [alignMiddle , onClick optionsKeyEvt] $
+                        label idCardIcon
                           `styleBasic` 
                             [ bgColor black
                             , textMiddle

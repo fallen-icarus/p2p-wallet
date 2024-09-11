@@ -206,3 +206,6 @@ updatePaymentAddressIcon = remixShareForwardLine
 
 historyIcon :: Text
 historyIcon = remixFileHistoryLine
+
+swapIcon :: Text
+swapIcon = remixHandCoinLine

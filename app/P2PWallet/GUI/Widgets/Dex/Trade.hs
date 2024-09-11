@@ -289,8 +289,14 @@ orderBookWidget AppModel{dexModel=DexModel{..}, reverseTickerMap} = do
             , spacer_ [width 5]
             , box_ [alignMiddle, onClick swapEvent] $
                 tooltip_ "Swap" [tooltipDelay 0] $
-                  label remixHandCoinLine
-                    `styleBasic` [textMiddle,textFont "Remix", textSize 8, textColor customBlue]
+                  label swapIcon
+                    `styleBasic` 
+                      [ radius 3
+                      , textMiddle
+                      ,textFont "Remix"
+                      , textSize 8
+                      , textColor customBlue
+                      ]
                     `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             ] `styleBasic`
                 [ padding 5

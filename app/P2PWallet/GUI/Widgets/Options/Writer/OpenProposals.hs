@@ -163,7 +163,7 @@ openProposalsWidget model@AppModel{knownWallets,optionsModel=OptionsModel{..},re
       hstack
         [ vstack
             [ hstack
-                [ label ("Offer Asset: " <> showAssetBalance True reverseTickerMap offerAmount)
+                [ label ("Offer: " <> showAssetBalance True reverseTickerMap offerAmount)
                     `styleBasic` [textSize 10, textColor customBlue]
                 , spacer_ [width 5]
                 , let prettyRef = display utxoRef in

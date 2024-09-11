@@ -95,7 +95,7 @@ data LoanBuilderEvent
   | RemoveSelectedInterestApplication Int
   -- | Remove the selected expired claim from the builder.
   | RemoveSelectedExpiredClaim Int
-  -- | Remove the selected laon key burn from the builder.
+  -- | Remove the selected loan key burn from the builder.
   | RemoveSelectedLoanKeyBurn Int
   -- | Remove the selected lender address update from the builder.
   | RemoveSelectedLenderAddressUpdate Int
@@ -1083,7 +1083,7 @@ addAddressUpdateToBody txBody (_,LenderAddressUpdate{..}) =
       & #outputs %~ (<> [newKeyOutput])
       -- Invalid hereafter must be set to loan expiration.
       & #invalidHereafter ?~ upperBound
-      -- Add the interest observer execution.
+      -- Add the address observer execution.
       & #withdrawals %~ (addressObserverStakeWithdrawal:)
       & #network .~ network
   where
@@ -1146,7 +1146,7 @@ addAddressUpdateToBody txBody (_,LenderAddressUpdate{..}) =
     addressObserverStakeWithdrawal = TxBodyWithdrawal
       { stakeAddress = Loans.addressUpdateObserverStakeAddress network
       , lovelace = 0
-      , stakeCredential = ScriptCredential Loans.interestObserverScriptHash
+      , stakeCredential = ScriptCredential Loans.addressUpdateObserverScriptHash
       , stakingScriptInfo = Just $ StakingScriptInfo
           { scriptWitness = 
               ReferenceWitness $ Loans.getScriptRef network Loans.AddressObserverScript

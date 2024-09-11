@@ -48,6 +48,7 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ loanBuilderModel ^. #askCloses
       , assetBalancesForChange $ loanBuilderModel ^. #offerCloses
       , assetBalancesForChange $ optionsBuilderModel ^. #proposalCloses
+      , assetBalancesForChange $ optionsBuilderModel ^. #expiredCloses
       ]
 
     -- The amount of ADA and native assets from the output sources. All quantities in this list must
@@ -79,6 +80,9 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ loanBuilderModel ^. #addressUpdates
       , assetBalancesForChange $ optionsBuilderModel ^. #proposalUpdates
       , assetBalancesForChange $ optionsBuilderModel ^. #proposalPurchases
+      , assetBalancesForChange $ optionsBuilderModel ^. #addressUpdates
+      , assetBalancesForChange $ optionsBuilderModel ^. #keyBurns
+      , assetBalancesForChange $ optionsBuilderModel ^. #contractExecutions
       ]
 
     newChange :: ChangeOutput
@@ -116,6 +120,10 @@ balanceTx tx@TxBuilderModel{..} =
       , optionsBuilderModel ^. #proposalCloses /= []
       , optionsBuilderModel ^. #proposalUpdates /= []
       , optionsBuilderModel ^. #proposalPurchases /= []
+      , optionsBuilderModel ^. #expiredCloses /= []
+      , optionsBuilderModel ^. #addressUpdates /= []
+      , optionsBuilderModel ^. #keyBurns /= []
+      , optionsBuilderModel ^. #contractExecutions /= []
       ]
 
     -- What kind of transaction this is.
@@ -147,4 +155,6 @@ balanceTx tx@TxBuilderModel{..} =
       , map (view $ _2 % #borrowerStakeKeyDerivation) $ loanBuilderModel ^. #expiredClaims
       , map (view $ _2 % #stakeKeyDerivation) $ optionsBuilderModel ^. #proposalCloses
       , map (view $ _2 % #oldProposal % #stakeKeyDerivation) $ optionsBuilderModel ^. #proposalUpdates
+      , map (view $ _2 % #stakeKeyDerivation) $ optionsBuilderModel ^. #expiredCloses
+      , map (view $ _2 % #stakeKeyDerivation) $ optionsBuilderModel ^. #addressUpdates
       ]

@@ -128,7 +128,7 @@ buildTxBody network tx = do
 
   -- Calculate the budgets if necessary.
   budgets <- if not (templateTx ^. #requiresCollateral) then return Nothing else do
-      -- Any plutus scripts that are used locally must be exported.  The redeemers and datums used
+      -- Any plutus scripts that are used locally must be exported. The redeemers and datums used
       -- must also be exported. All files will be located in the tmp directory and will have their
       -- hashes as the file names.
       exportContractFiles initialTxBody

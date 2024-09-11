@@ -109,10 +109,14 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferCreation
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferUpdate
       P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ContractExecution
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ExpiredClose
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.OptionsKeyBurn
       P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalClose
       P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalCreation
       P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalPurchase
       P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.WriterAddressUpdate
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
       P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
@@ -209,6 +213,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Home.AddPaymentWallet
       P2PWallet.GUI.Widgets.Home.NativeAssets
       P2PWallet.GUI.Widgets.Home.NativeAssets.LoanKeys
+      P2PWallet.GUI.Widgets.Home.NativeAssets.OptionsKeys
       P2PWallet.GUI.Widgets.Home.Transactions
       P2PWallet.GUI.Widgets.Home.UTxOs
       P2PWallet.GUI.Widgets.Lending
@@ -231,6 +236,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Options
       P2PWallet.GUI.Widgets.Options.Buyer
       P2PWallet.GUI.Widgets.Options.Writer
+      P2PWallet.GUI.Widgets.Options.Writer.ActiveContracts
       P2PWallet.GUI.Widgets.Options.Writer.OpenProposals
       P2PWallet.GUI.Widgets.Profiles
       P2PWallet.GUI.Widgets.Settings
@@ -238,23 +244,27 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.TxBuilder
       P2PWallet.GUI.Widgets.TxBuilder.Internal
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder
-      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AddressUpdates
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCloses
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCreations
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskUpdates
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.ExpiredClaims
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.InterestApplications
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.KeyBurns
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.LenderAddressUpdates
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.LoanPayments
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferAcceptances
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCloses
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCreations
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferUpdates
       P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ContractExecutions
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ExpiredCloses
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.KeyBurns
       P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalCloses
       P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalCreations
       P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalPurchases
       P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.WriterAddressUpdates
       P2PWallet.GUI.Widgets.TxBuilder.StatusBar
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder
       P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCloses

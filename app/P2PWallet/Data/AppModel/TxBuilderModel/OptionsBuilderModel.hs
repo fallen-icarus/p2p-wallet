@@ -8,22 +8,32 @@ module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel
   ( OptionsBuilderModel(..)
   , emptyOptionsBuilderModel
   , isEmptyOptionsBuilderModel
+  , onlyOneOptionsActiveBeaconActionError
+  , hasOnlyOneOptionsActiveBeaconAction
 
   , OptionsBuilderEvent(..)
 
+  , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ContractExecution
+  , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ExpiredClose
+  , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.OptionsKeyBurn
   , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalClose
   , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalCreation
   , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalPurchase
   , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalUpdate
+  , module P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.WriterAddressUpdate
   ) where
 
 import Data.List (minimum,(!!))
 
 import P2PWallet.Data.AppModel.Common
+import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ContractExecution
+import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ExpiredClose
+import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.OptionsKeyBurn
 import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalClose
 import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalCreation
 import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalPurchase
 import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalUpdate
+import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.WriterAddressUpdate
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
 import P2PWallet.Data.Core.Wallets
@@ -54,6 +64,16 @@ data OptionsBuilderEvent
   -- | Edit selected proposal purchase. This can only change the selected terms. The `Int` is
   -- the index into `proposalPurchases` and the `Integer` is the new desired terms index.
   | EditSelectedProposalPurchase (ProcessEvent (Int,ProposalPurchase) (Int,ProposalPurchase))
+  -- | Remove the selected expired close from the builder.
+  | RemoveSelectedExpiredOptionsClose Int
+  -- | Remove the selected writer address update from the builder.
+  | RemoveSelectedWriterAddressUpdate Int
+  -- | Edit selected writer address update.
+  | EditSelectedWriterAddressUpdate (AddEvent (Int,WriterAddressUpdate) (Int,WriterAddressUpdate))
+  -- | Remove the selected options key burn from the builder.
+  | RemoveSelectedOptionsKeyBurn Int
+  -- | Remove the selected options contract execution from the builder.
+  | RemoveSelectedOptionsContractExecution Int
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -69,6 +89,11 @@ data OptionsBuilderModel = OptionsBuilderModel
   -- | The `Int` is the index into `proposalUpdates`.
   , targetProposalUpdate :: Maybe (Int,NewProposalCreation)
   , proposalPurchases :: [(Int,ProposalPurchase)]
+  , expiredCloses :: [(Int,ExpiredOptionsClose)]
+  , addressUpdates :: [(Int,WriterAddressUpdate)]
+  , targetAddressUpdate :: Maybe (Int,NewWriterAddressUpdate)
+  , keyBurns :: [(Int,OptionsKeyBurn)]
+  , contractExecutions :: [(Int,OptionsContractExecution)]
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''OptionsBuilderModel
@@ -81,6 +106,11 @@ instance Default OptionsBuilderModel where
     , proposalUpdates = []
     , targetProposalUpdate = Nothing
     , proposalPurchases = []
+    , expiredCloses = []
+    , addressUpdates = []
+    , targetAddressUpdate = Nothing
+    , keyBurns = []
+    , contractExecutions = []
     }
 
 -- | This is just an alias for `def`. The name is more clear what it is.
@@ -93,9 +123,34 @@ isEmptyOptionsBuilderModel OptionsBuilderModel{..} = and
   , null proposalCloses
   , null proposalUpdates
   , null proposalPurchases
+  , null expiredCloses
+  , null addressUpdates
+  , null keyBurns
+  , null contractExecutions
   , isNothing targetProposalCreation
   , isNothing targetProposalUpdate
+  , isNothing targetAddressUpdate
   ]
+
+onlyOneOptionsActiveBeaconActionError :: Text
+onlyOneOptionsActiveBeaconActionError = unwords
+  [ "It is not possible to burn excess Key NFTs in transactions where options contracts are"
+  , "being purchased, executed, or closed. Burning excess Key NFTs requires a separate"
+  , "transaction."
+  ]
+
+hasOnlyOneOptionsActiveBeaconAction :: OptionsBuilderModel -> Bool
+hasOnlyOneOptionsActiveBeaconAction OptionsBuilderModel{..}
+  | hasCoreActions = null keyBurns
+  | keyBurns /= [] = not hasCoreActions 
+  | otherwise = True
+  where
+    hasCoreActions = or
+      [ expiredCloses /= []
+      , proposalPurchases /= []
+      , contractExecutions /= []
+      ]
+  
 
 -------------------------------------------------
 -- OptionsBuilderModel --> TxBody
@@ -112,6 +167,14 @@ instance AddToTxBody OptionsBuilderModel where
         & flip (foldl' addProposalUpdateToBody) proposalUpdates
         -- Add the proposal purchases.
         & flip (foldl' addProposalPurchaseToBody) proposalPurchases
+        -- Add the expired closes.
+        & flip (foldl' addExpiredCloseToBody) expiredCloses
+        -- Add the address updates.
+        & flip (foldl' addAddressUpdateToBody) addressUpdates
+        -- Add the key burns.
+        & flip (foldl' addOptionsKeyBurnToBody) keyBurns
+        -- Add the contract executions.
+        & flip (foldl' addContractExecutionToBody) contractExecutions
         -- Merge any beacon mints so that there is only one `TxBodyMint` per minting policy.
         & #mints %~ mergeTxBodyMints
         -- Adjust any executions based on whether all mints canceled out.
@@ -418,4 +481,244 @@ addProposalPurchaseToBody txBody (_,ProposalPurchase{..}) =
                  $ Options.PurchaseExecuteOrCloseExpiredContracts Options.proposalBeaconCurrencySymbol
       , scriptWitness = ReferenceWitness $ Options.getScriptRef network Options.activeBeaconScriptHash
       , executionBudget = def -- These must be calculated during the build step.
+      }
+
+addExpiredCloseToBody :: TxBody -> (Int,ExpiredOptionsClose) -> TxBody
+addExpiredCloseToBody txBody (_,ExpiredOptionsClose{..}) =
+    txBody
+      -- Add the new proposal to the inputs.
+      & #inputs %~ flip snoc newInput
+      -- Add the new beacons to be burned. 
+      & #mints %~ (newBurn:)
+      -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
+      -- instance of `TxBody`. They will also be sorted.
+      & #requiredWitnesses %~ maybe id (:) requiredWitness
+      -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
+      -- instance of `TxBody`. They will also be sorted.
+      & #keyWitnesses %~ maybe id (:) requiredWitness
+      -- Invalid before must be set to the current time to prove the contract is actually expired.
+      & #invalidBefore ?~ posixTimeToSlot slotConfig expiration
+      & #network .~ network
+  where
+    slotConfig :: SlotConfig
+    slotConfig = case network of
+      Mainnet -> mainnetSlotConfig
+      Testnet -> testnetSlotConfig
+
+    Options.ActiveDatum{offerBeacon,askBeacon,tradingPairBeacon,contractId,expiration} =
+      fromMaybe def activeDatum
+
+    beacons = 
+      -- One Ask Beacon.
+      [ NativeAsset Options.activeBeaconCurrencySymbol (askBeacon ^. #unAskBeacon) "" (-1)
+      -- One Offer Beacon.
+      , NativeAsset Options.activeBeaconCurrencySymbol (offerBeacon ^. #unOfferBeacon) "" (-1)
+      -- One Contract Id beacon.
+      , NativeAsset Options.activeBeaconCurrencySymbol (contractId ^. #unContractId) "" (-1)
+      -- One tradingPair beacon.
+      , NativeAsset Options.activeBeaconCurrencySymbol (tradingPairBeacon ^. #unTradingPairBeacon) "" (-1)
+      ]
+
+    requiredWitness :: Maybe KeyWitness
+    requiredWitness = case writerCredential of
+      ScriptCredential _ -> Nothing
+      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+
+    newInput :: TxBodyInput
+    newInput = TxBodyInput
+      { utxoRef = utxoRef
+      , spendingScriptInfo = Just $ SpendingScriptInfo
+          { datum = InputDatum
+          , redeemer = toRedeemer Options.CloseExpiredContract
+          , scriptWitness = ReferenceWitness $ Options.getScriptRef network Options.optionsScriptHash
+          , executionBudget = def
+          , scriptHash = Options.optionsScriptHash
+          }
+      }
+
+    newBurn :: TxBodyMint
+    newBurn = TxBodyMint
+      { mintingPolicyHash = Options.activeBeaconScriptHash
+      , nativeAssets = beacons
+      , redeemer = 
+          toRedeemer 
+            $ Options.PurchaseExecuteOrCloseExpiredContracts Options.proposalBeaconCurrencySymbol
+      , scriptWitness = ReferenceWitness $ Options.getScriptRef network Options.activeBeaconScriptHash
+      , executionBudget = def -- These must be calculated during the build step.
+      }
+
+addAddressUpdateToBody :: TxBody -> (Int,WriterAddressUpdate) -> TxBody
+addAddressUpdateToBody txBody (_,WriterAddressUpdate{..}) =
+    txBody 
+      -- Add the collateral input to the input list.
+      & #inputs %~ (<> [newContractInput])
+      -- Add the updated collateral output to the list.
+      & #outputs %~ (<> [newContractOutput])
+      -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
+      -- instance of `TxBody`. They will also be sorted.
+      & #requiredWitnesses %~ maybe id (:) requiredWitness
+      -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
+      -- instance of `TxBody`. They will also be sorted.
+      & #keyWitnesses %~ maybe id (:) requiredWitness
+      -- Invalid hereafter must be set to contract expiration.
+      & #invalidHereafter ?~ upperBound
+      -- Add the address observer execution.
+      & #withdrawals %~ (addressObserverStakeWithdrawal:)
+      & #network .~ network
+  where
+    activeDatum@Options.ActiveDatum{expiration} = 
+      fromMaybe def $ optionsUTxOActiveDatum optionsUTxO
+
+    requiredWitness :: Maybe KeyWitness
+    requiredWitness = case writerCredential of
+      ScriptCredential _ -> Nothing
+      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+
+    upperBound :: Slot
+    upperBound = 
+      -- The node can only specify invalidHereafter for 1.5 days into the future due to the
+      -- possibility for epoch lengths and slot lengths to change. Using a tighter bound will not
+      -- change the behavior of the protocol.
+      min (posixTimeToSlot slotConfig expiration) (129600 + posixTimeToSlot slotConfig currentTime)
+
+    slotConfig :: SlotConfig
+    slotConfig = case network of
+      Mainnet -> mainnetSlotConfig
+      Testnet -> testnetSlotConfig
+
+    newPlutusAddress = fromRight (Address (PubKeyCredential "") Nothing) 
+                     $ paymentAddressToPlutusAddress newPaymentAddress
+
+    postUpdateDatum = 
+      Options.createPostAddressUpdateActiveDatum 
+        newPlutusAddress 
+        (unLovelace extraDeposit) 
+        activeDatum
+
+    newContractInput :: TxBodyInput
+    newContractInput = TxBodyInput
+      { utxoRef = optionsUTxO ^. #utxoRef
+      , spendingScriptInfo = Just $ SpendingScriptInfo
+          { datum = InputDatum
+          , redeemer = toRedeemer $ 
+              Options.UpdatePaymentAddress newPlutusAddress (unLovelace extraDeposit)
+          , scriptWitness = 
+              ReferenceWitness $ Options.getScriptRef network Options.optionsScriptHash
+          , executionBudget = def
+          , scriptHash = Options.optionsScriptHash
+          }
+      }
+
+    newContractOutput :: TxBodyOutput
+    newContractOutput = TxBodyOutput
+      { paymentAddress = optionsUTxO ^. #optionsAddress
+      , lovelace = optionsUTxO ^. #lovelace + extraDeposit
+      , nativeAssets = optionsUTxO ^. #nativeAssets
+      , datum = OutputDatum $ toDatum postUpdateDatum
+      }
+
+    addressObserverStakeWithdrawal :: TxBodyWithdrawal
+    addressObserverStakeWithdrawal = TxBodyWithdrawal
+      { stakeAddress = Options.addressObserverStakeAddress network
+      , lovelace = 0
+      , stakeCredential = ScriptCredential Options.addressObserverScriptHash
+      , stakingScriptInfo = Just $ StakingScriptInfo
+          { scriptWitness = 
+              ReferenceWitness $ Options.getScriptRef network Options.addressObserverScriptHash
+          , redeemer = toRedeemer Options.ObserveAddressUpdate
+          , executionBudget = def
+          }
+      }
+
+addOptionsKeyBurnToBody :: TxBody -> (Int,OptionsKeyBurn) -> TxBody
+addOptionsKeyBurnToBody txBody (_,OptionsKeyBurn{..}) =
+    txBody
+      -- Add the new beacons to be burned. 
+      & #mints %~ (newMint:)
+      & #network .~ network
+  where
+    newMint :: TxBodyMint
+    newMint = TxBodyMint
+      { mintingPolicyHash = policyIdToScriptHash Options.activeBeaconCurrencySymbol
+      , nativeAssets = [contractIdAsset]
+      , redeemer = toRedeemer Options.BurnActiveBeacons
+      , scriptWitness = 
+          ReferenceWitness $ Options.getScriptRef network Options.activeBeaconScriptHash
+      , executionBudget = def -- These must be calculated during the build step.
+      }
+
+addContractExecutionToBody :: TxBody -> (Int,OptionsContractExecution) -> TxBody
+addContractExecutionToBody txBody (_,OptionsContractExecution{..}) =
+    txBody
+      -- Add the new execution to the inputs.
+      & #inputs %~ flip snoc newInput
+      -- Add the payment output.
+      & #outputs %~ (<> [newPaymentOutput])
+      -- Add the new beacons to be burned. 
+      & #mints %~ (newBurn:)
+      -- Invalid hereafter must be set to the contract expiration.
+      & #invalidHereafter ?~ upperBound
+      & #network .~ network
+  where
+    Options.ActiveDatum{..} = fromMaybe def $ optionsUTxOActiveDatum optionsUTxO
+
+    slotConfig :: SlotConfig
+    slotConfig = case network of
+      Mainnet -> mainnetSlotConfig
+      Testnet -> testnetSlotConfig
+
+    upperBound :: Slot
+    upperBound = 
+      -- The node can only specify invalidHereafter for 1.5 days into the future due to the
+      -- possibility for epoch lengths and slot lengths to change. Using a tighter bound will not
+      -- change the behavior of the protocol.
+      min (posixTimeToSlot slotConfig expiration) (129600 + posixTimeToSlot slotConfig currentTime)
+
+    beacons =
+      -- One Offer Beacon.
+      [ NativeAsset Options.activeBeaconCurrencySymbol (offerBeacon ^. #unOfferBeacon) "" (-1)
+      -- One Ask Beacon.
+      , NativeAsset Options.activeBeaconCurrencySymbol (askBeacon ^. #unAskBeacon) "" (-1)
+      -- One Trading Pair beacon.
+      , NativeAsset Options.activeBeaconCurrencySymbol (tradingPairBeacon ^. #unTradingPairBeacon) "" (-1)
+      -- Two contract Ids.
+      , NativeAsset Options.activeBeaconCurrencySymbol (contractId ^. #unContractId) "" (-2)
+      ]
+    
+    (paymentLovelace,paymentNativeAssets)
+      | askValue ^. #policyId == "" = (Lovelace $ askValue ^. #quantity, []) 
+      | otherwise = (0, [askValue])
+
+    newInput :: TxBodyInput
+    newInput = TxBodyInput
+      { utxoRef = optionsUTxO ^. #utxoRef
+      , spendingScriptInfo = Just $ SpendingScriptInfo
+          { datum = InputDatum
+          , redeemer = toRedeemer Options.ExecuteContract
+          , scriptWitness = 
+              ReferenceWitness $ Options.getScriptRef network Options.optionsScriptHash
+          , executionBudget = def
+          , scriptHash = Options.optionsScriptHash
+          }
+      }
+
+    newBurn :: TxBodyMint
+    newBurn = TxBodyMint
+      { mintingPolicyHash = policyIdToScriptHash Options.activeBeaconCurrencySymbol
+      , nativeAssets = beacons
+      , redeemer = toRedeemer $ 
+          Options.PurchaseExecuteOrCloseExpiredContracts Options.proposalBeaconCurrencySymbol
+      , scriptWitness = ReferenceWitness $ Options.getScriptRef network Options.activeBeaconScriptHash
+      , executionBudget = def -- These must be calculated during the build step.
+      }
+
+    newPaymentOutput :: TxBodyOutput
+    newPaymentOutput = TxBodyOutput
+      { paymentAddress = either (const "") fst $ plutusToBech32 network paymentAddress
+      , lovelace = paymentLovelace + Lovelace contractDeposit
+      , nativeAssets = paymentNativeAssets
+      , datum = OutputDatum $ toDatum $ Options.PaymentDatum
+          ( Options.ActiveBeaconId Options.activeBeaconCurrencySymbol
+          , contractId
+          )
       }
