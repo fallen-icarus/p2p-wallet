@@ -8,6 +8,7 @@ import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.GUI.Widgets.Options.Writer.ActiveContracts
 import P2PWallet.GUI.Widgets.Options.Writer.OpenProposals
 import P2PWallet.Prelude
 
@@ -20,6 +21,8 @@ writerWidget model@AppModel{optionsModel} = do
           , spacer
           , box_ [mergeRequired reqUpdate] (openProposalsWidget model)
               `nodeVisible` (optionsModel ^. #writerModel % #scene == OpenOptionsProposals)
+          , box_ [mergeRequired reqUpdate] (activeContractsWidget model)
+              `nodeVisible` (optionsModel ^. #writerModel % #scene == ActiveOptionsContracts)
           ]
       ]
   where

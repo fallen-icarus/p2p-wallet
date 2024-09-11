@@ -73,6 +73,13 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
 
           let newInput = optionsUTxOToProposalPurchase network idx utxo
 
+          -- Check that all actions with the active beacons require the same redeemer.
+          let newOptionsBuilderModel = 
+                (txBuilderModel ^. #optionsBuilderModel) 
+                  & #proposalPurchases %~ flip snoc (0,newInput)
+          unless (hasOnlyOneOptionsActiveBeaconAction newOptionsBuilderModel) $
+            throwIO $ AppError onlyOneOptionsActiveBeaconActionError
+
           -- There should be two results, the first is for the premium payment output and the
           -- second is for the new Active contract UTxO.
           minUTxOValues <- 

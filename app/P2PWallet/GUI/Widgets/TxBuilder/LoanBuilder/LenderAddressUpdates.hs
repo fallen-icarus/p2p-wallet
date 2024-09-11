@@ -1,4 +1,4 @@
-module P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AddressUpdates
+module P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.LenderAddressUpdates
   ( 
     lenderAddressUpdatesList
   , editLenderAddressUpdateWidget

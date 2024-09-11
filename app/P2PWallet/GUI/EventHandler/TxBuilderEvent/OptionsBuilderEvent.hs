@@ -218,3 +218,100 @@ handleOptionsBuilderEvent model@AppModel{..} evt = case evt of
           , createOptionsPurchaseDepositMsg verifiedPurchase
           ]
       ]
+
+  -----------------------------------------------
+  -- Remove Expired Close from Builder
+  -----------------------------------------------
+  RemoveSelectedExpiredOptionsClose idx ->
+    [ Model $ model 
+        & #txBuilderModel % #optionsBuilderModel % #expiredCloses %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Remove Writer Address Update from Builder
+  -----------------------------------------------
+  RemoveSelectedWriterAddressUpdate idx ->
+    [ Model $ model 
+        & #txBuilderModel % #optionsBuilderModel % #addressUpdates %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Edit the Writer Address Update
+  -----------------------------------------------
+  EditSelectedWriterAddressUpdate modal -> case modal of
+    StartAdding mTarget ->
+      [ Model $ model & #txBuilderModel % #optionsBuilderModel % #targetAddressUpdate .~ 
+          fmap (fmap toNewWriterAddressUpdate) mTarget
+      ]
+    CancelAdding ->
+      [ Model $ model & #txBuilderModel % #optionsBuilderModel % #targetAddressUpdate .~ Nothing ]
+    ConfirmAdding ->
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (optionsBuilderEvent . EditSelectedWriterAddressUpdate . AddResult) $ do
+          (idx,newUpdate) <-
+            fromJustOrAppError "Nothing set for `targetAddressUpdate`" $ 
+              txBuilderModel ^. #optionsBuilderModel % #targetAddressUpdate
+
+          verifiedUpdate <- fromRightOrAppError $ 
+            verifyNewWriterAddressUpdate (config ^. #currentTime) newUpdate
+
+          -- There should only be one output in the `TxBody` for this action. The calculation must
+          -- be done twice because the datum must be updated with the minUTxOValue as well.
+          minUTxOValue <- do
+            minUTxOValue1 <- 
+              fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+                calculateMinUTxOValue 
+                  (config ^. #network) 
+                  (txBuilderModel ^? #parameters % _Just % _1) 
+                  -- Use a blank optionsBuilderModel to calculate the minUTxOValue for the new
+                  -- output.
+                  (emptyOptionsBuilderModel & #addressUpdates .~ [(0,verifiedUpdate)])
+
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
+                -- Use a blank optionsBuilderModel to calculate the minUTxOValue for the new
+                -- output.
+                (emptyOptionsBuilderModel & #addressUpdates .~ 
+                  [(0,verifiedUpdate & #extraDeposit .~ minUTxOValue1)])
+
+          return (idx, updateWriterAddressDeposit verifiedUpdate minUTxOValue)
+      ]
+    AddResult (idx,verifiedUpdate) ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          & #txBuilderModel % #optionsBuilderModel % #addressUpdates % ix idx % _2 .~ 
+              verifiedUpdate
+          & #txBuilderModel % #optionsBuilderModel % #targetAddressUpdate .~ Nothing
+          & #txBuilderModel %~ balanceTx
+      , Event $ Alert $ unlines
+          [ "Successfully added to builder!"
+          , ""
+          , createWriterAddressDepositMsg verifiedUpdate
+          ]
+      ]
+
+  -----------------------------------------------
+  -- Remove Options Key Burn from builder
+  -----------------------------------------------
+  RemoveSelectedOptionsKeyBurn idx ->
+    [ Model $ model 
+        & #txBuilderModel % #optionsBuilderModel % #keyBurns %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Remove Options execution from builder
+  -----------------------------------------------
+  RemoveSelectedOptionsContractExecution idx ->
+    [ Model $ model 
+        & #txBuilderModel % #optionsBuilderModel % #contractExecutions %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]

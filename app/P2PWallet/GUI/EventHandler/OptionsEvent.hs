@@ -131,6 +131,23 @@ handleOptionsEvent model@AppModel{..} evt = case evt of
           & #optionsModel % #cachedProposals .~ newCache
       ]
 
+  -----------------------------------------------
+  -- Sync Contracts for Key NFTs
+  -----------------------------------------------
+  LookupOptionsContract modal -> case modal of
+    StartProcess mContractId ->
+      [ Model $ model & #waitingStatus % #syncingOptionsContract .~ True
+      , Task $ runActionOrAlert (OptionsEvent . LookupOptionsContract . ProcessResults) $ do
+          contractId <- fromJustOrAppError "mContractId is Nothing" mContractId
+
+          syncOptionsContract (config ^. #network) contractId $ optionsModel ^. #cachedKeyContracts
+      ]
+    ProcessResults newCache ->
+      [ Model $ model 
+          & #waitingStatus % #syncingOptionsContract .~ False
+          & #optionsModel % #cachedKeyContracts .~ newCache
+      ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------

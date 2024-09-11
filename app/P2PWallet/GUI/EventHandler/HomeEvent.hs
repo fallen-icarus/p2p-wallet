@@ -422,10 +422,10 @@ handleHomeEvent model@AppModel{..} evt = case evt of
       [ Model $ model 
           & #waitingStatus % #addingToBuilder .~ False
           & #homeModel % #newLenderAddressUpdate .~ Nothing
-          -- Add the new payment with a dummy index.
+          -- Add the new update with a dummy index.
           & #txBuilderModel % #loanBuilderModel % #addressUpdates %~ 
               flip snoc (0,verifiedUpdate)
-          -- Sort the interest applications by the active UTxO. This is required to generate 
+          -- Sort the updates by the active UTxO. This is required to generate 
           -- the outputs in the proper order.
           & #txBuilderModel % #loanBuilderModel % #addressUpdates %~ 
               sortOn (view $ _2 % #loanUTxO % #utxoRef)
@@ -437,6 +437,54 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           , createLenderAddressDepositMsg verifiedUpdate
           ]
       ]
+
+  -----------------------------------------------
+  -- Inspecting Correpsonding Options Contract
+  -----------------------------------------------
+  InspectCorrespondingOptionsContract contractId -> 
+    [ Model $ model & #homeModel % #inspectedOptionsContract ?~ contractId
+    , Event $ case Map.lookup contractId (optionsModel ^. #cachedKeyContracts) of
+        Nothing -> OptionsEvent $ LookupOptionsContract $ StartProcess $ Just contractId
+        Just _ -> AppInit
+    ]
+  CloseInspectedCorrespondingOptionsContract -> 
+    [ Model $ model & #homeModel % #inspectedOptionsContract .~ Nothing ]
+
+  -----------------------------------------------
+  -- Add Options Key Burn to builder
+  -----------------------------------------------
+  BurnOptionsKeyNFT contractId ->
+    let PaymentWallet{network,alias} = homeModel ^. #selectedWallet
+        newInput = contractIdToOptionsKeyBurn network alias contractId
+     in case processNewOptionsKeyBurn newInput txBuilderModel of
+          Left err -> [ Task $ return $ Alert err ]
+          Right newTxModel -> 
+            if hasOnlyOneOptionsActiveBeaconAction $ newTxModel ^. #optionsBuilderModel then
+              [ Model $ model & #txBuilderModel .~ newTxModel
+              , Task $ return $ Alert "Successfully added to builder!"
+              ]
+            else
+              [ Event $ Alert onlyOneOptionsActiveBeaconActionError ]
+
+  -----------------------------------------------
+  -- Add Options Key Burn to builder
+  -----------------------------------------------
+  ExecuteOptionsContract optionsUTxO ->
+    let PaymentWallet{network,alias} = homeModel ^. #selectedWallet
+        newInput = optionsUTxOToOptionsContractExecution 
+          network 
+          alias 
+          (config ^. #currentTime)
+          optionsUTxO
+     in case processNewOptionsExecution newInput txBuilderModel of
+          Left err -> [ Task $ return $ Alert err ]
+          Right newTxModel -> 
+            if hasOnlyOneOptionsActiveBeaconAction $ newTxModel ^. #optionsBuilderModel then
+              [ Model $ model & #txBuilderModel .~ newTxModel
+              , Task $ return $ Alert "Successfully added to builder!"
+              ]
+            else
+              [ Event $ Alert onlyOneOptionsActiveBeaconActionError ]
 
 -------------------------------------------------
 -- Helper Functions
@@ -510,3 +558,34 @@ processNewLoanKeyBurn newBurn model@TxBuilderModel{loanBuilderModel=LoanBuilderM
   -- Add the new close to the end of the list of ask closes.
   return $ balanceTx $ model 
     & #loanBuilderModel % #keyBurns %~ flip snoc (newIdx,newBurn)
+
+-- | Validate the new options key burn and add it to the builder. Balance the transaction after.
+processNewOptionsKeyBurn :: OptionsKeyBurn -> TxBuilderModel -> Either Text TxBuilderModel
+processNewOptionsKeyBurn newBurn model@TxBuilderModel{optionsBuilderModel=OptionsBuilderModel{..}} = do
+  -- Verify that the contract id is not already being burned.
+  maybeToLeft () $ "This options Key is already being burned." <$
+    find (== newBurn ^. #contractIdAsset) (map (view $ _2 % #contractIdAsset) keyBurns)
+
+  -- Get the input's new index.
+  let newIdx = length keyBurns
+
+  -- Add the new close to the end of the list of ask closes.
+  return $ balanceTx $ model 
+    & #optionsBuilderModel % #keyBurns %~ flip snoc (newIdx,newBurn)
+
+-- | Validate the new options execution and add it to the builder. Balance the transaction after.
+processNewOptionsExecution :: OptionsContractExecution -> TxBuilderModel -> Either Text TxBuilderModel
+processNewOptionsExecution newExecution model@TxBuilderModel{optionsBuilderModel=OptionsBuilderModel{..}} = do
+  -- Verify that the contract is not already being executed.
+  maybeToLeft () $ "This options contract is already being executed." <$
+    find (== newExecution ^. #optionsUTxO) (map (view $ _2 % #optionsUTxO) contractExecutions)
+
+  return $ balanceTx $ model 
+    -- Add the new execution with a dummy index.
+    & #optionsBuilderModel % #contractExecutions %~ flip snoc (0,newExecution)
+    -- Sort the executions by the UTxO. This is required to generate 
+    -- the outputs in the proper order.
+    & #optionsBuilderModel % #contractExecutions %~ 
+        sortOn (view $ _2 % #optionsUTxO % #utxoRef)
+    -- Reindex the executions after sorting.
+    & #optionsBuilderModel % #contractExecutions %~ reIndex

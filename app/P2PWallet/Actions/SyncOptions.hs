@@ -1,5 +1,6 @@
 module P2PWallet.Actions.SyncOptions
   ( syncOptionsProposals
+  , syncOptionsContract
   ) where
 
 import Data.Map.Strict qualified as Map
@@ -25,3 +26,16 @@ syncOptionsProposals network key@(offerAsset, askAsset, mPremiumAsset) currentCa
     -- Update the cached.
     return $ currentCache
       & Map.insert key allProposals
+
+syncOptionsContract 
+  :: Network 
+  -> ContractId 
+  -> CachedKeyOptionsContracts 
+  -> IO CachedKeyOptionsContracts
+syncOptionsContract network contractId currentCache = do
+  mUTxO <- runQuerySpecificOptionsContract network contractId >>= 
+    -- Throw an error if syncing failed.
+    fromRightOrAppError
+
+  return $ currentCache
+    & Map.insert contractId mUTxO

@@ -15,6 +15,7 @@ module P2PWallet.Data.AppModel.OptionsModel
   , OptionsModel(..)
 
   , CachedOptionsProposals
+  , CachedKeyOptionsContracts
 
   , module P2PWallet.Data.AppModel.OptionsModel.BuyerModel
   , module P2PWallet.Data.AppModel.OptionsModel.WriterModel
@@ -34,6 +35,12 @@ import P2PWallet.Prelude
 -------------------------------------------------
 -- | A type alias for a map from trading pair to known proposals.
 type CachedOptionsProposals = Map.Map (OfferAsset, AskAsset, Maybe PremiumAsset) [OptionsUTxO]
+
+-------------------------------------------------
+-- Cached Options Contracts for the associated key NFTs
+-------------------------------------------------
+-- | A type alias for a map from Key NFT to contract state.
+type CachedKeyOptionsContracts = Map.Map ContractId (Maybe OptionsUTxO)
 
 -------------------------------------------------
 -- Options Scenes and Overlays
@@ -67,6 +74,8 @@ data OptionsEvent
   | OptionsBuyerEvent OptionsBuyerEvent
   -- | Sync the proposals for the selected contract assets.
   | SyncOptionsProposals (ProcessEvent (OfferAsset, AskAsset, Maybe PremiumAsset) CachedOptionsProposals)
+  -- | Sync the options contract for the selected options key nft.
+  | LookupOptionsContract (ProcessEvent ContractId CachedKeyOptionsContracts)
 
 -------------------------------------------------
 -- Options State
@@ -91,6 +100,8 @@ data OptionsModel = OptionsModel
   , buyerModel :: OptionsBuyerModel
   -- | Cached proposal contracts.
   , cachedProposals :: CachedOptionsProposals
+  -- | Cached key associated options contracts.
+  , cachedKeyContracts :: CachedKeyOptionsContracts
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''OptionsModel
@@ -106,4 +117,5 @@ instance Default OptionsModel where
     , writerModel = def
     , buyerModel = def
     , cachedProposals = mempty
+    , cachedKeyContracts = mempty
     }

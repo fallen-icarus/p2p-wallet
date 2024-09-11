@@ -109,6 +109,7 @@ txBuilderWidget model@AppModel{..} = do
               , isNothing (loanBuilderModel ^. #targetAddressUpdate)
               , isNothing (optionsBuilderModel ^. #targetProposalCreation)
               , isNothing (optionsBuilderModel ^. #targetProposalUpdate)
+              , isNothing (optionsBuilderModel ^. #targetAddressUpdate)
               , not addingChangeOutput
               , not addingExternalUserOutput
               , not addingTestMint
@@ -141,6 +142,8 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (optionsBuilderModel ^. #targetProposalCreation)
       , editProposalUpdateWidget model
           `nodeVisible` isJust (optionsBuilderModel ^. #targetProposalUpdate)
+      , editWriterAddressUpdateWidget
+          `nodeVisible` isJust (optionsBuilderModel ^. #targetAddressUpdate)
       , addExternalUserOutputWidget
           `nodeVisible` addingExternalUserOutput
       , addChangeOutputWidget
@@ -306,6 +309,12 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap,config} 
             optionsBuilderModel ^. #proposalUpdates
         , proposalPurchasesList reverseTickerMap (config ^. #timeZone) $ 
             optionsBuilderModel ^. #proposalPurchases
+        , expiredOptionsClosesList reverseTickerMap (config ^. #timeZone) $ 
+            optionsBuilderModel ^. #expiredCloses
+        , writerAddressUpdatesList $ optionsBuilderModel ^. #addressUpdates
+        , optionsKeyBurnsList $ optionsBuilderModel ^. #keyBurns
+        , optionsContractExecutionsList reverseTickerMap (config ^. #timeZone) $ 
+            optionsBuilderModel ^. #contractExecutions
         -- Certificates
         , userCertificatesList userCertificates
         -- Withdrawals

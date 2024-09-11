@@ -172,7 +172,8 @@ handleWriterEvent model@AppModel{..} evt = case evt of
                   txBuilderModel ^. #optionsBuilderModel % #proposalCloses
               , map (view $ _2 % #oldProposal % #utxoRef) $
                   txBuilderModel ^. #optionsBuilderModel % #proposalUpdates
-              -- , map (view $ _2 % #optionsUTxO % #utxoRef) proposalPurchases
+              , map (view $ _2 % #proposalUTxO % #utxoRef) $
+                  txBuilderModel ^. #optionsBuilderModel % #proposalPurchases
               ])
 
           -- There should only be one output in the `TxBody` for this action. The calculation must
@@ -241,6 +242,101 @@ handleWriterEvent model@AppModel{..} evt = case evt of
         , Event $ Alert err
         ]
 
+  -----------------------------------------------
+  -- Add Expired Close to Builder
+  -----------------------------------------------
+  AddSelectedExpiredOptionsClose optionsUTxO ->
+    let OptionsWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
+          optionsModel ^. #selectedWallet
+        newInput = optionsUTxOToExpiredOptionsClose 
+          network 
+          alias 
+          stakeCredential 
+          stakeKeyDerivation 
+          optionsUTxO
+     in case processNewExpiredClose newInput txBuilderModel of
+          Left err -> [ Task $ return $ Alert err ]
+          Right newTxModel -> 
+            [ Model $ model & #txBuilderModel .~ newTxModel
+            , Task $ return $ Alert "Successfully added to builder!"
+            ]
+
+  -----------------------------------------------
+  -- Change Writer Payment Address
+  -----------------------------------------------
+  UpdateWriterPaymentAddress modal -> case modal of
+    StartAdding mOptionsUTxO -> 
+      let OptionsWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
+            optionsModel ^. #selectedWallet
+          newInput = 
+            createNewWriterAddressUpdate network alias stakeCredential stakeKeyDerivation $ 
+              fromMaybe def mOptionsUTxO
+       in [ Model $ model 
+              & #optionsModel % #writerModel % #newWriterAddressUpdate ?~ newInput
+          ]
+    CancelAdding -> 
+      [ Model $ model 
+          & #optionsModel % #writerModel % #newWriterAddressUpdate .~ Nothing 
+      ]
+    ConfirmAdding -> 
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (OptionsEvent . OptionsWriterEvent . UpdateWriterPaymentAddress . AddResult) $ do
+          newUpdate <- fromJustOrAppError "newWriterAddressUpdate is Nothing" $ 
+            optionsModel ^. #writerModel % #newWriterAddressUpdate
+
+          -- Verify that the contract is not already being updated.
+          fromRightOrAppError $
+            maybeToLeft () $ "This payment address is already being updated." <$
+              find (== newUpdate ^. #optionsUTxO)
+                (map (view $ _2 % #optionsUTxO) $ 
+                  txBuilderModel ^. #optionsBuilderModel % #addressUpdates)
+
+          verifiedUpdate <- fromRightOrAppError $ 
+            verifyNewWriterAddressUpdate (config ^. #currentTime) newUpdate
+
+          -- There should only be one output in the `TxBody` for this action. The calculation must
+          -- be done twice because the datum must be updated with the minUTxOValue as well.
+          minUTxOValue <- do
+            minUTxOValue1 <- 
+              fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+                calculateMinUTxOValue 
+                  (config ^. #network) 
+                  (txBuilderModel ^? #parameters % _Just % _1) 
+                  -- Use a blank optionsBuilderModel to calculate the minUTxOValue for the new
+                  -- proposal.
+                  (emptyOptionsBuilderModel & #addressUpdates .~ [(0,verifiedUpdate)])
+
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
+                -- Use a blank optionsBuilderModel to calculate the minUTxOValue for the new
+                -- proposal.
+                (emptyOptionsBuilderModel & #addressUpdates .~ 
+                  [(0,verifiedUpdate & #extraDeposit .~ minUTxOValue1)])
+
+          return $ updateWriterAddressDeposit verifiedUpdate minUTxOValue
+      ]
+    AddResult verifiedUpdate ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          & #optionsModel % #writerModel % #newWriterAddressUpdate .~ Nothing
+          -- Add the new update with a dummy index.
+          & #txBuilderModel % #optionsBuilderModel % #addressUpdates %~ 
+              flip snoc (0,verifiedUpdate)
+          -- Sort the updates by the active UTxO. This is required to generate 
+          -- the outputs in the proper order.
+          & #txBuilderModel % #optionsBuilderModel % #addressUpdates %~ 
+              sortOn (view $ _2 % #optionsUTxO % #utxoRef)
+          -- Reindex after sorting.
+          & #txBuilderModel % #optionsBuilderModel % #addressUpdates %~ reIndex
+          & #txBuilderModel %~ balanceTx
+      , Task $ return $ Alert $ unlines $ intersperse "" $ filter (/= "")
+          [ "Successfully added to builder!"
+          , createWriterAddressDepositMsg verifiedUpdate
+          ]
+      ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
@@ -254,7 +350,7 @@ processNewProposalClose u@ProposalClose{utxoRef} model@TxBuilderModel{optionsBui
     find (== utxoRef) (concat
       [ map (view $ _2 % #utxoRef) proposalCloses
       , map (view $ _2 % #oldProposal % #utxoRef) proposalUpdates
-      -- , map (view $ _2 % #optionsUTxO % #utxoRef) proposalPurchases
+      , map (view $ _2 % #proposalUTxO % #utxoRef) proposalPurchases
       ])
 
   -- Get the input's new index.
@@ -263,3 +359,21 @@ processNewProposalClose u@ProposalClose{utxoRef} model@TxBuilderModel{optionsBui
   -- Add the new close to the end of the list of proposal closes.
   return $ balanceTx $ model 
     & #optionsBuilderModel % #proposalCloses %~ flip snoc (newIdx,u)
+
+-- | Validate the new expired close and add it to the builder. Balance the transaction after.
+processNewExpiredClose :: ExpiredOptionsClose -> TxBuilderModel -> Either Text TxBuilderModel
+processNewExpiredClose u@ExpiredOptionsClose{utxoRef} model@TxBuilderModel{optionsBuilderModel} = do
+  let OptionsBuilderModel{..} = optionsBuilderModel
+
+  -- Verify that the new utxo is not already being spent.
+  maybeToLeft () $ "This active UTxO is already being spent." <$
+    find (== utxoRef) (concat
+      [ map (view $ _2 % #utxoRef) expiredCloses
+      ])
+
+  -- Get the input's new index.
+  let newIdx = length expiredCloses
+
+  -- Add the new close to the end of the list of expired closes.
+  return $ balanceTx $ model 
+    & #optionsBuilderModel % #expiredCloses %~ flip snoc (newIdx,u)

@@ -217,7 +217,7 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
                           , textFont "Remix"
                           , textSize 10
                           , textColor customRed
-                              ]
+                          ]
                 , spacer_ [width 5]
                 , flip styleBasic [textSize 10] $ 
                     tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $

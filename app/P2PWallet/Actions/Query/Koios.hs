@@ -24,6 +24,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryBorrowerInformation
   , runQueryOptionsWallet
   , runQueryOptionsProposals
+  , runQuerySpecificOptionsContract
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
@@ -755,6 +756,21 @@ runQueryOptionsProposals network offerAsset askAsset mPremiumAsset = do
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
       first show <$> 
         handleTimeoutError (runClientM (queryOptionsProposals offerAsset askAsset mPremiumAsset) env)
+
+-- | Query the current state of an options contract.
+runQuerySpecificOptionsContract 
+  :: Network 
+  -> Options.ContractId 
+  -> IO (Either Text (Maybe OptionsUTxO))
+runQuerySpecificOptionsContract network contractId = do
+    fmap (fmap fromAddressUTxO . maybeHead) <$> fetchContractState
+  where
+    -- Try to query the current contract state.
+    fetchContractState :: IO (Either Text [AddressUTxO])
+    fetchContractState = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (querySpecificOptionsUTxO contractId) env)
 
 -------------------------------------------------
 -- Low-Level API
@@ -1555,6 +1571,31 @@ queryOptionsProposals offerAsset askAsset mPremiumAsset = queryApi 0 []
       , "\"}]"
       ]
 
+    select :: SelectParam
+    select = fromString $ intercalate ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]
+
+querySpecificOptionsUTxO :: Options.ContractId -> ClientM [AddressUTxO]
+querySpecificOptionsUTxO (Options.ContractId contractId) = do
+    -- There should only be two possible UTxOs and one of them should be stored at an options
+    -- address.
+    res <- assetUTxOsApi select 0 "eq.false" Nothing $ 
+      AssetList [(Options.activeBeaconCurrencySymbol, contractId)]
+
+    return $ filter (Options.isWriterAddress . view #paymentAddress) res
+  where
     select :: SelectParam
     select = fromString $ intercalate ","
       [ "is_spent"

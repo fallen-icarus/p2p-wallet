@@ -47,6 +47,7 @@ module P2PWallet.Data.DeFi.CardanoOptions
   , NewProposalInfo(..)
   , createProposalDatum
   , createActiveDatumFromProposal
+  , createPostAddressUpdateActiveDatum
 
     -- * Protocol Addresses
   , isValidOptionsPaymentAddress
@@ -215,6 +216,24 @@ data ActiveDatum = ActiveDatum
 PlutusTx.makeIsDataIndexed ''ActiveDatum [('ActiveDatum,1)]
 makeFieldLabelsNoPrefix ''ActiveDatum
 
+instance Default ActiveDatum where
+  def = ActiveDatum
+    { proposalBeaconId = ""
+    , activeBeaconId = ""
+    , addressObserverHash = ""
+    , offerAsset = OfferAsset ("","")
+    , offerQuantity = 0
+    , askAsset = AskAsset ("","")
+    , tradingPairBeacon = ""
+    , offerBeacon = ""
+    , askBeacon = ""
+    , strikePrice = 0
+    , expiration = 0
+    , contractDeposit = 0
+    , paymentAddress = Address (PubKeyCredential "") Nothing
+    , contractId = ""
+    }
+
 instance ToJSON ActiveDatum where
   toJSON ActiveDatum{..} =
     object [ "proposal_beacon_id" .= proposalBeaconId
@@ -245,10 +264,10 @@ instance FromJSON ActiveDatum where
       <*> o .: "trading_pair_beacon"
       <*> o .: "offer_beacon"
       <*> o .: "ask_beacon"
-      <*> o .: "contract_deposit"
-      <*> o .: "payment_address"
       <*> o .: "strike_price"
       <*> o .: "expiration"
+      <*> o .: "contract_deposit"
+      <*> o .: "payment_address"
       <*> o .: "contract_id"
 
 -------------------------------------------------
@@ -483,6 +502,12 @@ createActiveDatumFromProposal termsIndex proposalId ProposalDatum{..} = ActiveDa
   where
     desiredTerms :: Terms
     desiredTerms = possibleTerms !! fromIntegral termsIndex
+
+createPostAddressUpdateActiveDatum :: PlutusAddress -> Integer -> ActiveDatum -> ActiveDatum
+createPostAddressUpdateActiveDatum newAddress extraDeposit oldDatum =
+  oldDatum
+    & #paymentAddress .~ newAddress
+    & #contractDeposit %~ (+ extraDeposit)
 
 -------------------------------------------------
 -- Protocol Addresses

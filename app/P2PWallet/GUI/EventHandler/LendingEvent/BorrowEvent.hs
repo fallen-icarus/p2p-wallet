@@ -294,9 +294,6 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
           when (hasAskActions loanBuilderModel || hasOfferActions loanBuilderModel) $
             throwIO $ AppError acceptAndNegotiateError
 
-          unless (hasOnlyOneActiveBeaconAction loanBuilderModel) $
-            throwIO $ AppError onlyOneActiveBeaconActionError
-
           -- Full loan payments cannot happen in the same transaction where offers are accepted.
           let payments = txBuilderModel ^. #loanBuilderModel % #loanPayments
           when (any (view $ _2 % #isFullPayment) payments) $
@@ -328,6 +325,13 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
           let updatedVerifiedOfferAcceptance = verifiedOfferAcceptance & #deposit .~ minUTxOValue
 
           fromRightOrAppError $ acceptanceAdaCollateralCheck updatedVerifiedOfferAcceptance
+
+          -- Check that all actions with the active beacons require the same redeemer.
+          let newLoanBuilderModel = 
+                loanBuilderModel 
+                  & #offerAcceptances %~ flip snoc (0,updatedVerifiedOfferAcceptance)
+          unless (hasOnlyOneActiveBeaconAction newLoanBuilderModel) $
+            throwIO $ AppError onlyOneActiveBeaconActionError
 
           return updatedVerifiedOfferAcceptance
       ]

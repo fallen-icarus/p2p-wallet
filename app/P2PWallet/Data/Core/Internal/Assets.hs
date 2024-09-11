@@ -271,6 +271,7 @@ class AssetBalancesForChange a where
   assetBalancesForChange :: [a] -> (Lovelace, [NativeAsset])
 
 sumAssetBalances :: [(Lovelace, [NativeAsset])] -> (Lovelace, [NativeAsset])
+sumAssetBalances [] = (0, [])
 sumAssetBalances xs = (allLoves, allAssets)
   where
     (loves, assets) = unzip xs

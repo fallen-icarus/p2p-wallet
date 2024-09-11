@@ -52,6 +52,10 @@ data OptionsWriterEvent
   | CheckOpenProposalsFilterModel
   -- | Reset the open proposals fitler model.
   | ResetOpenProposalsFilters
+  -- | Add selected options close to transaction builder.
+  | AddSelectedExpiredOptionsClose OptionsUTxO
+  -- | Update options payment address.
+  | UpdateWriterPaymentAddress (AddEvent OptionsUTxO WriterAddressUpdate)
 
 -------------------------------------------------
 -- Sell State
@@ -68,6 +72,10 @@ data OptionsWriterModel = OptionsWriterModel
   , showProposalFilter :: Bool
   -- | The open proposals filter model.
   , proposalsFilterModel :: OpenProposalsFilterModel
+  -- | The new writer address update.
+  , newWriterAddressUpdate :: Maybe NewWriterAddressUpdate
+  -- | Whether to show the filter widget for active contracts.
+  , showActiveFilter :: Bool
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''OptionsWriterModel
@@ -79,4 +87,6 @@ instance Default OptionsWriterModel where
     , showProposalFilter = False
     , newProposalUpdate = Nothing
     , proposalsFilterModel = def
+    , newWriterAddressUpdate = Nothing
+    , showActiveFilter = False
     }

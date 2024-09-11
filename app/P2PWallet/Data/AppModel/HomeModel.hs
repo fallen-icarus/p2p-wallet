@@ -17,6 +17,7 @@ import P2PWallet.Data.Core.Internal.Bech32Address
 import P2PWallet.Data.Core.Transaction
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
+import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -83,6 +84,14 @@ data HomeEvent
   | BurnLoanKeyNFT Loans.LoanId
   -- | Update lender payment address.
   | UpdateLenderPaymentAddress (AddEvent LoanUTxO LenderAddressUpdate)
+  -- | Inspect options contract for corresponding key nft.
+  | InspectCorrespondingOptionsContract Options.ContractId
+  -- | Stop inspecting the options contract.
+  | CloseInspectedCorrespondingOptionsContract
+  -- | Execute the options contract.
+  | ExecuteOptionsContract OptionsUTxO
+  -- | Burn leftover Key NFT.
+  | BurnOptionsKeyNFT Options.ContractId
 
 -------------------------------------------------
 -- UTxO Filter Model
@@ -215,6 +224,8 @@ data HomeModel = HomeModel
   , inspectedLoan :: Maybe Loans.LoanId
   -- | The new loan address update.
   , newLenderAddressUpdate :: Maybe NewLenderAddressUpdate
+  -- | Focused options contract.
+  , inspectedOptionsContract :: Maybe Options.ContractId
   } deriving (Eq,Show)
 
 instance Default HomeModel where
@@ -238,6 +249,7 @@ instance Default HomeModel where
     , newAliasField = ""
     , inspectedLoan = Nothing
     , newLenderAddressUpdate = Nothing
+    , inspectedOptionsContract = Nothing
     }
 
 makeFieldLabelsNoPrefix ''HomeModel

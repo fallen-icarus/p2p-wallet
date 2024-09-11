@@ -112,6 +112,7 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
 
     (history, mLoanUTxO) = fromMaybe ([],Nothing) 
                          $ Map.lookup targetId cachedLoanHistories
+
     mCurrentDatum = mLoanUTxO >>= loanUTxOActiveDatum
 
     LoanEvent{state=mPreviousDatum} = fromMaybe def $ maybeLast history
