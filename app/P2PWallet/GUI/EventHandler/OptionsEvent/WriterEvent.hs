@@ -229,6 +229,11 @@ handleWriterEvent model@AppModel{..} evt = case evt of
         & #optionsModel % #writerModel % #proposalsFilterModel .~ def
         & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
+  ResetActiveContractsFilters -> 
+    [ Model $ model 
+        & #optionsModel % #writerModel % #activesFilterModel .~ def
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
 
   -----------------------------------------------
   -- Check Filters
@@ -239,6 +244,14 @@ handleWriterEvent model@AppModel{..} evt = case evt of
       Left err ->
         [ Model $ model
             & #optionsModel % #writerModel % #showProposalFilter .~ True -- keep it open
+        , Event $ Alert err
+        ]
+  CheckActiveContractsFilterModel ->
+    case checkActiveContractsFilterModel tickerMap $ optionsModel ^. #writerModel % #activesFilterModel of
+      Right () -> [Event AppInit]
+      Left err ->
+        [ Model $ model
+            & #optionsModel % #writerModel % #showActivesFilter .~ True -- keep it open
         , Event $ Alert err
         ]
 

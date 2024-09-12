@@ -13,6 +13,7 @@ import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
 import P2PWallet.GUI.Widgets.Options.Buyer
+import P2PWallet.GUI.Widgets.Options.Research
 import P2PWallet.GUI.Widgets.Options.Writer
 import P2PWallet.Prelude
 
@@ -64,6 +65,7 @@ mainWidget model@AppModel{scene=_,..} =
       , spacer_ [width 5]
       , writerWidget model `nodeVisible` (optionsModel ^. #scene == OptionsWriterScene)
       , buyerWidget model `nodeVisible` (optionsModel ^. #scene == OptionsBuyerScene)
+      , researchWidget model `nodeVisible` (optionsModel ^. #scene == OptionsResearchScene)
       ] 
   where
     optionsMainSceneButton :: Text -> OptionsScene -> AppNode
@@ -93,7 +95,7 @@ mainWidget model@AppModel{scene=_,..} =
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer
-      , optionsMainSceneButton "Research" ResearchOptionsScene
+      , optionsMainSceneButton "Research" OptionsResearchScene
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer

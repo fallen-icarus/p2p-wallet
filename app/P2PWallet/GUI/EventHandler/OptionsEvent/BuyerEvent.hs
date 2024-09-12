@@ -40,7 +40,7 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
     ConfirmAdding ->
       [ Task $ runActionOrAlert (OptionsEvent . OptionsBuyerEvent . SetNewContractAssets . AddResult) $ do
           let newAssets = optionsModel ^. #buyerModel % #newContractAssets
-          fromRightOrAppError $ verifyContractAssets tickerMap newAssets
+          fromRightOrAppError $ verifyProposalContractAssets tickerMap newAssets
       ]
     AddResult targetAssets ->
       [ Model $ model 

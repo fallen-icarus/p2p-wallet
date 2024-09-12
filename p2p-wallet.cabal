@@ -88,7 +88,10 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.OptionsModel
       P2PWallet.Data.AppModel.OptionsModel.BuyerModel
       P2PWallet.Data.AppModel.OptionsModel.BuyerModel.AllProposalsFilterModel
+      P2PWallet.Data.AppModel.OptionsModel.ResearchModel
+      P2PWallet.Data.AppModel.OptionsModel.ResearchModel.AllActivesFilterModel
       P2PWallet.Data.AppModel.OptionsModel.WriterModel
+      P2PWallet.Data.AppModel.OptionsModel.WriterModel.ActiveContractsFilterModel
       P2PWallet.Data.AppModel.OptionsModel.WriterModel.OpenProposalsFilterModel
       P2PWallet.Data.AppModel.ProfileModel
       P2PWallet.Data.AppModel.TickerRegistryModel
@@ -187,6 +190,7 @@ executable p2p-wallet
       P2PWallet.GUI.EventHandler.LendingEvent.ResearchEvent
       P2PWallet.GUI.EventHandler.OptionsEvent
       P2PWallet.GUI.EventHandler.OptionsEvent.BuyerEvent
+      P2PWallet.GUI.EventHandler.OptionsEvent.ResearchEvent
       P2PWallet.GUI.EventHandler.OptionsEvent.WriterEvent
       P2PWallet.GUI.EventHandler.ProfileEvent
       P2PWallet.GUI.EventHandler.TickerRegistryEvent
@@ -235,6 +239,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Notifications
       P2PWallet.GUI.Widgets.Options
       P2PWallet.GUI.Widgets.Options.Buyer
+      P2PWallet.GUI.Widgets.Options.Research
       P2PWallet.GUI.Widgets.Options.Writer
       P2PWallet.GUI.Widgets.Options.Writer.ActiveContracts
       P2PWallet.GUI.Widgets.Options.Writer.OpenProposals

@@ -14,10 +14,12 @@ module P2PWallet.Data.AppModel.OptionsModel.WriterModel
   , OptionsWriterEvent(..)
   , OptionsWriterModel(..)
 
+  , module P2PWallet.Data.AppModel.OptionsModel.WriterModel.ActiveContractsFilterModel
   , module P2PWallet.Data.AppModel.OptionsModel.WriterModel.OpenProposalsFilterModel
   )where
 
 import P2PWallet.Data.AppModel.Common
+import P2PWallet.Data.AppModel.OptionsModel.WriterModel.ActiveContractsFilterModel
 import P2PWallet.Data.AppModel.OptionsModel.WriterModel.OpenProposalsFilterModel
 import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel
 import P2PWallet.Data.Core.Wallets
@@ -56,6 +58,10 @@ data OptionsWriterEvent
   | AddSelectedExpiredOptionsClose OptionsUTxO
   -- | Update options payment address.
   | UpdateWriterPaymentAddress (AddEvent OptionsUTxO WriterAddressUpdate)
+  -- | Verify the active contracts filter model has valid information.
+  | CheckActiveContractsFilterModel
+  -- | Reset the active contracts fitler model.
+  | ResetActiveContractsFilters
 
 -------------------------------------------------
 -- Sell State
@@ -75,7 +81,9 @@ data OptionsWriterModel = OptionsWriterModel
   -- | The new writer address update.
   , newWriterAddressUpdate :: Maybe NewWriterAddressUpdate
   -- | Whether to show the filter widget for active contracts.
-  , showActiveFilter :: Bool
+  , showActivesFilter :: Bool
+  -- | The active contracts filter model.
+  , activesFilterModel :: ActiveContractsFilterModel
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''OptionsWriterModel
@@ -88,5 +96,6 @@ instance Default OptionsWriterModel where
     , newProposalUpdate = Nothing
     , proposalsFilterModel = def
     , newWriterAddressUpdate = Nothing
-    , showActiveFilter = False
+    , showActivesFilter = False
+    , activesFilterModel = def
     }
