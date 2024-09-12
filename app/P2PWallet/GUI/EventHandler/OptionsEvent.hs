@@ -13,6 +13,7 @@ import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
 import P2PWallet.GUI.EventHandler.OptionsEvent.BuyerEvent
+import P2PWallet.GUI.EventHandler.OptionsEvent.ResearchEvent
 import P2PWallet.GUI.EventHandler.OptionsEvent.WriterEvent
 import P2PWallet.Prelude
 
@@ -113,6 +114,11 @@ handleOptionsEvent model@AppModel{..} evt = case evt of
   ---------------------------------------------
   OptionsBuyerEvent buyerEvt -> handleBuyerEvent model buyerEvt
 
+  ---------------------------------------------
+  -- Research Event
+  ---------------------------------------------
+  OptionsResearchEvent researchEvt -> handleResearchEvent model researchEvt
+
   -----------------------------------------------
   -- Sync Proposals
   -----------------------------------------------
@@ -129,6 +135,25 @@ handleOptionsEvent model@AppModel{..} evt = case evt of
       [ Model $ model 
           & #waitingStatus % #syncingOptionsProposals .~ False
           & #optionsModel % #cachedProposals .~ newCache
+      ]
+
+  -----------------------------------------------
+  -- Sync Active Contracts
+  -----------------------------------------------
+  SyncActiveOptionsContracts modal -> case modal of
+    StartProcess mTargetAssets ->
+      [ Model $ model & #waitingStatus % #syncingActiveOptionsContracts .~ True
+      , Task $ runActionOrAlert (OptionsEvent . SyncActiveOptionsContracts . ProcessResults) $ do
+          targetAssets <- 
+            fromJustOrAppError "mTargetAssets is Nothing" mTargetAssets
+
+          syncActiveOptionsContracts (config ^. #network) targetAssets (config ^. #currentTime) $ 
+            optionsModel ^. #cachedActiveContracts
+      ]
+    ProcessResults newCache ->
+      [ Model $ model 
+          & #waitingStatus % #syncingActiveOptionsContracts .~ False
+          & #optionsModel % #cachedActiveContracts .~ newCache
       ]
 
   -----------------------------------------------

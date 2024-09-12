@@ -237,3 +237,42 @@ instance Insertable OptionsWallet where
     , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
+instance Notify OptionsWallet where
+  notify oldState newState
+    | msg /= [] =
+        Just $ Notification
+          { notificationType = OptionsNotification
+          , alias = oldState ^. #alias
+          , message = unlines msg
+          , markedAsRead = False
+          }
+    | otherwise = Nothing
+    where
+      msg :: [Text]
+      msg = filter (/= "")
+        [ proposalsMsg
+        , activesMsg
+        ]
+
+      proposalsOnly :: [OptionsUTxO] -> [TxOutRef]
+      proposalsOnly = sort
+                    . map (view #utxoRef) 
+                    . filter (isJust . preview (#optionsDatum % _Just % _OptionsProposalDatum))
+
+      activesOnly :: [OptionsUTxO] -> [TxOutRef]
+      activesOnly = sort
+                  . map (view #utxoRef) 
+                  . filter (isJust . preview (#optionsDatum % _Just % _OptionsActiveDatum))
+
+      proposalsMsg :: Text
+      proposalsMsg
+        | proposalsOnly (oldState ^. #utxos) /= proposalsOnly (newState ^. #utxos) = 
+            "Proposed options contract statuses have changed."
+        | otherwise = ""
+
+      activesMsg :: Text
+      activesMsg
+        | activesOnly (oldState ^. #utxos) /= activesOnly (newState ^. #utxos) = 
+            "Active options contract statuses have changed."
+        | otherwise = ""
+

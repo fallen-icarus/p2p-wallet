@@ -16,8 +16,13 @@ module P2PWallet.Data.AppModel.OptionsModel
 
   , CachedOptionsProposals
   , CachedKeyOptionsContracts
+  , CachedActiveOptionsContracts
+
+  , verifyProposalContractAssets
+  , verifyActiveContractAssets
 
   , module P2PWallet.Data.AppModel.OptionsModel.BuyerModel
+  , module P2PWallet.Data.AppModel.OptionsModel.ResearchModel
   , module P2PWallet.Data.AppModel.OptionsModel.WriterModel
   ) where
 
@@ -25,7 +30,10 @@ import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.OptionsModel.BuyerModel
+import P2PWallet.Data.AppModel.OptionsModel.ResearchModel
 import P2PWallet.Data.AppModel.OptionsModel.WriterModel
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal.Assets
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoOptions as Options
 import P2PWallet.Prelude
@@ -43,6 +51,12 @@ type CachedOptionsProposals = Map.Map (OfferAsset, AskAsset, Maybe PremiumAsset)
 type CachedKeyOptionsContracts = Map.Map ContractId (Maybe OptionsUTxO)
 
 -------------------------------------------------
+-- Cached Active Options Contracts
+-------------------------------------------------
+-- | A type alias for a map from trading pair to active options contracts.
+type CachedActiveOptionsContracts = Map.Map (OfferAsset, AskAsset) [OptionsUTxO]
+
+-------------------------------------------------
 -- Options Scenes and Overlays
 -------------------------------------------------
 -- | The subscenes for the Options page.
@@ -52,7 +66,7 @@ data OptionsScene
   -- | Information for the staking credential used as a lender.
   | OptionsBuyerScene
   -- | Research options.
-  | ResearchOptionsScene
+  | OptionsResearchScene
   deriving (Eq,Show)
 
 -------------------------------------------------
@@ -72,10 +86,14 @@ data OptionsEvent
   | OptionsWriterEvent OptionsWriterEvent
   -- | Buy Options Event.
   | OptionsBuyerEvent OptionsBuyerEvent
+  -- | Research Options Event.
+  | OptionsResearchEvent OptionsResearchEvent
   -- | Sync the proposals for the selected contract assets.
   | SyncOptionsProposals (ProcessEvent (OfferAsset, AskAsset, Maybe PremiumAsset) CachedOptionsProposals)
   -- | Sync the options contract for the selected options key nft.
   | LookupOptionsContract (ProcessEvent ContractId CachedKeyOptionsContracts)
+  -- | Sync the active contracts for the selected trading pair.
+  | SyncActiveOptionsContracts (ProcessEvent (OfferAsset, AskAsset) CachedActiveOptionsContracts)
 
 -------------------------------------------------
 -- Options State
@@ -98,10 +116,14 @@ data OptionsModel = OptionsModel
   , writerModel :: OptionsWriterModel
   -- | The buy model.
   , buyerModel :: OptionsBuyerModel
+  -- | The research model.
+  , researchModel :: OptionsResearchModel
   -- | Cached proposal contracts.
   , cachedProposals :: CachedOptionsProposals
   -- | Cached key associated options contracts.
   , cachedKeyContracts :: CachedKeyOptionsContracts
+  -- | Cached active options contracts.
+  , cachedActiveContracts :: CachedActiveOptionsContracts
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''OptionsModel
@@ -116,6 +138,45 @@ instance Default OptionsModel where
     , showMorePopup = False
     , writerModel = def
     , buyerModel = def
+    , researchModel = def
     , cachedProposals = mempty
     , cachedKeyContracts = mempty
+    , cachedActiveContracts = mempty
     }
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | Verify the proposal contract assets.
+verifyProposalContractAssets 
+  :: TickerMap 
+  -> (Text,Text,Text) 
+  -> Either Text (OfferAsset, AskAsset, Maybe PremiumAsset)
+verifyProposalContractAssets tickerMap (rawOffer, rawAsk, rawPremium) = do
+  -- Check that the offer asset is valid. No fingerprints can be used.
+  verifiedOfferAsset <- fromNativeAsset <$> parseNativeAssetName tickerMap rawOffer
+
+  -- Check that the ask asset is valid. No fingerprints can be used.
+  verifiedAskAsset <- fromNativeAsset <$> parseNativeAssetName tickerMap rawAsk
+
+  -- If a premium asset is set, check that the premium asset is valid. 
+  -- No fingerprints can be used.
+  mVerifiedPremiumAsset <- case rawPremium of
+    "" -> return Nothing
+    xs -> Just . fromNativeAsset <$> parseNativeAssetName tickerMap xs
+
+  return (verifiedOfferAsset, verifiedAskAsset, mVerifiedPremiumAsset)
+
+-- | Verify the active contract assets.
+verifyActiveContractAssets 
+  :: TickerMap 
+  -> (Text,Text) 
+  -> Either Text (OfferAsset, AskAsset)
+verifyActiveContractAssets tickerMap (rawOffer, rawAsk) = do
+  -- Check that the offer asset is valid. No fingerprints can be used.
+  verifiedOfferAsset <- fromNativeAsset <$> parseNativeAssetName tickerMap rawOffer
+
+  -- Check that the ask asset is valid. No fingerprints can be used.
+  verifiedAskAsset <- fromNativeAsset <$> parseNativeAssetName tickerMap rawAsk
+
+  return (verifiedOfferAsset, verifiedAskAsset)

@@ -130,7 +130,7 @@ allProposalsWidget AppModel{optionsModel=OptionsModel{..},reverseTickerMap,confi
           , tooltip_ "Change Trading Pair" [tooltipDelay 0] $
               box_ [onClick $ OptionsEvent $ OptionsBuyerEvent $ SetNewContractAssets $ StartAdding Nothing] $
                 hstack
-                  [ label "Options For"
+                  [ label "Proposed Options For"
                       `styleBasic` [textFont "Italics", textSize 12]
                   , spacer_ [width 2]
                   , label (showAssetNameOnly reverseTickerMap $ toNativeAsset targetOffer)

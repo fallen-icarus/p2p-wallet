@@ -4,6 +4,7 @@ module P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalPurchases
   ) where
 
 import Monomer as M
+import Data.List ((!!))
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
@@ -71,8 +72,10 @@ proposalPurchasesList reverseTickerMap timeZone = map utxoRow
     utxoRow s@(idx,ProposalPurchase{..}) = do
       let Options.ProposalDatum{..} = fromMaybe def $ optionsUTxOProposalDatum proposalUTxO
           offerAmount = toNativeAsset offerAsset & #quantity .~ offerQuantity
-          askNativeAsset = toNativeAsset askAsset
           premiumNativeAsset = toNativeAsset premiumAsset
+          Options.Terms{strikePrice} = possibleTerms !! fromIntegral desiredTerms
+          askQuantity = roundUp $ toRational strikePrice * toRational offerQuantity
+          askNativeAsset = toNativeAsset askAsset & #quantity .~ askQuantity
           payToAddress = either (const "error") fst $ plutusToBech32 network paymentAddress
           addressTip = unwords
             [ "Payments to:"
@@ -125,7 +128,7 @@ proposalPurchasesList reverseTickerMap timeZone = map utxoRow
                 , label remixArrowRightFill
                     `styleBasic` [textMiddle, textFont "Remix", textSize 10, textColor white]
                 , spacer_ [width 2]
-                , label (showAssetNameOnly reverseTickerMap askNativeAsset)
+                , label (showAssetBalance True reverseTickerMap askNativeAsset)
                     `styleBasic` [textSize 10, textColor white]
                 ]
             , spacer_ [width 2]

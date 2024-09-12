@@ -25,6 +25,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryOptionsWallet
   , runQueryOptionsProposals
   , runQuerySpecificOptionsContract
+  , runQueryActiveOptionsContracts
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
@@ -757,6 +758,30 @@ runQueryOptionsProposals network offerAsset askAsset mPremiumAsset = do
       first show <$> 
         handleTimeoutError (runClientM (queryOptionsProposals offerAsset askAsset mPremiumAsset) env)
 
+-- | Get the current active options contracts.
+runQueryActiveOptionsContracts
+  :: Network 
+  -> Options.OfferAsset 
+  -> Options.AskAsset 
+  -> POSIXTime
+  -> IO (Either Text [OptionsUTxO])
+runQueryActiveOptionsContracts network offerAsset askAsset currentTime = do
+    activeRes <- fetchContracts
+
+    case activeRes of
+      Right actives -> do
+        return $ Right $ sortOn optionsUTxOOfferAmount $ map fromAddressUTxO actives
+      Left err -> return $ Left err
+  where
+    -- Try to query the active contracts.
+    fetchContracts :: IO (Either Text [AddressUTxO])
+    fetchContracts = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> 
+        handleTimeoutError 
+          (runClientM (queryActiveOptionsContracts offerAsset askAsset currentTime) env)
+
 -- | Query the current state of an options contract.
 runQuerySpecificOptionsContract 
   :: Network 
@@ -886,7 +911,7 @@ type KoiosApi
      :> QueryParam "_after_block_height" Integer
      :> Get '[JSON] [AssetTransaction]
 
-  -- A version of asset_utxos that supports filtering AskUTxOs by what is in the datum.
+  -- A version of asset_utxos that supports filtering Loans.AskUTxOs by what is in the datum.
   -- The inline datum is VERY specific to Ask UTxOs so this cannot be used with other UTxOs.
   :<|>  "asset_utxos"
      :> QueryParam' '[Required] "select" SelectParam
@@ -902,7 +927,7 @@ type KoiosApi
      :> ReqBody '[JSON] AssetList
      :> Post '[JSON] [AddressUTxO]
 
-  -- A version of asset_utxos that supports filtering OfferUTxOs by what is in the datum.
+  -- A version of asset_utxos that supports filtering Loans.OfferUTxOs by what is in the datum.
   -- The inline datum is VERY specific to Offer UTxOs so this cannot be used with other UTxOs.
   :<|>  "asset_utxos"
      :> QueryParam' '[Required] "select" SelectParam
@@ -916,7 +941,7 @@ type KoiosApi
      :> ReqBody '[JSON] AssetList
      :> Post '[JSON] [AddressUTxO]
 
-  -- A version of asset_utxos that supports filtering ActiveUTxOs by what is in the datum.
+  -- A version of asset_utxos that supports filtering Loans.ActiveUTxOs by what is in the datum.
   -- The inline datum is VERY specific to Active UTxOs so this cannot be used with other UTxOs.
   :<|>  "asset_utxos"
      :> QueryParam' '[Required] "select" SelectParam
@@ -926,6 +951,18 @@ type KoiosApi
      :> QueryParam "inline_datum->value->fields->11->int" InlineDatumFilterParam
      -- The maximum loan duration.
      :> QueryParam "inline_datum->value->fields->11->int" InlineDatumFilterParam
+     :> QueryParam "asset_list" AssetListFilterParam
+     :> ReqBody '[JSON] AssetList
+     :> Post '[JSON] [AddressUTxO]
+
+  -- A version of asset_utxos that supports filtering Options.ActiveUTxOs by what is in the datum.
+  -- The inline datum is VERY specific to Active UTxOs so this cannot be used with other UTxOs.
+  :<|>  "asset_utxos"
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "offset" OffsetParam
+     :> QueryParam' '[Required] "is_spent" IsSpentParam
+     -- The options expiration field.
+     :> QueryParam "inline_datum->value->fields->10->int" InlineDatumFilterParam
      :> QueryParam "asset_list" AssetListFilterParam
      :> ReqBody '[JSON] AssetList
      :> Post '[JSON] [AddressUTxO]
@@ -945,9 +982,10 @@ submitApi
   :<|> assetUTxOsApi
   :<|> mintHistoryApi
   :<|> assetTxHistoryApi
-  :<|> askUTxOsApi
-  :<|> offerUTxOsApi
-  :<|> activeUTxOsApi
+  :<|> loanAskUTxOsApi
+  :<|> loanOfferUTxOsApi
+  :<|> loanActiveUTxOsApi
+  :<|> optionsActiveUTxOsApi
   = client (Proxy :: Proxy KoiosApi)
 
 -- Query all UTxOs for a list of payment addresses.
@@ -1254,7 +1292,7 @@ queryLoanAsks LoanAskConfiguration{..} = queryApi 0 []
 
     queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
     queryApi offset !acc = do
-      res <- askUTxOsApi 
+      res <- loanAskUTxOsApi 
         select 
         offset 
         "eq.false" 
@@ -1314,7 +1352,7 @@ queryLoanOffers LoanOfferConfiguration{..} = queryApi 0 []
 
     queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
     queryApi offset !acc = do
-      res <- offerUTxOsApi 
+      res <- loanOfferUTxOsApi 
         select 
         offset 
         "eq.false" 
@@ -1490,7 +1528,7 @@ queryActiveLoans ActiveLoanConfiguration{..} = queryApi 0 []
 
     queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
     queryApi offset !acc = do
-      res <- activeUTxOsApi 
+      res <- loanActiveUTxOsApi 
         select 
         offset 
         "eq.false" 
@@ -1596,6 +1634,47 @@ querySpecificOptionsUTxO (Options.ContractId contractId) = do
 
     return $ filter (Options.isWriterAddress . view #paymentAddress) res
   where
+    select :: SelectParam
+    select = fromString $ intercalate ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]
+
+queryActiveOptionsContracts
+  :: Options.OfferAsset 
+  -> Options.AskAsset 
+  -> POSIXTime
+  -> ClientM [AddressUTxO]
+queryActiveOptionsContracts offerAsset askAsset currentTime = queryApi 0 []
+  where
+    tradingPairBeacon = 
+      Options.unTradingPairBeacon $ Options.genTradingPairBeaconName offerAsset askAsset
+
+    expirationFilter :: Maybe InlineDatumFilterParam
+    expirationFilter = 
+      Just $ InlineDatumFilterParam $ ("gt." <>) $ display $ toPlutusTime currentTime
+
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- optionsActiveUTxOsApi select offset "eq.false" expirationFilter Nothing $ 
+        AssetList [(Options.activeBeaconCurrencySymbol, tradingPairBeacon)]
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
     select :: SelectParam
     select = fromString $ intercalate ","
       [ "is_spent"

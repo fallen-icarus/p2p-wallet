@@ -107,7 +107,7 @@ data LoanResearchScene
 -------------------------------------------------
 -- Research Scene Events
 -------------------------------------------------
--- | The possible UI events on the Lend Scene
+-- | The possible UI events on the Research Scene
 data LoanResearchEvent
   -- | Change the Research subscene to the specified subscene.
   = ChangeLoanResearchScene LoanResearchScene

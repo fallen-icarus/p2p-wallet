@@ -23,7 +23,7 @@ data OpenProposalsSortMethod
   | OpenProposalsPremium
   -- | By the strike price.
   | OpenProposalsStrikePrice
-  -- | By the duration of the contract. This goes by the min/max expiration inside the possible
+  -- | By the expiration date of the contract. This goes by the min/max expiration inside the possible
   -- terms.
   | OpenProposalsExpiration
   -- | By the time the proposal was last "touched".

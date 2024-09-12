@@ -1202,3 +1202,34 @@ activeOptionsMsg = unwords
   , "purchased can be found though the Home page by looking for all Options Key NFTs you own."
   ]
 
+activeFilterSortMsg :: Text
+activeFilterSortMsg = unlines
+  [ "Active options contracts can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Chronologically based on the time the UTxO was created"
+  , "3. Based on the amount of the offer asset"
+  , "4. Based on the amount of the ask asset to be deposited"
+  , "5. Based on the stike prices"
+  , "6. Based on the expirations"
+  , ""
+  , "Option 3 is only available when the offer asset is set in the filter settings."
+  , ""
+  , "Option 4 is only available when the ask asset is set in the filter settings."
+  , ""
+  , unwords
+      [ "Option 5 is only available when both the offer asset and the ask asset are set in"
+      , "the filter settings."
+      ]
+  ]
+
+allActivesFilterSortMsg :: Text
+allActivesFilterSortMsg = unlines
+  [ "Active options contracts can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Chronologically based on the time the UTxO was created"
+  , "3. Based on the amount of the offer asset"
+  , "4. Based on the amount of the ask asset to be deposited"
+  , "5. Based on the stike prices"
+  , "6. Based on the expirations"
+  ]
+

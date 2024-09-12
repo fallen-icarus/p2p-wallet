@@ -25,6 +25,7 @@ data NotificationType
   | StakeNotification
   | DexNotification
   | LoanNotification
+  | OptionsNotification
   deriving (Show,Eq,Ord)
 
 -------------------------------------------------
