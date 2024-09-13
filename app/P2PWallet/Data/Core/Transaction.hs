@@ -179,6 +179,34 @@ data Transaction = Transaction
 
 makeFieldLabelsNoPrefix ''Transaction
 
+instance Default Transaction where
+  def = Transaction
+    { txHash = ""
+    , blockTime = 0
+    , blockHeight = 0
+    , fee = 0
+    , size = 0
+    , deposit = 0
+    , invalidBefore = Nothing
+    , invalidAfter = Nothing
+    , collateralInputs = []
+    , showCollateralInputs = False
+    , referenceInputs = []
+    , showReferenceInputs = False
+    , inputs = []
+    , showInputs = False
+    , outputs = []
+    , showOutputs = False
+    , certificates = []
+    , showCertificates = False
+    , withdrawals = []
+    , showWithdrawals = False
+    , mints = []
+    , showMints = False
+    , plutusContracts = []
+    , showPlutusContracts = False
+    }
+
 -- | Convert a Koios Transaction to a P2PWallet Transaction.
 toTransaction :: Koios.Transaction -> Transaction
 toTransaction Koios.Transaction{..} = Transaction

@@ -10,6 +10,7 @@ import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Options.Writer.ActiveContracts
 import P2PWallet.GUI.Widgets.Options.Writer.OpenProposals
+import P2PWallet.GUI.Widgets.Options.Writer.Transactions
 import P2PWallet.Prelude
 
 writerWidget :: AppModel -> AppNode
@@ -23,7 +24,11 @@ writerWidget model@AppModel{optionsModel} = do
               `nodeVisible` (optionsModel ^. #writerModel % #scene == OpenOptionsProposals)
           , box_ [mergeRequired reqUpdate] (activeContractsWidget model)
               `nodeVisible` (optionsModel ^. #writerModel % #scene == ActiveOptionsContracts)
+          , box_ [mergeRequired reqUpdate] (transactionsWidget model)
+              `nodeVisible` (optionsModel ^. #writerModel % #scene == OptionsTransactions)
           ]
+      , widgetIf (isJust $ optionsModel ^. #writerModel % #inspectedTransaction) $
+          inspectionWidget model
       ]
   where
     writerSceneButton :: Text -> OptionsWriterScene -> AppNode
@@ -49,7 +54,7 @@ writerWidget model@AppModel{optionsModel} = do
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer
-      , writerSceneButton "Transactions" OptionsTransactions
+      , writerSceneButton "Options History" OptionsTransactions
       , spacer
       ] `styleBasic`
           [ bgColor customGray2
@@ -65,6 +70,11 @@ writerWidget model@AppModel{optionsModel} = do
           openProposalsFilterModelRequiresUpdate
               (oldOptions ^. #writerModel % #proposalsFilterModel)
               (newOptions ^. #writerModel % #proposalsFilterModel)
+      | oldOptions ^. #writerModel % #txFilterModel /=
+        newOptions ^. #writerModel % #txFilterModel =
+          txFilterModelRequiresUpdate
+              (oldOptions ^. #writerModel % #txFilterModel)
+              (newOptions ^. #writerModel % #txFilterModel)
       | otherwise = True
 
 -- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
@@ -77,6 +87,18 @@ openProposalsFilterModelRequiresUpdate old new
   | old ^. #sortingMethod /= new ^. #sortingMethod = True
   | old ^. #sortingDirection /= new ^. #sortingDirection = True
   | old ^. #shouldBeExpired /= new ^. #shouldBeExpired = True
+  | old ^. #offerAsset /= new ^. #offerAsset = False
+  | old ^. #askAsset /= new ^. #askAsset = False
+  | old ^. #premiumAsset /= new ^. #premiumAsset = False
+  | otherwise = True
+
+-- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
+txFilterModelRequiresUpdate 
+  :: OptionsTxFilterModel 
+  -> OptionsTxFilterModel 
+  -> Bool
+txFilterModelRequiresUpdate old new
+  | old ^. #scene /= new ^. #scene = True
   | old ^. #offerAsset /= new ^. #offerAsset = False
   | old ^. #askAsset /= new ^. #askAsset = False
   | old ^. #premiumAsset /= new ^. #premiumAsset = False

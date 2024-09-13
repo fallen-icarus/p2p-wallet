@@ -234,6 +234,12 @@ handleWriterEvent model@AppModel{..} evt = case evt of
         & #optionsModel % #writerModel % #activesFilterModel .~ def
         & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
+  ResetOptionsTxFilters -> 
+    let newDefault = def & #dateRange % _1 ?~ addDays (-30) (config ^. #currentDay) in
+    [ Model $ model 
+        & #optionsModel % #writerModel % #txFilterModel .~ newDefault 
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
 
   -----------------------------------------------
   -- Check Filters
@@ -349,6 +355,14 @@ handleWriterEvent model@AppModel{..} evt = case evt of
           , createWriterAddressDepositMsg verifiedUpdate
           ]
       ]
+
+  -----------------------------------------------
+  -- Inspecting Transactions
+  -----------------------------------------------
+  InspectOptionsTransaction tx -> 
+    [ Model $ model & #optionsModel % #writerModel % #inspectedTransaction ?~ tx ]
+  CloseInspectedOptionsTransaction -> 
+    [ Model $ model & #optionsModel % #writerModel % #inspectedTransaction .~ Nothing ]
 
 -------------------------------------------------
 -- Helper Functions
