@@ -665,7 +665,7 @@ inspectBorrowerWidget model@AppModel{lendingModel=LendingModel{..}} = do
                         , textSize 12
                         ]
                       `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-          , spacer_ [width 3]
+              , spacer_ [width 3]
               ]
           , spacer
           , vscroll_ [wheelRate 50] $ vstack
@@ -1668,7 +1668,7 @@ copyableLabelSelf caption color fontSize =
 -------------------------------------------------
 -- Helper Lens
 -------------------------------------------------
--- | A lens to toggle the `show` field of the `Transaction`.
+-- | A lens to toggle the `show` field of the `BorrowerInformation`.
 toggleShow :: Lens' BorrowerInformation Bool -> Lens' (Maybe BorrowerInformation) Bool
 toggleShow finalLens = lens getToggleShow setToggleShow
   where

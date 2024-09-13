@@ -1233,3 +1233,38 @@ allActivesFilterSortMsg = unlines
   , "6. Based on the expirations"
   ]
 
+optionsTxFilterOfferAssetMsg :: Text
+optionsTxFilterOfferAssetMsg = unlines
+  [ "What asset is the offer asset?"
+  , ""
+  , "The asset quantity must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+optionsTxFilterAskAssetMsg :: Text
+optionsTxFilterAskAssetMsg = unlines
+  [ "What asset is the ask asset?"
+  , ""
+  , "The asset quantity must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+optionsTxFilterPremiumAssetMsg :: Text
+optionsTxFilterPremiumAssetMsg = unlines
+  [ "What asset is the premium asset?"
+  , ""
+  , "The asset quantity must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]

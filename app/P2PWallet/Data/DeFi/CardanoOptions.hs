@@ -306,6 +306,13 @@ data OptionsRedeemer
 
 makeFieldLabelsNoPrefix ''OptionsRedeemer
 
+instance Display OptionsRedeemer where
+  display CloseOrUpdateProposal = "Closed/Updated"
+  display (PurchaseContract _) = "Purchased"
+  display ExecuteContract = "Executed"
+  display CloseExpiredContract = "Closed Expired"
+  display (UpdatePaymentAddress _ _) = "Address Updated"
+
 data AddressObserverRedeemer
   -- | Observer a writer's address update transaction.
   = ObserveAddressUpdate

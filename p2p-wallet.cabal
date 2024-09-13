@@ -243,6 +243,7 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.Options.Writer
       P2PWallet.GUI.Widgets.Options.Writer.ActiveContracts
       P2PWallet.GUI.Widgets.Options.Writer.OpenProposals
+      P2PWallet.GUI.Widgets.Options.Writer.Transactions
       P2PWallet.GUI.Widgets.Profiles
       P2PWallet.GUI.Widgets.Settings
       P2PWallet.GUI.Widgets.TickerRegistry

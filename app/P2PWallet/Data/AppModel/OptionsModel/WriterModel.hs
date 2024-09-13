@@ -14,6 +14,8 @@ module P2PWallet.Data.AppModel.OptionsModel.WriterModel
   , OptionsWriterEvent(..)
   , OptionsWriterModel(..)
 
+  , OptionsTxFilterModel(..)
+
   , module P2PWallet.Data.AppModel.OptionsModel.WriterModel.ActiveContractsFilterModel
   , module P2PWallet.Data.AppModel.OptionsModel.WriterModel.OpenProposalsFilterModel
   )where
@@ -22,6 +24,7 @@ import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.OptionsModel.WriterModel.ActiveContractsFilterModel
 import P2PWallet.Data.AppModel.OptionsModel.WriterModel.OpenProposalsFilterModel
 import P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel
+import P2PWallet.Data.Core.Transaction
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
 
@@ -62,6 +65,38 @@ data OptionsWriterEvent
   | CheckActiveContractsFilterModel
   -- | Reset the active contracts fitler model.
   | ResetActiveContractsFilters
+  -- | Reset Tx Filters.
+  | ResetOptionsTxFilters
+  -- | Inspect an options Transaction.
+  | InspectOptionsTransaction Transaction
+  -- | Stop inspecting the transaction.
+  | CloseInspectedOptionsTransaction
+
+-------------------------------------------------
+-- Transaction Filter Model
+-------------------------------------------------
+data OptionsTxFilterModel = OptionsTxFilterModel
+  { scene :: FilterScene
+  -- | The contract must offer the specified asset. Leave it blank for any asset.
+  , offerAsset :: Text
+  -- | The contract must ask for the specified asset. Leave it blank for any asset.
+  , askAsset :: Text
+  -- | The contract must use for the specified asset for the premium. Leave it blank for any asset.
+  , premiumAsset :: Text
+  -- | The date range for displaying transactions.
+  , dateRange :: (Maybe Day, Maybe Day)
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''OptionsTxFilterModel
+
+instance Default OptionsTxFilterModel where
+  def = OptionsTxFilterModel
+    { scene = FilterScene
+    , offerAsset = ""
+    , askAsset = ""
+    , premiumAsset = ""
+    , dateRange = (Nothing,Nothing)
+    }
 
 -------------------------------------------------
 -- Sell State
@@ -84,6 +119,12 @@ data OptionsWriterModel = OptionsWriterModel
   , showActivesFilter :: Bool
   -- | The active contracts filter model.
   , activesFilterModel :: ActiveContractsFilterModel
+  -- | Whether to show the filter widget for transactions.
+  , showTransactionFilter :: Bool
+  -- | The transactions filter model.
+  , txFilterModel :: OptionsTxFilterModel
+  -- | Focused transaction details.
+  , inspectedTransaction :: Maybe Transaction
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''OptionsWriterModel
@@ -98,4 +139,7 @@ instance Default OptionsWriterModel where
     , newWriterAddressUpdate = Nothing
     , showActivesFilter = False
     , activesFilterModel = def
+    , showTransactionFilter = False
+    , txFilterModel = def
+    , inspectedTransaction = Nothing
     }

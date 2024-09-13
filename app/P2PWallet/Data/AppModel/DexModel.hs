@@ -204,7 +204,7 @@ data DexModel = DexModel
   , showTransactionFilter :: Bool
   -- | The transactions filter model.
   , txFilterModel :: DexTxFilterModel
-  -- | Teh transactions filter scene.
+  -- | The transactions filter scene.
   , txFilterScene :: FilterScene
   -- | Focused transaction details.
   , inspectedTransaction :: Maybe Transaction
