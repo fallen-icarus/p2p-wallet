@@ -561,8 +561,9 @@ addressObserverStakeAddress network =
 -------------------------------------------------
 -- Reference Script UTxOs
 -------------------------------------------------
--- The reference scripts are locked at the loan address without any staking credential.
+-- The reference scripts are locked at the options address without any staking credential.
 -- For testnet, that address is: 
+-- addr_test1wprnu4c2twkgwep43eytwlhlfmc8ezv85q3cvnrslnxfsaga0t5pn
 --
 -- The scripts are deliberately stored with an invalid datum so that they are locked forever.
 
@@ -582,16 +583,16 @@ referenceScriptMap = Map.fromList
 
 optionsScriptTestnetRef :: TxOutRef
 optionsScriptTestnetRef = 
-  TxOutRef "8df8187a76bbfd8b04921d844b7aed52088a20da026d4764c7e9ceeeda79b065" 0
+  TxOutRef "82ac4b618f9315cda59a6dbed59f9debad492e90335c7e17ebac10b2b9b00ed9" 0
 
 proposalBeaconScriptTestnetRef :: TxOutRef
 proposalBeaconScriptTestnetRef = 
-  TxOutRef "b2d23610ebc013c63397c73f674ee0522c39e1b10fc80263babff276741f02fe" 0
+  TxOutRef "101c2c11149a2b81eb1aab19686410883833da9d457fc5d3cc9e632badb5acd9" 0
 
 activeBeaconScriptTestnetRef :: TxOutRef
 activeBeaconScriptTestnetRef = 
-  TxOutRef "947423f6c830a483c210baf71b173ba53db3b9f838a5e511d1a3e954cdc13f80" 0
+  TxOutRef "843f93739aefad02677dbb804a99f1d32485b45efcff7b4bb88baab26e0bd08d" 0
 
 addressObserverScriptTestnetRef :: TxOutRef
 addressObserverScriptTestnetRef = 
-  TxOutRef "8bb773cbd8de20135f8143879895d89291dd99adb04d8d36f0179200fdd79bee" 0
+  TxOutRef "c054959635d30f681e5075cd70b1b3e2bbdbb5214e5dc1c59f99721c4b1126ba" 0
