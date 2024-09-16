@@ -535,20 +535,12 @@ instance Semigroup TxBody where
         -- Most txBodies will have a fee of zero so the non-zero one must be chosen.
         -- I do not think there is a case where two txBodies will both have fees set.
         max (txBody1 ^. #fee) (txBody2 ^. #fee)
-    , invalidBefore =
-        -- When two txBodies, use invalidBefore, the more restrictive one should be used.
-        case (txBody1 ^. #invalidBefore, txBody2 ^. #invalidBefore) of
-          (Nothing, Nothing) -> Nothing
-          (Nothing, x) -> x
-          (x, Nothing) -> x
-          (Just here1, Just here2) -> Just $ max here1 here2
-    , invalidHereafter =
-        -- When two txBodies, use invalidHereafter, the more restrictive one should be used.
-        case (txBody1 ^. #invalidHereafter, txBody2 ^. #invalidHereafter) of
-          (Nothing, Nothing) -> Nothing
-          (Nothing, x) -> x
-          (x, Nothing) -> x
-          (Just here1, Just here2) -> Just $ min here1 here2
+    , invalidBefore = 
+        -- When two txBodies use invalidBefore, the more restrictive one should be used.
+        updateInvalidBefore (txBody1 ^. #invalidBefore) (txBody2 ^. #invalidBefore)
+    , invalidHereafter = 
+        -- When two txBodies use invalidHereafter, the more restrictive one should be used.
+        updateInvalidHereafter (txBody1 ^. #invalidHereafter) (txBody2 ^. #invalidHereafter)
     , network = 
         if txBody1 ^. #network /= txBody2 ^. #network 
         then error "Networks don't match" -- This should never happen.
@@ -604,3 +596,14 @@ calcTotalReferenceScriptSize TxBody{..} = Map.foldl' (+) 0 referenceMap
       , mapMaybe (preview $ #stakingScriptInfo % _Just % #scriptWitness % _ReferenceWitness) withdrawals
       , mapMaybe (preview $ #scriptWitness % _ReferenceWitness) mints
       ]
+
+updateInvalidBefore :: Maybe Slot -> Maybe Slot -> Maybe Slot
+updateInvalidBefore = updateBound max
+
+updateInvalidHereafter :: Maybe Slot -> Maybe Slot -> Maybe Slot
+updateInvalidHereafter = updateBound min
+
+updateBound :: (Slot -> Slot -> Slot) -> Maybe Slot -> Maybe Slot -> Maybe Slot
+updateBound selector newBound oldBound = case (newBound, oldBound) of
+  (Just bound1, Just bound2) -> Just $ selector bound1 bound2
+  (x,y) -> x <|> y

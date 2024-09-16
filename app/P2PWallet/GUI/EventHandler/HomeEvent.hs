@@ -14,6 +14,8 @@ import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
+import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
 import P2PWallet.Prelude
 
 handleHomeEvent :: AppModel -> HomeEvent -> [AppEventResponse AppModel AppEvent]
@@ -361,6 +363,18 @@ handleHomeEvent model@AppModel{..} evt = case evt of
               [ Event $ Alert onlyOneActiveBeaconActionError ]
 
   -----------------------------------------------
+  -- Add Key Input
+  -----------------------------------------------
+  AddKeyInput NativeAsset{fingerprint} ->
+    let PaymentWallet{utxos} = homeModel ^. #selectedWallet
+        newInput@PersonalUTxO{utxoRef} = fromMaybe def $
+          find (any (\asset -> asset ^. #fingerprint == fingerprint) . view #nativeAssets) utxos
+        currentInputs = map (view #utxoRef . snd) $ txBuilderModel ^. #userInputs
+     in if utxoRef `elem` currentInputs 
+        then [Event $ Alert "Successfully added to builder!"]
+        else [Event $ HomeEvent $ AddSelectedUserInput newInput]
+
+  -----------------------------------------------
   -- Add Loan Key Burn to builder
   -----------------------------------------------
   BurnLoanKeyNFT loanId ->
@@ -371,7 +385,9 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           Right newTxModel -> 
             if hasOnlyOneActiveBeaconAction $ newTxModel ^. #loanBuilderModel then
               [ Model $ model & #txBuilderModel .~ newTxModel
-              , Task $ return $ Alert "Successfully added to builder!"
+              -- Find the input and add it to the builder.
+              , Event $ HomeEvent $ AddKeyInput $ 
+                  mkNativeAsset Loans.activeBeaconCurrencySymbol $ loanId ^. #unLoanId
               ]
             else
               [ Event $ Alert onlyOneActiveBeaconActionError ]
@@ -461,7 +477,9 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           Right newTxModel -> 
             if hasOnlyOneOptionsActiveBeaconAction $ newTxModel ^. #optionsBuilderModel then
               [ Model $ model & #txBuilderModel .~ newTxModel
-              , Task $ return $ Alert "Successfully added to builder!"
+              -- Find the input and add it to the builder.
+              , Event $ HomeEvent $ AddKeyInput $ 
+                  mkNativeAsset Options.activeBeaconCurrencySymbol $ contractId ^. #unContractId
               ]
             else
               [ Event $ Alert onlyOneOptionsActiveBeaconActionError ]

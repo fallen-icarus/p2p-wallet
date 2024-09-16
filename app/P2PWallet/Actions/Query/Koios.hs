@@ -1433,7 +1433,7 @@ queryBorrowerCreditHistory b@(Loans.BorrowerId borrowerId) = do
     let processedTxs = map (view #txHash) -- Get the tx hash.
                      $ filter ((<0) . view #quantity) txs -- Get only burn transactions.
     info <- eventTxInfoApi select "block_height.desc" $ TxHashes processedTxs
-    return $ mapMaybe (toLoanResult b) info
+    return $ concatMap (toLoanResult b) info
   where
     select = SelectParam $ toText $ intercalate ","
       [ "tx_hash"

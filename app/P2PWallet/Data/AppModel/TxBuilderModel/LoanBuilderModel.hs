@@ -600,12 +600,16 @@ addOfferAcceptanceToBody txBody (_,OfferAcceptance{..}) =
       -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
-      -- Invalid before must be set to the current time.
-      & #invalidBefore ?~ posixTimeToSlot slotConfig currentTime
+      -- Invalid before must be set to the current time. If one is already set, use the maximum of
+      -- the two.
+      & #invalidBefore %~ updateInvalidBefore (Just lowerBound)
       -- Invalid hereafter must be set to the offer expiration if one is set.
-      & #invalidHereafter .~ upperBound
+      & #invalidHereafter %~ updateInvalidHereafter upperBound
       & #network .~ network
   where
+    lowerBound :: Slot
+    lowerBound = posixTimeToSlot slotConfig currentTime
+
     upperBound :: Maybe Slot
     upperBound = case targetOfferDatum ^. #offerExpiration of
       Nothing -> Nothing
@@ -784,8 +788,9 @@ addLoanPaymentToBody txBody (_,LoanPayment{..}) =
       -- Add the witness is required. Duplicate witnesses are removed by the `Semigroup` 
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
-      -- Invalid hereafter must be set to the next deadline.
-      & #invalidHereafter ?~ upperBound
+      -- Invalid hereafter must be set to the next deadline. Don't overwrite the previously set
+      -- invalidHereafter! Instead, use the smaller of the previous setting and the new upperBound.
+      & #invalidHereafter %~ updateInvalidHereafter (Just upperBound)
       -- Add the payment observer execution.
       & #withdrawals %~ (paymentObserverStakeWithdrawal:)
       & #network .~ network
@@ -921,7 +926,7 @@ addInterestApplicationToBody txBody (_,InterestApplication{..}) =
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
       -- Invalid hereafter must be set to loan expiration.
-      & #invalidHereafter ?~ upperBound
+      & #invalidHereafter %~ updateInvalidHereafter (Just upperBound)
       -- Add the interest observer execution.
       & #withdrawals %~ (interestObserverStakeWithdrawal:)
       & #network .~ network
@@ -997,7 +1002,7 @@ addExpiredClaimToBody txBody (_,ExpiredClaim{..}) =
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
       -- Invalid before must be set to the current time.
-      & #invalidBefore ?~ lowerBound
+      & #invalidBefore %~ updateInvalidBefore (Just lowerBound)
       & #network .~ network
   where
     Loans.ActiveDatum{..} = fromMaybe def $ loanUTxOActiveDatum loanUTxO
@@ -1082,7 +1087,7 @@ addAddressUpdateToBody txBody (_,LenderAddressUpdate{..}) =
       -- Add the new key output to the list.
       & #outputs %~ (<> [newKeyOutput])
       -- Invalid hereafter must be set to loan expiration.
-      & #invalidHereafter ?~ upperBound
+      & #invalidHereafter %~ updateInvalidHereafter (Just upperBound)
       -- Add the address observer execution.
       & #withdrawals %~ (addressObserverStakeWithdrawal:)
       & #network .~ network

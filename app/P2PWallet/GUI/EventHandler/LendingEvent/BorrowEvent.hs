@@ -427,7 +427,7 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
           & #txBuilderModel % #loanBuilderModel % #loanPayments %~ 
               sortOn (view $ _2 % #activeUTxO % #utxoRef)
           -- Reindex the acceptances after sorting.
-          & #txBuilderModel % #loanBuilderModel % #offerAcceptances %~ reIndex
+          & #txBuilderModel % #loanBuilderModel % #loanPayments %~ reIndex
           & #txBuilderModel % #loanBuilderModel % #userCredential ?~
               verifiedNewPayment ^. #borrowerCredential
           & #lendingModel % #borrowModel % #newLoanPayment .~ Nothing
