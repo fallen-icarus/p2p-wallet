@@ -192,7 +192,7 @@ addProposalCreationToBody txBody (_,ProposalCreation{..}) =
       -- Add the new beacons to be minted. 
       & #mints %~ (newMint:)
       -- Invalid hereafter must be set to the closest expiration among the possible terms.
-      & #invalidHereafter ?~ upperBound
+      & #invalidHereafter %~ updateInvalidHereafter (Just upperBound)
       & #network .~ network
   where
     slotConfig :: SlotConfig
@@ -497,7 +497,7 @@ addExpiredCloseToBody txBody (_,ExpiredOptionsClose{..}) =
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
       -- Invalid before must be set to the current time to prove the contract is actually expired.
-      & #invalidBefore ?~ posixTimeToSlot slotConfig expiration
+      & #invalidBefore %~ updateInvalidBefore (Just $ posixTimeToSlot slotConfig expiration)
       & #network .~ network
   where
     slotConfig :: SlotConfig
@@ -561,7 +561,7 @@ addAddressUpdateToBody txBody (_,WriterAddressUpdate{..}) =
       -- instance of `TxBody`. They will also be sorted.
       & #keyWitnesses %~ maybe id (:) requiredWitness
       -- Invalid hereafter must be set to contract expiration.
-      & #invalidHereafter ?~ upperBound
+      & #invalidHereafter %~ updateInvalidHereafter (Just upperBound)
       -- Add the address observer execution.
       & #withdrawals %~ (addressObserverStakeWithdrawal:)
       & #network .~ network
@@ -657,7 +657,7 @@ addContractExecutionToBody txBody (_,OptionsContractExecution{..}) =
       -- Add the new beacons to be burned. 
       & #mints %~ (newBurn:)
       -- Invalid hereafter must be set to the contract expiration.
-      & #invalidHereafter ?~ upperBound
+      & #invalidHereafter %~ updateInvalidHereafter (Just upperBound)
       & #network .~ network
   where
     Options.ActiveDatum{..} = fromMaybe def $ optionsUTxOActiveDatum optionsUTxO

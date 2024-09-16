@@ -13,6 +13,7 @@ module P2PWallet.Data.AppModel.HomeModel where
 
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LenderAddressUpdate
+import P2PWallet.Data.Core.Internal.Assets
 import P2PWallet.Data.Core.Internal.Bech32Address
 import P2PWallet.Data.Core.Transaction
 import P2PWallet.Data.Core.Wallets
@@ -80,6 +81,8 @@ data HomeEvent
   | CloseInspectedCorrespondingLoan
   -- | Claim collateral from an expired loan.
   | ClaimExpiredCollateral LoanUTxO
+  -- | Add the required input for the Key burn if it is not already in the tx builder.
+  | AddKeyInput NativeAsset
   -- | Burn leftover Key NFT.
   | BurnLoanKeyNFT Loans.LoanId
   -- | Update lender payment address.

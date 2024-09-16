@@ -282,6 +282,8 @@ data LoanResult = LoanResult
   , remainingNativeAssets :: [NativeAsset]
   -- | The loan terms.
   , terms :: Loans.ActiveDatum
+  -- | The time of the final event.
+  , completionTime :: POSIXTime
   } deriving (Show,Eq,Generic,FromJSON,ToJSON)
 
 makeFieldLabelsNoPrefix ''LoanResult
@@ -289,9 +291,10 @@ makeFieldLabelsNoPrefix ''LoanResult
 instance Ord LoanResult where
   res1 <= res2 = res1 ^. #terms % #loanId <= res2 ^. #terms % #loanId
 
-toLoanResult :: Loans.BorrowerId -> Koios.EventTransaction -> Maybe LoanResult
-toLoanResult borrowerId Koios.EventTransaction{..} = do
-    maybeHead $ mapMaybe proccessEvent plutusContracts
+-- | Get all loan results from a transaction. One transaction can contain multiple results when
+-- borrowers make final payments on multiple loans in the transaction.
+toLoanResult :: Loans.BorrowerId -> Koios.EventTransaction -> [LoanResult]
+toLoanResult borrowerId Koios.EventTransaction{..} = mapMaybe proccessEvent plutusContracts
   where
     proccessEvent :: Koios.TransactionPlutusContract -> Maybe LoanResult
     proccessEvent Koios.TransactionPlutusContract{..} = do
@@ -312,6 +315,7 @@ toLoanResult borrowerId Koios.EventTransaction{..} = do
               , remainingLovelace = lovelace
               , remainingNativeAssets = nativeAssets
               , terms = parsedDatum
+              , completionTime = blockTime
               }
         Loans.SpendWithKeyNFT -> 
           return $ LoanResult
@@ -319,6 +323,7 @@ toLoanResult borrowerId Koios.EventTransaction{..} = do
             , remainingLovelace = lovelace
             , remainingNativeAssets = nativeAssets
             , terms = parsedDatum
+            , completionTime = blockTime
             }
         Loans.Unlock -> 
           return $ LoanResult
@@ -326,6 +331,7 @@ toLoanResult borrowerId Koios.EventTransaction{..} = do
             , remainingLovelace = lovelace
             , remainingNativeAssets = nativeAssets
             , terms = parsedDatum
+            , completionTime = blockTime
             }
         _ -> Nothing
   

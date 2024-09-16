@@ -60,6 +60,19 @@ instance FromJSON PersonalUTxO where
       <*> o .: "block_height"
       <*> return False
 
+instance Default PersonalUTxO where
+  def = PersonalUTxO
+    { utxoRef = TxOutRef "" 0
+    , lovelace = 0
+    , datumHash = Nothing
+    , inlineDatum = Nothing
+    , referenceScript = Nothing
+    , nativeAssets = []
+    , blockTime = 0
+    , blockHeight = 0
+    , showDetails = False
+    }
+
 instance FromAddressUTxO PersonalUTxO where
   fromAddressUTxO AddressUTxO{..} = PersonalUTxO
     { utxoRef = utxoRef
