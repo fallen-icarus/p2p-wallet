@@ -838,7 +838,7 @@ type KoiosApi
      :> QueryParam' '[Required] "select" SelectParam
      :> QueryParam' '[Required] "is_spent" IsSpentParam
      :> QueryParam' '[Required] "offset" OffsetParam
-     :> QueryParam' '[Required] "order" OrderParam
+     :> QueryParam "order" OrderParam
      :> QueryParam "asset_list" AssetListFilterParam
      :> ReqBody '[JSON] PaymentAddressesExtended
      :> Post '[JSON] [AddressUTxO]
@@ -990,7 +990,11 @@ submitApi
 
 -- Query all UTxOs for a list of payment addresses.
 queryAddressUTxOs :: [PaymentAddress] -> ClientM [AddressUTxO]
-queryAddressUTxOs addrs = queryUTxOs 0 []
+queryAddressUTxOs addrs = 
+    -- The native assets are sorted because different koios instances can return the assets
+    -- in different orders which can make the redundancy checks fail. The UTxOs can also appear in
+    -- different orders which would also make the redundancy checks fail.
+    sortOn (view #utxoRef) . map (over #nativeAssets sort) <$> queryUTxOs 0 []
   where
     -- | This queries 1000 UTxOs at a time.
     queryUTxOs :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
@@ -1000,7 +1004,7 @@ queryAddressUTxOs addrs = queryUTxOs 0 []
           select 
           (IsSpentParam "eq.false")
           offset 
-          (OrderParam "block_height.asc") 
+          Nothing 
           Nothing
           (PaymentAddressesExtended addrs)
       if length res == 1000 then 
@@ -1309,7 +1313,11 @@ queryLoanAsks LoanAskConfiguration{..} = queryApi 0 []
         return $ acc <> res
 
 queryLoanOffers :: LoanOfferConfiguration -> ClientM [AddressUTxO]
-queryLoanOffers LoanOfferConfiguration{..} = queryApi 0 []
+queryLoanOffers LoanOfferConfiguration{..} = 
+    -- The native assets are sorted because different koios instances can return the assets
+    -- in different orders which can make the redundancy checks fail. The UTxOs can also appear in
+    -- different orders which would also make the redundancy checks fail.
+    sortOn (view #utxoRef) . map (over #nativeAssets sort) <$> queryApi 0 []
   where
     lenderIdAsAsset :: [Loans.Asset]
     lenderIdAsAsset = case lenderCredential of
