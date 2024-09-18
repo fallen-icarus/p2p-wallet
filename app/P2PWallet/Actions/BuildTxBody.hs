@@ -227,6 +227,8 @@ buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificat
       -- Create the certificate file.
       runBuildCmd_ builderLogFile $ unwords
         [ "cardano-cli stake-address registration-certificate"
+        , "--conway-era"
+        , "--key-reg-deposit-amt 2000000" -- 2 ADA
         , "--stake-address " <> toText stakeAddress
         , "--out-file " <> toText fullFileName
         ]
@@ -241,6 +243,8 @@ buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificat
       -- Create the certificate file.
       runBuildCmd_ builderLogFile $ unwords
         [ "cardano-cli stake-address deregistration-certificate"
+        , "--conway-era"
+        , "--key-reg-deposit-amt 2000000" -- 2 ADA
         , "--stake-address " <> toText stakeAddress
         , "--out-file " <> toText fullFileName
         ]
@@ -254,6 +258,7 @@ buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificat
       -- Create the certificate file.
       runBuildCmd_ builderLogFile $ unwords
         [ "cardano-cli stake-address delegation-certificate"
+        , "--conway-era"
         , "--stake-address " <> toText stakeAddress
         , "--stake-pool-id " <> poolID
         , "--out-file " <> toText fullFileName
