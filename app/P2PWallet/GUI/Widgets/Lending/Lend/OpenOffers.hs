@@ -26,14 +26,14 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
       , offersFilterWidget model `nodeVisible` (lendModel ^. #showOpenOffersFilter)
       ]
   where
-    Config{currentTime} = config
+    Config{currentTime,network,timeZone} = config
 
     toggleOffStyle :: Style
     toggleOffStyle = 
       def `styleBasic` [ bgColor transparent , textColor customBlue ]
           `styleHover` [ bgColor customGray1 ]
 
-    LoanWallet{..} = selectedWallet
+    LoanWallet{offerUTxOs} = selectedWallet
 
     allOffers :: [LoanUTxO]
     allOffers = filter ((==Just True) . fmap (is _OfferDatum) . view #loanDatum) offerUTxOs
@@ -103,7 +103,7 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
             ]
 
     offerRow :: LoanUTxO -> AppNode
-    offerRow u@LoanUTxO{utxoRef,blockTime} = do
+    offerRow u@LoanUTxO{loanAddress,utxoRef,blockTime} = do
       let Loans.OfferDatum{..} = fromMaybe def $ loanUTxOOfferDatum u
           loanAmount = toNativeAsset loanAsset & #quantity .~ loanPrincipal
           borrowerId = Loans.genBorrowerId 
@@ -112,13 +112,16 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
           duration = calcDaysInPosixPeriod $ fromPlutusTime loanTerm
           collateralPrices = map (over _1 toNativeAsset . over _2 toRational) 
                            $ collateralization ^. #unCollateralization
-          prettyInterest = unwords
-            [ "Interest:"
-            , displayPercentage (toRational loanInterest) <> "%"
-            ]
-          prettyCompounding = flip (maybe "Non-Compounding") compoundFrequency $ \freq ->
+          prettyInterest 
+            | loanInterest == 0 = "Interest-Free"
+            | otherwise = unwords
+                [ if compoundingInterest then "Compounding" else "Non-Compounding"
+                , "Interest:"
+                , displayPercentage (toRational loanInterest) <> "%"
+                ]
+          prettyEpochDuration = flip (maybe "No Loan Epochs") epochDuration $ \freq ->
             unwords
-              [ "Compounding Every"
+              [ "Loan Epoch:"
               , show (calcDaysInPosixPeriod $ fromPlutusTime freq)
               , "Day(s)"
               ]
@@ -138,13 +141,13 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
               ]
           prettyLocalTime = unwords
             [ "Created:"
-            , showLocalDate (config ^. #timeZone) blockTime
-            , showLocalTime (config ^. #timeZone) blockTime
+            , showLocalDate timeZone blockTime
+            , showLocalTime timeZone blockTime
             ]
           prettyExpirationTime exprTime = unwords
             [ "Expires:"
-            , showLocalDate (config ^. #timeZone) exprTime
-            , showLocalTime (config ^. #timeZone) exprTime
+            , showLocalDate timeZone exprTime
+            , showLocalTime timeZone exprTime
             ]
           swapCollateralMsg = "Collateral can be swapped out for other approved collateral"
           payToAddress = either (const "error") fst $ plutusToBech32 network lenderAddress
@@ -249,10 +252,10 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
                 [ label prettyInterest
                     `styleBasic` [textSize 8, textColor lightGray]
                 , filler
-                , label prettyCompounding
+                , label prettyEpochDuration
                     `styleBasic` [textSize 8, textColor lightGray]
                 ]
-            , widgetIf (isJust compoundFrequency) $ vstack
+            , widgetIf (isJust epochDuration) $ vstack
                 [ spacer_ [width 3]
                 , hstack
                     [ label prettyMinPayment
@@ -687,12 +690,12 @@ updateOfferWidget AppModel{lendingModel, knownWallets, reverseTickerMap, tickerM
             ]
         , spacer
         , hstack
-            [ helpButton offerCompoundFrequencyMsg
+            [ helpButton offerEpochDurationMsg
             , spacer_ [width 3]
-            , label "Compound Frequency:"
+            , label "Epoch Duration:"
                 `styleBasic` [textSize 10]
             , spacer
-            , textField_ (toLensVL $ maybeLens' % _2 % #compoundFrequency) 
+            , textField_ (toLensVL $ maybeLens' % _2 % #epochDuration) 
                   [placeholder "5"] 
                 `styleBasic` [textSize 10, width 50, bgColor customGray1, sndColor darkGray]
                 `styleFocus` [border 1 customBlue]
@@ -700,8 +703,18 @@ updateOfferWidget AppModel{lendingModel, knownWallets, reverseTickerMap, tickerM
             , label "Day(s)"
                 `styleBasic` [textColor lightGray, textMiddle, textSize 10]
             ]
-        , widgetIf (compoundFrequency /= "") $ vstack
+        , widgetIf (epochDuration /= "") $ vstack
             [ spacer
+            , hstack
+                [ helpButton offerCompoundingInterestMsg
+                , spacer_ [width 3]
+                , label "Compounding:"
+                    `styleBasic` [textSize 10]
+                , spacer
+                , checkbox_ (toLensVL $ maybeLens' % _2 % #compoundingInterest) [checkboxSquare]
+                    `styleBasic` [fgColor customGray1, hlColor customBlue]
+                ]
+            , spacer
             , hstack
                 [ helpButton offerMinimumPaymentMsg
                 , spacer_ [width 3]

@@ -29,6 +29,7 @@ import P2PWallet.Data.AppModel.LendingModel.LendModel.RequestsFilterModel
 import P2PWallet.Data.AppModel.LendingModel.LoanAskConfiguration
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
 import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.Transaction
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Prelude
@@ -84,6 +85,10 @@ data LendEvent
   | CloseInspectedTargetLoanHistory
   -- | Reset lend tx filters.
   | ResetLendTxFilters
+  -- | Inspect an offer Transaction.
+  | InspectOfferTransaction Transaction
+  -- | Stop inspecting the transaction.
+  | CloseInspectedOfferTransaction
 
 -------------------------------------------------
 -- Transaction Filter Model
@@ -140,6 +145,8 @@ data LendModel = LendModel
   , txFilterModel :: LendTxFilterModel
   -- | The transaction filter model scene.
   , txFilterScene :: FilterScene
+  -- | Focused offer transaction details.
+  , inspectedOfferTransaction :: Maybe Transaction
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''LendModel
@@ -161,4 +168,5 @@ instance Default LendModel where
     , txFilterModel = def
     , txFilterScene = FilterScene
     , showTransactionFilter = False
+    , inspectedOfferTransaction = Nothing
     }

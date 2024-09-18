@@ -170,9 +170,9 @@ loanUTxOLenderAddress LoanUTxO{loanDatum} = case loanDatum of
 loanUTxONextDeadline :: LoanUTxO -> Maybe PlutusTime
 loanUTxONextDeadline LoanUTxO{loanDatum} = case loanDatum of
   Just (ActiveDatum Loans.ActiveDatum{..}) -> 
-    case (+lastCompounding) <$> compoundFrequency of
+    case (+lastEpochBoundary) <$> epochDuration of
       Nothing -> Just loanExpiration
-      Just nextCompounding -> Just $ min nextCompounding loanExpiration
+      Just nextEpochBoundary -> Just $ min nextEpochBoundary loanExpiration
   _ -> Nothing
 
 -- | Get the next required payment from a LoanUTxO.

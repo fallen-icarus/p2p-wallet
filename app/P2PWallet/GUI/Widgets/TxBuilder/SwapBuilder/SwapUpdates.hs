@@ -73,9 +73,6 @@ swapUpdatesList reverseTickerMap = map utxoRow
                           , radius 5
                           ]
                         `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-                , spacer_ [width 5]
-                , label ("(Deposit: " <> display deposit <> ")")
-                    `styleBasic` [textSize 8, textColor lightGray]
                 , filler
                 , label positionSize
                     `styleBasic` [textSize 10, textColor white]
@@ -171,9 +168,6 @@ swapUpdatesList reverseTickerMap = map utxoRow
                           , radius 5
                           ]
                         `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-                , spacer_ [width 5]
-                , label ("(Deposit: " <> display deposit <> ")")
-                    `styleBasic` [textSize 8, textColor lightGray]
                 , filler
                 , label offerAssetName
                     `styleBasic` [textSize 10, textColor white]

@@ -649,12 +649,12 @@ createNewOfferWidget AppModel{lendingModel, knownWallets, reverseTickerMap, tick
             ]
         , spacer
         , hstack
-            [ helpButton offerCompoundFrequencyMsg
+            [ helpButton offerEpochDurationMsg
             , spacer_ [width 3]
-            , label "Compound Frequency:"
+            , label "Epoch Duration:"
                 `styleBasic` [textSize 10]
             , spacer
-            , textField_ (toLensVL $ maybeLens' % #compoundFrequency) 
+            , textField_ (toLensVL $ maybeLens' % #epochDuration) 
                   [placeholder "5"] 
                 `styleBasic` [textSize 10, width 50, bgColor customGray1, sndColor darkGray]
                 `styleFocus` [border 1 customBlue]
@@ -662,8 +662,18 @@ createNewOfferWidget AppModel{lendingModel, knownWallets, reverseTickerMap, tick
             , label "Day(s)"
                 `styleBasic` [textColor lightGray, textMiddle, textSize 10]
             ]
-        , widgetIf (compoundFrequency /= "") $ vstack
+        , widgetIf (epochDuration /= "") $ vstack
             [ spacer
+            , hstack
+                [ helpButton offerCompoundingInterestMsg
+                , spacer_ [width 3]
+                , label "Compounding:"
+                    `styleBasic` [textSize 10]
+                , spacer
+                , checkbox_ (toLensVL $ maybeLens' % #compoundingInterest) [checkboxSquare]
+                    `styleBasic` [fgColor customGray1, hlColor customBlue]
+                ]
+            , spacer
             , hstack
                 [ helpButton offerMinimumPaymentMsg
                 , spacer_ [width 3]
@@ -975,13 +985,16 @@ creditHistoryField AppModel{..} = do
             [ "Unpaid Balance:"
             , showAssetBalance True reverseTickerMap unpaidBalance
             ]
-          prettyInterest = unwords
-            [ "Interest:"
-            , displayPercentage (toRational loanInterest) <> "%"
-            ]
-          prettyCompounding = flip (maybe "Non-Compounding") compoundFrequency $ \freq ->
+          prettyInterest 
+            | loanInterest == 0 = "Interest-Free"
+            | otherwise = unwords
+                [ if compoundingInterest then "Compounding" else "Non-Compounding"
+                , "Interest:"
+                , displayPercentage (toRational loanInterest) <> "%"
+                ]
+          prettyEpochDuration = flip (maybe "No Loan Epochs") epochDuration $ \freq ->
             unwords
-              [ "Compounding Every"
+              [ "Loan Epoch:"
               , show (calcDaysInPosixPeriod $ fromPlutusTime freq)
               , "Day(s)"
               ]
@@ -1046,10 +1059,10 @@ creditHistoryField AppModel{..} = do
             [ label prettyInterest
                 `styleBasic` [textSize 8, textColor lightGray]
             , filler
-            , label prettyCompounding
+            , label prettyEpochDuration
                 `styleBasic` [textSize 8, textColor lightGray]
             ]
-        , widgetIf (isJust compoundFrequency) $ vstack
+        , widgetIf (isJust epochDuration) $ vstack
             [ spacer_ [width 3]
             , hstack
                 [ label prettyMinPayment
@@ -1282,13 +1295,16 @@ currentOffersField AppModel{..} = do
           duration = calcDaysInPosixPeriod $ fromPlutusTime loanTerm
           collateralPrices = map (over _1 toNativeAsset . over _2 toRational) 
                            $ collateralization ^. #unCollateralization
-          prettyInterest = unwords
-            [ "Interest:"
-            , displayPercentage (toRational loanInterest) <> "%"
-            ]
-          prettyCompounding = flip (maybe "Non-Compounding") compoundFrequency $ \freq ->
+          prettyInterest 
+            | loanInterest == 0 = "Interest-Free"
+            | otherwise = unwords
+                [ if compoundingInterest then "Compounding" else "Non-Compounding"
+                , "Interest:"
+                , displayPercentage (toRational loanInterest) <> "%"
+                ]
+          prettyEpochDuration = flip (maybe "No Loan Epochs") epochDuration $ \freq ->
             unwords
-              [ "Compounding Every"
+              [ "Loan Epoch:"
               , show (calcDaysInPosixPeriod $ fromPlutusTime freq)
               , "Day(s)"
               ]
@@ -1372,10 +1388,10 @@ currentOffersField AppModel{..} = do
             [ label prettyInterest
                 `styleBasic` [textSize 8, textColor lightGray]
             , filler
-            , label prettyCompounding
+            , label prettyEpochDuration
                 `styleBasic` [textSize 8, textColor lightGray]
             ]
-        , widgetIf (isJust compoundFrequency) $ vstack
+        , widgetIf (isJust epochDuration) $ vstack
             [ spacer_ [width 3]
             , hstack
                 [ label prettyMinPayment
@@ -1472,19 +1488,27 @@ activeLoansField AppModel{..} = do
       let Loans.ActiveDatum{borrowerId=_,..} = fromMaybe def $ loanUTxOActiveDatum u
           loanBalance = toNativeAsset loanAsset & #quantity .~ roundUp (toRational loanOutstanding)
           expiration = fromPlutusTime loanExpiration
-          mNextCompounding = (+lastCompounding) <$> compoundFrequency
-          nextPaymentDueDate = case mNextCompounding of
+          claimDeadline = fromPlutusTime claimExpiration
+          mNextEpochBoundary = (+lastEpochBoundary) <$> epochDuration
+          nextPaymentDueDate = case mNextEpochBoundary of
             Nothing -> expiration
-            Just nextCompounding -> min (fromPlutusTime nextCompounding) expiration
+            Just nextEpochBoundary -> min (fromPlutusTime nextEpochBoundary) expiration
           amountDue = minPayment - totalEpochPayments
           nextPaymentSize
             | minPayment == 0 = loanBalance
             | amountDue < 0 = loanBalance & #quantity .~ 0
             | otherwise = loanBalance & #quantity .~ amountDue
-          prettyExpirationTime = unwords
-            [ "Expires:"
-            , showLocalDate (config ^. #timeZone) expiration
-            , showLocalTime (config ^. #timeZone) expiration
+          prettyExpirationTime = unlines
+            [ unwords
+                [ "Expires:"
+                , showLocalDate (config ^. #timeZone) expiration
+                , showLocalTime (config ^. #timeZone) expiration
+                ]
+            , unwords
+                [ "Claim Expiration:"
+                , showLocalDate (config ^. #timeZone) claimDeadline
+                , showLocalTime (config ^. #timeZone) claimDeadline
+                ]
             ]
           prettyNextPaymentDueDate = unwords
             [ "Next Deadline:"
@@ -1492,18 +1516,21 @@ activeLoansField AppModel{..} = do
             , showLocalDate (config ^. #timeZone) nextPaymentDueDate
             , showLocalTime (config ^. #timeZone) nextPaymentDueDate
             ]
-          prettyInterest = unwords
-            [ "Interest:"
-            , displayPercentage (toRational loanInterest) <> "%"
-            ]
+          prettyInterest 
+            | loanInterest == 0 = "Interest-Free"
+            | otherwise = unwords
+                [ if compoundingInterest then "Compounding" else "Non-Compounding"
+                , "Interest:"
+                , displayPercentage (toRational loanInterest) <> "%"
+                ]
           prettyNextPayment = unwords
             [ "Amount Required by Deadline:"
             , ""
             , showAssetBalance True reverseTickerMap nextPaymentSize
             ]
-          prettyCompounding = flip (maybe "Non-Compounding") compoundFrequency $ \freq ->
+          prettyEpochDuration = flip (maybe "No Loan Epochs") epochDuration $ \freq ->
             unwords
-              [ "Compounding Every"
+              [ "Loan Epoch:"
               , show (calcDaysInPosixPeriod $ fromPlutusTime freq)
               , "Day(s)"
               ]
@@ -1582,13 +1609,13 @@ activeLoansField AppModel{..} = do
             [ label prettyInterest
                 `styleBasic` [textSize 8, textColor lightGray]
             , filler
-            , label prettyNextPayment
+            , label prettyEpochDuration
                 `styleBasic` [textSize 8, textColor lightGray]
             ]
-        , widgetIf (isJust compoundFrequency) $ vstack
+        , widgetIf (isJust epochDuration) $ vstack
             [ spacer_ [width 3]
             , hstack
-                [ label prettyCompounding
+                [ label prettyNextPayment
                     `styleBasic` [textSize 8, textColor lightGray]
                 , filler
                 , label prettyPenalty

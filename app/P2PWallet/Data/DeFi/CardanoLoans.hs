@@ -184,12 +184,14 @@ data OfferDatum = OfferDatum
   , assetBeaconId :: AssetBeaconId
   -- | The size of the loan.
   , loanPrincipal :: Integer
-  -- | The frequency at which interest must be applied.
-  , compoundFrequency :: Maybe PlutusTime
+  -- | The frequency at which interest must be applied and/or penalties applied.
+  , epochDuration :: Maybe PlutusTime
   -- | How long the loan is active once accepted.
   , loanTerm :: PlutusTime
   -- | The interest that must be periodically applied.
   , loanInterest :: Fraction
+  -- | Whether the interest is compounding.
+  , compoundingInterest  :: Bool
   -- | The minimum loan payment that must be made each loan epoch.
   , minPayment :: Integer
   -- | The penalty that gets applied if the minimum payment has not been met this loan epoch.
@@ -217,9 +219,10 @@ instance Default OfferDatum where
     , loanAsset = Asset ("","")
     , assetBeaconId = ""
     , loanPrincipal = 0
-    , compoundFrequency = Nothing
+    , epochDuration = Nothing
     , loanTerm = 0
     , loanInterest = Fraction (0,1)
+    , compoundingInterest = False
     , minPayment = 0
     , penalty = NoPenalty
     , collateralization = Collateralization []
@@ -238,9 +241,10 @@ instance ToJSON OfferDatum where
            , "loan_asset" .= loanAsset
            , "asset_beacon_id" .= assetBeaconId
            , "principal" .= loanPrincipal
-           , "compound_frequency" .= compoundFrequency
+           , "epoch_duration" .= epochDuration
            , "loan_term" .= loanTerm
            , "loan_interest" .= loanInterest
+           , "compounding_interest" .= compoundingInterest
            , "minimum_payment" .= minPayment
            , "penalty" .= penalty
            , "collateralization" .= collateralization
@@ -260,9 +264,10 @@ instance FromJSON OfferDatum where
       <*> (o .: "loan_asset")
       <*> (o .: "asset_beacon_id")
       <*> (o .: "principal")
-      <*> (o .: "compound_frequency")
+      <*> (o .: "epoch_duration")
       <*> (o .: "loan_term")
       <*> (o .: "loan_interest")
+      <*> (o .: "compounding_interest")
       <*> (o .: "minimum_payment")
       <*> (o .: "penalty")
       <*> (o .: "collateralization")
@@ -293,14 +298,16 @@ data ActiveDatum = ActiveDatum
   , assetBeaconId :: AssetBeaconId
   -- | The size of the loan.
   , loanPrincipal :: Integer
-  -- | The frequency at which interest must be applied.
-  , compoundFrequency :: Maybe PlutusTime
-  -- | The last time interest was applied.
-  , lastCompounding :: PV2.POSIXTime
+  -- | The frequency at which interest/penalties must be applied.
+  , epochDuration :: Maybe PlutusTime
+  -- | The last time interest/penalties were applied.
+  , lastEpochBoundary :: PV2.POSIXTime
   -- | How long the loan is active once accepted.
   , loanTerm :: PlutusTime
   -- | The interest that must be periodically applied.
   , loanInterest :: Fraction
+  -- | Whether the interest is compounding.
+  , compoundingInterest  :: Bool
   -- | The minimum loan partial payment that can be made.
   , minPayment :: Integer
   -- | The penalty that gets applied if the minimum payment has not been met this loan epoch.
@@ -334,10 +341,11 @@ instance ToJSON ActiveDatum where
            , "loan_asset" .= loanAsset
            , "asset_beacon_id" .= assetBeaconId
            , "principal" .= loanPrincipal
-           , "compound_frequency" .= compoundFrequency
-           , "last_compounding" .= lastCompounding
+           , "epoch_duration" .= epochDuration
+           , "last_compounding" .= lastEpochBoundary
            , "loan_term" .= loanTerm
            , "loan_interest" .= loanInterest
+           , "compounding_interest" .= compoundingInterest
            , "minimum_payment" .= minPayment
            , "penalty" .= penalty
            , "collateralization" .= collateralization
@@ -361,10 +369,11 @@ instance FromJSON ActiveDatum where
       <*> (o .: "loan_asset")
       <*> (o .: "asset_beacon_id")
       <*> (o .: "principal")
-      <*> (o .: "compound_frequency")
+      <*> (o .: "epoch_duration")
       <*> (o .: "last_compounding")
       <*> (o .: "loan_term")
       <*> (o .: "loan_interest")
+      <*> (o .: "compounding_interest")
       <*> (o .: "minimum_payment")
       <*> (o .: "penalty")
       <*> (o .: "collateralization")
@@ -386,10 +395,11 @@ instance Default ActiveDatum where
     , loanAsset = Asset ("","")
     , assetBeaconId = ""
     , loanPrincipal = 0
-    , compoundFrequency = Nothing
-    , lastCompounding = 0
+    , epochDuration = Nothing
+    , lastEpochBoundary = 0
     , loanTerm = 0
     , loanInterest = Fraction (0,1)
+    , compoundingInterest = False
     , minPayment = 0
     , penalty = NoPenalty
     , collateralization = Collateralization []
@@ -439,6 +449,16 @@ data LoanRedeemer
   -- | Claim "Lost" collateral.
   | Unlock
   deriving (Generic,FromJSON,ToJSON,Eq,Show)
+
+instance Display LoanRedeemer where
+  display CloseOrUpdateAsk = "Closed/Updated Ask"
+  display CloseOrUpdateOffer = "Closed/Updated Offer"
+  display AcceptOffer = "Accepted"
+  display (MakePayment _) = "Made Payment"
+  display (ApplyInterest _ _) = "Applied Interest/Penalties"
+  display SpendWithKeyNFT = "Lender Claimed Collateral"
+  display (UpdateLenderAddress _ _) = "Address Updated"
+  display Unlock = "Borrower Claimed Lost Collateral"
 
 -------------------------------------------------
 -- Payment Observer Redeemer
@@ -747,7 +767,8 @@ data LenderTerms = LenderTerms
   , loanTerm :: PlutusTime -- A counter-offer for the loan duration.
   , loanAmount :: NativeAsset -- A counter-offer for the asset/amount to borrow.
   , interest :: Rational
-  , compoundFrequency :: Maybe PlutusTime
+  , compoundingInterest :: Bool
+  , epochDuration :: Maybe PlutusTime
   , minPayment :: Integer
   , penalty :: Penalty
   , claimPeriod :: PlutusTime
@@ -770,7 +791,8 @@ createOfferDatum LenderTerms{..} = OfferDatum
   , loanPrincipal = loanAmount ^. #quantity
   , loanTerm = loanTerm -- use the new loan term.
   , loanInterest = fromRational interest
-  , compoundFrequency = compoundFrequency
+  , compoundingInterest = compoundingInterest
+  , epochDuration = epochDuration
   , minPayment = minPayment
   , penalty = penalty
   , collateralIsSwappable = collateralIsSwappable
@@ -794,14 +816,15 @@ createActiveDatumFromOffer borrowerCred offerId startTime OfferDatum{..} = Activ
   , loanAsset = loanAsset
   , assetBeaconId = assetBeaconId
   , loanPrincipal = loanPrincipal
-  , compoundFrequency = compoundFrequency
+  , epochDuration = epochDuration
   , loanTerm = loanTerm
   , loanInterest = loanInterest
+  , compoundingInterest = compoundingInterest
   , minPayment = minPayment
   , penalty = penalty
   , collateralization = collateralization
   , collateralIsSwappable = collateralIsSwappable
-  , lastCompounding = startTime
+  , lastEpochBoundary = startTime
   , claimExpiration = startTime + loanTerm + claimPeriod
   , loanExpiration = startTime + loanTerm
   , loanOutstanding = applyInterest (fromInteger loanPrincipal) loanInterest
@@ -821,16 +844,21 @@ createPostPaymentActiveDatum paymentAmount activeDatum =
 -- | Update the ActiveDatum to reflect the interest accrual and penalties.
 createPostInterestActiveDatum :: Integer -> ActiveDatum -> ActiveDatum
 createPostInterestActiveDatum numberOfTimes activeDatum@ActiveDatum{..} =
-  activeDatum
-    -- Add the compoundFrequency to the lastCompounding field. Also account for the
-    -- interest being applied for several compound periods in a single transaction.
-    & #lastCompounding %~ (+ maybe 0 (* fromInteger numberOfTimes) compoundFrequency)
-    -- Apply the interest n time. The penalty must be applied the first time as well if the
-    -- minimum payment has not been met.
-    & #loanOutstanding %~ 
-        applyInterestNTimes (minPayment > totalEpochPayments) penalty numberOfTimes loanInterest
-    -- Reset the totalEpochPayments field.
-    & #totalEpochPayments .~ 0
+  let correctedInterest = if compoundingInterest then loanInterest else 0 in
+    activeDatum
+      -- Add the epochDuration to the lastEpochBoundary field. Also account for the
+      -- interest being applied for several compound periods in a single transaction.
+      & #lastEpochBoundary %~ (+ maybe 0 (* fromInteger numberOfTimes) epochDuration)
+      -- Apply the interest n time. The penalty must be applied the first time as well if the
+      -- minimum payment has not been met.
+      & #loanOutstanding %~ 
+          applyInterestNTimes 
+            (minPayment > totalEpochPayments) 
+            penalty 
+            numberOfTimes 
+            correctedInterest
+      -- Reset the totalEpochPayments field.
+      & #totalEpochPayments .~ 0
 
 -- | Update the ActiveDatum to reflect the lender address update.
 createPostAddressUpdateActiveDatum :: PlutusAddress -> ActiveDatum -> ActiveDatum
@@ -913,7 +941,7 @@ addressUpdateObserverStakeAddress network =
 -------------------------------------------------
 -- The reference scripts are locked at the loan address without any staking credential.
 -- For testnet, that address is: 
--- addr_test1wrv3ff2vrjj3rujdnggeap27r69w763dkauumks70jngeysem97wj
+-- addr_test1wzc8hkkr9ygdfs02gf0d4hu8awlp8yeefm3kvglf0cw3fnqry5lx4
 --
 -- The scripts are deliberately stored with an invalid datum so that they are locked forever.
 
@@ -946,28 +974,28 @@ referenceScriptMap = Map.fromList
 
 loanScriptTestnetRef :: TxOutRef
 loanScriptTestnetRef = 
-  TxOutRef "80069bfaaa4a10c7319a545d10bd5fbb4df735f84fbc008e24483412cfcfab3a" 0
+  TxOutRef "69049298b1b240955e56775d586542cc5b246d3aa0a6843a9c26c24b263a256e" 0
 
 negotiationBeaconScriptTestnetRef :: TxOutRef
 negotiationBeaconScriptTestnetRef = 
-  TxOutRef "00b5bfe1e150d0885cd448f4ecabf68dd64d2954346e3a421cad73e12d52eb58" 0
+  TxOutRef "1cf071ff8dd90288de651fd6b774f1e6cc4959faf52cb1261b9b429b1710f8f1" 0
 
 activeBeaconScriptTestnetRef :: TxOutRef
 activeBeaconScriptTestnetRef = 
-  TxOutRef "b9d98aa9d66df40506725fbd548052a638f79656d97b39ba2de8d924e4cd0a06" 0
+  TxOutRef "7d85aa644fece35ce4d22a5968f08b7f8bd90d83a51ba011f920324afc59f1b0" 0
 
 paymentObserverScriptTestnetRef :: TxOutRef
 paymentObserverScriptTestnetRef = 
-  TxOutRef "d097731fd4dbd9690ec14d3822121d60c549b700a320c9fbe7b4320d6879219d" 0
+  TxOutRef "8119bc8f8f6fd9aba3d5b26e36d01cd7794c008140644c22613223cc8c01ceef" 0
 
 interestObserverScriptTestnetRef :: TxOutRef
 interestObserverScriptTestnetRef = 
-  TxOutRef "2191eb43d4fdce09735d52d815b4bbfb0a8abcfed50ed7be0e9b6a969ec0b339" 0
+  TxOutRef "272e49fdf315a90a6fbdd3e2ce2593877b6a5af8c71eabecd0c32210b6eed4cf" 0
 
 addressUpdateObserverScriptTestnetRef :: TxOutRef
 addressUpdateObserverScriptTestnetRef = 
-  TxOutRef "19600902dd39afd60fee4963396d76064740e53b948f960f169f6aad12bbe0f8" 0
+  TxOutRef "2a02137b2fb0e2a802415160bee0c361dd48e9a0f11df434fda0c22d77fa7b13" 0
 
 proxyScriptTestnetRef :: TxOutRef
 proxyScriptTestnetRef = 
-  TxOutRef "45dfa4701657ae47a3a45e7941f038f2958ee2fd74321e87064ff2aca283bfb7" 0
+  TxOutRef "d47cc4fa725feed453a1f598001fd0daf8684ae28a5f48c00d245eff7e210348" 0

@@ -62,11 +62,14 @@ updateStakeIdAliases stakeWalletId newAlias wallets =
          , LabelOptic "alias" A_Lens a a Text Text
          ) 
       => [a] -> [a]
-    update ws = 
-      let target = fromMaybe def $ find ((stakeWalletId ==) . view #stakeWalletId) ws
-          rest = filter ((stakeWalletId /=) . view #stakeWalletId) ws
-          updatedTarget = target & #alias .~ newAlias
-      in sortOn (view #stakeWalletId) $ updatedTarget : rest
+    update ws = case find ((stakeWalletId ==) . view #stakeWalletId) ws of
+      -- A stake wallet may not be used for defi wallets, and therefore, won't be found in the
+      -- list.
+      Nothing -> ws
+      Just target ->
+        let rest = filter ((stakeWalletId /=) . view #stakeWalletId) ws
+            updatedTarget = target & #alias .~ newAlias
+        in sortOn (view #stakeWalletId) $ updatedTarget : rest
 
 -- | Delete all wallets using that `stakeId`.
 deleteStakeIdWallets :: StakeWalletId -> Wallets -> Wallets

@@ -209,7 +209,7 @@ utxosWidget model@AppModel{homeModel=HomeModel{..},reverseTickerMap,config} =
                         , lovelace >= 5_000_000
                         ]
                 , tooltip_ "Spend UTxO" [tooltipDelay 0] $
-                    button spendUTxOIcon (HomeEvent $ AddSelectedUserInput u)
+                    button spendUTxOIcon (HomeEvent $ AddSelectedUserInput (Nothing,u))
                       `styleBasic` 
                         [ textSize 10
                         , textColor customBlue

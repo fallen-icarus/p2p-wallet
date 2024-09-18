@@ -34,6 +34,8 @@ borrowWidget model@AppModel{lendingModel} = do
           , box_ [mergeRequired reqUpdate] (transactionsWidget model)
               `nodeVisible` (lendingModel ^. #borrowModel % #scene == BorrowerTransactions)
           ]
+      , widgetIf (isJust $ lendingModel ^. #borrowModel % #inspectedBorrowerTransaction) $
+          borrowerTxInspectionWidget model
         -- The inspected loan is here since only one loan can be inspected at a time.
         -- It doesn't make sense to move to other borrower scenes while inspecting a loan.
       , inspectLoanWidget model

@@ -127,6 +127,12 @@ editLoanPaymentWidget AppModel{..} = do
               `styleFocus` [border 1 customBlue]
           , spacer_ [width 3]
           , helpButton offerLoanAmountMsg
+          , spacer_ [width 7]
+          , box_ [alignMiddle, onClick $ loanBuilderEvent SetEditLoanPaymentToFullPayment] $
+              tooltip_ "Pay remaining balance" [tooltipDelay 0] $
+                (label "max" `styleBasic` [padding 5, textSize 10])
+                `styleBasic` [radius 5, padding 5, bgColor customGray1]
+                `styleHover` [bgColor customBlue, cursorIcon CursorHand]
           , filler
           , label ("Collateral Unlocked: " <> prettyRatio)
               `styleBasic` [textSize 12]
@@ -141,6 +147,7 @@ editLoanPaymentWidget AppModel{..} = do
       , hstack
           [ label "Collateral Assets (separated with newlines)"
               `styleBasic` [textSize 12]
+          , spacer_ [width 3]
           , helpButton paymentCollateralAmountsMsg
           ]
       , spacer

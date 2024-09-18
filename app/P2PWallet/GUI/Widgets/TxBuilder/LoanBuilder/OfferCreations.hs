@@ -179,12 +179,12 @@ editOfferCreationWidget AppModel{txBuilderModel, knownWallets, reverseTickerMap,
         ]
     , spacer
     , hstack
-        [ helpButton offerCompoundFrequencyMsg
+        [ helpButton offerEpochDurationMsg
         , spacer_ [width 3]
-        , label "Compound Frequency:"
+        , label "Epoch Duration:"
             `styleBasic` [textSize 10]
         , spacer
-        , textField_ (toLensVL $ maybeLens' % _2 % #compoundFrequency) 
+        , textField_ (toLensVL $ maybeLens' % _2 % #epochDuration) 
               [placeholder "5"] 
             `styleBasic` [textSize 10, width 50, bgColor customGray1, sndColor darkGray]
             `styleFocus` [border 1 customBlue]
@@ -192,8 +192,18 @@ editOfferCreationWidget AppModel{txBuilderModel, knownWallets, reverseTickerMap,
         , label "Day(s)"
             `styleBasic` [textColor lightGray, textMiddle, textSize 10]
         ]
-    , widgetIf (compoundFrequency /= "") $ vstack
+    , widgetIf (epochDuration /= "") $ vstack
         [ spacer
+        , hstack
+            [ helpButton offerCompoundingInterestMsg
+            , spacer_ [width 3]
+            , label "Compounding:"
+                `styleBasic` [textSize 10]
+            , spacer
+            , checkbox_ (toLensVL $ maybeLens' % _2 % #compoundingInterest) [checkboxSquare]
+                `styleBasic` [fgColor customGray1, hlColor customBlue]
+            ]
+        , spacer
         , hstack
             [ helpButton offerMinimumPaymentMsg
             , spacer_ [width 3]

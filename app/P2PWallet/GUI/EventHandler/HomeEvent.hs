@@ -294,14 +294,17 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- Add Personal UTxO to Builder
   -----------------------------------------------
-  AddSelectedUserInput personalUTxO ->
+  AddSelectedUserInput (mMsg, personalUTxO) ->
     let PaymentWallet{alias,paymentAddress,paymentKeyDerivation} = homeModel ^. #selectedWallet
         newInput = personalUTxOToUserInput alias paymentAddress paymentKeyDerivation personalUTxO
-    in  case processNewUserInput newInput txBuilderModel of
+     in case processNewUserInput newInput txBuilderModel of
           Left err -> [ Task $ return $ Alert err ]
           Right newTxModel ->
             [ Model $ model & #txBuilderModel .~ newTxModel
-            , Task $ return $ Alert "Successfully added to builder!"
+            , Event $ Alert $ unlines $ intersperse "" $ filter (/= "")
+                [ "Successfully added to builder!"
+                , fromMaybe "" mMsg
+                ]
             ]
 
   -----------------------------------------------
@@ -352,12 +355,17 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           Nothing 
           (config ^. #currentTime) 
           loanUTxO
+        loanId = view #loanId $ fromMaybe def $ loanUTxOActiveDatum loanUTxO
      in case processNewExpiredClaim newInput txBuilderModel of
           Left err -> [ Task $ return $ Alert err ]
           Right newTxModel -> 
             if hasOnlyOneActiveBeaconAction $ newTxModel ^. #loanBuilderModel then
               [ Model $ model & #txBuilderModel .~ newTxModel
-              , Task $ return $ Alert "Successfully added to builder!"
+              -- Find the key input and add it to the builder.
+              , Event $ HomeEvent $ AddKeyInput $ 
+                  ( Just $ "Also added UTxO with Key NFT to builder."
+                  , mkNativeAsset Loans.activeBeaconCurrencySymbol $ loanId ^. #unLoanId
+                  )
               ]
             else
               [ Event $ Alert onlyOneActiveBeaconActionError ]
@@ -365,14 +373,18 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- Add Key Input
   -----------------------------------------------
-  AddKeyInput NativeAsset{fingerprint} ->
+  AddKeyInput (mMsg, NativeAsset{fingerprint}) ->
     let PaymentWallet{utxos} = homeModel ^. #selectedWallet
         newInput@PersonalUTxO{utxoRef} = fromMaybe def $
           find (any (\asset -> asset ^. #fingerprint == fingerprint) . view #nativeAssets) utxos
         currentInputs = map (view #utxoRef . snd) $ txBuilderModel ^. #userInputs
      in if utxoRef `elem` currentInputs 
-        then [Event $ Alert "Successfully added to builder!"]
-        else [Event $ HomeEvent $ AddSelectedUserInput newInput]
+        then [ Event $ Alert $ unlines $ intersperse "" $ filter (/= "")
+                [ "Successfully added to builder!"
+                , fromMaybe "" mMsg
+                ]
+             ]
+        else [Event $ HomeEvent $ AddSelectedUserInput (mMsg, newInput)]
 
   -----------------------------------------------
   -- Add Loan Key Burn to builder
@@ -387,7 +399,9 @@ handleHomeEvent model@AppModel{..} evt = case evt of
               [ Model $ model & #txBuilderModel .~ newTxModel
               -- Find the input and add it to the builder.
               , Event $ HomeEvent $ AddKeyInput $ 
-                  mkNativeAsset Loans.activeBeaconCurrencySymbol $ loanId ^. #unLoanId
+                  ( Just $ "Also added UTxO with Key NFT to builder."
+                  , mkNativeAsset Loans.activeBeaconCurrencySymbol $ loanId ^. #unLoanId
+                  )
               ]
             else
               [ Event $ Alert onlyOneActiveBeaconActionError ]
@@ -434,7 +448,8 @@ handleHomeEvent model@AppModel{..} evt = case evt of
 
           fromRightOrAppError $ updateLenderAddressDeposit verifiedUpdate minValues
       ]
-    AddResult verifiedUpdate ->
+    AddResult verifiedUpdate@LenderAddressUpdate{loanUTxO} ->
+      let loanId = view #loanId $ fromMaybe def $ loanUTxOActiveDatum loanUTxO in
       [ Model $ model 
           & #waitingStatus % #addingToBuilder .~ False
           & #homeModel % #newLenderAddressUpdate .~ Nothing
@@ -448,10 +463,13 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           -- Reindex after sorting.
           & #txBuilderModel % #loanBuilderModel % #addressUpdates %~ reIndex
           & #txBuilderModel %~ balanceTx
-      , Task $ return $ Alert $ unlines $ intersperse "" $ filter (/= "")
-          [ "Successfully added to builder!"
-          , createLenderAddressDepositMsg verifiedUpdate
-          ]
+      , Event $ HomeEvent $ AddKeyInput
+          ( Just $ unlines $ intersperse "" $ filter (/= "") 
+              [ "Added UTxO with Key NFT to builder."
+              , createLenderAddressDepositMsg verifiedUpdate
+              ]
+          , mkNativeAsset Loans.activeBeaconCurrencySymbol $ loanId ^. #unLoanId
+          )
       ]
 
   -----------------------------------------------
@@ -479,7 +497,9 @@ handleHomeEvent model@AppModel{..} evt = case evt of
               [ Model $ model & #txBuilderModel .~ newTxModel
               -- Find the input and add it to the builder.
               , Event $ HomeEvent $ AddKeyInput $ 
-                  mkNativeAsset Options.activeBeaconCurrencySymbol $ contractId ^. #unContractId
+                  ( Just $ "Also added UTxO with Key NFT to builder."
+                  , mkNativeAsset Options.activeBeaconCurrencySymbol $ contractId ^. #unContractId
+                  )
               ]
             else
               [ Event $ Alert onlyOneOptionsActiveBeaconActionError ]
@@ -494,12 +514,17 @@ handleHomeEvent model@AppModel{..} evt = case evt of
           alias 
           (config ^. #currentTime)
           optionsUTxO
+        contractId = view #contractId $ fromMaybe def $ optionsUTxOActiveDatum optionsUTxO
      in case processNewOptionsExecution newInput txBuilderModel of
           Left err -> [ Task $ return $ Alert err ]
           Right newTxModel -> 
             if hasOnlyOneOptionsActiveBeaconAction $ newTxModel ^. #optionsBuilderModel then
               [ Model $ model & #txBuilderModel .~ newTxModel
-              , Task $ return $ Alert "Successfully added to builder!"
+              -- Find the input and add it to the builder.
+              , Event $ HomeEvent $ AddKeyInput $ 
+                  ( Just $ "Also added UTxO with Key NFT to builder."
+                  , mkNativeAsset Options.activeBeaconCurrencySymbol $ contractId ^. #unContractId
+                  )
               ]
             else
               [ Event $ Alert onlyOneOptionsActiveBeaconActionError ]

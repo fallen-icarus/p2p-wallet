@@ -80,11 +80,11 @@ loanUTxOToInterestApplication network alias stakeCredential mKeyInfo currentTime
       , currentTime = toPlutusTime currentTime
       , extraDeposit = 0 -- This will be set later.
       , requiredApplicationCount = toInteger $
-          -- The GUI should prevent applying interests/penalties on loans with no compoundFrequency.
-          (toPlutusTime currentTime - lastCompounding) `div` fromJust compoundFrequency 
+          -- The GUI should prevent applying interests/penalties on loans with no epochDuration.
+          (toPlutusTime currentTime - lastEpochBoundary) `div` fromJust epochDuration 
       }
   where 
-    Loans.ActiveDatum{lastCompounding, compoundFrequency} = 
+    Loans.ActiveDatum{lastEpochBoundary, epochDuration} = 
       fromMaybe def $ loanUTxOActiveDatum u
 
 -- | Update the required deposit increase if necessary.

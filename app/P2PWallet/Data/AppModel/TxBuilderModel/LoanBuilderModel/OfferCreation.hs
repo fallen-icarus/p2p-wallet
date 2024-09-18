@@ -38,8 +38,10 @@ data OfferCreation = OfferCreation
   , loanAmount :: NativeAsset
   -- | The interest that must be periodically applied, specified as a percentage.
   , interest :: Rational
-  -- | The frequency at which interest must be applied, specified as number of days.
-  , compoundFrequency :: Maybe Integer
+  -- | Whether the interest is compounding.
+  , compoundingInterest :: Bool
+  -- | The frequency at which interest/penalties must be applied, specified as number of days.
+  , epochDuration :: Maybe Integer
   -- | The required minimum payment due each compound period.
   , minPayment :: Integer
   -- | The penalty to apply if the minimum payment is not met before the next compounding.
@@ -106,10 +108,12 @@ data NewOfferCreation = NewOfferCreation
   -- | The interest that must be periodically applied, specified as a percentage. Can be left blank
   -- for an interest free loan.
   , interest :: Text
+  -- | Whether the interest is compounding.
+  , compoundingInterest :: Bool
   -- | The frequency at which interest must be applied, specified as number of days.
-  , compoundFrequency :: Text
+  , epochDuration :: Text
   -- | The required minimum payment due each compound period. This can only be set when 
-  -- compoundFrequency is not "".
+  -- epochDuration is not "".
   , minPayment :: Text
   -- | The penalty to apply if the minimum payment is not met before the next compounding.
   -- This can only be set when minPayment is > 0.
@@ -160,7 +164,8 @@ instance Default NewOfferCreation where
     , loanAmount = ""
     , loanTerm = 30
     , interest = "5"
-    , compoundFrequency = ""
+    , compoundingInterest = False
+    , epochDuration = ""
     , minPayment = "0"
     , penalty = (NoNewPenalty, "0")
     , collateralization = ""
@@ -232,8 +237,8 @@ verifyNewOfferCreation reverseTickerMap tickerMap currentTime NewOfferCreation{.
     when (verifiedInterest < 0) $
       Left "Interest must be > 0"
 
-    -- Check the compoundFrequency.
-    verifiedCompoundFrequency <- case compoundFrequency of
+    -- Check the epochDuration.
+    verifiedCompoundFrequency <- case epochDuration of
       "" -> return Nothing
       xs -> fmap Just $ maybeToRight ("Could not parse compound frequency: " <> xs) $ 
         readMaybe @Integer $ toString xs
@@ -296,7 +301,8 @@ verifyNewOfferCreation reverseTickerMap tickerMap currentTime NewOfferCreation{.
       , loanAmount = verifiedLoanAmount
       , loanTerm = loanTerm
       , interest = verifiedInterest
-      , compoundFrequency = verifiedCompoundFrequency
+      , compoundingInterest = compoundingInterest
+      , epochDuration = verifiedCompoundFrequency
       , minPayment = verifiedMinPayment
       , penalty = verifiedPenalty
       , collateralization = verifiedCollateralization
@@ -342,7 +348,8 @@ toNewOfferCreation reverseTickerMap OfferCreation{..} = NewOfferCreation
     , loanTerm = loanTerm
     , loanAmount = showAssetBalance True reverseTickerMap loanAmount
     , interest = displayPercentage interest
-    , compoundFrequency = maybe "" show compoundFrequency
+    , compoundingInterest = compoundingInterest
+    , epochDuration = maybe "" show epochDuration
     , minPayment = showAssetQuantityOnly reverseTickerMap $ loanAmount & #quantity .~ minPayment
     , penalty = fromPenalty reverseTickerMap loanAmount penalty
     , collateralization = 

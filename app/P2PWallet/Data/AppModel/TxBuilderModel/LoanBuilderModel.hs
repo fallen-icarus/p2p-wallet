@@ -101,6 +101,8 @@ data LoanBuilderEvent
   | RemoveSelectedLenderAddressUpdate Int
   -- | Edit selected lender address update.
   | EditSelectedLenderAddressUpdate (AddEvent (Int,LenderAddressUpdate) (Int,LenderAddressUpdate))
+  -- | Set the payment to the full amount.
+  | SetEditLoanPaymentToFullPayment
   deriving (Show,Eq)
 
 -------------------------------------------------
@@ -445,7 +447,8 @@ addOfferCreationToBody txBody (_,OfferCreation{..}) =
       , loanTerm = toPlutusTime $ convertDaysToPosixPeriod loanTerm
       , loanAmount = loanAmount
       , interest = interest
-      , compoundFrequency = toPlutusTime . convertDaysToPosixPeriod <$> compoundFrequency
+      , compoundingInterest = compoundingInterest
+      , epochDuration = toPlutusTime . convertDaysToPosixPeriod <$> epochDuration
       , minPayment = minPayment
       , penalty = penalty
       , claimPeriod = toPlutusTime $ convertDaysToPosixPeriod claimPeriod
@@ -825,9 +828,9 @@ addLoanPaymentToBody txBody (_,LoanPayment{..}) =
       | policyId == "" = Nothing
       | otherwise = Just asset
 
-    nextDeadline = case (+lastCompounding) <$> compoundFrequency of
+    nextDeadline = case (+lastEpochBoundary) <$> epochDuration of
       Nothing -> loanExpiration
-      Just nextCompounding -> min nextCompounding loanExpiration
+      Just nextEpochBoundary -> min nextEpochBoundary loanExpiration
 
     postPaymentDatum = 
       Loans.createPostPaymentActiveDatum (paymentAmount ^. #quantity) targetActiveDatum

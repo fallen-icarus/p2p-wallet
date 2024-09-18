@@ -20,6 +20,7 @@ import P2PWallet.GUI.Widgets.Delegation.AddStakeWallet
 import P2PWallet.GUI.Widgets.Delegation.PoolPicker
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 delegationWidget :: AppModel -> AppNode
@@ -150,6 +151,8 @@ mainWidget AppModel{..} =
     wallet :: StakeWallet
     wallet@StakeWallet{..} = delegationModel ^. #selectedWallet
 
+    stakeHash = fromRight (PubKeyCredential "") $ stakeAddressToPlutusCredential stakeAddress
+
     -- Shows an icon representing where the address is paired or watched.
     (walletTypeIcon,walletTypeTip)
       | isNothing stakeKeyDerivation = (watchedIcon,"Watched")
@@ -168,13 +171,33 @@ mainWidget AppModel{..} =
             [ tooltip_ walletTypeTip [tooltipDelay 0] $ label walletTypeIcon
                 `styleBasic` [textSize 12, textColor white, textMiddle, textFont "Remix"]
             , spacer_ [width 5]
-            , widgetMaybe stakeKeyDerivation $ \keyInfo ->
-                vstack
-                  [ copyableLabelSelf 10 white $ display stakeAddress
-                  , copyableLabelSelf 8 lightGray $ display keyInfo
-                  ]
-            , widgetIf (isNothing stakeKeyDerivation) $
-                copyableLabelSelf 10 white $ display stakeAddress
+            , vstack
+                [ copyableLabelSelf 10 white $ display stakeAddress
+                , hstack
+                    [ copyableLabelSelf 8 lightGray $ display stakeHash
+                    , widgetMaybe stakeKeyDerivation $ \keyInfo ->
+                        hstack
+                          [ spacer_ [width 5]
+                          , flip styleBasic [textSize 10] $ 
+                              tooltip_ (display keyInfo) [tooltipDelay 0] $
+                                box_ [alignMiddle, onClick $ CopyText $ display keyInfo] $
+                                  label remixRouteLine
+                                    `styleBasic` 
+                                      [ bgColor black
+                                      , textMiddle
+                                      , textFont "Remix"
+                                      , textSize 8
+                                      , textColor customBlue
+                                      , paddingT 1
+                                      , paddingB 1
+                                      , paddingL 3
+                                      , paddingR 3
+                                      , radius 5
+                                      ]
+                                    `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                          ]
+                    ]
+                ]
             , spacer_ [width 1]
             , morePopup `styleBasic` [styleIf (isJust stakeKeyDerivation) $ paddingT 2]
             ] `styleBasic`
@@ -184,14 +207,14 @@ mainWidget AppModel{..} =
                 , border 1 black
                 ]
         , spacer
-        , textDropdown_ 
+        , box_ [alignMiddle] $ textDropdown_ 
               (toLensVL $ #delegationModel % #selectedWallet) 
               (knownWallets ^. #stakeWallets) 
               (view #alias) 
               [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
             `styleBasic` 
               [ bgColor customGray3
-              , width 120
+              , width 110
               , paddingR 10
               , border 1 black
               , textSize 10

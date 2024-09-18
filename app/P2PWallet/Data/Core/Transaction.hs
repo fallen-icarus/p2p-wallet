@@ -60,6 +60,19 @@ data TransactionUTxO = TransactionUTxO
 
 makeFieldLabelsNoPrefix ''TransactionUTxO
 
+instance Default TransactionUTxO where
+  def = TransactionUTxO
+    { paymentAddress = ""
+    , stakeAddress = Nothing
+    , utxoRef = TxOutRef "" 0
+    , lovelace = 0
+    , datumHash = Nothing
+    , inlineDatum = Nothing
+    , referenceScriptHash = Nothing
+    , nativeAssets = []
+    , showDetails = False
+    }
+
 instance ToJSON TransactionUTxO where
   toJSON TransactionUTxO{..} =
     object [ "utxo_ref" .= utxoRef 
