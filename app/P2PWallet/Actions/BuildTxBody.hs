@@ -60,6 +60,19 @@ runBuildCmd builderLogFile cmd =
 -- the parameters so there is no need to query for them again.
 changeAdaValueCheck :: Network -> ByteString -> ChangeOutput -> IO ()
 changeAdaValueCheck network parameters changeOutput@ChangeOutput{lovelace} = do
+  -- This must be checked first since a negative value will cause `calculateMinUTxOValue` to throw
+  -- an unfriendly error.
+  when (lovelace < 0) $
+    throwIO $ AppError $ unlines
+      [ unwords 
+          [ "There is not enough ADA change to cover the fee. The estimated extra ADA required"
+          , "is " <> display (abs lovelace) <> "."
+          ]
+      , ""
+      , "Add another input to increase the amount of ADA as change."
+      , "NOTE: This will require a re-calculation of the fee."
+      ]
+
   minUTxOValue <-
     calculateMinUTxOValue network (Just parameters) changeOutput >>= 
       fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead
@@ -150,13 +163,18 @@ buildTxBody network tx = do
           -- before calculating the fee.
           updateBudgets budgets initialTxBody
       
-      -- Calculate the fee a second time.
+      -- Calculate the fee a second time after adding the first calculated fee.
+      let updatedTx@TxBuilderModel{changeOutput} = balanceTx $ templateTx & #fee .~ feeCalc1
+
+      -- `balanceTx` will subtract the fee from the change which can result in a negative change.
+      -- The `changeOutput` should always be `Just`.
+      fromJustOrAppError "changeOutput is Nothing" changeOutput >>=
+        changeAdaValueCheck network allParameters
+
       estimateTxFee tmpDir builderLogFile paramsFile txBodyFile certificateFiles $
         -- The result of `convertToTxBody` does not have the calculated budgets so they must be
         -- added again.
-        updateBudgets budgets $ 
-          -- Replace the fee and rebalance.
-          convertToTxBody $ balanceTx $ templateTx & #fee .~ feeCalc1
+        updateBudgets budgets $ convertToTxBody updatedTx
 
   -- Update the `TxBuilderModel` with the results.
   let finalizedTx = 
@@ -169,7 +187,8 @@ buildTxBody network tx = do
           -- time.
           & #parameters ?~ parameters
 
-  -- Check that the change output has enough ada now that the fee has been subtracted.
+  -- Check that the change output has enough ada now that the final fee has been subtracted
+  -- (as part of `balanceTx`.)
   changeAdaValueCheck network allParameters $ fromMaybe def $ finalizedTx ^. #changeOutput
 
   -- Verify that the transaction has enough collateral.
