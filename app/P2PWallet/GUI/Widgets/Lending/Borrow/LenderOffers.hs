@@ -118,13 +118,16 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
           duration = calcDaysInPosixPeriod $ fromPlutusTime loanTerm
           collateralPrices = map (over _1 toNativeAsset . over _2 toRational) 
                            $ collateralization ^. #unCollateralization
-          prettyInterest = unwords
-            [ "Interest:"
-            , displayPercentage (toRational loanInterest) <> "%"
-            ]
-          prettyCompounding = flip (maybe "Non-Compounding") compoundFrequency $ \freq ->
+          prettyInterest 
+            | loanInterest == 0 = "Interest-Free"
+            | otherwise = unwords
+                [ if compoundingInterest then "Compounding" else "Non-Compounding"
+                , "Interest:"
+                , displayPercentage (toRational loanInterest) <> "%"
+                ]
+          prettyEpochDuration = flip (maybe "No Loan Epochs") epochDuration $ \freq ->
             unwords
-              [ "Compounding Every"
+              [ "Loan Epoch:"
               , show (calcDaysInPosixPeriod $ fromPlutusTime freq)
               , "Day(s)"
               ]
@@ -210,10 +213,10 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
                 [ label prettyInterest
                     `styleBasic` [textSize 8, textColor lightGray]
                 , filler
-                , label prettyCompounding
+                , label prettyEpochDuration
                     `styleBasic` [textSize 8, textColor lightGray]
                 ]
-            , widgetIf (isJust compoundFrequency) $ vstack
+            , widgetIf (isJust epochDuration) $ vstack
                 [ spacer_ [width 3]
                 , hstack
                     [ label prettyMinPayment

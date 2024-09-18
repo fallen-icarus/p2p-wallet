@@ -9,6 +9,10 @@ import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Prelude
 
 handleLoanBuilderEvent :: AppModel -> LoanBuilderEvent -> [AppEventResponse AppModel AppEvent]
@@ -486,3 +490,18 @@ handleLoanBuilderEvent model@AppModel{..} evt = case evt of
           , createLenderAddressDepositMsg verifiedUpdate
           ]
       ]
+
+  -----------------------------------------------
+  -- Set payment to outstanding balance
+  -----------------------------------------------
+  SetEditLoanPaymentToFullPayment ->
+    let Loans.ActiveDatum{loanAsset,loanOutstanding} = 
+          fromMaybe def $ 
+            loanUTxOActiveDatum =<<
+                txBuilderModel ^? #loanBuilderModel % #targetLoanPayment % _Just % _2 % #activeUTxO
+        newPayment = toNativeAsset loanAsset & #quantity .~ roundUp (toRational loanOutstanding)
+     in [ Model $ model
+           & #txBuilderModel % #loanBuilderModel % #targetLoanPayment % _Just % _2 % #paymentAmount .~
+             showAssetBalance True reverseTickerMap newPayment
+        ]
+

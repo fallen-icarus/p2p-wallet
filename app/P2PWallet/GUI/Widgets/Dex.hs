@@ -39,12 +39,8 @@ dexWidget model@AppModel{..} = do
           ]
       , widgetIf isAdding $ addDexWalletWidget model
       , widgetIf isDeleting $ confirmDeleteWidget model
-      , widgetMaybe (model ^. #dexModel % #inspectedTransaction) $ \tx -> 
-          inspectionWidget 
-            reverseTickerMap 
-            (dexModel ^. #selectedWallet % #oneWaySwapAddress) 
-            (dexModel ^. #selectedWallet % #twoWaySwapAddress) 
-            tx
+      , widgetIf (isJust $ dexModel ^. #inspectedTransaction) $
+          inspectionWidget model
       ]
   where
     hasDexWallets :: Bool

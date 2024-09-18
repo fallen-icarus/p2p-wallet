@@ -366,6 +366,14 @@ handleLendEvent model@AppModel{..} evt = case evt of
         & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
     ]
 
+  -----------------------------------------------
+  -- Inspecting Offer Transactions
+  -----------------------------------------------
+  InspectOfferTransaction tx -> 
+    [ Model $ model & #lendingModel % #lendModel % #inspectedOfferTransaction ?~ tx ]
+  CloseInspectedOfferTransaction -> 
+    [ Model $ model & #lendingModel % #lendModel % #inspectedOfferTransaction .~ Nothing ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------

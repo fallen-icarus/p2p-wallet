@@ -243,8 +243,8 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
           loanBalance = toNativeAsset loanAsset & #quantity .~ roundUp (toRational loanOutstanding)
           expiration = fromPlutusTime loanExpiration
           claimDeadline = fromPlutusTime claimExpiration
-          mNextCompounding = (+lastCompounding) <$> compoundFrequency
-          nextPaymentDueDate = case mNextCompounding of
+          mNextEpochBoundary = (+lastEpochBoundary) <$> epochDuration
+          nextPaymentDueDate = case mNextEpochBoundary of
             Nothing -> expiration
             Just nextCompounding -> min (fromPlutusTime nextCompounding) expiration
           amountDue = minPayment - totalEpochPayments
@@ -270,18 +270,21 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
             , showLocalDate (config ^. #timeZone) nextPaymentDueDate
             , showLocalTime (config ^. #timeZone) nextPaymentDueDate
             ]
-          prettyInterest = unwords
-            [ "Interest:"
-            , displayPercentage (toRational loanInterest) <> "%"
-            ]
+          prettyInterest 
+            | loanInterest == 0 = "Interest-Free"
+            | otherwise = unwords
+                [ if compoundingInterest then "Compounding" else "Non-Compounding"
+                , "Interest:"
+                , displayPercentage (toRational loanInterest) <> "%"
+                ]
           prettyNextPayment = unwords
             [ "Amount Required by Deadline:"
             , ""
             , showAssetBalance True reverseTickerMap nextPaymentSize
             ]
-          prettyCompounding = flip (maybe "Non-Compounding") compoundFrequency $ \freq ->
+          prettyEpochDuration = flip (maybe "No Loan Epochs") epochDuration $ \freq ->
             unwords
-              [ "Compounding Every"
+              [ "Loan Epoch:"
               , show (calcDaysInPosixPeriod $ fromPlutusTime freq)
               , "Day(s)"
               ]
@@ -366,13 +369,13 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
             [ label prettyInterest
                 `styleBasic` [textSize 8, textColor lightGray]
             , filler
-            , label prettyNextPayment
+            , label prettyEpochDuration
                 `styleBasic` [textSize 8, textColor lightGray]
             ]
-        , widgetIf (isJust compoundFrequency) $ vstack
+        , widgetIf (isJust epochDuration) $ vstack
             [ spacer_ [width 3]
             , hstack
-                [ label prettyCompounding
+                [ label prettyNextPayment
                     `styleBasic` [textSize 8, textColor lightGray]
                 , filler
                 , label prettyPenalty

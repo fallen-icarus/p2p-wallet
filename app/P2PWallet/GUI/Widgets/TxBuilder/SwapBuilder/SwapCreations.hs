@@ -55,9 +55,6 @@ swapCreationsList reverseTickerMap = map utxoRow
             [ hstack
                 [ label "Create New Limit Order"
                     `styleBasic` [textSize 10, textColor customBlue]
-                , spacer_ [width 5]
-                , label ("(Deposit: " <> display deposit <> ")")
-                    `styleBasic` [textSize 8, textColor lightGray]
                 , filler
                 , label positionSize
                     `styleBasic` [textSize 10, textColor white]
@@ -146,9 +143,6 @@ swapCreationsList reverseTickerMap = map utxoRow
             [ hstack
                 [ label "Create New Liquidity Swap"
                     `styleBasic` [textSize 10, textColor customBlue]
-                , spacer_ [width 5]
-                , label ("(Deposit: " <> display deposit <> ")")
-                    `styleBasic` [textSize 8, textColor lightGray]
                 , filler
                 , label offerAssetName
                     `styleBasic` [textSize 10, textColor white]

@@ -101,19 +101,25 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
           loanBalance = toNativeAsset loanAsset & #quantity .~ roundUp (toRational loanOutstanding)
           expiration = fromPlutusTime loanExpiration
           claimDeadline = fromPlutusTime claimExpiration
-          mNextCompounding = (+lastCompounding) <$> compoundFrequency
-          nextPaymentDueDate = case mNextCompounding of
+          mNextEpochBoundary = (+lastEpochBoundary) <$> epochDuration
+          nextPaymentDueDate = case mNextEpochBoundary of
             Nothing -> expiration
-            Just nextCompounding -> min (fromPlutusTime nextCompounding) expiration
+            Just nextEpochBoundary -> min (fromPlutusTime nextEpochBoundary) expiration
           amountDue = minPayment - totalEpochPayments
           nextPaymentSize
             | minPayment == 0 = loanBalance
             | amountDue < 0 = loanBalance & #quantity .~ 0
             | otherwise = loanBalance & #quantity .~ amountDue
-          prettyExpirationTime = unwords
-            [ "Expires:"
-            , showLocalDate (config ^. #timeZone) expiration
-            , showLocalTime (config ^. #timeZone) expiration
+          prettyExpirationTime = unlines
+            [ unwords
+                [ "Expires:"
+                , showLocalDate (config ^. #timeZone) expiration
+                , showLocalTime (config ^. #timeZone) expiration
+                ]
+            , unwords
+                [ "Claim Expiration:"
+                , prettyClaimExpiration
+                ]
             ]
           prettyClaimExpiration = unwords
             [ showLocalDate (config ^. #timeZone) claimDeadline
@@ -125,18 +131,21 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
             , showLocalDate (config ^. #timeZone) nextPaymentDueDate
             , showLocalTime (config ^. #timeZone) nextPaymentDueDate
             ]
-          prettyInterest = unwords
-            [ "Interest:"
-            , displayPercentage (toRational loanInterest) <> "%"
-            ]
+          prettyInterest 
+            | loanInterest == 0 = "Interest-Free"
+            | otherwise = unwords
+                [ if compoundingInterest then "Compounding" else "Non-Compounding"
+                , "Interest:"
+                , displayPercentage (toRational loanInterest) <> "%"
+                ]
           prettyNextPayment = unwords
             [ "Amount Required by Deadline:"
             , ""
             , showAssetBalance True reverseTickerMap nextPaymentSize
             ]
-          prettyCompounding = flip (maybe "Non-Compounding") compoundFrequency $ \freq ->
+          prettyEpochDuration = flip (maybe "No Loan Epochs") epochDuration $ \freq ->
             unwords
-              [ "Compounding Every"
+              [ "Loan Epoch:"
               , show (calcDaysInPosixPeriod $ fromPlutusTime freq)
               , "Day(s)"
               ]
@@ -245,13 +254,13 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
                 [ label prettyInterest
                     `styleBasic` [textSize 8, textColor lightGray]
                 , filler
-                , label prettyNextPayment
+                , label prettyEpochDuration
                     `styleBasic` [textSize 8, textColor lightGray]
                 ]
-            , widgetIf (isJust compoundFrequency) $ vstack
+            , widgetIf (isJust epochDuration) $ vstack
                 [ spacer_ [width 3]
                 , hstack
-                    [ label prettyCompounding
+                    [ label prettyNextPayment
                         `styleBasic` [textSize 8, textColor lightGray]
                     , filler
                     , label prettyPenalty
@@ -353,6 +362,12 @@ makePaymentWidget AppModel{..} = do
                   `styleFocus` [border 1 customBlue]
               , spacer_ [width 3]
               , helpButton offerLoanAmountMsg
+              , spacer_ [width 7]
+              , box_ [alignMiddle, onClick $ LendingEvent $ BorrowEvent SetNewLoanPaymentToFullPayment] $
+                  tooltip_ "Pay remaining balance" [tooltipDelay 0] $
+                    (label "max" `styleBasic` [padding 5, textSize 10])
+                    `styleBasic` [radius 5, padding 5, bgColor customGray1]
+                    `styleHover` [bgColor customBlue, cursorIcon CursorHand]
               , filler
               , label ("Collateral Unlocked: " <> prettyRatio)
                   `styleBasic` [textSize 12]
@@ -367,6 +382,7 @@ makePaymentWidget AppModel{..} = do
           , hstack
               [ label "Collateral Assets (separated with newlines)"
                   `styleBasic` [textSize 12]
+              , spacer_ [width 3]
               , helpButton paymentCollateralAmountsMsg
               ]
           , spacer

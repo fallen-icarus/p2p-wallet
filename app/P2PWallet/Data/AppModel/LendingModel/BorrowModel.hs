@@ -27,6 +27,7 @@ import P2PWallet.Data.AppModel.LendingModel.BorrowModel.ActiveLoansFilterModel
 import P2PWallet.Data.AppModel.LendingModel.BorrowModel.LenderOffersFilterModel
 import P2PWallet.Data.AppModel.LendingModel.BorrowModel.OpenAsksFilterModel
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
+import P2PWallet.Data.Core.Transaction
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Prelude
@@ -95,6 +96,8 @@ data BorrowEvent
   | RolloverLoan (ProcessEvent LoanUTxO InterestApplication)
   -- | Make a loan payment.
   | MakeLoanPayment (AddEvent LoanUTxO LoanPayment)
+  -- | Set the payment to the full amount.
+  | SetNewLoanPaymentToFullPayment
   -- | Claim the lost collateral.
   | ClaimLostCollateral LoanUTxO
   -- | Inspect Active Loan's history.
@@ -107,6 +110,10 @@ data BorrowEvent
   | ResetActiveLoansFilters
   -- | Reset borrow tx filters.
   | ResetBorrowTxFilters
+  -- | Inspect a borrower Transaction.
+  | InspectBorrowerTransaction Transaction
+  -- | Stop inspecting the transaction.
+  | CloseInspectedBorrowerTransaction
 
 -------------------------------------------------
 -- Transaction Filter Model
@@ -160,6 +167,8 @@ data BorrowModel = BorrowModel
   , txFilterModel :: BorrowTxFilterModel
   -- | The transaction filter model scene.
   , txFilterScene :: FilterScene
+  -- | Focused borrower transaction details.
+  , inspectedBorrowerTransaction :: Maybe Transaction
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''BorrowModel
@@ -182,4 +191,5 @@ instance Default BorrowModel where
     , showTransactionFilter = False
     , txFilterModel = def
     , txFilterScene = FilterScene
+    , inspectedBorrowerTransaction = Nothing
     }

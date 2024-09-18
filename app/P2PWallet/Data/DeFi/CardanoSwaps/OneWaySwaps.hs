@@ -202,6 +202,11 @@ data SwapRedeemer
   | Swap
   deriving (Eq,Generic,Show)
 
+instance Display SwapRedeemer where
+  display SpendWithMint = "Closed/Updated"
+  display SpendWithStake = "Closed/Updated"
+  display Swap = "Executed"
+
 data BeaconRedeemer
   -- | Execute the beacon script as a minting policy. Used anytime beacons must be minted or burned.
   = CreateOrCloseSwaps

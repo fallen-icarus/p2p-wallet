@@ -124,7 +124,7 @@ mainWidget model@AppModel{dexModel=DexModel{..},config,reverseTickerMap} =
         [ hstack 
             [ copyableLabelSelf txHash 10 customBlue lightGray
             , spacer_ [width 2]
-            , widgetIf (executedCount > 0) $ tooltip_ "Inspect Swap Executions" [tooltipDelay 0] $
+            , tooltip_ "Inspect DEX Transaction" [tooltipDelay 0] $
                 button inspectIcon (DexEvent $ InspectDexTransaction tx)
                   `styleBasic` 
                     [ textSize 10
@@ -170,25 +170,25 @@ mainWidget model@AppModel{dexModel=DexModel{..},config,reverseTickerMap} =
         , hstack
             [ label (show closedCount <> " Swap(s) Closed")
                 `styleBasic` 
-                  [ textSize 10
+                  [ textSize 8
                   , textColor lightGray
                   ]
             , spacer_ [width 5]
             , label "/"
                 `styleBasic` 
-                  [ textSize 10
+                  [ textSize 8
                   , textColor lightGray
                   ]
             , spacer_ [width 5]
             , label (show createdCount <> " Swap(s) Created")
                 `styleBasic` 
-                  [ textSize 10
+                  [ textSize 8
                   , textColor lightGray
                   ]
             , filler
             , label (show executedCount <> " Swap(s) Executed")
                 `styleBasic` 
-                  [ textSize 10
+                  [ textSize 8
                   , textColor lightGray
                   ]
             ]
@@ -365,85 +365,493 @@ txFilterWidget model = do
             ]
         ]
 
-inspectionWidget :: ReverseTickerMap -> PaymentAddress -> PaymentAddress -> Transaction -> AppNode
-inspectionWidget reverseTickerMap oneWayAddress twoWayAddress Transaction{..} = do
+inspectionWidget :: AppModel -> AppNode
+inspectionWidget model = do
     flip styleBasic [bgColor $ black & #a .~ 0.4, padding 30, radius 10] $ box $
       vstack
-        [ centerWidgetH $ label "Swap(s) Executed"
-            `styleBasic` 
-              [ textFont "Italics"
-              , paddingB 14
-              ]
-        , vstack_ [childSpacing_ 5] $ map executionRow plutusContracts
+        [ centerWidgetH $ label "DEX Transaction"
+            `styleBasic` [ textFont "Italics" ]
+        , spacer
+        , vscroll_ [wheelRate 50] $ vstack
+            [ dexInputs model
+            , spacer
+            , dexOutputs model
+            ]
         , filler
         , hstack
             [ filler
             , button "Close" $ DexEvent CloseInspectedDexTransaction
             ]
         ] `styleBasic` [bgColor customGray3, padding 30, radius 10]
-  where
-    executionRow :: TransactionPlutusContract -> AppNode
-    executionRow TransactionPlutusContract{spendsInput,paymentAddress,redeemer} = do
-      let parsedRedeemer
-            | paymentAddress == Just oneWayAddress = 
-                OneWayRedeemer <$> decodeData @OneWay.SwapRedeemer redeemer
-            | paymentAddress == Just twoWayAddress =
-                TwoWayRedeemer <$> decodeData @TwoWay.SwapRedeemer redeemer
-            | otherwise = Nothing
-          isExecutionRedeemer = or
-            [ parsedRedeemer == Just (OneWayRedeemer OneWay.Swap)
-            , parsedRedeemer == Just (TwoWayRedeemer TwoWay.TakeAsset1)
-            , parsedRedeemer == Just (TwoWayRedeemer TwoWay.TakeAsset2)
-            ]
-      widgetIf isExecutionRedeemer $ do
-        let input = find ((== spendsInput) . Just . view #utxoRef) inputs
-            output = flip find outputs $ \o -> 
-              (view #inlineDatum o >>= prevSwapInput . parseInlineSwapDatum) == spendsInput
-            diffAssets = sumNativeAssets $ mconcat
-              [ map (over #quantity negate) $ maybe [] (view #nativeAssets) input
-              , maybe [] (view #nativeAssets) output
-              ]
-            diffLoves = maybe 0 (view #lovelace) output - maybe 0 (view #lovelace) input
-        flip styleBasic [padding 5, bgColor customGray2, radius 5, border 1 black] $ 
-          box_ [alignMiddle] $ vstack
-            [ copyableLabelSelf (maybe "" display spendsInput) 10 customBlue lightGray
-            , spacer_ [width 2]
-            , hstack
-                [ label "Taken:"
-                    `styleBasic` [textSize 8, textColor lightGray]
-                , spacer_ [width 5]
-                , widgetIf (diffLoves < 0) $
-                    label (display $ abs diffLoves)
-                      `styleBasic` [textSize 8, textColor lightGray]
-                , widgetIf (diffLoves < 0 && any ((<0) . view #quantity) diffAssets) $
-                    hstack
-                      [ spacer_ [width 5]
-                      , label "+"
-                          `styleBasic` [textSize 8, textColor lightGray]
-                      , spacer_ [width 5]
-                      ]
-                , widgetMaybe (find ((<0) . view #quantity) diffAssets) $ \asset ->
-                    label (showAssetBalance True reverseTickerMap $ asset & #quantity %~ negate)
-                      `styleBasic` [textSize 8, textColor lightGray]
-                , filler
-                , label "Deposited:"
-                    `styleBasic` [textSize 8, textColor lightGray]
-                , spacer_ [width 5]
-                , widgetIf (diffLoves > 0) $
-                    label (display diffLoves)
-                      `styleBasic` [textSize 8, textColor lightGray]
-                , widgetIf (diffLoves > 0 && any ((>0) . view #quantity) diffAssets) $
-                    hstack
-                      [ spacer_ [width 5]
-                      , label "+"
-                          `styleBasic` [textSize 8, textColor lightGray]
-                      , spacer_ [width 5]
-                      ]
-                , widgetMaybe (find ((>0) . view #quantity) diffAssets) $ \asset ->
-                    label (showAssetBalance True reverseTickerMap asset)
-                      `styleBasic` [textSize 8, textColor lightGray]
+
+dexInputs :: AppModel -> AppNode
+dexInputs AppModel{..} = do
+    vstack
+      [ hstack
+          [ label "Inputs:"
+              `styleBasic` [textSize 12]
+          , spacer
+          , toggleButton_ horizontalMoreIcon 
+              (toLensVL $ #dexModel % #inspectedTransaction % toggleShow #showInputs)
+              [toggleButtonOffStyle moreOffStyle]
+              `styleBasic` 
+                [ textSize 10
+                , textColor customRed
+                , textFont "Remix"
+                , textMiddle
+                , radius 20
+                , paddingT 2
+                , paddingB 2
+                , paddingR 5
+                , paddingL 5
+                , bgColor black
+                , border 0 transparent
                 ]
+              `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+              `nodeVisible` (allInputs /= [])
+          , label "none" 
+              `styleBasic` [textColor white, textSize 12]
+              `nodeVisible` null allInputs
+          ]
+      , widgetIf showInputs $
+          vstack_ [childSpacing] (map inputRow allInputs)
+            `styleBasic` [padding 10]
+      ]
+  where
+    DexWallet{oneWaySwapAddress,twoWaySwapAddress} = dexModel ^. #selectedWallet
+
+    Transaction{showInputs, plutusContracts, inputs} = 
+      fromMaybe def $ dexModel ^. #inspectedTransaction
+
+    allInputs = flip filter plutusContracts $ \TransactionPlutusContract{paymentAddress} ->
+      paymentAddress == Just oneWaySwapAddress || paymentAddress == Just twoWaySwapAddress
+
+    inputRow :: TransactionPlutusContract -> AppNode
+    inputRow TransactionPlutusContract{spendsInput,datum,redeemer} =
+      case parseInlineSwapDatum <$> datum of
+        Just (OneWayDatum oneWayDatum) -> 
+          limitOrderRow
+            (fromMaybe (TxOutRef "" 0) spendsInput)
+            oneWayDatum
+            (fromMaybe OneWay.SpendWithMint $ decodeData @OneWay.SwapRedeemer redeemer)
+        Just (TwoWayDatum twoWayDatum) -> 
+          liquiditySwapRow
+            (fromMaybe (TxOutRef "" 0) spendsInput)
+            twoWayDatum
+            (fromMaybe TwoWay.SpendWithMint $ decodeData @TwoWay.SwapRedeemer redeemer)
+        _ -> spacer `nodeVisible` False
+
+    limitOrderRow :: TxOutRef -> OneWay.SwapDatum -> OneWay.SwapRedeemer -> AppNode
+    limitOrderRow utxoRef OneWay.SwapDatum{..} redeemer = do
+      let u = fromMaybe def $ find ((==utxoRef) . view #utxoRef) inputs
+          offerAsset = updateQuantity u $ mkNativeAsset offerId offerName
+          askAsset = updateQuantity u $ mkNativeAsset askId askName
+          offerAssetName = showAssetNameOnly reverseTickerMap offerAsset
+          askAssetName = showAssetNameOnly reverseTickerMap askAsset
+          buyPrice = showPriceFormatted reverseTickerMap askAsset offerAsset 
+                   $ toGHC swapPrice
+          sellPrice = showPriceFormatted reverseTickerMap offerAsset askAsset 
+                    $ 1 / toGHC swapPrice
+          buyPriceCaption = unwords
+            [ "Buy"
+            , askAssetName
+            , "@"
+            , sellPrice
+            , offerAssetName
+            , "/"
+            , askAssetName
             ]
+          sellPriceCaption = unwords
+            [ "Sell"
+            , offerAssetName
+            , "@"
+            , buyPrice
+            , askAssetName
+            , "/"
+            , offerAssetName
+            ]
+      vstack
+        [ hstack 
+            [ label "Limit Order:"
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 5]
+            , label offerAssetName
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 3]
+            , label remixArrowRightLine 
+                `styleBasic` [textSize 12, textMiddle, textFont "Remix", textColor customBlue]
+            , spacer_ [width 3]
+            , label askAssetName
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 5]
+            , let prettyRef = display utxoRef in
+              flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                box_ [alignMiddle, onClick $ CopyText $ display utxoRef] $
+                  label targetUTxOIcon
+                    `styleBasic` 
+                      [ bgColor black
+                      , textMiddle
+                      , textFont "Remix"
+                      , textSize 8
+                      , textColor customBlue
+                      , paddingT 1
+                      , paddingB 1
+                      , paddingL 3
+                      , paddingR 3
+                      , radius 5
+                      ]
+                    `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+            , filler
+            , label (display redeemer)
+                `styleBasic` [textSize 12, textColor customRed, textFont "Italics"]
+            , filler
+            , label (showAssetBalance True reverseTickerMap offerAsset)
+                `styleBasic` [textSize 10, textColor customBlue]
+            ]
+        , spacer_ [width 2]
+        , hstack
+            [ label sellPriceCaption
+                `styleBasic` [textSize 8, textColor lightGray]
+            , spacer_ [width 10]
+            , separatorLine
+            , spacer_ [width 10]
+            , label buyPriceCaption
+                `styleBasic` [textSize 8, textColor lightGray]
+            , filler
+            , label ("Converted: " <> showAssetBalance True reverseTickerMap askAsset)
+                `styleBasic` [textSize 8, textColor lightGray]
+            ]
+        ] `styleBasic` 
+              [ padding 10
+              , bgColor customGray2
+              , radius 5
+              , border 1 black
+              ]
+
+    liquiditySwapRow :: TxOutRef -> TwoWay.SwapDatum -> TwoWay.SwapRedeemer -> AppNode
+    liquiditySwapRow utxoRef TwoWay.SwapDatum{..} redeemer = do
+      let u = fromMaybe def $ find ((==utxoRef) . view #utxoRef) inputs
+          asset1 = updateQuantity u $ mkNativeAsset asset1Id asset1Name
+          asset2 = updateQuantity u $ mkNativeAsset asset2Id asset2Name
+          asset1AssetName = showAssetNameOnly reverseTickerMap asset1
+          asset2AssetName = showAssetNameOnly reverseTickerMap asset2
+          sellAsset1Price = 
+            showPriceFormatted reverseTickerMap asset1 asset2 $ toGHC asset2Price
+          sellAsset2Price = 
+            showPriceFormatted reverseTickerMap asset2 asset1 $ toGHC asset1Price
+          buyAsset1Price = 
+            showPriceFormatted reverseTickerMap asset2 asset1 $ 1 / toGHC asset2Price
+          buyAsset2Price = 
+            showPriceFormatted reverseTickerMap asset1 asset2 $ 1 / toGHC asset1Price
+          buyPriceCaption w x y z = 
+            fromString $ printf "Buy %s @ %s %s / %s" w x y z
+          sellPriceCaption w x y z = 
+            fromString $ printf "Sell %s @ %s %s / %s" w x y z
+      vstack
+        [ hstack 
+            [ label "Liquidity Swap:"
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 5]
+            , label asset1AssetName
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 3]
+            , label twoWayIcon
+                `styleBasic` [textSize 12, textMiddle, textFont "Remix", textColor customBlue]
+            , spacer_ [width 3]
+            , label asset2AssetName
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 5]
+            , let prettyRef = display utxoRef in
+              flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                box_ [alignMiddle, onClick $ CopyText $ display utxoRef] $
+                  label targetUTxOIcon
+                    `styleBasic` 
+                      [ bgColor black
+                      , textMiddle
+                      , textFont "Remix"
+                      , textSize 8
+                      , textColor customBlue
+                      , paddingT 1
+                      , paddingB 1
+                      , paddingL 3
+                      , paddingR 3
+                      , radius 5
+                      ]
+                    `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+            , filler
+            , label (display redeemer)
+                `styleBasic` [textSize 12, textColor customRed, textFont "Italics"]
+            , filler
+            , label (showAssetBalance True reverseTickerMap asset1)
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 3]
+            , label twoWayIcon
+                `styleBasic` [textSize 12, textMiddle, textFont "Remix", textColor customBlue]
+            , spacer_ [width 3]
+            , label (showAssetBalance True reverseTickerMap asset2)
+                `styleBasic` [textSize 10, textColor customBlue]
+            ]
+        , spacer_ [width 2]
+        , hstack
+            [ label 
+                (sellPriceCaption asset1AssetName sellAsset2Price asset2AssetName asset1AssetName)
+                `styleBasic` [textSize 8, textColor lightGray]
+            , filler
+            , label 
+                (sellPriceCaption asset2AssetName sellAsset1Price asset1AssetName asset2AssetName)
+                `styleBasic` [textSize 8, textColor lightGray]
+            ]
+        , spacer_ [width 2]
+        , hstack
+            [ label 
+                (buyPriceCaption asset1AssetName buyAsset1Price asset2AssetName asset1AssetName)
+                `styleBasic` [textSize 8, textColor lightGray]
+            , filler
+            , label 
+                (buyPriceCaption asset2AssetName buyAsset2Price asset1AssetName asset2AssetName)
+                `styleBasic` [textSize 8, textColor lightGray]
+            ]
+        ] `styleBasic` 
+              [ padding 10
+              , bgColor customGray2
+              , radius 5
+              , border 1 black
+              ]
+
+dexOutputs :: AppModel -> AppNode
+dexOutputs AppModel{..} = do
+    vstack
+      [ hstack
+          [ label "Outputs:"
+              `styleBasic` [textSize 12]
+          , spacer
+          , toggleButton_ horizontalMoreIcon 
+              (toLensVL $ #dexModel % #inspectedTransaction % toggleShow #showOutputs)
+              [toggleButtonOffStyle moreOffStyle]
+              `styleBasic` 
+                [ textSize 10
+                , textColor customRed
+                , textFont "Remix"
+                , textMiddle
+                , radius 20
+                , paddingT 2
+                , paddingB 2
+                , paddingR 5
+                , paddingL 5
+                , bgColor black
+                , border 0 transparent
+                ]
+              `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+              `nodeVisible` (allOutputs /= [])
+          , label "none" 
+              `styleBasic` [textColor white, textSize 12]
+              `nodeVisible` null allOutputs
+          ]
+      , widgetIf showOutputs $
+          vstack_ [childSpacing] (map outputRow allOutputs)
+            `styleBasic` [padding 10]
+      ]
+  where
+    DexWallet{oneWaySwapAddress,twoWaySwapAddress} = dexModel ^. #selectedWallet
+
+    Transaction{showOutputs, outputs} = 
+      fromMaybe def $ dexModel ^. #inspectedTransaction
+
+    allOutputs = flip filter outputs $ \TransactionUTxO{paymentAddress} ->
+      paymentAddress == oneWaySwapAddress || paymentAddress == twoWaySwapAddress
+
+    outputRow :: TransactionUTxO -> AppNode
+    outputRow output@TransactionUTxO{paymentAddress,utxoRef,inlineDatum}
+      | paymentAddress /= oneWaySwapAddress && paymentAddress /= twoWaySwapAddress 
+      = spacer `nodeVisible` False
+      | otherwise =
+          case parseInlineSwapDatum <$> inlineDatum of
+            Just (OneWayDatum oneWayDatum) -> limitOrderRow utxoRef oneWayDatum output
+            Just (TwoWayDatum twoWayDatum) -> liquiditySwapRow utxoRef twoWayDatum output
+            _ -> spacer `nodeVisible` False
+
+    limitOrderRow :: TxOutRef -> OneWay.SwapDatum -> TransactionUTxO -> AppNode
+    limitOrderRow utxoRef OneWay.SwapDatum{..} output = do
+      let offerAsset = updateQuantity output $ mkNativeAsset offerId offerName
+          askAsset = updateQuantity output $ mkNativeAsset askId askName
+          offerAssetName = showAssetNameOnly reverseTickerMap offerAsset
+          askAssetName = showAssetNameOnly reverseTickerMap askAsset
+          buyPrice = showPriceFormatted reverseTickerMap askAsset offerAsset 
+                   $ toGHC swapPrice
+          sellPrice = showPriceFormatted reverseTickerMap offerAsset askAsset 
+                    $ 1 / toGHC swapPrice
+          buyPriceCaption = unwords
+            [ "Buy"
+            , askAssetName
+            , "@"
+            , sellPrice
+            , offerAssetName
+            , "/"
+            , askAssetName
+            ]
+          sellPriceCaption = unwords
+            [ "Sell"
+            , offerAssetName
+            , "@"
+            , buyPrice
+            , askAssetName
+            , "/"
+            , offerAssetName
+            ]
+      vstack
+        [ hstack 
+            [ label "Limit Order:"
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 5]
+            , label offerAssetName
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 3]
+            , label remixArrowRightLine 
+                `styleBasic` [textSize 12, textMiddle, textFont "Remix", textColor customBlue]
+            , spacer_ [width 3]
+            , label askAssetName
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 5]
+            , let prettyRef = display utxoRef in
+              flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                box_ [alignMiddle, onClick $ CopyText $ display utxoRef] $
+                  label targetUTxOIcon
+                    `styleBasic` 
+                      [ bgColor black
+                      , textMiddle
+                      , textFont "Remix"
+                      , textSize 8
+                      , textColor customBlue
+                      , paddingT 1
+                      , paddingB 1
+                      , paddingL 3
+                      , paddingR 3
+                      , radius 5
+                      ]
+                    `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+            , filler
+            , label (showAssetBalance True reverseTickerMap offerAsset)
+                `styleBasic` [textSize 10, textColor customBlue]
+            ]
+        , spacer_ [width 2]
+        , hstack
+            [ label sellPriceCaption
+                `styleBasic` [textSize 8, textColor lightGray]
+            , spacer_ [width 10]
+            , separatorLine
+            , spacer_ [width 10]
+            , label buyPriceCaption
+                `styleBasic` [textSize 8, textColor lightGray]
+            , filler
+            , label ("Converted: " <> showAssetBalance True reverseTickerMap askAsset)
+                `styleBasic` [textSize 8, textColor lightGray]
+            ]
+        ] `styleBasic` 
+              [ padding 10
+              , bgColor customGray2
+              , radius 5
+              , border 1 black
+              ]
+
+    liquiditySwapRow :: TxOutRef -> TwoWay.SwapDatum -> TransactionUTxO -> AppNode
+    liquiditySwapRow utxoRef TwoWay.SwapDatum{..} output = do
+      let asset1 = updateQuantity output $ mkNativeAsset asset1Id asset1Name
+          asset2 = updateQuantity output $ mkNativeAsset asset2Id asset2Name
+          asset1AssetName = showAssetNameOnly reverseTickerMap asset1
+          asset2AssetName = showAssetNameOnly reverseTickerMap asset2
+          sellAsset1Price = 
+            showPriceFormatted reverseTickerMap asset1 asset2 $ toGHC asset2Price
+          sellAsset2Price = 
+            showPriceFormatted reverseTickerMap asset2 asset1 $ toGHC asset1Price
+          buyAsset1Price = 
+            showPriceFormatted reverseTickerMap asset2 asset1 $ 1 / toGHC asset2Price
+          buyAsset2Price = 
+            showPriceFormatted reverseTickerMap asset1 asset2 $ 1 / toGHC asset1Price
+          buyPriceCaption w x y z = 
+            fromString $ printf "Buy %s @ %s %s / %s" w x y z
+          sellPriceCaption w x y z = 
+            fromString $ printf "Sell %s @ %s %s / %s" w x y z
+      vstack
+        [ hstack 
+            [ label "Liquidity Swap:"
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 5]
+            , label asset1AssetName
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 3]
+            , label twoWayIcon
+                `styleBasic` [textSize 12, textMiddle, textFont "Remix", textColor customBlue]
+            , spacer_ [width 3]
+            , label asset2AssetName
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 5]
+            , let prettyRef = display utxoRef in
+              flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                box_ [alignMiddle, onClick $ CopyText $ display utxoRef] $
+                  label targetUTxOIcon
+                    `styleBasic` 
+                      [ bgColor black
+                      , textMiddle
+                      , textFont "Remix"
+                      , textSize 8
+                      , textColor customBlue
+                      , paddingT 1
+                      , paddingB 1
+                      , paddingL 3
+                      , paddingR 3
+                      , radius 5
+                      ]
+                    `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+            , filler
+            , label (showAssetBalance True reverseTickerMap asset1)
+                `styleBasic` [textSize 10, textColor customBlue]
+            , spacer_ [width 3]
+            , label twoWayIcon
+                `styleBasic` [textSize 12, textMiddle, textFont "Remix", textColor customBlue]
+            , spacer_ [width 3]
+            , label (showAssetBalance True reverseTickerMap asset2)
+                `styleBasic` [textSize 10, textColor customBlue]
+            ]
+        , spacer_ [width 2]
+        , hstack
+            [ label 
+                (sellPriceCaption asset1AssetName sellAsset2Price asset2AssetName asset1AssetName)
+                `styleBasic` [textSize 8, textColor lightGray]
+            , filler
+            , label 
+                (sellPriceCaption asset2AssetName sellAsset1Price asset1AssetName asset2AssetName)
+                `styleBasic` [textSize 8, textColor lightGray]
+            ]
+        , spacer_ [width 2]
+        , hstack
+            [ label 
+                (buyPriceCaption asset1AssetName buyAsset1Price asset2AssetName asset1AssetName)
+                `styleBasic` [textSize 8, textColor lightGray]
+            , filler
+            , label 
+                (buyPriceCaption asset2AssetName buyAsset2Price asset1AssetName asset2AssetName)
+                `styleBasic` [textSize 8, textColor lightGray]
+            ]
+        ] `styleBasic` 
+              [ padding 10
+              , bgColor customGray2
+              , radius 5
+              , border 1 black
+              ]
+
+moreOffStyle :: Style
+moreOffStyle = 
+  def `styleBasic` 
+        [ bgColor black
+        , textColor customBlue
+        , radius 20
+        , paddingT 2
+        , paddingB 2
+        , paddingR 5
+        , paddingL 5
+        ]
+      `styleHover`
+        [ bgColor customGray1]
 
 -------------------------------------------------
 -- Helper Lens
@@ -469,6 +877,16 @@ upperBoundText = lens getLowerBoundText setLowerBoundText
     setLowerBoundText :: DexTxFilterModel -> Text -> DexTxFilterModel
     setLowerBoundText tx date = 
       tx & #dateRange % _2 .~ Time.parseTimeM True Time.defaultTimeLocale "%m-%d-%Y" (toString date)
+
+-- | A lens to toggle the `show` field of the `Transaction`.
+toggleShow :: Lens' Transaction Bool -> Lens' (Maybe Transaction) Bool
+toggleShow finalLens = lens getToggleShow setToggleShow
+  where
+    getToggleShow :: Maybe Transaction -> Bool
+    getToggleShow = maybe False (view finalLens)
+
+    setToggleShow :: Maybe Transaction -> Bool -> Maybe Transaction
+    setToggleShow maybeInfo b = fmap (set finalLens b) maybeInfo
 
 -------------------------------------------------
 -- Helper Functions
@@ -581,6 +999,13 @@ applySearchFilter selectedWallet reverseTickerMap filterModel xs
       [ any (matchesUTxO selectedWallet reverseTickerMap filterModel) inputs
       , any (matchesUTxO selectedWallet reverseTickerMap filterModel) outputs
       ]
+
+-- | Update the native asset quantity to reflect the actual values present in the UTxO.
+updateQuantity :: TransactionUTxO -> NativeAsset -> NativeAsset
+updateQuantity TransactionUTxO{nativeAssets,lovelace} asset@NativeAsset{policyId,fingerprint}
+  | policyId == "" = asset & #quantity .~ unLovelace lovelace
+  | otherwise = flip (set #quantity) asset $ maybe 0 (view #quantity) $ flip find nativeAssets $
+      \a -> a ^. #fingerprint == fingerprint
 
 -------------------------------------------------
 -- Helper Widgets

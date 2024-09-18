@@ -10,8 +10,10 @@ import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.AssetMaps
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Prelude
 
 handleBorrowEvent :: AppModel -> BorrowEvent -> [AppEventResponse AppModel AppEvent]
@@ -440,6 +442,20 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
       ]
 
   -----------------------------------------------
+  -- Set payment to outstanding balance
+  -----------------------------------------------
+  SetNewLoanPaymentToFullPayment ->
+    let Loans.ActiveDatum{loanAsset,loanOutstanding} = 
+          fromMaybe def $ 
+            loanUTxOActiveDatum =<<
+                lendingModel ^? #borrowModel % #newLoanPayment % _Just % #activeUTxO
+        newPayment = toNativeAsset loanAsset & #quantity .~ roundUp (toRational loanOutstanding)
+     in [ Model $ model
+           & #lendingModel % #borrowModel % #newLoanPayment % _Just % #paymentAmount .~
+             showAssetBalance True reverseTickerMap newPayment
+        ]
+
+  -----------------------------------------------
   -- Inspecting Loan Histories
   -----------------------------------------------
   InspectActiveLoanHistory loanId -> 
@@ -545,6 +561,14 @@ handleBorrowEvent model@AppModel{..} evt = case evt of
               ]
             else
               [ Event $ Alert onlyOneActiveBeaconActionError ]
+
+  -----------------------------------------------
+  -- Inspecting Borrower Transactions
+  -----------------------------------------------
+  InspectBorrowerTransaction tx -> 
+    [ Model $ model & #lendingModel % #borrowModel % #inspectedBorrowerTransaction ?~ tx ]
+  CloseInspectedBorrowerTransaction -> 
+    [ Model $ model & #lendingModel % #borrowModel % #inspectedBorrowerTransaction .~ Nothing ]
 
 -------------------------------------------------
 -- Helper Functions

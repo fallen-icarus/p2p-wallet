@@ -65,7 +65,8 @@ loanUTxOToNewOfferCreation
         , loanAmount = showAssetBalance True reverseTickerMap loanAmount
         , loanTerm = calcDaysInPosixPeriod $ fromPlutusTime loanTerm
         , interest = displayPercentage $ toRational loanInterest
-        , compoundFrequency = maybe "" (show . calcDaysInPosixPeriod . fromPlutusTime) compoundFrequency
+        , compoundingInterest = compoundingInterest
+        , epochDuration = maybe "" (show . calcDaysInPosixPeriod . fromPlutusTime) epochDuration
         , minPayment = showAssetQuantityOnly reverseTickerMap $ loanAmount & #quantity .~ minPayment
         , penalty = fromPenalty reverseTickerMap loanAmount penalty
         , claimPeriod = calcDaysInPosixPeriod $ fromPlutusTime claimPeriod

@@ -70,7 +70,8 @@ data HomeEvent
   -- | Stop inspecting transaction.
   | CloseInspectedHomeTransaction
   -- | Add the selected user input to the tx builder.
-  | AddSelectedUserInput PersonalUTxO
+  -- The `Maybe Text` is an options message to go along with the final message.
+  | AddSelectedUserInput (Maybe Text, PersonalUTxO)
   -- | Add the selected collateral input to the tx builder.
   | AddSelectedCollateralInput PersonalUTxO
   -- | Add the selected change address to the tx builder.
@@ -82,7 +83,8 @@ data HomeEvent
   -- | Claim collateral from an expired loan.
   | ClaimExpiredCollateral LoanUTxO
   -- | Add the required input for the Key burn if it is not already in the tx builder.
-  | AddKeyInput NativeAsset
+  -- The `Maybe Text` is an options message to go along with the final message.
+  | AddKeyInput (Maybe Text, NativeAsset)
   -- | Burn leftover Key NFT.
   | BurnLoanKeyNFT Loans.LoanId
   -- | Update lender payment address.
@@ -139,8 +141,8 @@ instance Default UTxOFilterModel where
     { hasReferenceScript = Nothing
     , hasDatum = Nothing
     , hasNativeAssets = Nothing
-    , sortingMethod = UTxOLexicographical
-    , sortingDirection = SortAscending
+    , sortingMethod = UTxOTime
+    , sortingDirection = SortDescending
     , search = ""
     }
 

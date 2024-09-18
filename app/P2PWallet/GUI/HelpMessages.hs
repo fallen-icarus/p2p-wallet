@@ -763,25 +763,36 @@ offerPaymentAddressMsg = unlines
 
 offerInterestMsg :: Text
 offerInterestMsg = unlines
-  [ "The interest that will be applied at the end of each compound period."
+  [ unwords
+      [ "The interest is applied immediately upon accepting the offer, and then again"
+      , "at the end of each loan epoch if the interest is compounding."
+
+      ]
   , ""
-  , "The first interest application is applied immediately upon accepting the offer."
+  , unwords
+      [ "To offer a non-compounding interest loan, set the interest > 0, and do not check"
+      , "'Compounding' (only visible if an epoch duration is set)."
+      ]
   , ""
-  , "To offer a non-compounding interest loan, leave the compound frequency field blank."
+  , "To offer an interest-free loan, set the interest to 0%."
   ]
 
+offerCompoundingInterestMsg :: Text
+offerCompoundingInterestMsg = unlines
+  [ "Whether the interest is compounding."
+  ]
 
-offerCompoundFrequencyMsg :: Text
-offerCompoundFrequencyMsg = unlines
+offerEpochDurationMsg :: Text
+offerEpochDurationMsg = unlines
   [ unwords
       [ "How often the interest will be applied, and how long the borrower has to satisfy the"
       , "minimum payment requirement."
       ]
   , ""
-  , "It must be specified in # of days. Leave the field blank to not set a compounding frequency."
+  , "It must be specified in # of days. Leave the field blank to not set an epoch duration."
   , ""
   , unwords
-      [ "If you do not set a compounding period, you will not be able to set a minimum payment and"
+      [ "If you do not set an epoch duration, you will not be able to set a minimum payment and"
       , "penalty."
       ]
   ]
@@ -789,7 +800,7 @@ offerCompoundFrequencyMsg = unlines
 offerMinimumPaymentMsg :: Text
 offerMinimumPaymentMsg = unlines
   [ unwords
-      [ "How much the borrower must pay back each compounding period. This is similar to the"
+      [ "How much the borrower must pay back before the end of each loan epoch. This is similar to the"
       , "required monthly payment of TradFi loans."
       ]
   , ""
@@ -807,11 +818,11 @@ offerPenaltyMsg = unlines
   , "1. No Penalty"
   , unwords
       [ "2. Fixed Fee Penalty - the outstanding loan balance will increase by a fixed amount every time"
-      , "the minimum payment is not met in a given compounding period."
+      , "the minimum payment is not met in a given loan epoch."
       ]
   , unwords
       [ "3. Percent Penalty - the outstanding loan balance will increase by a percentage every time"
-      , "the minimum payment is not met in a given compounding period."
+      , "the minimum payment is not met in a given loan epoch."
       ]
   ]
 
