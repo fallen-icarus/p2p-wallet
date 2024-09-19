@@ -1,7 +1,8 @@
 # P2P-DeFi Wallet
 
-A fully p2p Cardano wallet with intrinsic support for a DEX, lending/borrowing, and options trading.
-It includes a *transaction builder* that can be used to build arbitrarily complex DeFi compositions.
+A fully p2p desktop Cardano wallet with intrinsic support for a DEX, lending/borrowing, and options
+trading. It includes a *transaction builder* that can be used to build arbitrarily complex DeFi
+compositions.
 
 > [!WARNING]
 > This is a prototype! Expect breaking changes until at least an official v1 release.
@@ -24,24 +25,28 @@ The P2P-DeFi wallet is the first of its kind wallet that enables users to build 
 complex transactions. It functions like an online marketplace's shopping cart where uses add actions
 to their cart until they are ready to "checkout". By enabling users to compose actions together into
 a single transaction, users have access to significantly better economic opportunities (e.g.,
-composing a DEX with an options contract execution) while saving 10x more money in the long run.
+composing a DEX with an options contract execution) while saving 10x more money in the long run. It
+has builtin support for a full DeFi stack: DEX, lending/borrowing, options trading, and aftermarket.
+Furthermore, since it uses the p2p-DeFi protocols, it is the first fully-decentralized and
+censorship-resistant DeFi experience. There is no multisig or central point of failure that can be
+used to stop any part of it.
 
 ## Motivation
 
 An overwhelming majority of Cardano's potential is wasted due to users being extremely limited in
-what they can put in a transaction. If you have split your delegation across two staking
-credentials, why does it require two transactions to update your delegation preferences (e.g., one
-transaction per credential)? If you have a DEX position you intend to close, why can't you close the
-position and send the money to a friend in the same transaction? Finally, if you want to buy an
-options contract but don't have the required asset to buy it, why can't you exchange for the asset
-on a DEX and use it to buy the options contract in the same transaction?
+what they can put in a transaction. If you split your delegation across two staking credentials, why
+does it require two transactions to update your delegation preferences (e.g., one transaction per
+credential)? If you have a DEX position you intend to close, why can't you close the position and
+send the money to a friend in the same transaction? Finally, if you want to buy an options contract
+but don't have the required asset to buy it, why can't you exchange for the required asset on a DEX
+and use it to buy the options contract in the same transaction?
 
 The reason why the answers to the above questions are universally "No" is a product of how DApps and
 frontends (aka wallets) are designed. The eUTxO model natively supports *arbitrary* action
 compositions within transactions. Unfortunately, developers are simply not taking advantage of it,
 and by extension, they are preventing Cardano users from being able to take advantage of it.
 
-There are two main reasons why developers need to start prioritizing support for composing actions
+There are three main reasons why developers need to start prioritizing support for composing actions
 within Cardano transactions:
 
 ### Cost Savings
@@ -49,15 +54,15 @@ within Cardano transactions:
 The (simplified) transaction fee calculation for Cardano is:
 
 ```
-fee = a * size_of_tx + b
+fee = a * size_of_tx_in_bytes + b
 ```
 
-where the current parameters are `a = 0.000044 ADA` and `b == 0.155381 ADA`
+where the current parameters are `a = 0.000044 ADA` and `b = 0.155381 ADA`
 ([source](https://cardano.stackexchange.com/questions/4472/calculation-of-transaction-fees)).
 Substituting the parameters in to the equation results in:
 
 ```
-fee = 0.000044 * size_of_tx + 0.155381
+fee = 0.000044 * size_of_tx_in_bytes + 0.155381
 ```
 
 Every transaction you submit has a **minimum** fee of 0.15 ADA! Meanwhile, the cost per byte is dirt
@@ -66,10 +71,10 @@ both of their delegation preferences. A transaction with a single delegation cer
 approximately 420 bytes in size which means the fee is approximately 0.173861 ADA. You need to pay
 this twice (once per delegation transaction) so the total cost to you comes out to 0.347722 ADA.
 
-But what if you combined the delegation updates into a single transaction? A transaction with two
-delegation certificates is approximately 550 bytes in size which means the fee is approximately
-0.179581 ADA. You pay literally have the transaction fees by combining the delegation updates into
-one transaction! And it is just because you only have to pay the constant 0.155381 ADA once.
+But what if you combined the delegation updates into a single transaction? A single transaction with
+two delegation certificates is approximately 550 bytes in size which means the fee is approximately
+0.179581 ADA. You pay literally half the transaction fees by combining the delegation updates into
+one transaction!
 
 For every action that you are forced to use separate transactions for, you are forced to pay an
 additional 0.155381 ADA in transaction fees. Take the delegation example to an extreme where you
@@ -82,8 +87,8 @@ transaction fee of 0.225341 ADA. That's almost 10x cheaper!
 
 Perhaps you won't find yourself ever needing to update the delegation preferences for 10 staking
 credentials, but what about updating the prices for 10 DEX positions? What about making loan
-payments on 10 separate loans? When you consider DeFi, there are a lot of actions that *should* go
-together in a single transaction. 
+payments on 10 separate loans? What about updating 5 DEX positions and making 5 loan payments? When
+you consider DeFi, there are a lot of actions that **should** go together in a single transaction. 
 
 In order to maximize savings, every transaction should be as full as possible. If developers are not
 allowing you to combine actions together into a single transaction, they are making you waste
@@ -104,10 +109,10 @@ The only difference between the two deals is the level of risk. While this examp
 highlights the fact that, in order to get more people involved in pursuing opportunities, minimizing
 risk can do a lot.
 
-When it comes to Cardano, is it better to have more people participating in DeFi or less? **This
-isn't a zero-sum game.** If more people participate in Cardano DeFi, businesses will be incentivized
-to also join in. This then feeds on itself since businesses provide services that attract more
-users. On net, the following happens:
+When it comes to Cardano, is it better to have more people participating in DeFi or less? **This is
+not a zero-sum game because of the network effect.** If more people participate in Cardano DeFi,
+businesses will be incentivized to also join in. This then feeds on itself since businesses provide
+services that attract more users. On net, the following happens:
 
 1. The value of everyone's ada increases relative to all other assets.
 2. Stake pool rewards start to rise again as more transactions result in more transaction fees to
@@ -126,17 +131,41 @@ convert it back to DJED in another transaction. Simply trying to go after this o
 have cost you money.
 
 But what if you could compose the conversion with the options purchase? If either the conversion
-fails or the options purchase fail, the entire transaction would be invalidated. In other words, the
-only scenario where you convert DJED to AGIX is the scenario where you immediately use it to buy the
-options contract. You have **zero** market volatility risk, **zero** collateral risk, and you saved
-money since you only paid the 0.155381 ADA once. Because this method is effectively risk-free,
-significantly more people will try taking advantage of these DEX+Options opportunities. As a bonus,
-the DEX and the options market even end up with greater liquidity!
+fails or the options purchase fails, the entire transaction would be invalidated. In other words,
+the only scenario where you convert DJED to AGIX is the scenario where you immediately use it to buy
+the options contract. You have **zero** market volatility risk, **zero** collateral risk, and you
+**saved money** since you only paid the 0.155381 ADA once. Because this method is effectively
+risk-free, significantly more people will try taking advantage of these DEX+Options opportunities.
+As a bonus, the DEX and the options market even end up with greater liquidity!
 
-Perhaps you find this example too contrived. If you do, then I encourage you to read how not being
-able to compose DeFi actions in a single transaction can actually lead to [DeFi recessions and
-market
+Perhaps you find this example too contrived. If you do, you should read how not being able to
+compose DeFi actions in a single transaction can actually lead to [DeFi recessions and market
 instabilities](https://github.com/fallen-icarus/cardano-loans?tab=readme-ov-file#no-trustless-composability-with-other-dapps).
+
+### Simpler DApps (KISS)
+
+Imagine you have a DEX position open that has already completed with 10 ADA waiting to be claimed by
+you. What if you would like to send this ada to your friend, Alice? Without being able to compose,
+you would first need to close the DEX position in one transaction, and then send the 10 ADA to Alice
+in a separate transaction. This extra transaction is an inconvenience that users would rather avoid.
+
+To satisfy users, DApp developers can try adding a feature to the DApp that enables the swap to go
+to an address of the users choice when their swap is being fulfilled. This feature makes the DApp
+significantly more complicated code-wise and it can also distort the DApp's incentives! If you are
+interested, consider checking out this
+[comment](https://github.com/fallen-icarus/cardano-swaps/issues/16#issuecomment-2039642837) that
+explains how adding this feature to cardano-swaps could have severe negative consequences for its
+incentives.
+
+There is no reason DApps should need to add this feature to the smart contracts! Instead, this
+feature can easily be enabled by frontends. By enabling arbitrary compositions within transactions,
+DApps can use a *separation of concerns* approach to design. This approach makes the overall DApps
+significantly simpler, and most likely as a consequence, more secure.
+
+It is *always* better to design things using simple building blocks that can then be arbitrarily
+combined to build more complicated things. The fact that developers are not enabling support for
+composing actions within transactions is fundamentally undermining efforts to build a vibrant and
+*secure* Cardano DeFi ecosystem.
 
 ## The P2P-DeFi Wallet
 
@@ -145,7 +174,8 @@ what Cardano has to offer:
 
 - **Fully Permissionless DeFi** - no one can stop you from participating in DeFi. The p2p-wallet
 uses the p2p-DeFi protocols which means you retain full custody, delegation control, and voting
-control at all times. 
+control at all times. There is also no multisig that can be used to freeze or make changes to any
+part of the DeFi stack.
 - **Arbitrarily Complex Transactions** - you can close a swap and use the proceeds to pay a friend
 *in the same transaction*. You can create a swap, ask for a loan, execute an options contract, and
 change your delegation preferences *in the same transaction*. If you can think of the composition,
