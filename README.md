@@ -13,11 +13,59 @@ compositions.
 
 ---
 ## Table of Contents
+- [Screenshots](#screenshots)
 - [Abstract](#abstract)
 - [Motivation](#motivation)
 - [FAQ](#faq)
-- [Screenshots](#screenshots)
 - [Installing](#installing)
+
+## Screenshots
+
+### Transaction Builder
+
+![Alt text](/assets/screenshots/tx_builder.png?raw=true)
+
+### DEX
+
+#### Order Book
+
+![Alt text](/assets/screenshots/dex_trading.png?raw=true)
+
+#### Open Positions
+
+![Alt text](/assets/screenshots/dex_positions.png?raw=true)
+
+### Lending/Borrowing
+
+#### Active Loans
+
+![Alt text](/assets/screenshots/active_loans.png?raw=true)
+
+#### Credit Report (Borrower View)
+
+![Alt text](/assets/screenshots/credit_history.png?raw=true)
+
+#### Credit Report (Lender View)
+
+![Alt text](/assets/screenshots/credit_report.png?raw=true)
+
+### Options Trading
+
+![Alt text](/assets/screenshots/options_trading.png?raw=true)
+
+### Delegation
+
+#### Main View
+
+![Alt text](/assets/screenshots/delegation.png?raw=true)
+
+#### Pool Picker
+
+![Alt text](/assets/screenshots/delegation_pool_picker.png?raw=true)
+
+### Personal UTxOs
+
+![Alt text](/assets/screenshots/utxo_picker.png?raw=true)
 
 ## Abstract
 
@@ -197,54 +245,6 @@ number of users means the total transaction fees collected actually **grows**.
 To put some numbers on it, if Alice decreases her total fees paid from 0.5 ADA to 0.17 ADA, while at
 the same time 9 more users join and they each also pay 0.17 ADA, the total fees collected increased
 from 0.5 ADA to 1.7 ADA. It tripled despite Alice personally cutting costs by 66%!
-
-## Screenshots
-
-### Transaction Builder
-
-![Alt text](/assets/screenshots/tx_builder.png?raw=true)
-
-### DEX
-
-#### Order Book
-
-![Alt text](/assets/screenshots/dex_trading.png?raw=true)
-
-#### Open Positions
-
-![Alt text](/assets/screenshots/dex_positions.png?raw=true)
-
-### Lending/Borrowing
-
-#### Active Loans
-
-![Alt text](/assets/screenshots/active_loans.png?raw=true)
-
-#### Credit Report (Borrower View)
-
-![Alt text](/assets/screenshots/credit_history.png?raw=true)
-
-#### Credit Report (Lender View)
-
-![Alt text](/assets/screenshots/credit_report.png?raw=true)
-
-### Options Trading
-
-![Alt text](/assets/screenshots/options_trading.png?raw=true)
-
-### Delegation
-
-#### Main View
-
-![Alt text](/assets/screenshots/delegation.png?raw=true)
-
-#### Pool Picker
-
-![Alt text](/assets/screenshots/delegation_pool_picker.png?raw=true)
-
-### Personal UTxOs
-
-![Alt text](/assets/screenshots/utxo_picker.png?raw=true)
 
 ## Installing
 
