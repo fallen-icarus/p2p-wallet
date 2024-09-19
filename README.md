@@ -2,8 +2,6 @@
 
 A fully p2p Cardano wallet with intrinsic support for a DEX, lending/borrowing, and options trading.
 It includes a *transaction builder* that can be used to build arbitrarily complex DeFi compositions.
-The transaction builder can even be used to manage multiple staking credentials in a single
-transaction.
 
 > [!WARNING]
 > This is a prototype! Expect breaking changes until at least an official v1 release.
@@ -25,7 +23,7 @@ transaction.
 The P2P-DeFi wallet is the first of its kind wallet that enables users to build up arbitrarily
 complex transactions. It functions like an online marketplace's shopping cart where uses add actions
 to their cart until they are ready to "checkout". By enabling users to compose actions together into
-a single transaction, users have access to significantly more economic opportunities (e.g.,
+a single transaction, users have access to significantly better economic opportunities (e.g.,
 composing a DEX with an options contract execution) while saving 10x more money in the long run.
 
 ## Motivation
@@ -40,15 +38,15 @@ on a DEX and use it to buy the options contract in the same transaction?
 
 The reason why the answers to the above questions are universally "No" is a product of how DApps and
 frontends (aka wallets) are designed. The eUTxO model natively supports *arbitrary* action
-compositions within transactions. Developers are simply not taking advantage of it, and by
-extension, they are preventing Cardano users from being able to take advantage of it.
+compositions within transactions. Unfortunately, developers are simply not taking advantage of it,
+and by extension, they are preventing Cardano users from being able to take advantage of it.
 
 There are two main reasons why developers need to start prioritizing support for composing actions
 within Cardano transactions:
 
 ### Cost Savings
 
-The transaction fee calculation for Cardano is:
+The (simplified) transaction fee calculation for Cardano is:
 
 ```
 fee = a * size_of_tx + b
@@ -91,7 +89,7 @@ In order to maximize savings, every transaction should be as full as possible. I
 allowing you to combine actions together into a single transaction, they are making you waste
 money...
 
-### Increased Economic Opportunities
+### Better Economic Opportunities
 
 All opportunities carry some form of risk. Whether you choose to go after the opportunity depends on
 how comfortable you are with that risk. The less risky an opportunity, the more people will be
@@ -171,6 +169,52 @@ the same time 9 more users join and they each also pay 0.17 ADA, the total fees 
 from 0.5 ADA to 1.7 ADA. It tripled despite Alice personally cutting costs by 66%!
 
 ## Screenshots
+
+### Transaction Builder
+
+![Alt text](/assets/screenshots/tx_builder.png?raw=true)
+
+### DEX
+
+#### Order Book
+
+![Alt text](/assets/screenshots/dex_trading.png?raw=true)
+
+#### Open Positions
+
+![Alt text](/assets/screenshots/dex_positions.png?raw=true)
+
+### Lending/Borrowing
+
+#### Active Loans
+
+![Alt text](/assets/screenshots/active_loans.png?raw=true)
+
+#### Credit Report (Borrower View)
+
+![Alt text](/assets/screenshots/credit_history.png?raw=true)
+
+#### Credit Report (Lender View)
+
+![Alt text](/assets/screenshots/credit_report.png?raw=true)
+
+### Options Trading
+
+![Alt text](/assets/screenshots/options_trading.png?raw=true)
+
+### Delegation
+
+#### Main View
+
+![Alt text](/assets/screenshots/delegation.png?raw=true)
+
+#### Pool Picker
+
+![Alt text](/assets/screenshots/delegation_pool_picker.png?raw=true)
+
+### Personal UTxOs
+
+![Alt text](/assets/screenshots/utxo_picker.png?raw=true)
 
 ## Installing
 
