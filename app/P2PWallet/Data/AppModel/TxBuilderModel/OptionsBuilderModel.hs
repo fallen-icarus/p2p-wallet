@@ -448,7 +448,7 @@ addProposalPurchaseToBody txBody (_,ProposalPurchase{..}) =
       , lovelace = premiumLovelace
       , nativeAssets = premiumNativeAssets
       , datum = OutputDatum $ toDatum $ Options.PaymentDatum
-          ( Options.ActiveBeaconId $ Options.activeBeaconCurrencySymbol
+          ( Options.ActiveBeaconId Options.activeBeaconCurrencySymbol
           , activeDatum ^. #contractId
           )
       }

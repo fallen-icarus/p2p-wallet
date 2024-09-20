@@ -88,7 +88,7 @@ mainWidget model@AppModel{optionsModel=OptionsModel{..},config,reverseTickerMap}
     today :: Day
     today = config ^. #currentDay
 
-    (mLowerDay,mUpperDay) = writerModel ^. #txFilterModel ^. #dateRange
+    (mLowerDay,mUpperDay) = writerModel ^. #txFilterModel % #dateRange
 
     startTime :: POSIXTime
     startTime = maybe 0 (localTimeToPosixTime timeZone . beginningOfDay) mLowerDay
@@ -491,9 +491,10 @@ optionsInputs AppModel{..} = do
       -> NativeAsset 
       -> NativeAsset 
       -> Options.OptionsRedeemer
-      -> (Integer, Options.Terms)
+      -> Integer
+      -> Options.Terms
       -> AppNode
-    termsRow offerAsset askAsset premiumAsset redeemer (idx, terms) = do
+    termsRow offerAsset askAsset premiumAsset redeemer targetIdx terms = do
       let purchasedIdx = case redeemer of
             Options.PurchaseContract i -> Just i
             _ -> Nothing
@@ -524,7 +525,7 @@ optionsInputs AppModel{..} = do
             [ bgColor customGray4
             , padding 2
             , radius 3
-            , border 1 $ if purchasedIdx == Just idx then customBlue else customGray1
+            , border 1 $ if purchasedIdx == Just targetIdx then customBlue else customGray1
             ]
 
     proposalRow :: TxOutRef -> Options.ProposalDatum -> Options.OptionsRedeemer -> AppNode
@@ -592,8 +593,11 @@ optionsInputs AppModel{..} = do
         , spacer_ [width 2]
         , hstack
             [ spacer
-            , vstack $ map (termsRow offerAmount askNativeAsset premiumNativeAsset redeemer) $
-                zip [0..] possibleTerms
+            , vstack $ 
+                zipWith 
+                  (termsRow offerAmount askNativeAsset premiumNativeAsset redeemer)
+                  [0..] 
+                  possibleTerms
             ]
         ] `styleBasic` 
             [ padding 10
@@ -1036,7 +1040,7 @@ optionsActionCount optionsAddress Transaction{plutusContracts,outputs} =
   where
     checkSpend :: (Int,Int,Int,Int) -> TransactionPlutusContract -> (Int,Int,Int,Int)
     checkSpend acc@(closed,addressUpdate,executed,purchased) TransactionPlutusContract{..} =
-      if not (Just optionsAddress == paymentAddress) then acc else
+      if Just optionsAddress /= paymentAddress then acc else
         case decodeData @Options.OptionsRedeemer redeemer of
           Nothing -> acc
           Just r -> case r of

@@ -362,8 +362,8 @@ handleHomeEvent model@AppModel{..} evt = case evt of
             if hasOnlyOneActiveBeaconAction $ newTxModel ^. #loanBuilderModel then
               [ Model $ model & #txBuilderModel .~ newTxModel
               -- Find the key input and add it to the builder.
-              , Event $ HomeEvent $ AddKeyInput $ 
-                  ( Just $ "Also added UTxO with Key NFT to builder."
+              , Event $ HomeEvent $ AddKeyInput
+                  ( Just "Also added UTxO with Key NFT to builder."
                   , mkNativeAsset Loans.activeBeaconCurrencySymbol $ loanId ^. #unLoanId
                   )
               ]
@@ -398,8 +398,8 @@ handleHomeEvent model@AppModel{..} evt = case evt of
             if hasOnlyOneActiveBeaconAction $ newTxModel ^. #loanBuilderModel then
               [ Model $ model & #txBuilderModel .~ newTxModel
               -- Find the input and add it to the builder.
-              , Event $ HomeEvent $ AddKeyInput $ 
-                  ( Just $ "Also added UTxO with Key NFT to builder."
+              , Event $ HomeEvent $ AddKeyInput
+                  ( Just "Also added UTxO with Key NFT to builder."
                   , mkNativeAsset Loans.activeBeaconCurrencySymbol $ loanId ^. #unLoanId
                   )
               ]
@@ -496,8 +496,8 @@ handleHomeEvent model@AppModel{..} evt = case evt of
             if hasOnlyOneOptionsActiveBeaconAction $ newTxModel ^. #optionsBuilderModel then
               [ Model $ model & #txBuilderModel .~ newTxModel
               -- Find the input and add it to the builder.
-              , Event $ HomeEvent $ AddKeyInput $ 
-                  ( Just $ "Also added UTxO with Key NFT to builder."
+              , Event $ HomeEvent $ AddKeyInput
+                  ( Just "Also added UTxO with Key NFT to builder."
                   , mkNativeAsset Options.activeBeaconCurrencySymbol $ contractId ^. #unContractId
                   )
               ]
@@ -521,8 +521,8 @@ handleHomeEvent model@AppModel{..} evt = case evt of
             if hasOnlyOneOptionsActiveBeaconAction $ newTxModel ^. #optionsBuilderModel then
               [ Model $ model & #txBuilderModel .~ newTxModel
               -- Find the input and add it to the builder.
-              , Event $ HomeEvent $ AddKeyInput $ 
-                  ( Just $ "Also added UTxO with Key NFT to builder."
+              , Event $ HomeEvent $ AddKeyInput
+                  ( Just "Also added UTxO with Key NFT to builder."
                   , mkNativeAsset Options.activeBeaconCurrencySymbol $ contractId ^. #unContractId
                   )
               ]
