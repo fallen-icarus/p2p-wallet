@@ -16,6 +16,7 @@ compositions.
 - [Abstract](#abstract)
 - [Screenshots](#screenshots)
 - [Motivation](#motivation)
+- [The P2P-DeFi Wallet](#the-p2p-defi-wallet)
 - [FAQ](#faq)
 - [Installing](#installing)
 
@@ -220,10 +221,11 @@ composing actions within transactions is fundamentally undermining efforts to bu
 The p2p-wallet is the first wallet frontend that actually enables users to take full advantage of
 what Cardano has to offer:
 
+- **Cross-Platform** - the desktop app works on Windows, macOS, and Linux.
 - **Fully Permissionless DeFi** - no one can stop you from participating in DeFi. The p2p-wallet
 uses the p2p-DeFi protocols which means you retain full custody, delegation control, and voting
-control at all times. There is also no multisig that can be used to freeze or make changes to any
-part of the DeFi stack.
+control of your assets at all times. There is also no multisig that can be used to freeze or make
+changes to any part of the DeFi stack.
 - **Arbitrarily Complex Transactions** - you can close a swap and use the proceeds to pay a friend
 *in the same transaction*. You can create a swap, ask for a loan, execute an options contract, and
 change your delegation preferences *in the same transaction*. If you can think of the composition,
@@ -237,7 +239,7 @@ Was your options contract executed? The wallet will tell you.
 ### If composing actions in a single transaction decreases costs, how can it also increase the total transaction fees collected in an epoch?
 
 While it is true that being able to avoid paying multiples of the 0.155381 ADA will reduce fees paid
-by an individual Cardano users, its impact stops there. The increased economic opportunities, on the
+by an individual Cardano users, its impact stops there. The better economic opportunities, on the
 other hand, has a network effect - more users/businesses attract more users/businesses. So while the
 transaction fees collected by any individual user decreases, the exponential increase in total
 number of users means the total transaction fees collected actually **grows**.
