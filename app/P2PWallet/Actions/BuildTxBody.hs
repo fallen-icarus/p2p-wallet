@@ -201,11 +201,11 @@ buildTxBody network tx = do
     -- The budgets need to be added again.
     updateBudgets budgets $ convertToTxBody finalizedTx
 
-  trace "Re-enable CBOR transformation for hardware wallet support" $ pure ()
-  -- -- Convert the tx.body file to the proper CBOR format for using the hardware wallet.
-  -- -- The old tx.body file will be over-written. This is done even if no hardware wallets need to be
-  -- -- used.
-  -- runBuildCmd_ builderLogFile $ transformTxBodyCmd txBodyFile transformedTxFile
+  trace "After cardano-hw-cli Issues #177 and #186 are fixed, this should be enabled for all transactions" $ 
+    when (finalizedTx ^. #txType /= WatchedTx) $
+      -- Convert the tx.body file to the proper CBOR format for using hardware wallets.
+      -- The old tx.body file will be over-written. 
+      runBuildCmd_ builderLogFile $ transformTxBodyCmd txBodyFile transformedTxFile
 
   -- Return the updated `TxBuilderModel`. Mark the model as built; this must be done last in case
   -- there is an error with any of the previous steps. If the tx was marked as built too soon, it

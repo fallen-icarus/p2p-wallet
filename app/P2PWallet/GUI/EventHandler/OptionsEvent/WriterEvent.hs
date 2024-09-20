@@ -394,9 +394,7 @@ processNewExpiredClose u@ExpiredOptionsClose{utxoRef} model@TxBuilderModel{optio
 
   -- Verify that the new utxo is not already being spent.
   maybeToLeft () $ "This active UTxO is already being spent." <$
-    find (== utxoRef) (concat
-      [ map (view $ _2 % #utxoRef) expiredCloses
-      ])
+    find (== utxoRef) (map (view $ _2 % #utxoRef) expiredCloses)
 
   -- Get the input's new index.
   let newIdx = length expiredCloses

@@ -115,7 +115,7 @@ parseStakeAddress :: Network -> Text -> Either Text StakeAddress
 parseStakeAddress targetNetwork rawAddr = do
     Address.AddressInfo{..} <- inspectBech32Address rawAddr
     
-    trace "Still need to remove workaround" $ pure ()
+    trace "Remove workaround after cardano-addresses' bug is fixed (PR #268 has fix)" $ pure ()
     -- -- The address should not have any payment credentials.
     -- when (isJust $ infoScriptHash <|> infoSpendingKeyHash) $ 
     --   Left "Address is not a stake address."

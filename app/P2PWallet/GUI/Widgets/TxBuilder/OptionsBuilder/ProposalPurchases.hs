@@ -25,9 +25,10 @@ proposalPurchasesList reverseTickerMap timeZone = map utxoRow
       -> NativeAsset 
       -> NativeAsset 
       -> NativeAsset 
-      -> (Integer,Options.Terms)
+      -> Integer
+      -> Options.Terms
       -> AppNode
-    termsRow targetPurchase offerAsset askAsset premiumAsset (idx,terms) = do
+    termsRow targetPurchase offerAsset askAsset premiumAsset targetIdx terms = do
       let (_, ProposalPurchase{desiredTerms}) = targetPurchase
           Options.Terms{premium,expiration,strikePrice} = terms
           formattedPrice = 
@@ -45,7 +46,7 @@ proposalPurchasesList reverseTickerMap timeZone = map utxoRow
                   $ EditSelectedProposalPurchase 
                   $ StartProcess 
                   $ Just
-                  $ targetPurchase & _2 % #desiredTerms .~ idx
+                  $ targetPurchase & _2 % #desiredTerms .~ targetIdx
           termsWidget = hstack
             [ spacer_ [width 2]
             , label ("Premium: " <> prettyPremium)
@@ -61,10 +62,11 @@ proposalPurchasesList reverseTickerMap timeZone = map utxoRow
                 [ bgColor customGray4
                 , padding 2
                 , radius 3
-                , border 1 $ if desiredTerms == idx then customBlue else customGray1
+                , border 1 $ if desiredTerms == targetIdx then customBlue else customGray1
                 ]
-              `styleHover` [border 1 customBlue, configIf (desiredTerms /= idx) $ cursorIcon CursorHand]
-      if desiredTerms == idx then termsWidget else
+              `styleHover` 
+                [border 1 customBlue, configIf (desiredTerms /= targetIdx) $ cursorIcon CursorHand]
+      if desiredTerms == targetIdx then termsWidget else
         tooltip_ "Change Selected Terms" [tooltipDelay 0] $ 
           box_ [onClick editEvt] termsWidget
 
@@ -138,8 +140,10 @@ proposalPurchasesList reverseTickerMap timeZone = map utxoRow
             , hstack
                 [ spacer
                 , vstack $ 
-                    map (termsRow s offerAmount askNativeAsset premiumNativeAsset) $ 
-                      zip [0..] possibleTerms
+                    zipWith 
+                      (termsRow s offerAmount askNativeAsset premiumNativeAsset)
+                      [0..] 
+                      possibleTerms
                 ]
             ] `styleBasic` 
                 [ padding 10

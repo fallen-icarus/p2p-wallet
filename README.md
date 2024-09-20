@@ -13,11 +13,23 @@ compositions.
 
 ---
 ## Table of Contents
-- [Screenshots](#screenshots)
 - [Abstract](#abstract)
+- [Screenshots](#screenshots)
 - [Motivation](#motivation)
 - [FAQ](#faq)
 - [Installing](#installing)
+
+## Abstract
+
+The P2P-DeFi wallet is the first of its kind wallet that enables users to build up arbitrarily
+complex transactions. It functions like an online marketplace's shopping cart where uses add actions
+to their cart until they are ready to "checkout". By enabling users to compose actions together into
+a single transaction, users have access to significantly better economic opportunities (e.g.,
+composing a DEX with an options contract execution) while saving 10x more money in the long run. It
+has builtin support for a full DeFi stack: DEX, lending/borrowing, options trading, and aftermarket.
+Furthermore, since it uses the p2p-DeFi protocols, it is the first fully-decentralized and
+censorship-resistant DeFi experience. There is no multisig or central point of failure that can be
+used to stop any part of it.
 
 ## Screenshots
 
@@ -66,18 +78,6 @@ compositions.
 ### Personal UTxOs
 
 ![Alt text](/assets/screenshots/utxo_picker.png?raw=true)
-
-## Abstract
-
-The P2P-DeFi wallet is the first of its kind wallet that enables users to build up arbitrarily
-complex transactions. It functions like an online marketplace's shopping cart where uses add actions
-to their cart until they are ready to "checkout". By enabling users to compose actions together into
-a single transaction, users have access to significantly better economic opportunities (e.g.,
-composing a DEX with an options contract execution) while saving 10x more money in the long run. It
-has builtin support for a full DeFi stack: DEX, lending/borrowing, options trading, and aftermarket.
-Furthermore, since it uses the p2p-DeFi protocols, it is the first fully-decentralized and
-censorship-resistant DeFi experience. There is no multisig or central point of failure that can be
-used to stop any part of it.
 
 ## Motivation
 
@@ -260,16 +260,19 @@ GLEW.
 > not been able to verify the wallet on anything but Linux.
 
 > [!IMPORTANT] 
-> This is not a software wallet! I do not know how to safely encrypt/decrypt hot keys, and so I can't
-> add support for that. The wallet is fully capable of signing with hardware wallets directly, or
-> exporting/importing the built transactions for signing manually.
+> This is not a software wallet! I do not know how to safely handle spending passwords for hot keys,
+> so I cannot add support for that. The wallet is fully capable of signing with hardware wallets
+> directly, or exporting/importing the built transactions for signing manually.
 
 > [!WARNING] 
-> There is currently a bug in cardano-hw-cli that prevents hardware wallets from being able to sign
-> DeFi transactions. You can find the official bug report
-> [here](https://github.com/vacuumlabs/cardano-hw-interop-lib/issues/25) and the CIP discussion
-> [here](https://github.com/cardano-foundation/CIPs/issues/871). Unfortunately, there is no timeline
-> for a fix. Perhaps this wallet will create enough pressure to get it fixed ASAP.
+> There are currently two bugs in cardano-hw-cli that prevent hardware wallets from being able to
+> sign transactions ([bug1](https://github.com/vacuumlabs/cardano-hw-cli/issues/186), and
+> [bug2](https://github.com/vacuumlabs/cardano-hw-cli/issues/177)). If you ever come across a 
+> `Tx serialization mismatch` error or a `ScriptIntegrity` error when trying to use your hardware
+> wallet to sign, you have encountered these bugs. Unfortunately, there is no timeline for a fix.
+> Perhaps this wallet will create enough pressure to get it fixed ASAP. Luckily, when a fix is
+> implemented, you can simply swap out the version of cardano-hw-cli on you system and the
+> p2p-wallet should start working with harware wallets without having to re-compile it.
 
 ### Prerequisites
 

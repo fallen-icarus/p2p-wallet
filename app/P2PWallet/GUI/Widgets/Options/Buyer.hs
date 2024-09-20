@@ -191,18 +191,19 @@ allProposalsWidget AppModel{optionsModel=OptionsModel{..},reverseTickerMap,confi
 
     sample :: [OptionsUTxO]
     sample = orderer (buyerModel ^. #proposalsFilterModel % #sortingDirection) 
-           $ sorter targetOffer (buyerModel ^. #proposalsFilterModel) 
-           $ allProposals
+           $ sorter targetOffer (buyerModel ^. #proposalsFilterModel) allProposals
 
     termsRow 
       :: OptionsUTxO
       -> NativeAsset 
       -> NativeAsset 
       -> NativeAsset 
-      -> (Integer,Options.Terms)
+      -> Integer
+      -> Options.Terms
       -> AppNode
-    termsRow u offerAsset askAsset premiumAsset (idx,Options.Terms{premium, strikePrice, expiration}) = do
-      let formattedPrice = 
+    termsRow u offerAsset askAsset premiumAsset targetIdx terms = do
+      let Options.Terms{premium, strikePrice, expiration} = terms
+          formattedPrice = 
             showPriceFormatted reverseTickerMap askAsset offerAsset $ toRational strikePrice
           prettyPrice = mconcat
             [ formattedPrice
@@ -217,7 +218,7 @@ allProposalsWidget AppModel{optionsModel=OptionsModel{..},reverseTickerMap,confi
                       $ OptionsBuyerEvent 
                       $ PurchaseOptionsProposal 
                       $ StartProcess 
-                      $ Just (idx,u)
+                      $ Just (targetIdx,u)
           termsWidget = hstack
             [ spacer_ [width 2]
             , label ("Premium: " <> prettyPremium)
@@ -299,8 +300,11 @@ allProposalsWidget AppModel{optionsModel=OptionsModel{..},reverseTickerMap,confi
         , spacer_ [width 2]
         , hstack
             [ spacer
-            , vstack $ map (termsRow u offerAmount askNativeAsset premiumNativeAsset) $ 
-                zip [0..] possibleTerms
+            , vstack $ 
+                zipWith 
+                  (termsRow u offerAmount askNativeAsset premiumNativeAsset)
+                  [0..] 
+                  possibleTerms
             ]
         ] `styleBasic` 
             [ padding 10
