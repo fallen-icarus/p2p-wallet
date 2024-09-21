@@ -60,4 +60,4 @@ source-repository-package
     type: git
     location: https://github.com/fallen-icarus/cardano-options
     -- v1.0.0.0rc
-    tag: bd9092d6674c15ba602f2f0b02620f9477e34d52
+    tag: b69127fd6db0bc48d49aa1f7ab278fc4095b68a8
