@@ -4,6 +4,7 @@ module P2PWallet.Actions.SyncWallets
   ) where
 
 import UnliftIO.Async (pooledMapConcurrently, concurrently)
+import Control.Concurrent (threadDelay)
 
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.Query.Koios
@@ -22,6 +23,10 @@ syncWallets databaseFile network ws@Wallets{..} = do
     (updatedPaymentWallets,(updatedStakeWallets,networkParameters)) <- 
       concurrently fetchPaymentWallets $ concurrently fetchStakeWallets fetchParameters
       
+    -- Wait 5 seconds so as to not exceed Koios' burst limit of 100 request within 10 seconds.
+    -- Each batch of requests goes to a separate instance so this should be enough.
+    threadDelay 5_000_000
+
     -- These are queried separately to minimize the chance of exceeding Koios' burst limit.
     (updatedDexWallets, updatedLoanWallets) <- concurrently fetchDexWallets fetchLoanWallets
 

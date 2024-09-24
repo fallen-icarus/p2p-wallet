@@ -267,14 +267,14 @@ GLEW.
 > directly, or exporting/importing the built transactions for signing manually.
 
 > [!WARNING] 
-> There are currently two bugs in cardano-hw-cli that prevent hardware wallets from being able to
-> sign transactions ([bug1](https://github.com/vacuumlabs/cardano-hw-cli/issues/186), and
-> [bug2](https://github.com/vacuumlabs/cardano-hw-cli/issues/177)). If you ever come across a 
-> `Tx serialization mismatch` error or a `ScriptIntegrity` error when trying to use your hardware
-> wallet to sign, you have encountered these bugs. Unfortunately, there is no timeline for a fix.
-> Perhaps this wallet will create enough pressure to get it fixed ASAP. Luckily, when a fix is
-> implemented, you can simply swap out the version of cardano-hw-cli on you system and the
-> p2p-wallet should start working with harware wallets without having to re-compile it.
+> There is currently a bug in cardano-hw-cli that prevents hardware wallets from being able to sign
+> certain DeFi transactions ([bug](https://github.com/vacuumlabs/cardano-hw-cli/issues/177)).
+> cardano-swaps is not impacted by this bug! However, the other p2p-DeFi protocols are impacted. If
+> you ever come across a `ScriptIntegrity` error when trying to use your hardware wallet to sign,
+> you have encountered this bug. Unfortunately, there is no timeline for a fix. Perhaps this wallet
+> will create enough pressure to get it fixed ASAP. Luckily, when a fix is implemented, you can
+> simply swap out the version of cardano-hw-cli on you system and the p2p-wallet should be able to
+> sign these DeFi transactions without having to re-compile it.
 
 ### Prerequisites
 

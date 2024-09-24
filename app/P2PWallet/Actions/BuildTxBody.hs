@@ -201,7 +201,7 @@ buildTxBody network tx = do
     -- The budgets need to be added again.
     updateBudgets budgets $ convertToTxBody finalizedTx
 
-  trace "After cardano-hw-cli Issues #177 and #186 are fixed, this should be enabled for all transactions" $ 
+  trace "After cardano-hw-cli Issue #177 is fixed, this should be enabled for all transactions" $ 
     when (finalizedTx ^. #txType /= WatchedTx) $
       -- Convert the tx.body file to the proper CBOR format for using hardware wallets.
       -- The old tx.body file will be over-written. 
