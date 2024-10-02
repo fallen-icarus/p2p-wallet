@@ -4,259 +4,437 @@ module P2PWallet.GUI.EventHandler.TxBuilderEvent
   ) where
 
 import Monomer
-import Data.Maybe (fromJust)
+import System.Directory qualified as Dir
 
+import P2PWallet.Actions.AssembleWitnesses
+import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.BuildTxBody
+import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.ExportTxBody
+import P2PWallet.Actions.WitnessTxBody
 import P2PWallet.Actions.Utils
-import P2PWallet.Data.App
-import P2PWallet.Data.Core
-import P2PWallet.Data.Files
-import P2PWallet.Data.Lens
+import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Internal
+import P2PWallet.GUI.EventHandler.TxBuilderEvent.LoanBuilderEvent
+import P2PWallet.GUI.EventHandler.TxBuilderEvent.OptionsBuilderEvent
+import P2PWallet.GUI.EventHandler.TxBuilderEvent.SwapBuilderEvent
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
-handleTxBuilderEvent
-  :: AppModel
-  -> TxBuilderEvent
-  -> [AppEventResponse AppModel AppEvent]
-handleTxBuilderEvent model@AppModel{_config=Config{_network}, _txBuilderModel} evt = case evt of
+handleTxBuilderEvent :: AppModel -> TxBuilderEvent -> [AppEventResponse AppModel AppEvent]
+handleTxBuilderEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
-  -- Changing Scenes
+  -- Reset the Builder
   -----------------------------------------------
-  ChangeBuilderScene newScene -> 
-    -- Whenever the builder scene is changed, reset the `new` fields to clear the widgets from
-    -- the last usages.
-    [ Model $ model & txBuilderModel . scene .~ newScene 
-                    & txBuilderModel . newOutput .~ def
-                    & txBuilderModel . newInput .~ def 
+  ResetBuilder -> 
+    [ Model $ model & #txBuilderModel .~ def ]
+
+  -----------------------------------------------
+  -- Run swap event
+  -----------------------------------------------
+  SwapBuilderEvent swapEvent -> handleSwapBuilderEvent model swapEvent
+
+  -----------------------------------------------
+  -- Run loan event
+  -----------------------------------------------
+  LoanBuilderEvent loanEvent -> handleLoanBuilderEvent model loanEvent
+
+  -----------------------------------------------
+  -- Run options event
+  -----------------------------------------------
+  OptionsBuilderEvent optionsEvent -> handleOptionsBuilderEvent model optionsEvent
+
+  -----------------------------------------------
+  -- Open the Add Popup
+  -----------------------------------------------
+  ShowTxAddPopup -> 
+    [ Model $ model & #txBuilderModel % #showAddPopup .~ True ]
+
+  -----------------------------------------------
+  -- Open the Change Popup
+  -----------------------------------------------
+  ShowTxChangePopup -> 
+    [ Model $ model & #txBuilderModel % #showChangePopup .~ True ]
+
+  -----------------------------------------------
+  -- Open the Collateral Popup
+  -----------------------------------------------
+  ShowTxCollateralPopup -> 
+    [ Model $ model & #txBuilderModel % #showCollateralPopup .~ True ]
+
+  -----------------------------------------------
+  -- Remove User Input from Builder
+  -----------------------------------------------
+  RemoveSelectedUserInput idx ->
+    [ Model $ model 
+        & #txBuilderModel % #userInputs %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
     ]
 
   -----------------------------------------------
-  -- Building Transactions
+  -- Remove User Output from Builder
   -----------------------------------------------
-  ResetBuilder ->
-    -- Reset all fields in the `txBuilderModel`.
-    [ Model $ model & txBuilderModel .~ def ]
-  InsertNewOutput ->
-    -- Indices are used to keep track of which output is being edited. If the index is 0, then
-    -- this is a new output. Otherwise, it is editing the output with the corresponding index.
-    case processNewOutput _network _txBuilderModel of
-      Left err -> 
-        -- If there was an error processing the new output, display the error to the user. Don't
-        -- change the scene to make it easy for the user to quickly retry.
-        [ Model $ model & alertMessage .~ Just err ]
-      Right newBalancedTx ->
-        -- If processing was successfull, close the `addOutput` widget and return the user
-        -- to the transaction summary page. Also reset the `newOutput` field so that it is
-        -- cleared for next time. Finally, disable the `isBuilt` flag since the new changes
-        -- invalidate the old build.
-        [ Model $ flip (set txBuilderModel) model $
-            newBalancedTx & isBuilt .~ False
-                          & scene .~ BuilderSummary
-                          & newOutput .~ def
-        ]
-  EditOutput index ->
-    -- Edit the output with the specified index. Editing is done by setting `newOutput` to
-    -- the specified index and opening the `addOutput` widget. Once editing is done,
-    -- `InsertNewOutput` will be called.
-    let target = fromJust $ find ((==index) . fst) $ _txBuilderModel ^. outputs
-    in [ Model $ model & txBuilderModel . newOutput .~ fmap fromVerifiedOutput target
-                       & txBuilderModel . scene .~ BuilderAddNewOutput 
-       ]
-  DeleteOutput index ->
-    -- Delete the output with the specified index. Re-index the remaining outputs (preserving
-    -- ordering). The new `txBuilderModel` will need to be rebalanced with the fee reset to 0. 
-    -- The `isBuilt` flag must be reset to false since the change invalidates the previous build. 
-    let newOutputs = reIndex $ filter ((/= index) . fst) $ _txBuilderModel ^. outputs
-        newBalancedTx = 
-          balanceTx $ 
-            _txBuilderModel & outputs .~ newOutputs
-                            & txFee .~ 0
-    in [ Model $ flip (set txBuilderModel) model $
-          newBalancedTx & isBuilt .~ False
-       ]
-  InsertNewInput ->
-    -- Indices are used to keep track of which input is being edited. If the index is 0, then
-    -- this is a new input. Otherwise, it is editing the input with the corresponding index.
-    case processNewInput (model ^. wallets) _txBuilderModel of
-      Left err -> 
-        -- If there was an error processing the new input, display the error to the user. Don't
-        -- change the scene to make it easy for the user to quickly retry.
-        [ Model $ model & alertMessage .~ Just err ]
-      Right newBalancedTx ->
-        -- If processing was successfull, close the `addInput` widget and return the user
-        -- to the transaction summary page. Also reset the `newInput` field so that it is
-        -- cleared for next time. Finally, disable the `isBuilt` flag since the new changes
-        -- invalidate the old build.
-        [ Model $ flip (set txBuilderModel) model $
-            newBalancedTx & isBuilt .~ False
-                          & scene .~ BuilderSummary
-                          & newInput .~ def
-        ]
-  EditInput index ->
-    -- Edit the input with the specified index. Editing is done by setting `newInput` to
-    -- the specified index and opening the `addInput` widget. Once editing is done,
-    -- `InsertNewInput` will be called.
-    let target = fromJust $ find ((==index) . fst) $ _txBuilderModel ^. inputs
-    in [ Model $ model & txBuilderModel . newInput .~ fmap fromVerifiedInput target
-                       & txBuilderModel . scene .~ BuilderAddNewInput
-       ]
-  DeleteInput index ->
-    -- Delete the input with the specified index. Re-index the remaining inputs (perserving
-    -- ordering). The new `txBuilderModel` will need to be rebalanced with the fee 
-    -- reset to 0. The `isBuilt` flag must be reset to false since the change invalidates the 
-    -- previous build. 
-    let newInputs = reIndex $ filter ((/= index) . fst) $ _txBuilderModel ^. inputs
-        newBalancedTx = 
-          balanceTx $ 
-            _txBuilderModel & inputs .~ newInputs
-                            & txFee .~ 0
-    in [ Model $ flip (set txBuilderModel) model $
-          newBalancedTx & isBuilt .~ False
-       ]
-  InsertNewChangeOutput ->
-    -- Check if the new change output is valid.
-    case processNewChangeOutput _network _txBuilderModel of
-      Left err -> 
-        -- If there was an error processing the new change output, display the error to the user. 
-        -- Don't change the scene to make it easy for the user to quickly retry.
-        [ Model $ model & alertMessage .~ Just err ]
-      Right newBalancedTx ->
-        -- If processing was successfull, close the `addChangeOutput` widget and return the user
-        -- to the transaction summary page. Also reset the `newChangeOutput` field so that it is
-        -- cleared for next time. Finally, disable the `isBuilt` flag since the new changes
-        -- invalidate the old build.
-        [ Model $ flip (set txBuilderModel) model $
-            newBalancedTx & isBuilt .~ False
-                          & scene .~ BuilderSummary
-                          & newChangeOutput .~ def
-        ]
-  EditChangeOutput ->
-    -- Edit the current change output. `InsertNewChangeOutput` will be called after editing.
-    [ Model $ model & txBuilderModel . scene .~ BuilderAddChangeOutput
-                    & txBuilderModel . newChangeOutput .~ 
-                        (fromVerifiedChangeOutput $ _txBuilderModel ^. changeOutput)
-    ]
-  InsertNewCertificate ->
-    -- Check if the new certificate is valid.
-    case processNewCertificate _network _txBuilderModel of
-      Left err -> 
-        -- If there was an error processing the new certificate, display the error to the user. 
-        -- Don't change the scene to make it easy for the user to quickly retry.
-        [ Model $ model & alertMessage .~ Just err ]
-      Right newBalancedTx ->
-        -- If processing was successfull, close the `addCertificate` widget and return the user
-        -- to the transaction summary page. Also reset the `newCertificate` field so that it is
-        -- cleared for next time. Finally, disable the `isBuilt` flag since the new changes
-        -- invalidate the old build.
-        [ Model $ flip (set txBuilderModel) model $
-            newBalancedTx & isBuilt .~ False
-                          & scene .~ BuilderSummary
-                          & newCertificate .~ def
-        ]
-  EditCertificate index ->
-    -- Edit the certificate with the specified index. Editing is done by setting `newCertificate` to
-    -- the specified index and opening the `addCertificate` widget. Once editing is done,
-    -- `InsertNewCertificate` will be called.
-    let target = fromJust $ find ((==index) . fst) $ _txBuilderModel ^. certificates
-    in [ Model $ model & txBuilderModel . newCertificate .~ fmap fromVerifiedCertificate target
-                       & txBuilderModel . scene .~ BuilderAddNewCertificate 
-       ]
-  DeleteCertificate index ->
-    -- Delete the certificate with the specified index. Re-index the remaining certificates 
-    -- (preserving ordering). The new `txBuilderModel` will need to be rebalanced with the fee 
-    -- reset to 0. The `isBuilt` flag must be reset to false since the change invalidates the 
-    -- previous build. 
-    let newCerts = reIndex $ filter ((/= index) . fst) $ _txBuilderModel ^. certificates
-        newBalancedTx = 
-          balanceTx $ 
-            _txBuilderModel & certificates .~ newCerts
-                            & txFee .~ 0
-    in [ Model $ flip (set txBuilderModel) model $
-          newBalancedTx & isBuilt .~ False
-       ]
-  InsertNewWithdrawal ->
-    -- Check if the new withdrawal is valid.
-    case processNewWithdrawal _network _txBuilderModel of
-      Left err -> 
-        -- If there was an error processing the new withdrawal, display the error to the user. 
-        -- Don't change the scene to make it easy for the user to quickly retry.
-        [ Model $ model & alertMessage .~ Just err ]
-      Right newBalancedTx ->
-        -- If processing was successfull, close the `addWithdrawal` widget and return the user
-        -- to the transaction summary page. Also reset the `nwWithdrawal` field so that it is
-        -- cleared for next time. Finally, disable the `isBuilt` flag since the new changes
-        -- invalidate the old build.
-        [ Model $ flip (set txBuilderModel) model $
-            newBalancedTx & isBuilt .~ False
-                          & scene .~ BuilderSummary
-                          & newWithdrawal .~ def
-        ]
-  EditWithdrawal index ->
-    -- Edit the withdrawal with the specified index. Editing is done by setting `newWithdrawal` to
-    -- the specified index and opening the `addWithdrawal` widget. Once editing is done,
-    -- `InsertNewWithdrawal` will be called.
-    let target = fromJust $ find ((==index) . fst) $ _txBuilderModel ^. withdrawals
-    in [ Model $ model & txBuilderModel . newWithdrawal .~ fmap fromVerifiedWithdrawal target
-                       & txBuilderModel . scene .~ BuilderAddNewWithdrawal 
-       ]
-  DeleteWithdrawal index ->
-    -- Delete the withdrawal with the specified index. Re-index the remaining withdrawals 
-    -- (preserving ordering). The new `txBuilderModel` will need to be rebalanced with the fee 
-    -- reset to 0. The `isBuilt` flag must be reset to false since the change invalidates the 
-    -- previous build. 
-    let newWtdrs = reIndex $ filter ((/= index) . fst) $ _txBuilderModel ^. withdrawals
-        newBalancedTx = 
-          balanceTx $ 
-            _txBuilderModel & withdrawals .~ newWtdrs
-                            & txFee .~ 0
-    in [ Model $ flip (set txBuilderModel) model $
-          newBalancedTx & isBuilt .~ False
-       ]
-  BuildTx ->
-    -- Build the transaction using the current `txBuilderModel`. It will calculate the fee
-    -- and will return an updated `txBuilderModel`. The resulting tx.body file will be
-    -- located in the tmp directory. If an error is throw, it will be displayed in an alert
-    -- message. Otherwise, `BuildResult` will be called.
-    [ Model $ model & building .~ True 
-    , Task $ 
-        runActionOrAlert
-          (TxBuilderEvent . BuildResult)
-          (buildTxBody _network _txBuilderModel)
-    ]
-  BuildResult newTx -> 
-    -- Replace the old `txBuilderModel` with the new one that has the proper fee and disable
-    -- the `building` flag. An `alertMessage` is used to tell the user the estimated transaction
-    -- fee. Finally, now that is built, the `isBuilt` flag can be set to True to allow acting
-    -- on the tx.body file currently in the tmp directory.
-    [ Model $ 
-        model & txBuilderModel .~ newTx 
-              & building .~ False
-              & txBuilderModel . isBuilt .~ True
-              & alertMessage .~ Just 
-                  (fromString $ printf "Estimated Fee: %D ADA" (toADA $ newTx ^. txFee))
+  RemoveSelectedUserOutput idx ->
+    [ Model $ model 
+        & #txBuilderModel % #userOutputs %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
     ]
 
   -----------------------------------------------
-  -- Exporting the transaction.
+  -- Remove User Certificate from Builder
   -----------------------------------------------
-  ExportTxBody ->
-    -- Exporting the transaction can only be done if `isBuilt` is set to True since that means
-    -- the tx.body file in the tmp directory is up-to-date. If there is an error, it will be shown
-    -- in the `alertMessage`. If it is successfull, the success message will be shown in the 
-    -- `alertMessage` alongside the absolute path to the exported file. It is currently hardcoded
-    -- to be exported to the user's $HOME directory.
-    [ Task $
-        if not $ _txBuilderModel ^. isBuilt
-        then return $ Alert "You must first build the transaction."
-        else runActionOrAlert (TxBuilderEvent . ExportTxBodyResult) $ 
-               exportTxBody $ TxBodyFile $ toString $ model ^. extraTextField
+  RemoveSelectedUserCertificate idx ->
+    [ Model $ model 
+        & #txBuilderModel % #userCertificates %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
     ]
-  ExportTxBodyResult successMsg ->
-    -- Close the export widget, return to the summary page, and display a success message.
-    -- Reset the extraTextField for next time.
-    [ Model $ model & txBuilderModel . scene .~ BuilderSummary
-                    & extraTextField .~ ""
-    , Task $
-        return $ Alert successMsg
+
+  -----------------------------------------------
+  -- Remove User Withdrawal from Builder
+  -----------------------------------------------
+  RemoveSelectedUserWithdrawal idx ->
+    [ Model $ model 
+        & #txBuilderModel % #userWithdrawals %~ removeAction idx
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
     ]
+
+  -----------------------------------------------
+  -- Remove Test Mint from Builder
+  -----------------------------------------------
+  RemoveTestMint ->
+    [ Model $ model 
+        & #txBuilderModel % #testMint .~ Nothing
+        & #txBuilderModel %~ balanceTx
+    , Task $ return $ Alert "Successfully removed from builder!"
+    ]
+
+  -----------------------------------------------
+  -- Increment the number of copies of that User Output
+  -----------------------------------------------
+  ChangeUserOutputCount idx newCount ->
+    [ Model $ model 
+        & #txBuilderModel % #userOutputs % ix idx % _2 % #count .~ newCount
+        & #txBuilderModel %~ balanceTx
+    ]
+
+  -----------------------------------------------
+  -- Edit the User Output
+  -----------------------------------------------
+  EditSelectedUserOutput modal -> case modal of
+    StartAdding mTarget ->
+      [ Model $ model 
+          & #txBuilderModel % #targetUserOutput .~ 
+              (mTarget & _Just % _2 %~ toNewUserOutput reverseTickerMap)
+      ]
+    CancelAdding ->
+      [ Model $ model & #txBuilderModel % #targetUserOutput .~ Nothing ]
+    ConfirmAdding -> 
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (TxBuilderEvent . EditSelectedUserOutput . AddResult) $ do
+          (idx,newOutput) <- fromJustOrAppError "targetUserOutput is Nothing" $ 
+            txBuilderModel ^. #targetUserOutput
+
+          verifiedOutput <- 
+            fromRightOrAppError $ 
+              verifyNewUserOutput (config ^. #network) tickerMap fingerprintMap newOutput
+
+          -- There should only be one output in the `TxBody` for this action.
+          minUTxOValue <-
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
+                verifiedOutput
+
+          when (minUTxOValue > verifiedOutput ^. #lovelace) $
+            throwIO $ AppError $ minUTxOErrorMessage minUTxOValue
+
+          return (idx,verifiedOutput)
+      ]
+    AddResult newInfo@(idx,_) ->
+      [ Model $ model 
+          & #waitingStatus % #addingToBuilder .~ False
+          & #txBuilderModel % #userOutputs % ix idx .~ newInfo
+          & #txBuilderModel % #targetUserOutput .~ Nothing
+          & #txBuilderModel %~ balanceTx
+      ]
+
+  -----------------------------------------------
+  -- Add the new external user output
+  -----------------------------------------------
+  AddNewExternalUserOutput modal -> case modal of
+    StartAdding _ ->
+      [ Model $ model 
+          & #txBuilderModel % #newExternalUserOutput .~ def
+          & #txBuilderModel % #addingExternalUserOutput .~ True
+      ]
+    CancelAdding ->
+      [ Model $ model 
+          & #txBuilderModel % #newExternalUserOutput .~ def 
+          & #txBuilderModel % #addingExternalUserOutput .~ False
+      ]
+    ConfirmAdding -> 
+      [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+      , Task $ runActionOrAlert (TxBuilderEvent . AddNewExternalUserOutput . AddResult) $ do
+          verifiedOutput <- 
+            fromRightOrAppError $ 
+              verifyNewUserOutput 
+                (config ^. #network) 
+                tickerMap
+                fingerprintMap
+                (txBuilderModel ^. #newExternalUserOutput)
+
+          -- There should only be one output in the `TxBody` for this action.
+          minUTxOValue <- 
+            fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+              calculateMinUTxOValue 
+                (config ^. #network) 
+                (txBuilderModel ^? #parameters % _Just % _1) 
+                verifiedOutput
+
+          when (minUTxOValue > verifiedOutput ^. #lovelace) $
+            throwIO $ AppError $ minUTxOErrorMessage minUTxOValue
+
+          return verifiedOutput
+      ]
+    AddResult verifiedOutput ->
+      -- Get the index for the new output.
+      let newIdx = length $ model ^. #txBuilderModel % #userOutputs in
+        [ Model $ model 
+            & #waitingStatus % #addingToBuilder .~ False
+            & #txBuilderModel % #addingExternalUserOutput .~ False
+            & #txBuilderModel % #newExternalUserOutput .~ def 
+            & #txBuilderModel % #userOutputs %~ flip snoc (newIdx,verifiedOutput)
+            & #txBuilderModel %~ balanceTx
+        , Task $ return $ Alert "Successfully added to builder!"
+        ]
+
+  -----------------------------------------------
+  -- Add the new change output
+  -----------------------------------------------
+  AddNewChangeOutput modal -> case modal of
+    StartAdding _ ->
+      [ Model $ model 
+          & #txBuilderModel % #newChangeOutput .~ 
+              -- Populate the fields with the currently set change output.
+              maybe def toNewChangeOutput (txBuilderModel ^. #changeOutput)
+          & #txBuilderModel % #addingChangeOutput .~ True
+      ]
+    CancelAdding ->
+      [ Model $ model 
+          & #txBuilderModel % #newChangeOutput .~ def 
+          & #txBuilderModel % #addingChangeOutput .~ False
+      ]
+    ConfirmAdding -> 
+      [ Task $ runActionOrAlert (TxBuilderEvent . AddNewChangeOutput . AddResult) $ do
+          fromRightOrAppError $
+            verifyNewChangeOutput (config ^. #network) (txBuilderModel ^. #newChangeOutput)
+      ]
+    AddResult verifiedChangeOutput ->
+      [ Model $ model 
+          & #txBuilderModel % #changeOutput ?~ verifiedChangeOutput
+          & #txBuilderModel % #newChangeOutput .~ def
+          & #txBuilderModel % #addingChangeOutput .~ False
+          & #txBuilderModel %~ balanceTx
+      ]
+
+  -----------------------------------------------
+  -- Add the new test mint
+  -----------------------------------------------
+  AddNewTestMint modal -> case modal of
+    StartAdding _ ->
+      -- Set the `newTestMint` field to either the current info if set, or a fresh
+      -- entry.
+      let currentMint = maybe def toNewTestMint $ txBuilderModel ^. #testMint in
+      [ Model $ model 
+          & #txBuilderModel % #newTestMint .~ currentMint
+          & #txBuilderModel % #addingTestMint .~ True
+      ]
+    CancelAdding ->
+      [ Model $ model 
+          & #txBuilderModel % #newTestMint .~ def 
+          & #txBuilderModel % #addingTestMint .~ False
+      ]
+    ConfirmAdding -> 
+      [ Task $ runActionOrAlert (TxBuilderEvent . AddNewTestMint . AddResult) $ do
+          fromRightOrAppError $
+            verifyNewTestMint $ txBuilderModel ^. #newTestMint
+      ]
+    AddResult verifiedTestMint ->
+      [ Model $ model 
+          & #txBuilderModel % #testMint ?~ verifiedTestMint
+          & #txBuilderModel % #newTestMint .~ def
+          & #txBuilderModel % #addingTestMint .~ False
+          & #txBuilderModel %~ balanceTx
+      ]
+
+  -----------------------------------------------
+  -- Convert the user's token name to hexidecimal
+  -----------------------------------------------
+  ConvertExampleTestMintNameToHexidecimal ->
+    [ Model $ model
+        & #txBuilderModel % #newTestMint % #exampleOutput .~
+            toHexidecimal (txBuilderModel ^. #newTestMint % #exampleInput)
+    ]
+
+  -----------------------------------------------
+  -- Building transactions
+  -----------------------------------------------
+  BuildTx modal -> case modal of
+    StartProcess _ ->
+      -- Build the transaction using the current `txBuilderModel`. It will calculate the fee
+      -- and will return an updated `txBuilderModel`. The resulting tx.body file will be
+      -- located in the tmp directory. If an error is throw, it will be displayed in an alert
+      -- message. Otherwise, `BuildResult` will be called. 
+      [ Model $ model & #waitingStatus % #building .~ True 
+      , Task $ runActionOrAlert (TxBuilderEvent . BuildTx . ProcessResults) $
+          buildTxBody (config ^. #network) txBuilderModel
+      ]
+    ProcessResults newTx -> 
+      -- Replace the old `txBuilderModel` with the new one that has the proper fee and disable the
+      -- `building` flag. An `alertMessage` is used to tell the user the estimated transaction fee.
+      -- Finally, now that is built, the `isBuilt` is set to True to allow acting on the tx.body
+      -- file currently in the tmp directory; this was already toggled by `buildTxBody`.
+      [ Model $ model 
+          & #txBuilderModel .~ newTx 
+          & #waitingStatus % #building .~ False
+          & #alertMessage ?~
+              fromString (printf "Estimated Fee: %D ADA" (toAda $ newTx ^. #fee))
+      ]
+
+  -----------------------------------------------
+  -- Witnessing transactions
+  -----------------------------------------------
+  WitnessTx modal -> case modal of
+    StartProcess _ ->
+      if not $ txBuilderModel ^. #isBuilt
+      then [ Task $ return $ Alert "The transaction must first be built." ]
+      else
+        [ Model $ model & #waitingStatus % #waitingOnDevice .~ True 
+        , Task $ runActionOrAlert (TxBuilderEvent . WitnessTx . ProcessResults) $
+            witnessTxBody (config ^. #network) txBuilderModel
+        ]
+    ProcessResults witnessFiles -> 
+      [ Model $ model
+          -- The waitingOnDevice flag is left active. It will be disabled by whatever gets called
+          -- next.
+          & #txBuilderModel % #keyWitnessFiles .~ witnessFiles
+      , Task $ case txBuilderModel ^. #txType of
+          PairedTx -> 
+            -- The witnesses can be assembled and then submitted to the blockchain.
+            return $ TxBuilderEvent $ AssembleWitnesses $ StartProcess Nothing
+          _ ->
+            -- Export the tx.body file so it can be signed externally. The witnesses will also be
+            -- exported.
+            return $ TxBuilderEvent $ ExportTxBody $ StartProcess Nothing
+      ]
+
+  -----------------------------------------------
+  -- Assembling witnesses
+  -----------------------------------------------
+  AssembleWitnesses modal -> case modal of
+    StartProcess _ ->
+      [ Task $ runActionOrAlert (TxBuilderEvent . AssembleWitnesses . ProcessResults) $
+          assembleWitnesses (txBuilderModel ^. #keyWitnessFiles)
+      ]
+    ProcessResults signedFile -> 
+      [ Model $ model 
+          & #waitingStatus % #waitingOnDevice .~ False
+      , Task $ return $ SubmitTx signedFile
+      ]
+
+  -----------------------------------------------
+  -- Exporting the tx.body file and witnesses
+  -----------------------------------------------
+  ExportTxBody modal -> case modal of
+    StartProcess _ ->
+      [ Task $ runActionOrAlert (TxBuilderEvent . ExportTxBody . ProcessResults) $
+          exportTxBody (txBuilderModel ^. #targetPath) (txBuilderModel ^. #keyWitnessFiles)
+      ]
+    ProcessResults exportDestination -> 
+      [ Model $ model 
+          & #waitingStatus % #waitingOnDevice .~ False -- This can be called from `WitnessTx`.
+      , Task $ return $ Alert $ unlines
+          [ "Transaction file(s) successfully exported to the following directory:"
+          , toText exportDestination
+          ]
+      ]
+
+  -----------------------------------------------
+  -- Import tx.signed
+  -----------------------------------------------
+  ImportSignedTxFile modal -> case modal of
+    StartAdding _ ->
+      [ Model $ model 
+          & #txBuilderModel % #targetPath .~ ""
+          & #txBuilderModel % #importing .~ True
+      ]
+    CancelAdding ->
+      [ Model $ model 
+          & #txBuilderModel % #targetPath .~ ""
+          & #txBuilderModel % #importing .~ False
+      ]
+    ConfirmAdding -> 
+      [ Task $ runActionOrAlert (TxBuilderEvent . ImportSignedTxFile . AddResult) $ do
+          let rawPath = toString $ txBuilderModel ^. #targetPath
+
+          -- Expand the filepath.
+          expandedPath <- expandFilePath rawPath >>= 
+            fromJustOrAppError ("Not a valid file path: " <> toText rawPath)
+
+          -- Verify the file exists and is not a directory.
+          unlessM (Dir.doesFileExist expandedPath) $ 
+            throwIO $ AppError $ "File does not exist: " <> toText expandedPath
+
+          -- Return the filepath.
+          return expandedPath
+      ]
+    AddResult importedFile ->
+      [ Model $ model 
+          & #txBuilderModel % #targetPath .~ ""
+          & #txBuilderModel % #importing .~ False
+      , Task $ return $ SubmitTx $ SignedTxFile importedFile
+      ]
+
+  -----------------------------------------------
+  -- Get export directory
+  -----------------------------------------------
+  GetTxFileExportDirectory modal -> case modal of
+    StartAdding _ ->
+      [ Model $ model 
+          & #txBuilderModel % #targetPath .~ ""
+          & #txBuilderModel % #exporting .~ True
+      ]
+    CancelAdding ->
+      [ Model $ model 
+          & #txBuilderModel % #targetPath .~ ""
+          & #txBuilderModel % #exporting .~ False
+      ]
+    ConfirmAdding -> 
+      [ Task $ runActionOrAlert (TxBuilderEvent . GetTxFileExportDirectory . AddResult) $ do
+          let rawPath = toString $ txBuilderModel ^. #targetPath
+
+          -- Expand the path to get the absolute path.
+          expandedPath <- 
+            expandFilePath rawPath >>= fromJustOrAppError ("Not a valid path: " <> toText rawPath)
+
+          -- Verify the destination is not a file.
+          Dir.doesFileExist (toString expandedPath) >>= \exists -> when exists $
+            throwIO $ AppError "Destination directory is a file."
+
+          return expandedPath
+      ]
+    AddResult fullPath ->
+      [ Model $ model 
+          & #txBuilderModel % #targetPath .~ toText fullPath
+          & #txBuilderModel % #exporting .~ False
+      , Task $ return $ do
+          if txBuilderModel ^. #txType == WatchedTx then
+            TxBuilderEvent $ ExportTxBody $ StartProcess Nothing
+          else
+            TxBuilderEvent $ WitnessTx $ StartProcess Nothing
+      ]

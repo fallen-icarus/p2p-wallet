@@ -1,222 +1,386 @@
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module P2PWallet.Actions.BuildTxBody
-  ( 
+  (
     buildTxBody
   ) where
 
 import System.FilePath ((</>), (<.>))
-import Data.List (partition)
+import Data.Aeson (encode,parseJSON)
+import Data.Aeson.Types (parseMaybe)
 
 import P2PWallet.Actions.Query.Koios
+import P2PWallet.Actions.BalanceTx
+import P2PWallet.Actions.CalculateMinUTxOValue
 import P2PWallet.Actions.Utils
-import P2PWallet.Data.App
-import P2PWallet.Data.Core
-import P2PWallet.Data.Files
-import P2PWallet.Data.Lens hiding (info,network)
-import P2PWallet.Data.Plutus
+import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.TxBody
+import P2PWallet.Data.Koios.BudgetEstimations
 import P2PWallet.Prelude
 
--- | Lookup all untracted UTxO inputs. Then try to balance and build a transaction using 
--- `cardano-cli build-raw`. It will automatically set execution budgets and tx fee. A dedicated 
--- change output must be used so that the fee does not need to be taken from any of the other 
--- outputs.
+-- | The builder steps. This is useful for creating the builder.log file which shows the exact
+-- commands that were used to create the final transaction.
+data BuilderStep
+  -- | Create a fresh builder.log file.
+  = InitializeLogFile
+  -- | Add the command that is about to be executed to the builder log.
+  | BuildCommandStep String
+  -- | Add the exection budgets to the builder log.
+  | ExecutionBudgetStep [BudgetEstimation]
+
+-- | Log the build step.
+logBuilderStep :: BuilderLogFile -> BuilderStep -> IO ()
+logBuilderStep (BuilderLogFile file) step = case step of
+  InitializeLogFile -> 
+    -- Clear the log file from last time.
+    writeFile file "# Build Logs:"
+  BuildCommandStep cmd -> 
+    -- Add the command that is about to be executed.
+    appendFile file ("\n\n" <> cmd)
+  ExecutionBudgetStep budgets -> 
+    -- The execution budgets are not a command but are needed for later steps. They are shown as
+    -- commented json objects in the builder.log file.
+    appendFile file $ ("\n\n# Estimated budgets using previous tx.body:\n" <>) $ 
+      mconcat $ intersperse "\n" $ map (("# " <>) . show . encode) budgets
+
+-- | Log the command before actually running it. The command will be formatted to make it more
+-- human-readable.
+runBuildCmd_ :: BuilderLogFile -> Text -> IO ()
+runBuildCmd_ builderLogFile cmd = 
+  let formattedCmd = toString $ prettyFormatCmd cmd in
+  logBuilderStep builderLogFile (BuildCommandStep formattedCmd) >> runCmd_ formattedCmd
+
+-- | Log the command before actually running it. Return the results of the command. The command will
+-- be formatted to make it more human-readable.
+runBuildCmd :: BuilderLogFile -> Text -> IO String
+runBuildCmd builderLogFile cmd = 
+  let formattedCmd = toString $ prettyFormatCmd cmd in
+  logBuilderStep builderLogFile (BuildCommandStep formattedCmd) >> runCmd formattedCmd
+
+-- | Check whether the change output has enough ada. This should always be called _after_ getting
+-- the parameters so there is no need to query for them again.
+changeAdaValueCheck :: Network -> ByteString -> ChangeOutput -> IO ()
+changeAdaValueCheck network parameters changeOutput@ChangeOutput{lovelace} = do
+  -- This must be checked first since a negative value will cause `calculateMinUTxOValue` to throw
+  -- an unfriendly error.
+  when (lovelace < 0) $
+    throwIO $ AppError $ unlines
+      [ unwords 
+          [ "There is not enough ADA change to cover the fee. The estimated extra ADA required"
+          , "is " <> display (abs lovelace) <> "."
+          ]
+      , ""
+      , "Add another input to increase the amount of ADA as change."
+      , "NOTE: This will require a re-calculation of the fee."
+      ]
+
+  minUTxOValue <-
+    calculateMinUTxOValue network (Just parameters) changeOutput >>= 
+      fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead
+
+  when (minUTxOValue > lovelace) $ 
+    throwIO $ AppError $ changeHasTooLittleAdaMsg minUTxOValue
+  
+-- | Check whether there is enough collateral for the transaction.
+collateralValueCheck :: TxBuilderModel -> IO ()
+collateralValueCheck tx = 
+  whenJust (convertToTxBody tx ^. #collateralInput) $ 
+    \TxBodyCollateral{lovelace,requiredCollateral} -> 
+      when (lovelace - requiredCollateral < 0) $
+        throwIO $ AppError $ unlines
+          [ "There is not enough collateral for this transaction."
+          , unwords
+              [ display requiredCollateral
+              , "is required, but only"
+              , display lovelace
+              , "is available."
+              ]
+          , "Choose a different collateral input with at least " <> display requiredCollateral <> "."
+          ]
+
+-- | Build the transaction and generate the tx.body file.
 buildTxBody :: Network -> TxBuilderModel -> IO TxBuilderModel
-buildTxBody network tx@TxBuilderModel{_inputs,_changeOutput,_certificates} = do
-    -- Check if the transaction can be built without errors. This will throw an AppError if it
-    -- cannot.
-    canBeBuilt tx
+buildTxBody network tx = do
+  -- Check if the transaction can be built without errors. 
+  whenLeft_ (canBeBuilt tx) (throwIO . AppError)
 
-    -- Lookup the information for any unknown UTxOs and update the `TxBuilderModel` with them.
-    -- This is necessary to properly balance the transaction.
-    updateTx <- flip (set inputs) tx <$> lookupUnknownUTxOs
+  -- Get the file names since cardano-cli works with files.
+  tmpDir <- TmpDirectory <$> getTemporaryDirectory
+  let paramsFile = ParamsFile $ toString tmpDir </> "params" <.> "json"
+      txBodyFile = TxBodyFile $ toString tmpDir </> "tx" <.> "body"
+      builderLogFile = BuilderLogFile $ toString tmpDir </> "builder" <.> "log"
+      -- This will over-write the old tx.body file.
+      transformedTxFile = TransformedTxFile $ toString tmpDir </> "tx" <.> "body"
 
-    tmpDir <- getTemporaryDirectory
-    let paramsFile = ParamsFile $ tmpDir </> "params" <.> "json"
-        txBodyFile = TxBodyFile $ tmpDir </> "tx" <.> "body"
-        params = case network of
-          Mainnet -> mainnetParams
-          Testnet -> preprodParams
+  -- Create a fresh log file for this build iteration.
+  logBuilderStep builderLogFile InitializeLogFile
 
-    -- Export the param file so that cardano-cli can use it.
-    writeFileBS (toString paramsFile) params
+  -- Get the current parameters if necessary, and write them to a file for cardano-cli to use.
+  -- If wallets have already been synced since starting the app, the parameters should already be
+  -- saved in the `TxBuilderModel`.
+  parameters@(allParameters, collateralPercentage) <- 
+    maybe (runGetParams network >>= fromRightOrAppError) return $ tx ^. #parameters
+  writeFileBS (toString paramsFile) allParameters
 
-    -- Build the certificate files so they are available in the tmp directory. Registrations must
-    -- appear first in the transaction. The certificate file order sets the order in the tx.body.
-    certFiles <- mapM (buildCertificate tmpDir) $ 
-      sortOn (view certificateAction . snd) _certificates
+  -- Create the template tx that all intermediate transactions will be derived from. The original
+  -- tx cannot be used because the collateral input does not have the collateralPercentage set yet.
+  let templateTx = tx & #collateralInput % _Just % #collateralPercentage .~ collateralPercentage
 
-    -- Update the transaction fee. The changeOutput is already rebalanced to account for the
-    -- fee.
-    newTx <- estimateTxFee network paramsFile txBodyFile certFiles updateTx
+  -- Convert the model to `TxBody` and extract out the required witnesses for returning
+  -- with the finalized `TxBuilderModel`.
+  let initialTxBody@TxBody{keyWitnesses,certificates} = convertToTxBody $ 
+        -- Initialize the fee to 5 ADA so previous builds don't influence this interation's fee
+        -- calculation. It is set to 5 ADA because the execution budget calculation is slightly
+        -- impacted by the fee amount. 5 ADA should be an over-estimate in every case and when
+        -- the actual fee is calculated, setting it to the new fee should not impact the execution
+        -- budgets.
+        templateTx & #fee .~ 5_000_000
 
-    -- Build the transaction one more time so that the tx.body file has the finalized transaction.
-    void $ runCmd $ buildRawCmd paramsFile txBodyFile certFiles newTx
+  -- Build the certificate files so they are available in the tmp directory. Registrations must
+  -- appear first in the transaction. 
+  certificateFiles <- mapM (buildCertificate tmpDir builderLogFile) certificates
 
-    -- Return the balanced transaction.
-    return newTx
+  -- Calculate the budgets if necessary.
+  budgets <- if not (templateTx ^. #requiresCollateral) then return Nothing else do
+      -- Any plutus scripts that are used locally must be exported. The redeemers and datums used
+      -- must also be exported. All files will be located in the tmp directory and will have their
+      -- hashes as the file names.
+      exportContractFiles initialTxBody
 
-  where
-    lookupUnknownUTxOs :: IO [(Int,VerifiedInput)]
-    lookupUnknownUTxOs = do
-      -- All untracked inputs will have an empty address field.
-      let (untrackedInputs,trackedInputs) = partition (\(_,i) -> i ^. paymentAddress == "") _inputs
-          untrackedRefs = map (view utxoRef . snd) untrackedInputs
+      -- Create the intitial tx.body file.
+      runBuildCmd_ builderLogFile $ 
+        buildRawCmd tmpDir paramsFile txBodyFile certificateFiles initialTxBody
 
-      -- Lookup the information for the untracked UTxOs. Don't submit an empty list to Koios.
-      untrackedInputInfo <- 
-        case untrackedRefs of
-          [] -> return [] 
-          _ -> runQueryUnknownUTxOInfo network untrackedRefs >>= fromRightOrAppError 
+      -- Use the tx.body file to calculate the execution units.
+      Just <$> estimateExecutionBudgets network builderLogFile txBodyFile
 
-      -- Updated the information for the new inputs. They should already be in the proper order.
-      let updatedInfo = 
-            (flip . flip zipWith) untrackedInputs untrackedInputInfo $ \(idx,i) info ->
-              (idx, updateVerifiedInput info i)
+  -- Calculate the fee. This is unfortunately a moving target since updating the fee inevitably
+  -- changes the required fee. To account for this, the calculation is done twice (updating
+  -- the fee before the second calculation).
+  fee <- do
+      feeCalc1 <- 
+        estimateTxFee tmpDir builderLogFile paramsFile txBodyFile certificateFiles $ 
+          -- The original `TxBody` does not have the updated budgets so it must be updated
+          -- before calculating the fee.
+          updateBudgets budgets initialTxBody
+      
+      -- Calculate the fee a second time after adding the first calculated fee.
+      let updatedTx@TxBuilderModel{changeOutput} = balanceTx $ templateTx & #fee .~ feeCalc1
 
-      -- Recreate the input list with the updated info.
-      return $ sortOn fst $ updatedInfo <> trackedInputs
+      -- `balanceTx` will subtract the fee from the change which can result in a negative change.
+      -- The `changeOutput` should always be `Just`.
+      fromJustOrAppError "changeOutput is Nothing" changeOutput >>=
+        changeAdaValueCheck network allParameters
 
--- Since cardano-cli transaction build-raw can throw confusing error messages if certain
--- pieces are missing from the transaction, this check validates those cases will not occur.
--- It will throw an `AppError` with a more user friendly error message if cardano-cli 
--- transaction build-raw is likely to throw an error.
-canBeBuilt :: TxBuilderModel -> IO ()
-canBeBuilt TxBuilderModel{_inputs,_changeOutput}
-  -- The tx must have inputs.
-  | _inputs == [] = throwIO $ AppError "No inputs specified."
-  -- A change address must be specified.
-  | _changeOutput ^. paymentAddress == "" = throwIO $ AppError "Change address missing."
-  -- The inputs must have more assets than the outputs.
-  | moreOutputAssetsThanInputAssets = throwIO $ AppError "Outputs have more assets than inputs." 
-  | otherwise = return ()
-  where
-    moreOutputAssetsThanInputAssets :: Bool
-    moreOutputAssetsThanInputAssets = _changeOutput ^. lovelaces < 0 
-                                   || any ((<0) . view quantity) (_changeOutput ^. nativeAssets)
+      estimateTxFee tmpDir builderLogFile paramsFile txBodyFile certificateFiles $
+        -- The result of `convertToTxBody` does not have the calculated budgets so they must be
+        -- added again.
+        updateBudgets budgets $ convertToTxBody updatedTx
 
--- | Calculate the fee twice. The first time is to get the initial estimate and the second
--- time is to account for adding the new fee to the transaction.
+  -- Update the `TxBuilderModel` with the results.
+  let finalizedTx = 
+        balanceTx $ templateTx 
+          -- Set the fee.
+          & #fee .~ fee
+          -- Tell the app which key witnesses are required.
+          & #keyWitnesses .~ keyWitnesses
+          -- If the parameters were synced during this build, they should be saved for next
+          -- time.
+          & #parameters ?~ parameters
+
+  -- Check that the change output has enough ada now that the final fee has been subtracted
+  -- (as part of `balanceTx`.)
+  changeAdaValueCheck network allParameters $ fromMaybe def $ finalizedTx ^. #changeOutput
+
+  -- Verify that the transaction has enough collateral.
+  collateralValueCheck finalizedTx
+
+  -- Build the transaction one more time so that the tx.body file has the finalized transaction.
+  -- Also set the witnesses since the app will need them to determine what actions can be taken
+  -- on the tx.body file.
+  runBuildCmd_ builderLogFile $ buildRawCmd tmpDir paramsFile txBodyFile certificateFiles $ 
+    -- The budgets need to be added again.
+    updateBudgets budgets $ convertToTxBody finalizedTx
+
+  trace "After cardano-hw-cli Issue #177 is fixed, this should be enabled for all transactions" $ 
+    when (finalizedTx ^. #txType /= WatchedTx) $
+      -- Convert the tx.body file to the proper CBOR format for using hardware wallets.
+      -- The old tx.body file will be over-written. 
+      runBuildCmd_ builderLogFile $ transformTxBodyCmd txBodyFile transformedTxFile
+
+  -- Return the updated `TxBuilderModel`. Mark the model as built; this must be done last in case
+  -- there is an error with any of the previous steps. If the tx was marked as built too soon, it
+  -- could cause confusing behavior.
+  return $ finalizedTx & #isBuilt .~ True
+
+-- | Build all required certificates and return the filepaths used. Since the transaction
+-- can contain multiple certificates for a given stake address, the file name is suffixed with
+-- the action to keep the certificate files distinct. Later certificate actions override previous
+-- actions! This function will log the command used to create the certificate.
+buildCertificate :: TmpDirectory -> BuilderLogFile -> TxBodyCertificate -> IO CertificateFile
+buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificateAction} = do
+  let certFile suffix = toString tmpDir </> (toString stakeAddress <> "_" <> suffix) <.> "cert"
+  case certificateAction of
+    Registration -> do
+      -- Suffix the file name with the action.
+      let fullFileName = certFile "registration"
+
+      -- Create the certificate file.
+      runBuildCmd_ builderLogFile $ unwords
+        [ "cardano-cli stake-address registration-certificate"
+        , "--conway-era"
+        , "--key-reg-deposit-amt 2000000" -- 2 ADA
+        , "--stake-address " <> toText stakeAddress
+        , "--out-file " <> toText fullFileName
+        ]
+
+      -- Return the suffixed file name.
+      return $ CertificateFile fullFileName
+    Deregistration -> do
+      -- Suffix the file name with the action.
+      let fullFileName = certFile "deregistration"
+          
+
+      -- Create the certificate file.
+      runBuildCmd_ builderLogFile $ unwords
+        [ "cardano-cli stake-address deregistration-certificate"
+        , "--conway-era"
+        , "--key-reg-deposit-amt 2000000" -- 2 ADA
+        , "--stake-address " <> toText stakeAddress
+        , "--out-file " <> toText fullFileName
+        ]
+
+      -- Return the suffixed file name.
+      return $ CertificateFile fullFileName
+    Delegation (PoolID poolID) -> do
+      -- Suffix the file name with the action.
+      let fullFileName = certFile "delegation"
+      
+      -- Create the certificate file.
+      runBuildCmd_ builderLogFile $ unwords
+        [ "cardano-cli stake-address delegation-certificate"
+        , "--conway-era"
+        , "--stake-address " <> toText stakeAddress
+        , "--stake-pool-id " <> poolID
+        , "--out-file " <> toText fullFileName
+        ]
+
+      -- Return the suffixed file name.
+      return $ CertificateFile fullFileName
+
+-- | Calculate the fee.
 estimateTxFee 
-  :: Network 
+  :: TmpDirectory 
+  -> BuilderLogFile
   -> ParamsFile 
   -> TxBodyFile 
-  -> [CertificateFile]
-  -> TxBuilderModel 
-  -> IO TxBuilderModel
-estimateTxFee network paramsFile txBodyFile certFiles startTx = 
-    estimate startTx >>= estimate
+  -> [CertificateFile] 
+  -> TxBody 
+  -> IO Lovelace
+estimateTxFee tmpDir builderLogFile paramsFile txBodyFile certificateFiles tx@TxBody{..} = do
+    -- This builds the tx.body file and stores it in the tmp directory. 
+    runBuildCmd_ builderLogFile $ buildRawCmd tmpDir paramsFile txBodyFile certificateFiles tx
+
+    -- This uses the tx.body file to estimate the transaction fee. 
+    fromJustOrAppError "Could not parse min fee." . fmap Lovelace . readMaybe =<<
+      runBuildCmd builderLogFile calcFeeCmd
   where
-    estimate :: TxBuilderModel -> IO TxBuilderModel
-    estimate tx = do
-      witnesses <- fromRightOrAppError $ requiredWitnesses tx
+    numberOfInputs :: Int
+    numberOfInputs = sum
+      [ length inputs
+      , maybe 0 (const 1) collateralInput
+      ]
 
-      -- This builds the tx.body file and stores it in the tmp directory. 
-      void (runCmd $ buildRawCmd paramsFile txBodyFile certFiles tx)
+    numberOfOutputs :: Int
+    numberOfOutputs = sum
+      [ length outputs
+      -- The collateral change output will be present if there is a collateral input.
+      , maybe 0 (const 1) collateralInput 
+      ]
 
-      -- This uses the tx.body file to estimate the transaction fee. It will update
-      -- the fee inside the `TxBuilderModel`.
-      minFee <- fromJustOrAppError "Could not parse min fee." . fmap Lovelace . readMaybe =<<
-        runCmd (calcFeeCmd network paramsFile txBodyFile (tx ^. inputs) (tx ^. outputs) witnesses)
+    calcFeeCmd :: Text
+    calcFeeCmd = unwords
+      [ "(cardano-cli transaction calculate-min-fee"
+      , "--tx-body-file " <> toText txBodyFile
+      , toNetworkFlag network
+      , "--protocol-params-file " <> toText paramsFile
+      , "--tx-in-count " <> show numberOfInputs
+      , "--tx-out-count " <> show numberOfOutputs
+      , "--reference-script-size " <> show (calcTotalReferenceScriptSize tx)
+      , unwords 
+          [ "--witness-count " <> show (length keyWitnesses) <> ")"
+          , "| cut -d' ' -f1"
+          ]
+      ]
 
-      -- Add the fee to the transaction and rebalance the change output.
-      return $ balanceTx $ tx & txFee .~ minFee
-
-buildRawCmd :: ParamsFile -> TxBodyFile -> [CertificateFile] -> TxBuilderModel -> String
-buildRawCmd paramsFile outFile certFiles tx = toString $ unwords
-    [ "cardano-cli transaction build-raw"
-    , unwords $ map inputField $ tx ^. inputs
-    , unwords $ map outputField $ tx ^. outputs
-    , unwords $ map withdrawalField $ tx ^. withdrawals
-    , changeField $ tx ^. changeOutput
-    , unwords $ flip map certFiles $ \certFile -> "--certificate-file " <> toText certFile
+-- | Create the actual `cardano-cli transaction build-raw` command. This is formatted to be 
+-- human-readable since it will be added to the builder.log file.
+buildRawCmd :: TmpDirectory -> ParamsFile -> TxBodyFile -> [CertificateFile] -> TxBody -> Text
+buildRawCmd tmpDir paramsFile outFile certificateFiles TxBody{..} = 
+  -- Filter out unused fields.
+  unwords $ filter (/= "")
+    [ "cardano-cli conway transaction build-raw"
+    , unwords $ map (toBuildCmdField tmpDir) inputs
+    , unwords $ map (toBuildCmdField tmpDir) outputs
+    , toBuildCmdField tmpDir mints
+    , unwords $ map (toBuildCmdField tmpDir) withdrawals
+    , unwords $ for certificateFiles $ 
+        \certFile -> "--certificate-file " <> toText certFile
+    , unwords $ for requiredWitnesses $ 
+        \(KeyWitness (kh,_)) -> "--required-signer-hash " <> show kh
+    , maybe "" (toBuildCmdField tmpDir) collateralInput
+    , maybe "" (\slot -> "--invalid-before " <> display slot) invalidBefore
+    , maybe "" (\slot -> "--invalid-hereafter " <> display slot) invalidHereafter
     , "--protocol-params-file " <> toText paramsFile
-    , "--fee " <> show (unLovelace $ tx ^. txFee)
+    , "--fee " <> show (unLovelace fee)
     , "--out-file " <> toText outFile
     ]
+
+-- | Estimate the execution budget for each smart contract in the transaction. Log the results in
+-- the builder.log file before returning them.
+estimateExecutionBudgets :: Network -> BuilderLogFile -> TxBodyFile -> IO [BudgetEstimation]
+estimateExecutionBudgets network builderLogFile (TxBodyFile txBodyFile) = do
+  runEvaluateTx network txBodyFile >>= \case
+    Left err -> throwIO $ AppError err
+    Right r -> do 
+      -- It was returned as `Value` so the result must still be decoded.
+      let mBudgets = unEstimationResult <$> parseMaybe parseJSON r
+          mErrMsg = unEstimationError <$> parseMaybe parseJSON r
+
+      -- Terminate this function and throw the error if estimation failed.
+      whenJust mErrMsg $ \msg -> throwIO $ AppError $ showValue msg
+
+      case mBudgets of
+        Nothing -> throwIO $ AppError $ "Could not parse response:\n\n" <> showValue r
+        Just budgets -> do
+          -- Log the budgets.
+          logBuilderStep builderLogFile $ ExecutionBudgetStep budgets
+          -- Return the budgets.
+          return budgets
+
+-- | Update the budgets for the `TxBody`. The result of `convertToTxBody` does not have the
+-- budgets set so they will need to be added after each conversion. This is called even when
+-- budgets aren't necessary so the `Maybe` is used to dictate whether any changes are actually
+-- needed.
+updateBudgets :: Maybe [BudgetEstimation] -> TxBody -> TxBody
+updateBudgets Nothing tx = tx
+updateBudgets (Just budgets) tx = foldl' updateBudget tx budgets
   where
-    inputField :: (Int,VerifiedInput) -> Text
-    inputField (_,input) = unwords
-      [ "--tx-in " <> (showTxOutRef $ input ^. utxoRef)
-      ]
+    -- The validators are assumed to be in the same order as was evaluated.
+    updateBudget :: TxBody -> BudgetEstimation -> TxBody
+    updateBudget oldTx BudgetEstimation{..} = case validatorIndex of
+      Spending idx ->
+        -- Replace the old execution budgets with the newly calculated ones.
+        oldTx & #inputs % ix idx % #spendingScriptInfo % _Just % #executionBudget .~ executionBudget
+      Minting idx -> 
+        -- Replace the old execution budgets with the newly calculated ones.
+        oldTx & #mints % ix idx % #executionBudget .~ executionBudget
+      Withdrawing idx ->
+        -- Replace the old execution budgets with the newly calculated ones.
+        oldTx & #withdrawals % ix idx % #stakingScriptInfo % _Just % #executionBudget .~ executionBudget
 
-    outputField :: (Int,VerifiedOutput) -> Text
-    outputField (_,output) = unwords
-      [ mconcat 
-          [ "--tx-out "
-          , show $ unwords
-              [ toText $ output ^. paymentAddress
-              , show (unLovelace $ output ^. lovelaces) <> " lovelace"
-              , unwords $ flip map (output ^. nativeAssets) $ \asset ->
-                  "+ " <> show (asset ^. quantity) <> " " <> (fullAssetName asset)
-              ] 
-          ]
-      ]
-
-    withdrawalField :: (Int,VerifiedWithdrawal) -> Text
-    withdrawalField (_,wtdr) = unwords
-      [ "--withdrawal"
-      , (toText $ wtdr ^. stakeAddress) <> "+" <> show (unLovelace $ wtdr ^. lovelaces)
-      ]
-
-    -- The fee has already been subtracted from the change output.
-    changeField :: VerifiedChangeOutput -> Text
-    changeField output = unwords
-      [ mconcat 
-          [ "--tx-out "
-          , show $ unwords
-              [ toText $ output ^. paymentAddress
-              , show (unLovelace $ output ^. lovelaces) <> " lovelace"
-              , unwords $ flip map (output ^. nativeAssets) $ \asset ->
-                  "+ " <> show (asset ^. quantity) <> " " <> (fullAssetName asset)
-              ] 
-          ]
-      ]
-
-calcFeeCmd 
-  :: Network
-  -> ParamsFile 
-  -> TxBodyFile 
-  -> [(Int,VerifiedInput)] 
-  -> [(Int,VerifiedOutput)] 
-  -> ([NormalWitness],[RegistrationWitness])
-  -> String
-calcFeeCmd network paramsFile txBodyFile _inputs _outputs (normalWits,regWits) = 
-  toString $ (<> " | cut -d' ' -f1") $ unwords
-    [ "cardano-cli transaction calculate-min-fee"
-    , "--tx-body-file " <> toText txBodyFile
-    , toNetworkFlag network
-    , "--protocol-params-file " <> toText paramsFile
-    , "--tx-in-count " <> show (length _inputs)
-    , "--tx-out-count " <> show (length _outputs)
-    , "--witness-count " <> show 
-        (length $ ordNubOn fst $ map (view witness) normalWits <> map (view witness) regWits)
-    ]
-
--- | Build all required certificates and return the filepaths used. Since a transaction
--- can contain multiple certificates for a given stakeAddress, the index is used to
--- differentiate between each certificate.
-buildCertificate :: FilePath -> (Int,VerifiedCertificate) -> IO CertificateFile
-buildCertificate tmpDir (i,VerifiedCertificate{..}) = do
-    let certFile = tmpDir </> (toString _stakeAddress <> "_" <> show i) <.> "cert"
-    void $ runCmd $
-      case _certificateAction of
-        Registration -> toString $ unwords
-          [ "cardano-cli stake-address registration-certificate"
-          , "--stake-address " <> toText _stakeAddress
-          , "--out-file " <> toText certFile
-          ]
-        Deregistration -> toString $ unwords
-          [ "cardano-cli stake-address deregistration-certificate"
-          , "--stake-address " <> toText _stakeAddress
-          , "--out-file " <> toText certFile
-          ]
-        Delegation pool -> toString $ unwords
-          [ "cardano-cli stake-address delegation-certificate"
-          , "--stake-address " <> toText _stakeAddress
-          , "--stake-pool-id " <> toText pool
-          , "--out-file " <> toText certFile
-          ]
-
-    return $ CertificateFile certFile
+-- | The command to convert the transaction to the proper cbor format.
+transformTxBodyCmd :: TxBodyFile -> TransformedTxFile -> Text
+transformTxBodyCmd txBodyFile transformedTxFile = 
+    fromString $ printf cmdTemplate (toString txBodyFile) (toString transformedTxFile)
+  where
+    cmdTemplate = "cardano-hw-cli transaction transform --tx-file %s --out-file %s" 

@@ -4,17 +4,23 @@ module P2PWallet.GUI.EventHandler
   ) where
 
 import Monomer
+import Data.Text qualified as Text
+import Data.Time.Clock.POSIX qualified as Time
 
-import P2PWallet.Actions.BackupFiles
-import P2PWallet.Actions.LookupPools
-import P2PWallet.Actions.SignTx
 import P2PWallet.Actions.SubmitTx
 import P2PWallet.Actions.SyncWallets
 import P2PWallet.Actions.Utils
-import P2PWallet.Data.App
-import P2PWallet.Data.Lens
+import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Wallets
+import P2PWallet.GUI.EventHandler.AddressBookEvent
 import P2PWallet.GUI.EventHandler.DelegationEvent
+import P2PWallet.GUI.EventHandler.DexEvent
 import P2PWallet.GUI.EventHandler.HomeEvent
+import P2PWallet.GUI.EventHandler.LendingEvent
+import P2PWallet.GUI.EventHandler.OptionsEvent
+import P2PWallet.GUI.EventHandler.ProfileEvent
+import P2PWallet.GUI.EventHandler.TickerRegistryEvent
 import P2PWallet.GUI.EventHandler.TxBuilderEvent
 import P2PWallet.Prelude
 
@@ -24,14 +30,22 @@ handleEvent
   -> AppModel
   -> AppEvent
   -> [AppEventResponse AppModel AppEvent]
-handleEvent _ _ model evt = case evt of
+handleEvent _ _ model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- Application Start and "Do nothing" event.
   -----------------------------------------------
   -- Aside from starting the application, this is sometimes useful for when a widget requires 
-  -- an event but you don't actually want to trigger an event. An example would be a read-only
+  -- an event, but you don't actually want to trigger an event. An example would be a read-only
   -- implementation of `Monomer.textFieldV_`.
   AppInit -> []
+
+  -----------------------------------------------
+  -- Copying Text
+  -----------------------------------------------
+  CopyText text -> 
+    [ setClipboardData $ ClipboardText text
+    , Task $ return $ Alert "Successfully copied to clipboard!"
+    ]
 
   -----------------------------------------------
   -- Alert Messages
@@ -40,150 +54,44 @@ handleEvent _ _ model evt = case evt of
   --
   -- Note on errors: Even though Monomer allows disabling widgets if certain criteria is not
   -- satisfied, when several criteria must be met, it is not always clear what is not satisfied.
-  -- To improve the user experience, the "submit" widgets will always be enabled and an alert
+  -- To improve the user experience, the "submit" widgets will usually be enabled and an alert
   -- message will shown when the input is invalid. The alert message will explain to the user
   -- what is wrong. IMO this is a much better UX.
   Alert msg -> 
     -- Disable all overlays and display the message. The scene is not changed so users can 
     -- quickly try again if desired. 
-    [ Model $ model & alertMessage .~ Just msg
-                    & waitingOnDevice .~ False
-                    & syncingWallets .~ False
-                    & syncingPools .~ False
-                    & building .~ False
-                    & submitting .~ False
+    [ Model $ model 
+        & #alertMessage ?~ msg 
+        & #waitingStatus .~ def
+        & #txBuilderModel %~
+            -- Clear the tx builder, but only if the submission was successfull.
+            if "Submission successfull!" `Text.isPrefixOf` msg then const def else id
     ]
   CloseAlertMessage -> 
     -- Close the alert widget and reset the alert message.
-    [ Model $ model & alertMessage .~ Nothing ]
+    [ Model $ model & #alertMessage .~ Nothing ]
 
   -----------------------------------------------
   -- Changing Scenes
   -----------------------------------------------
+  -- Change the main scene while leaving the `AppModel` alone. This way, users can switch
+  -- between scenes without losing their place when building transactions.
   ChangeMainScene newScene -> 
-    [ Model $ model & scene .~ newScene ]
+    [ Model $ model & #scene .~ newScene ]
 
   -----------------------------------------------
-  -- Changing the current profile
+  -- Set Network
   -----------------------------------------------
-  -- Change the currently selected profile and load the new wallets. If there profile has
-  -- existing wallets, sync them.
-  ChangeProfile modal -> case modal of
-    -- Remove the current profile and open the profile picker widget.
-    LogoutCurrentProfile ->
-      [ Model $ model & selectedProfile .~ Nothing ]
-    -- Set the new profile as the selectedProfile. Then try to load the wallets for that profile.
-    LoadNewProfile newProfile' ->
-      [ Model $ model & selectedProfile .~ Just newProfile'
-      , Task $
-          runActionOrAlert
-            (ChangeProfile . LoadWalletsResult)
-            (loadWallets (model ^. config . network) newProfile' >>= fromRightOrAppError)
-      ]
-    -- Initialize the model with the wallet information for the profile. Take the user
-    -- to the home page.
-    LoadWalletsResult wallets' ->
-      [ Model $ model & wallets .~ wallets'
-                      & homeModel . selectedWallet .~
-                          fromMaybe def (maybeHead $ wallets' ^. paymentWallets)
-                      & delegationModel . selectedWallet .~
-                          fromMaybe def (maybeHead $ wallets' ^. stakeWallets)
-                      & scene .~ HomeScene
-      , Task $
-          if wallets' == def
-          then return AppInit
-          else return $ SyncWallets StartSync
-      ]
+  -- Set the app config to that network and load the profiles associated with that network.
+  SetNetwork targetNetwork -> 
+    [ Model $ model & #config % #network .~ targetNetwork
+    , Task $ return $ ProfileEvent $ LoadKnownProfiles $ StartProcess Nothing
+    ]
 
   -----------------------------------------------
-  -- Adding new profiles
+  -- Profile Events
   -----------------------------------------------
-  AddNewProfile modal -> case modal of
-    -- Show the addNewProfile widget, clear the old information, and initialize the accountIndex
-    -- with the next index.
-    StartAdding -> 
-      let newIdx = length $ model ^. knownProfiles
-      in [ Model $ model & newProfile . accountIndex .~ newIdx
-                         & newProfile . alias .~ ""
-                         & scene .~ NewProfileScene
-                         & addingProfile .~ True
-         ]
-    CancelAdding -> 
-      -- Close the widget for getting the new info.
-      [ Model $ model & addingProfile .~ False 
-                      & scene .~ ProfilePickerScene
-      ]
-    ConfirmAdding -> 
-      -- Check if the profile name or accountIndex is already in use.
-      case processNewProfile (model ^. newProfile) (model ^. knownProfiles) of
-        Left err -> [ Task $ return $ Alert err ]
-        Right newProfile' -> [ Task $ return $ AddNewProfile $ AddResult newProfile' ]
-    AddResult newProfile' ->
-      -- Backup the new profile and take the user to the home page. Also toggle the 
-      -- addingProfile flag. Initialize the new profile's wallet file.
-      let network' = model ^. config . network
-          newProfiles = sortOn (view accountIndex) $ newProfile' : model ^. knownProfiles
-      in [ Model $ 
-             model & selectedProfile .~ Just newProfile'
-                   & knownProfiles .~ newProfiles
-                   & addingProfile .~ False
-                   & scene .~ HomeScene
-         , Task $ do
-             backupProfiles network' newProfiles
-             backupWallets network' newProfile' def
-             return AppInit
-         ]
-
-  -----------------------------------------------
-  -- Syncing Wallets
-  -----------------------------------------------
-  SyncWallets modal -> case modal of
-    StartSync -> 
-      -- Set `syncing` to True to let users know syncing is happening.
-      [ Model $ model & syncingWallets .~ True 
-      , Task $ 
-          let network' = model ^. config . network
-              wallets' = model ^. wallets
-          in runActionOrAlert
-              (SyncWallets . SyncResults)
-              (syncWallets network' wallets')
-      ]
-    SyncResults resp -> 
-      -- Disable `syncing` and update the list of wallets. Also update the information for
-      -- the `selectedWallet`.
-      let paymentTarget = model ^. homeModel . selectedWallet . alias
-          updatedPaymentTarget = 
-            fromMaybe def $ find (\w -> w ^. alias == paymentTarget) $ resp ^. paymentWallets
-          stakeTarget = model ^. delegationModel . selectedWallet . alias
-          updatedStakeTarget = 
-            fromMaybe def $ find (\w -> w ^. alias == stakeTarget) $ resp ^. stakeWallets
-      in
-        [ Model $ 
-            model & syncingWallets .~ False
-                  & wallets .~ resp
-                  & homeModel . selectedWallet .~ updatedPaymentTarget
-                  & delegationModel . selectedWallet .~ updatedStakeTarget
-        ]
-
-  -----------------------------------------------
-  -- Syncing Registered Pools
-  -----------------------------------------------
-  SyncRegisteredPools modal -> case modal of
-    StartSync -> 
-      -- Set `syncing` to True to let users know syncing is happening.
-      [ Model $ model & syncingPools .~ True 
-      , Task $ 
-          let network' = model ^. config . network
-          in runActionOrAlert
-              (SyncRegisteredPools . SyncResults)
-              (lookupRegisteredPools network')
-      ]
-    SyncResults resp -> 
-      -- Disable `syncing` and update the list of pools. 
-      [ Model $ 
-          model & syncingPools .~ False
-                & delegationModel . registeredPools .~ resp
-      ]
+  ProfileEvent modal -> handleProfileEvent model modal
 
   -----------------------------------------------
   -- Home Events
@@ -196,38 +104,119 @@ handleEvent _ _ model evt = case evt of
   DelegationEvent modal -> handleDelegationEvent model modal
 
   -----------------------------------------------
+  -- Ticker Registry Events
+  -----------------------------------------------
+  TickerRegistryEvent modal -> handleTickerRegistryEvent model modal
+
+  -----------------------------------------------
+  -- Address Book Events
+  -----------------------------------------------
+  AddressBookEvent modal -> handleAddressBookEvent model modal
+
+  -----------------------------------------------
+  -- Dex Events
+  -----------------------------------------------
+  DexEvent modal -> handleDexEvent model modal
+
+  -----------------------------------------------
+  -- Loans Events
+  -----------------------------------------------
+  LendingEvent modal -> handleLendingEvent model modal
+
+  -----------------------------------------------
+  -- Options Events
+  -----------------------------------------------
+  OptionsEvent modal -> handleOptionsEvent model modal
+
+  -----------------------------------------------
   -- TxBuilder Events
   -----------------------------------------------
   TxBuilderEvent modal -> handleTxBuilderEvent model modal
 
   -----------------------------------------------
-  -- Sign Transaction
+  -- Updating the current date
   -----------------------------------------------
-  SignTx ->
-    -- Signing the transaction can only be done if `isBuilt` is set to True since that means
-    -- the tx.body file in the tmp directory is up-to-date. If there is an error, it will be shown
-    -- in the `alertMessage`. Signing assumes the same hardware wallet seed phrase manages all
-    -- relevant keys for the transaction.
-    if not $ model ^. txBuilderModel . isBuilt
-    then [ Task $ return $ Alert "You must first build the transaction."]
-    else
-      [ Model $ model & waitingOnDevice .~ True
-      , Task $
-          runActionOrAlert SubmitTx $ 
-            signTx (model ^. config . network) (model ^. txBuilderModel)
+  -- This is always called after syncing so it will handle any new notifications.
+  UpdateCurrentDate modal -> case modal of
+    StartProcess _ -> 
+      [ Task $ runActionOrAlert (UpdateCurrentDate . ProcessResults) $ 
+          (,) <$> getCurrentDay (config ^. #timeZone)
+              <*> Time.getPOSIXTime
       ]
+    ProcessResults (day,time) ->
+      [ Model $ model 
+          & #config % #currentDay .~ day
+          & #config % #currentTime .~ time
+      , Task $ 
+          if notifications /= [] then do
+            return $ Alert $ unlines
+              [ "You have new notifications!"
+              , "Go to the News page to check them out."
+              ]
+          else return AppInit
+      ]
+
+  -----------------------------------------------
+  -- Syncing Wallets
+  -----------------------------------------------
+  SyncWallets modal -> case modal of
+    StartProcess _ -> 
+      -- Set `syncing` to True to let users know syncing is happening.
+      [ Model $ model & #waitingStatus % #syncingWallets .~ True 
+      , Task $ do
+          runActionOrAlert (SyncWallets . ProcessResults) $ 
+            syncWallets databaseFile (config ^. #network) knownWallets
+      ]
+    ProcessResults (resp@Wallets{..}, networkParams, newNotifications) ->
+      -- Disable `syncing` and update the list of wallets. Also update the information for
+      -- the `selectedWallet`.
+      let paymentTarget = model ^. #homeModel % #selectedWallet % #paymentWalletId
+          updatedPaymentTarget = 
+            fromMaybe def $ find (\w -> w ^. #paymentWalletId == paymentTarget) paymentWallets
+          stakeTarget = model ^. #delegationModel % #selectedWallet % #stakeWalletId
+          updatedStakeTarget = 
+            fromMaybe def $ find (\w -> w ^. #stakeWalletId == stakeTarget) stakeWallets
+          dexTarget = model ^. #dexModel % #selectedWallet % #dexWalletId
+          updatedDexTarget = 
+            fromMaybe def $ find (\w -> w ^. #dexWalletId == dexTarget) dexWallets
+          loanTarget = model ^. #lendingModel % #selectedWallet % #loanWalletId
+          updatedLoanTarget = 
+            fromMaybe def $ find (\w -> w ^. #loanWalletId == loanTarget) loanWallets
+          optionsTarget = model ^. #optionsModel % #selectedWallet % #optionsWalletId
+          updatedOptionsTarget = 
+            fromMaybe def $ find (\w -> w ^. #optionsWalletId == optionsTarget) optionsWallets
+      in  [ Model $ model 
+              & #waitingStatus % #syncingWallets .~ False
+              & #knownWallets .~ resp
+              & #homeModel % #selectedWallet .~ updatedPaymentTarget
+              & #delegationModel % #selectedWallet .~ updatedStakeTarget
+              & #dexModel % #selectedWallet .~ updatedDexTarget
+              & #lendingModel % #selectedWallet .~ updatedLoanTarget
+              & #optionsModel % #selectedWallet .~ updatedOptionsTarget
+              & #txBuilderModel % #parameters ?~ networkParams
+              & #fingerprintMap .~ 
+                  toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)
+              & #notifications .~ zip [0..] newNotifications
+          -- `UpdateCurrentDate` will handle any new notifications alerts.
+          , Task $ return $ UpdateCurrentDate $ StartProcess Nothing
+          ]
 
   -----------------------------------------------
   -- Submit Transaction
   -----------------------------------------------
   SubmitTx signedFile ->
-    -- Submitting the transaction can only be done if `isBuilt` is set to True since that means
-    -- the tx.signed file in the tmp directory is up-to-date. If there is an error, it will be shown
-    -- in the `alertMessage`.
-    [ Model $ model & submitting .~ True
-                    & waitingOnDevice .~ False -- Disable this since it can be called from `SignTx`.
-    , Task $
-        if not $ model ^. txBuilderModel . isBuilt
-        then return $ Alert "You must first build the transaction."
-        else runActionOrAlert Alert $ submitTx (model ^. config . network) signedFile
+    [ Model $ model & #waitingStatus % #submitting .~ True
+    , Task $ runActionOrAlert Alert $ submitTx (config ^. #network) signedFile
     ]
+
+  -----------------------------------------------
+  -- Toggle notification status
+  -----------------------------------------------
+  ToggleNotificationReadStatus idx ->
+    [ Model $ model & #notifications % ix idx % _2 % #markedAsRead %~ not ]
+
+  -----------------------------------------------
+  -- Mark all notifications as read
+  -----------------------------------------------
+  MarkAllNotificationsAsRead ->
+    [ Model $ model & #notifications %~ map (set (_2 % #markedAsRead) True) ]

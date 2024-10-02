@@ -1,136 +1,184 @@
-{-# LANGUAGE RecordWildCards #-}
-
-module P2PWallet.GUI.Widgets.Home.About where
+module P2PWallet.GUI.Widgets.Home.About 
+  ( 
+    aboutWidget
+  ) where
 
 import Monomer
-import Monomer.Lens qualified as L
-import Data.Maybe (fromJust)
-import Prettyprinter (pretty)
+import Prettyprinter (pretty,tupled)
+import Data.Text qualified as Text
 
-import P2PWallet.Data.App
-import P2PWallet.Data.Core
-import P2PWallet.Data.Lens
-import P2PWallet.Data.Plutus
-import P2PWallet.Prelude
+import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.Wallets
+import P2PWallet.GUI.Colors
+import P2PWallet.GUI.Icons
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.Plutus
+import P2PWallet.Prelude
 
-aboutWidget :: AppWenv -> AppModel -> AppNode
-aboutWidget wenv model = do
+aboutWidget :: AppModel -> AppNode
+aboutWidget model = do
+    vstack 
+      [ hstack [spacer, addressInfoWidget model, spacer]
+      , filler
+      , hstack
+          [ filler
+          -- The widget is initialized using PairPaymentWallet. It is the same for all wallet 
+          -- types.
+          , box (mainButton "Add Wallet" $ HomeEvent $ PairPaymentWallet $ StartAdding Nothing) 
+              `styleBasic` [padding 20]
+          ]
+      ] `nodeVisible` not isAdding
+  where
+    isAdding :: Bool
+    isAdding = model ^. #homeModel % #addingWallet
+
+-- Show key information about the address.
+addressInfoWidget :: AppModel -> AppNode
+addressInfoWidget AppModel{homeModel=HomeModel{selectedWallet},..} = do
+  let -- Payment info
+      PaymentWallet{paymentAddress,paymentKeyDerivation,stakeAddress,stakeKeyDerivation} = 
+        selectedWallet
+      addrInfo = inspectBech32Address $ unPaymentAddress paymentAddress
+      spendingKeyHash = fromMaybe "" $ either (const Nothing) infoSpendingKeyHash addrInfo
+
+      -- Stake info
+      hasStaking = isJust stakeAddress
+      stakeKeyHash = either (const Nothing) infoStakeKeyHash addrInfo
+      knownStakeWallets = knownWallets ^. #stakeWallets
+      mTrackedStakeWallet = flip (maybe Nothing) stakeAddress $ 
+        \addr -> find (\stake -> addr == stake ^. #stakeAddress) knownStakeWallets
+
   vstack 
-    [ hstack [spacer, addressInfoWidget wenv model, spacer]
-    , filler
-    , hstack
-        [ filler
-        , box (mainButton "Pair" $ HomeEvent $ PairPaymentWallet StartAdding) 
-            `styleBasic` [paddingR 5, paddingB 20, paddingL 20, paddingT 20]
-        , box (mainButton "Watch" $ HomeEvent $ WatchPaymentWallet StartAdding) 
-            `styleBasic` [paddingL 5, paddingB 20, paddingR 20, paddingT 20]
-        ]
-    ] `nodeVisible` (not (model ^. homeModel . pairing) && not (model ^. homeModel . watching))
-
--- | Show key information about the address.
-addressInfoWidget :: AppWenv -> AppModel -> AppNode
-addressInfoWidget wenv model = do
-  let wallet = model ^. homeModel . selectedWallet
-      eInfo = inspectBech32Address $ unPaymentAddress $ wallet ^. paymentAddress
-      spendingKeyHash = either (const $ Just "") infoSpendingKeyHash eInfo
-      stakeKeyHash = either (const Nothing) infoStakeKeyHash eInfo
-      stakeAddr = wallet ^. stakeAddress
-      stakeWallet = fromMaybe def $
-        find (\w -> stakeAddr == Just (w ^. stakeAddress)) $ model ^. wallets . stakeWallets
-      delegationStatus
-        | stakeWallet == def = "This address does not support staking"
-        | stakeWallet ^. registrationStatus == NotRegistered = "Not Registered"
-        | otherwise = maybe "Not Delegated" (toText . view poolId) $ stakeWallet ^. delegatedPool
-      sectionBgColor = wenv ^. L.theme . L.sectionColor
-
-  vstack 
-    [ centerWidgetH $ label "Address Info" 
-        `styleBasic` [textFont "Italics", textSize 18, padding 10]
+    [ centerWidgetH $ 
+        hstack
+          [ label "Address Info" 
+              `styleBasic` [textFont "Italics", textSize 18, padding 10, paddingR 2]
+          , box_ [alignMiddle] $ tooltip_ "Use for change" [tooltipDelay 0] $
+              button changeIcon (HomeEvent $ AddSelectedChangeAddress paymentAddress)
+                `styleBasic`
+                  [ border 0 transparent
+                  , radius 20
+                  , padding 2
+                  , bgColor transparent
+                  , textColor customBlue
+                  , textMiddle
+                  , textFont "Remix"
+                  ]
+                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          ]
     , vstack
         [ hstack
-            [ spacer
-            , spacer
-            , label "Payment Credential" `styleBasic` [textFont "Italics"]
+            [ spacer_ [width 10]
+            , label "Payment Credential" 
+                `styleBasic` [textSize 14, textColor lightGray, textFont "Italics"]
             ] `styleBasic` [padding 5]
         , hstack
-            [ spacer
-            , spacer
-            , spacer
-            , spacer
-            , label "Payment Address:"
-            , spacer
-            , copyableTextArea $ toText $ wallet ^. paymentAddress
+            [ spacer_ [width 20]
+            , copyableLabelWith "Address:" formatAddress paymentAddress
             ] `styleBasic` [padding 5]
         , hstack 
-            [ spacer
-            , spacer
-            , spacer
-            , spacer
-            , label "Payment Key Hash:" 
-            , spacer
-            , flip styleBasic [width 550] $ copyableTextArea $ 
-                show $ PubKeyHash $ BuiltinByteString $ fromJust spendingKeyHash
+            [ spacer_ [width 20]
+            , copyableLabelFor "Key Hash:" $ show $ PubKeyHash $ BuiltinByteString spendingKeyHash
             ] `styleBasic` [padding 5]
         , hstack
-            [ spacer
-            , spacer
-            , spacer
-            , spacer
-            , label "Derivation Path:"
-            , spacer
-            , copyableTextArea $ fromMaybe "none" $
-                show . pretty . showDerivationPath <$> wallet ^. paymentKeyPath
+            [ spacer_ [width 20]
+            , copyableLabelFor "Derivation:" $ maybe "none" display paymentKeyDerivation
             ] `styleBasic` [padding 5]
-              `nodeVisible` (isJust $ wallet ^. paymentKeyPath)
-        ]
-    , vstack
-        [ hstack
-            [ spacer
-            , spacer
-            , label "Stake Credential" `styleBasic` [textFont "Italics"]
-            ] `styleBasic` [padding 5]
-        , hstack
-            [ spacer
-            , spacer
-            , spacer
-            , spacer
-            , label "Stake Address:"
-            , spacer
-            , copyableTextArea $ maybe "none" toText $ wallet ^. stakeAddress
-            ] `styleBasic` [padding 5]
-        , hstack 
-            [ spacer
-            , spacer
-            , spacer
-            , spacer
-            , label "Stake Key Hash:" 
-            , spacer
-            , flip styleBasic [width 550] $ copyableTextArea $ 
-                fromMaybe "none" $ show . PubKeyHash . BuiltinByteString <$> stakeKeyHash
-            ] `styleBasic` [padding 5]
-              `nodeVisible` (isJust $ wallet ^. stakeAddress)
-        , hstack
-            [ spacer
-            , spacer
-            , spacer
-            , spacer
-            , label "Derivation Path:"
-            , spacer
-            , copyableTextArea $ fromMaybe "none" $
-                show . pretty . showDerivationPath <$> wallet ^. stakeKeyPath
-            ] `styleBasic` [padding 5]
-              `nodeVisible` (isJust $ wallet ^. stakeAddress)
-        , hstack
-            [ spacer
-            , spacer
-            , spacer
-            , spacer
-            , label "Delegation Status:"
-            , spacer
-            , copyableTextArea delegationStatus
-            ] `styleBasic` [padding 5]
-              `nodeVisible` (isJust $ wallet ^. stakeAddress)
+              `nodeVisible` isJust paymentKeyDerivation
         ]
     , spacer
-    ] `styleBasic` [radius 5, bgColor sectionBgColor]
+    , separatorLine `styleBasic` [paddingL 20, paddingR 20]
+    , spacer
+    , vstack
+        [ hstack
+            [ spacer_ [width 10]
+            , label "Stake Credential" 
+                `styleBasic` [textSize 14, textColor lightGray, textFont "Italics"]
+            , spacer
+            , widgetMaybe mTrackedStakeWallet $ \StakeWallet{alias} ->
+                label (show $ tupled [pretty alias])
+                  `styleBasic`
+                    [ padding 0
+                    , radius 5
+                    , textMiddle
+                    , border 0 transparent
+                    , textColor lightGray
+                    , bgColor transparent
+                    , textSize 14
+                    ]
+            ] `styleBasic` [padding 5]
+        , hstack
+            [ spacer_ [width 20]
+            , copyableLabelFor "Address:" $ maybe "none" toText stakeAddress
+            ] `styleBasic` [padding 5]
+        , hstack 
+            [ spacer_ [width 20]
+            , copyableLabelFor "Key Hash:" $ 
+                maybe "" (show . PubKeyHash . BuiltinByteString) stakeKeyHash
+            ] `styleBasic` [padding 5]
+              `nodeVisible` hasStaking
+        , widgetMaybe stakeKeyDerivation $ \keyInfo -> hstack
+            [ spacer_ [width 20]
+            , copyableLabelFor "Derivation:" $ display keyInfo
+            ] `styleBasic` [padding 5]
+              `nodeVisible` hasStaking
+        ]
+    ] `styleBasic`
+        [ padding 10
+        , radius 20
+        , bgColor customGray3
+        ]
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | An address with delegation can be very long and exceed the length of the window. This
+-- function will add an ellipsis in the middle if the address is likely to overflow.
+formatAddress :: PaymentAddress -> Text
+formatAddress (PaymentAddress text)
+    | Text.length text > 80 = newText
+    | otherwise = text
+  where
+    newText = Text.take 40 text <> "..." <> Text.drop 80 text
+
+-------------------------------------------------
+-- Helper Widgets
+-------------------------------------------------
+-- | A label button that will copy other data.
+copyableLabelFor :: Text -> Text -> WidgetNode s AppEvent
+copyableLabelFor caption info = 
+  hstack
+    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText info)
+        `styleBasic`
+          [ padding 0
+          , radius 5
+          , textMiddle
+          , border 0 transparent
+          , textColor customBlue
+          , bgColor transparent
+          , textSize 12
+          ]
+        `styleHover` [textColor lightGray, cursorIcon CursorHand]
+    , spacer
+    , label_ info [ellipsis,resizeFactor 2] `styleBasic` [textSize 12, textColor lightGray]
+    ]
+
+copyableLabelWith :: (ToText a) => Text -> (a -> Text) -> a -> WidgetNode s AppEvent
+copyableLabelWith caption modifier fullInfo = do
+  let formattedInfo = modifier fullInfo
+  hstack
+    [ tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText $ toText fullInfo)
+        `styleBasic`
+          [ padding 0
+          , radius 5
+          , textMiddle
+          , border 0 transparent
+          , textColor customBlue
+          , bgColor transparent
+          , textSize 12
+          ]
+        `styleHover` [textColor lightGray, cursorIcon CursorHand]
+    , spacer
+    , label_ formattedInfo [resizeFactor 2] `styleBasic` [textSize 12, textColor lightGray]
+    ]

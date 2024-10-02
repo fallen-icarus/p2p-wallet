@@ -1,31 +1,18 @@
 cabal-version:      3.0
 name:               p2p-wallet
 version:            0.1.0.0
-
--- A short (one-line) description of the package.
--- synopsis:
-
--- A longer description of the package.
--- description:
-
--- The license under which the package is released.
 license:            Apache-2.0
-
--- The file containing the license text.
 license-file:       LICENSE
-
--- The package author(s).
 author:             fallen-icarus
-
--- An email address to which users can send suggestions, bug reports, and patches.
 maintainer:         modern.daidalos+github@gmail.com
-
--- A copyright notice.
--- copyright:
 build-type:         Simple
-
--- Extra doc files to be distributed with the package, such as a CHANGELOG or a README.
-extra-doc-files:    CHANGELOG.md
+extra-doc-files:    
+  CHANGELOG.md
+  assets/remixicon.ttf
+  assets/Roboto-Bold.ttf
+  assets/Roboto-Italic.ttf
+  assets/Roboto-Medium.ttf
+  assets/Roboto-Regular.ttf
 
 -- Extra source files to be distributed with the package, such as examples, or a tutorial module.
 -- extra-source-files:
@@ -33,106 +20,278 @@ extra-doc-files:    CHANGELOG.md
 common warnings
     ghc-options: -Wall
 
-common threaded
-    ghc-options: -threaded -rtsopts -with-rtsopts=-N
+common optimizations
+    ghc-options: 
+      -threaded 
+      -rtsopts 
+      "-with-rtsopts=-A128m -n2m -N"
+      -O2
+      -j
 
 common extensions
     default-language: GHC2021
     default-extensions:
+      DeriveAnyClass
+      DerivingStrategies
+      DuplicateRecordFields
       OverloadedStrings
+      OverloadedLabels
       LambdaCase
       NoImplicitPrelude
+      RecordWildCards
 
 executable p2p-wallet
     import:
       , warnings
-      , threaded
+      , optimizations
       , extensions
 
-    -- .hs or .lhs file containing the Main module.
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
     other-modules:
       P2PWallet.Actions.AddWallet
-      P2PWallet.Actions.BackupFiles
+      P2PWallet.Actions.AssembleWitnesses
+      P2PWallet.Actions.BalanceTx
       P2PWallet.Actions.BuildTxBody
-      P2PWallet.Actions.ExportTxBody
+      P2PWallet.Actions.CalculateMinUTxOValue
+      P2PWallet.Actions.Database
       P2PWallet.Actions.ExportHwKey
+      P2PWallet.Actions.ExportTxBody
       P2PWallet.Actions.LookupPools
       P2PWallet.Actions.Query.Koios
       P2PWallet.Actions.Utils
-      P2PWallet.Actions.SignTx
       P2PWallet.Actions.SubmitTx
+      P2PWallet.Actions.SyncLoans
+      P2PWallet.Actions.SyncOptions
+      P2PWallet.Actions.SyncOrderBooks
       P2PWallet.Actions.SyncWallets
-      P2PWallet.Data.App
-      P2PWallet.Data.App.Common
-      P2PWallet.Data.App.Config
-      P2PWallet.Data.App.Delegation
-      P2PWallet.Data.App.Home
-      P2PWallet.Data.App.TxBuilder
-      P2PWallet.Data.Core
-      P2PWallet.Data.Core.Asset
-      P2PWallet.Data.Core.Bech32Address
-      P2PWallet.Data.Core.DerivationPath
-      P2PWallet.Data.Core.Network
-      P2PWallet.Data.Core.PoolID
+      P2PWallet.Actions.WitnessTxBody
+      P2PWallet.Data.AppModel
+      P2PWallet.Data.AppModel.AddressBookModel
+      P2PWallet.Data.AppModel.Common
+      P2PWallet.Data.AppModel.DelegationModel
+      P2PWallet.Data.AppModel.DexModel
+      P2PWallet.Data.AppModel.HomeModel
+      P2PWallet.Data.AppModel.LendingModel
+      P2PWallet.Data.AppModel.LendingModel.BorrowModel
+      P2PWallet.Data.AppModel.LendingModel.BorrowModel.ActiveLoansFilterModel
+      P2PWallet.Data.AppModel.LendingModel.BorrowModel.LenderOffersFilterModel
+      P2PWallet.Data.AppModel.LendingModel.BorrowModel.OpenAsksFilterModel
+      P2PWallet.Data.AppModel.LendingModel.LendModel
+      P2PWallet.Data.AppModel.LendingModel.LendModel.OpenOffersFilterModel
+      P2PWallet.Data.AppModel.LendingModel.LendModel.RequestsFilterModel
+      P2PWallet.Data.AppModel.LendingModel.ActiveLoanConfiguration
+      P2PWallet.Data.AppModel.LendingModel.LoanAskConfiguration
+      P2PWallet.Data.AppModel.LendingModel.LoanOfferConfiguration
+      P2PWallet.Data.AppModel.LendingModel.ResearchModel
+      P2PWallet.Data.AppModel.OptionsModel
+      P2PWallet.Data.AppModel.OptionsModel.BuyerModel
+      P2PWallet.Data.AppModel.OptionsModel.BuyerModel.AllProposalsFilterModel
+      P2PWallet.Data.AppModel.OptionsModel.ResearchModel
+      P2PWallet.Data.AppModel.OptionsModel.ResearchModel.AllActivesFilterModel
+      P2PWallet.Data.AppModel.OptionsModel.WriterModel
+      P2PWallet.Data.AppModel.OptionsModel.WriterModel.ActiveContractsFilterModel
+      P2PWallet.Data.AppModel.OptionsModel.WriterModel.OpenProposalsFilterModel
+      P2PWallet.Data.AppModel.ProfileModel
+      P2PWallet.Data.AppModel.TickerRegistryModel
+      P2PWallet.Data.AppModel.TxBuilderModel
+      P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
+      P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskClose
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskCreation
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.AskUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.ExpiredClaim
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.InterestApplication
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LenderAddressUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LoanKeyBurn
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LoanPayment
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferAcceptance
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferClose
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferCreation
+      P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.OfferUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ContractExecution
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ExpiredClose
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.OptionsKeyBurn
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalClose
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalCreation
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalPurchase
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.ProposalUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.OptionsBuilderModel.WriterAddressUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel
+      P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapClose
+      P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapCreation
+      P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapExecution
+      P2PWallet.Data.AppModel.TxBuilderModel.SwapBuilderModel.SwapUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.TestMint
+      P2PWallet.Data.AppModel.TxBuilderModel.UserCertificate
+      P2PWallet.Data.AppModel.TxBuilderModel.UserInput
+      P2PWallet.Data.AppModel.TxBuilderModel.UserOutput
+      P2PWallet.Data.AppModel.TxBuilderModel.UserWithdrawal
+      P2PWallet.Data.Core.AddressBook
+      P2PWallet.Data.Core.AssetMaps
+      P2PWallet.Data.Core.BorrowerInformation
+      P2PWallet.Data.Core.Internal
+      P2PWallet.Data.Core.Internal.AppError
+      P2PWallet.Data.Core.Internal.Assets
+      P2PWallet.Data.Core.Internal.Bech32Address
+      P2PWallet.Data.Core.Internal.Config
+      P2PWallet.Data.Core.Internal.Files
+      P2PWallet.Data.Core.Internal.HardwareDevice
+      P2PWallet.Data.Core.Internal.KeyDerivation
+      P2PWallet.Data.Core.Internal.KeyWitness
+      P2PWallet.Data.Core.Internal.Network
+      P2PWallet.Data.Core.Internal.Notification
+      P2PWallet.Data.Core.Internal.PrimaryKeys
+      P2PWallet.Data.Core.Internal.PoolID
+      P2PWallet.Data.Core.Internal.ReferenceScript
+      P2PWallet.Data.Core.Internal.RegistrationStatus
+      P2PWallet.Data.Core.Internal.TxCBOR
       P2PWallet.Data.Core.Profile
-      P2PWallet.Data.Core.RegistrationStatus
-      P2PWallet.Data.Core.TxCBOR
-      P2PWallet.Data.Core.Witness
-      P2PWallet.Data.Files
+      P2PWallet.Data.Core.StakeReward
+      P2PWallet.Data.Core.Transaction
+      P2PWallet.Data.Core.TxBody
+      P2PWallet.Data.Core.Wallets
+      P2PWallet.Data.Core.Wallets.DexWallet
+      P2PWallet.Data.Core.Wallets.LoanWallet
+      P2PWallet.Data.Core.Wallets.OptionsWallet
+      P2PWallet.Data.Core.Wallets.PaymentWallet
+      P2PWallet.Data.Core.Wallets.StakeWallet
+      P2PWallet.Data.DeFi.CardanoLoans
+      P2PWallet.Data.DeFi.CardanoLoans.Internal
+      P2PWallet.Data.DeFi.CardanoOptions
+      P2PWallet.Data.DeFi.CardanoOptions.Internal
+      P2PWallet.Data.DeFi.CardanoSwaps.Common
+      P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps
+      P2PWallet.Data.DeFi.CardanoSwaps.TwoWaySwaps
       P2PWallet.Data.Koios.AddressUTxO
+      P2PWallet.Data.Koios.AssetTransaction
+      P2PWallet.Data.Koios.BudgetEstimations
+      P2PWallet.Data.Koios.LinkedPaymentAddresses
+      P2PWallet.Data.Koios.MintTransaction
       P2PWallet.Data.Koios.Pool
       P2PWallet.Data.Koios.PostTypes
       P2PWallet.Data.Koios.StakeAccount
       P2PWallet.Data.Koios.StakeReward
       P2PWallet.Data.Koios.Transaction
       P2PWallet.Data.Koios.TxSubmissionResponse
-      P2PWallet.Data.FilterLang
-      P2PWallet.Data.Lens
-      P2PWallet.Data.Plutus
-      P2PWallet.Data.Wallets
-      P2PWallet.Data.Wallets.PaymentWallet
-      P2PWallet.Data.Wallets.StakeWallet
+      P2PWallet.Database
+      P2PWallet.GUI.Colors
       P2PWallet.GUI.EventHandler
+      P2PWallet.GUI.EventHandler.AddressBookEvent
       P2PWallet.GUI.EventHandler.DelegationEvent
+      P2PWallet.GUI.EventHandler.DexEvent
       P2PWallet.GUI.EventHandler.HomeEvent
+      P2PWallet.GUI.EventHandler.LendingEvent
+      P2PWallet.GUI.EventHandler.LendingEvent.BorrowEvent
+      P2PWallet.GUI.EventHandler.LendingEvent.LendEvent
+      P2PWallet.GUI.EventHandler.LendingEvent.ResearchEvent
+      P2PWallet.GUI.EventHandler.OptionsEvent
+      P2PWallet.GUI.EventHandler.OptionsEvent.BuyerEvent
+      P2PWallet.GUI.EventHandler.OptionsEvent.ResearchEvent
+      P2PWallet.GUI.EventHandler.OptionsEvent.WriterEvent
+      P2PWallet.GUI.EventHandler.ProfileEvent
+      P2PWallet.GUI.EventHandler.TickerRegistryEvent
       P2PWallet.GUI.EventHandler.TxBuilderEvent
+      P2PWallet.GUI.EventHandler.TxBuilderEvent.LoanBuilderEvent
+      P2PWallet.GUI.EventHandler.TxBuilderEvent.OptionsBuilderEvent
+      P2PWallet.GUI.EventHandler.TxBuilderEvent.SwapBuilderEvent
+      P2PWallet.GUI.HelpMessages
+      P2PWallet.GUI.Icons
+      P2PWallet.GUI.MonomerOptics
       P2PWallet.GUI.UIBuilder
+      P2PWallet.GUI.Widgets.AddressBook
       P2PWallet.GUI.Widgets.Delegation
-      P2PWallet.GUI.Widgets.Delegation.Details
-      P2PWallet.GUI.Widgets.Delegation.PairStakeWallet
-      P2PWallet.GUI.Widgets.Delegation.RegisteredPools
-      P2PWallet.GUI.Widgets.Delegation.RewardHistory
-      P2PWallet.GUI.Widgets.Delegation.Summary
-      P2PWallet.GUI.Widgets.Delegation.WatchStakeWallet
+      P2PWallet.GUI.Widgets.Delegation.AddStakeWallet
+      P2PWallet.GUI.Widgets.Delegation.PoolPicker
+      P2PWallet.GUI.Widgets.Dex
+      P2PWallet.GUI.Widgets.Dex.Positions
+      P2PWallet.GUI.Widgets.Dex.Trade
+      P2PWallet.GUI.Widgets.Dex.Transactions
       P2PWallet.GUI.Widgets.Internal.Custom
+      P2PWallet.GUI.Widgets.Internal.Popup
       P2PWallet.GUI.Widgets.Home
       P2PWallet.GUI.Widgets.Home.About
-      P2PWallet.GUI.Widgets.Home.Assets
-      P2PWallet.GUI.Widgets.Home.Details
-      P2PWallet.GUI.Widgets.Home.PairPaymentWallet
+      P2PWallet.GUI.Widgets.Home.AddPaymentWallet
+      P2PWallet.GUI.Widgets.Home.NativeAssets
+      P2PWallet.GUI.Widgets.Home.NativeAssets.LoanKeys
+      P2PWallet.GUI.Widgets.Home.NativeAssets.OptionsKeys
       P2PWallet.GUI.Widgets.Home.Transactions
       P2PWallet.GUI.Widgets.Home.UTxOs
-      P2PWallet.GUI.Widgets.Home.WatchPaymentWallet
+      P2PWallet.GUI.Widgets.Lending
+      P2PWallet.GUI.Widgets.Lending.Borrow
+      P2PWallet.GUI.Widgets.Lending.Borrow.ActiveLoans
+      P2PWallet.GUI.Widgets.Lending.Borrow.CreditHistory
+      P2PWallet.GUI.Widgets.Lending.Borrow.LenderOffers
+      P2PWallet.GUI.Widgets.Lending.Borrow.OpenAsks
+      P2PWallet.GUI.Widgets.Lending.Borrow.Transactions
+      P2PWallet.GUI.Widgets.Lending.Lend
+      P2PWallet.GUI.Widgets.Lending.Lend.OfferHistory
+      P2PWallet.GUI.Widgets.Lending.Lend.OpenOffers
+      P2PWallet.GUI.Widgets.Lending.Lend.ViewLoanRequests
+      P2PWallet.GUI.Widgets.Lending.Research
+      P2PWallet.GUI.Widgets.Lending.Research.Actives
+      P2PWallet.GUI.Widgets.Lending.Research.Offers
       P2PWallet.GUI.Widgets.MainMenu
+      P2PWallet.GUI.Widgets.Networks
+      P2PWallet.GUI.Widgets.Notifications
+      P2PWallet.GUI.Widgets.Options
+      P2PWallet.GUI.Widgets.Options.Buyer
+      P2PWallet.GUI.Widgets.Options.Research
+      P2PWallet.GUI.Widgets.Options.Writer
+      P2PWallet.GUI.Widgets.Options.Writer.ActiveContracts
+      P2PWallet.GUI.Widgets.Options.Writer.OpenProposals
+      P2PWallet.GUI.Widgets.Options.Writer.Transactions
       P2PWallet.GUI.Widgets.Profiles
+      P2PWallet.GUI.Widgets.Settings
+      P2PWallet.GUI.Widgets.TickerRegistry
       P2PWallet.GUI.Widgets.TxBuilder
-      P2PWallet.GUI.Widgets.TxBuilder.AddCertificate
-      P2PWallet.GUI.Widgets.TxBuilder.AddChangeOutput
-      P2PWallet.GUI.Widgets.TxBuilder.AddInput
-      P2PWallet.GUI.Widgets.TxBuilder.AddOutput
-      P2PWallet.GUI.Widgets.TxBuilder.AddWithdrawal
-      P2PWallet.GUI.Widgets.TxBuilder.ExportTxBody
-      P2PWallet.GUI.Widgets.TxBuilder.Summary
+      P2PWallet.GUI.Widgets.TxBuilder.Internal
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCloses
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCreations
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.ExpiredClaims
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.InterestApplications
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.KeyBurns
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.LenderAddressUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.LoanPayments
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferAcceptances
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCloses
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCreations
+      P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ContractExecutions
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ExpiredCloses
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.KeyBurns
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalCloses
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalCreations
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalPurchases
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.ProposalUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.WriterAddressUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.StatusBar
+      P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder
+      P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCloses
+      P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapCreations
+      P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapExecutions
+      P2PWallet.GUI.Widgets.TxBuilder.SwapBuilder.SwapUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.TestMint
+      P2PWallet.GUI.Widgets.TxBuilder.UserCertificates
+      P2PWallet.GUI.Widgets.TxBuilder.UserInputs
+      P2PWallet.GUI.Widgets.TxBuilder.UserOutputs
+      P2PWallet.GUI.Widgets.TxBuilder.UserWithdrawals
+      P2PWallet.Plutus
       P2PWallet.Prelude
 
     -- Other library packages from which modules are imported.
     build-depends:
         base
-      , monomer ==1.5.1.0
+      , monomer
       , lens
+      , optics
+      , optics-core
       , text
       , data-default
       , time
@@ -153,13 +312,23 @@ executable p2p-wallet
       , plutus-ledger
       , plutus-ledger-api
       , plutus-tx
+      , plutus-script-utils
+      , cardano-api
       , prettyprinter
       , unliftio
       , containers
       , cardano-swaps
+      , cardano-loans
+      , cardano-options
       , relude
       , vector
-      , aeson-pretty
+      , sqlite-simple
+      , bech32
+      , bech32-th
+      , cryptonite
+      , memory
+      , base16-bytestring
+      , plutus-core
 
     -- Directories containing source files.
     hs-source-dirs:   app

@@ -1,0 +1,55 @@
+module P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder.KeyBurns
+  ( 
+    optionsKeyBurnsList
+  ) where
+
+import Monomer as M hiding (duration)
+
+import P2PWallet.Data.AppModel
+import P2PWallet.GUI.Colors
+import P2PWallet.GUI.Icons
+import P2PWallet.GUI.MonomerOptics()
+import P2PWallet.Prelude
+
+optionsKeyBurnsList :: [(Int,OptionsKeyBurn)] -> [AppNode]
+optionsKeyBurnsList = map utxoRow
+  where
+    utxoRow :: (Int, OptionsKeyBurn) -> AppNode
+    utxoRow (idx,OptionsKeyBurn{..}) = do
+      hstack
+        [ vstack
+            [ hstack
+                [ label ("Burn Excess Options Key For " <> walletAlias)
+                    `styleBasic` [textSize 10, textColor customBlue]
+                , filler
+                ]
+            , spacer_ [width 2]
+            , hstack
+                [ label "Contract ID:"
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , spacer_ [width 5]
+                , label (display $ contractIdAsset ^. #tokenName)
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , filler
+                ]
+            ] `styleBasic` 
+                [ padding 10
+                , bgColor customGray2
+                , radius 5
+                , border 1 black
+                ]
+        , spacer_ [width 3]
+        , box_ [alignCenter,alignMiddle] $ tooltip_ "Remove Action" [tooltipDelay 0] $
+            button closeCircleIcon (optionsBuilderEvent $ RemoveSelectedOptionsKeyBurn idx)
+              `styleBasic` 
+                [ textSize 10
+                , textColor customRed
+                , textFont "Remix"
+                , textMiddle
+                , padding 3
+                , radius 3
+                , bgColor transparent
+                , border 0 transparent
+                ]
+              `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+        ]
