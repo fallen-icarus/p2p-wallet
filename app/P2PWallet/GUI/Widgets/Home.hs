@@ -106,7 +106,7 @@ mainWidget model@AppModel{scene=_,..} =
       | oldHome ^. #assetFilterModel % #search /= newHome ^. #assetFilterModel % #search = False
       | oldHome ^. #txFilterModel % #search /= newHome ^. #txFilterModel % #search = False
       | oldHome ^. #txFilterModel % #dateRange /= newHome ^. #txFilterModel % #dateRange = False
-      | otherwise = True
+      | otherwise = oldHome /= newHome
 
     (walletTypeTip,walletTypeIcon)
       | isNothing $ homeModel ^. #selectedWallet % #paymentKeyDerivation = ("Watched", watchedIcon)
