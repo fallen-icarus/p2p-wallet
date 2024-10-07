@@ -83,7 +83,7 @@ researchWidget model@AppModel{lendingModel} = do
           activesFilterModelRequiresUpdate 
             (oldLending ^. #researchModel % #activesFilterModel)
             (newLending ^. #researchModel % #activesFilterModel)
-      | otherwise = True
+      | otherwise = oldLending /= newLending
 
 -- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
 offersFilterModelRequiresUpdate :: OfferResearchFilterModel -> OfferResearchFilterModel -> Bool
@@ -95,7 +95,7 @@ offersFilterModelRequiresUpdate old new
   | old ^. #newLoanOfferConfiguration % #minDuration /= new ^. #newLoanOfferConfiguration % #minDuration = False
   | old ^. #newLoanOfferConfiguration % #maxDuration /= new ^. #newLoanOfferConfiguration % #maxDuration = False
   | old ^. #newLoanOfferConfiguration % #collateral /= new ^. #newLoanOfferConfiguration % #collateral = False
-  | otherwise = True
+  | otherwise = old /= new
 
 -- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
 activesFilterModelRequiresUpdate :: ActiveResearchFilterModel -> ActiveResearchFilterModel -> Bool
@@ -107,4 +107,4 @@ activesFilterModelRequiresUpdate old new
   | old ^. #newActiveLoanConfiguration % #minDuration /= new ^. #newActiveLoanConfiguration % #minDuration = False
   | old ^. #newActiveLoanConfiguration % #maxDuration /= new ^. #newActiveLoanConfiguration % #maxDuration = False
   | old ^. #newActiveLoanConfiguration % #collateral /= new ^. #newActiveLoanConfiguration % #collateral = False
-  | otherwise = True
+  | otherwise = old /= new

@@ -92,7 +92,7 @@ lendWidget model@AppModel{lendingModel} = do
           offerHistoryRequiresUpdate
               (oldLending ^. #lendModel % #txFilterModel)
               (newLending ^. #lendModel % #txFilterModel)
-      | otherwise = True
+      | otherwise = oldLending /= newLending
 
 -- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
 openOffersFilterModelRequiresUpdate :: OpenOffersFilterModel -> OpenOffersFilterModel -> Bool
@@ -105,7 +105,7 @@ openOffersFilterModelRequiresUpdate old new
   | old ^. #minDuration /= new ^. #minDuration = False
   | old ^. #maxDuration /= new ^. #maxDuration = False
   | old ^. #collateral /= new ^. #collateral = False
-  | otherwise = True
+  | otherwise = old /= new
 
 -- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
 offerHistoryRequiresUpdate :: LendTxFilterModel -> LendTxFilterModel -> Bool
@@ -113,4 +113,4 @@ offerHistoryRequiresUpdate old new
   | old ^. #loanAsset /= new ^. #loanAsset = False
   | old ^. #collateral /= new ^. #collateral = False
   | old ^. #dateRange /= new ^. #dateRange = False
-  | otherwise = True
+  | otherwise = old /= new

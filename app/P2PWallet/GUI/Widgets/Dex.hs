@@ -96,7 +96,7 @@ mainWidget model@AppModel{scene=_,..} =
       | oldDex ^. #positionsFilterModel % #askAsset /= 
           newDex ^. #positionsFilterModel % #askAsset = False
       | oldDex ^. #txFilterModel /= newDex ^. #txFilterModel = False
-      | otherwise = True
+      | otherwise = oldDex /= newDex
 
     (walletTypeTip,walletTypeIcon)
       | isNothing $ dexModel ^. #selectedWallet % #stakeKeyDerivation = ("Watched", watchedIcon)

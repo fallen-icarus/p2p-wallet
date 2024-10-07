@@ -75,7 +75,7 @@ writerWidget model@AppModel{optionsModel} = do
           txFilterModelRequiresUpdate
               (oldOptions ^. #writerModel % #txFilterModel)
               (newOptions ^. #writerModel % #txFilterModel)
-      | otherwise = True
+      | otherwise = oldOptions /= newOptions
 
 -- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
 openProposalsFilterModelRequiresUpdate 
@@ -90,7 +90,7 @@ openProposalsFilterModelRequiresUpdate old new
   | old ^. #offerAsset /= new ^. #offerAsset = False
   | old ^. #askAsset /= new ^. #askAsset = False
   | old ^. #premiumAsset /= new ^. #premiumAsset = False
-  | otherwise = True
+  | otherwise = old /= new
 
 -- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
 txFilterModelRequiresUpdate 
@@ -102,4 +102,4 @@ txFilterModelRequiresUpdate old new
   | old ^. #offerAsset /= new ^. #offerAsset = False
   | old ^. #askAsset /= new ^. #askAsset = False
   | old ^. #premiumAsset /= new ^. #premiumAsset = False
-  | otherwise = True
+  | otherwise = old /= new
