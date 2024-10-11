@@ -1,6 +1,8 @@
-{-# LANGUAGE NoFieldSelectors #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-
 
@@ -12,16 +14,17 @@ module P2PWallet.Data.Koios.StakeReward where
 
 import Data.Aeson
 
-import P2PWallet.Data.Core.Asset
-import P2PWallet.Data.Core.PoolID
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Prelude
 
 data StakeReward = StakeReward
-  { _earnedEpoch :: Integer
-  , _spendableEpoch :: Integer
-  , _amount :: Lovelace
-  , _poolId :: PoolID
+  { earnedEpoch :: Integer
+  , spendableEpoch :: Integer
+  , amount :: Lovelace
+  , poolId :: PoolID
   } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''StakeReward
 
 instance FromJSON StakeReward where
   parseJSON = withObject "StakeReward" $ \o ->
@@ -30,3 +33,11 @@ instance FromJSON StakeReward where
         <*> o .: "spendable_epoch"
         <*> o .: "amount"
         <*> o .: "pool_id"
+
+-- | This type is used to unwrap the koios response.
+newtype StakeRewards = StakeRewards { unStakeRewards :: [StakeReward] }
+
+instance FromJSON StakeRewards where
+  parseJSON = withObject "StakeRewards" $ \o ->
+      StakeRewards
+        <$> o .: "rewards"

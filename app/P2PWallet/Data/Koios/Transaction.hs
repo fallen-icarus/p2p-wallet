@@ -1,7 +1,8 @@
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE NoFieldSelectors #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-
 
@@ -13,51 +14,39 @@ which is why there is a dedicated `TransactionUTxO` type.
 module P2PWallet.Data.Koios.Transaction where
 
 import Data.Aeson
-import Data.Aeson.Types
-import Prettyprinter
+import Data.Aeson.Types (Parser, parseMaybe)
 
 import P2PWallet.Prelude
-import P2PWallet.Data.Core.Asset
-import P2PWallet.Data.Core.Bech32Address
-import P2PWallet.Data.Core.PoolID
-import P2PWallet.Data.Plutus
+import P2PWallet.Data.Core.Internal.Assets
+import P2PWallet.Data.Core.Internal.Bech32Address
+import P2PWallet.Data.Core.Internal.PoolID
+import P2PWallet.Plutus
 
+-------------------------------------------------
+-- TransactionUTxO
+-------------------------------------------------
 -- | The type respesenting the UTxOs returned as part of the tx_info API endpoint.
 data TransactionUTxO = TransactionUTxO
-  { _paymentAddress :: PaymentAddress
-  , _stakeAddress :: Maybe StakeAddress
-  , _utxoRef :: TxOutRef
-  , _lovelaces :: Lovelace
-  , _datumHash :: Maybe Text
-  , _inlineDatum :: Maybe Value
-  , _referenceScriptHash :: Maybe Text
-  , _nativeAssets :: [NativeAsset]
+  { paymentAddress :: PaymentAddress
+  , stakeAddress :: Maybe StakeAddress
+  , utxoRef :: TxOutRef
+  , lovelace :: Lovelace
+  , datumHash :: Maybe Text
+  , inlineDatum :: Maybe Value
+  , referenceScriptHash :: Maybe Text
+  , nativeAssets :: [NativeAsset]
   } deriving (Show,Eq)
 
-instance Pretty TransactionUTxO where
-  pretty TransactionUTxO{..} = align $
-    vsep [ "Payment Address:" <+> pretty _paymentAddress
-         , "Stake Address:" <+> maybe "none" pretty _stakeAddress
-         , "Output Reference:" <+> pretty @Text (showTxOutRef _utxoRef)
-         , "Value:" <+> pretty @String (printf "%D ADA" $ toADA _lovelaces)
-         , "Datum Hash:" <+> maybe "none" pretty _datumHash 
-         , "Inline Datum:" <+> maybe "none" (pretty . showValue) _inlineDatum
-         , "Reference Script Hash:" <+> maybe "none" pretty _referenceScriptHash
-         , if null _nativeAssets 
-           then "Native Assets: none"
-           else vsep [ "Native Assets:"
-                     , indent 4 $ align $ vsep $ map pretty _nativeAssets
-                     ]
-         ]
+makeFieldLabelsNoPrefix ''TransactionUTxO
 
 instance FromJSON TransactionUTxO where
   parseJSON =
       withObject "TransactionUTxO" $ \o ->
         TransactionUTxO
-          <$> (o .: "payment_addr" >>= withObject "payment_addr" (\o' -> o' .: "bech32"))
+          <$> (o .: "payment_addr" >>= withObject "payment_addr" (.: "bech32"))
           <*> o .: "stake_addr"
           <*> ( (concatRef <$> o .: "tx_hash" <*> o .: "tx_index") >>= 
-                  maybe mzero return . readTxOutRef)
+                  maybe mzero return . parseTxOutRef)
           <*> o .: "value"
           <*> o .: "datum_hash"
           <*> (o .: "inline_datum" >>= 
@@ -69,57 +58,59 @@ instance FromJSON TransactionUTxO where
       concatRef :: Text -> Integer -> Text
       concatRef hash idx = hash <> "#" <> show idx
 
+-------------------------------------------------
+-- TransactionCertificate
+-------------------------------------------------
 data CertificateType
-  = DelegationType
-  | StakeRegistrationType
-  | StakeDeregistrationType
-  | PoolUpdateType
-  | PoolRetireType
-  | ParamProposalType
-  | ReserveMirType
-  | TreasuryMirType
+  = DelegationCertificate
+  | StakeRegistrationCertificate
+  | StakeDeregistrationCertificate
+  | PoolUpdateCertificate
+  | PoolRetireCertificate
+  | ParamProposalCertificate
+  | ReserveMirCertificate
+  | TreasuryMirCertificate
   deriving (Show,Eq)
 
-instance Pretty CertificateType where
-  pretty DelegationType = "Delegation"
-  pretty StakeRegistrationType = "Stake Registration"
-  pretty StakeDeregistrationType = "Stake Deregistration"
-  pretty PoolUpdateType = "Pool Update"
-  pretty PoolRetireType = "Pool Retire"
-  pretty ReserveMirType = "Reserve MIR"
-  pretty TreasuryMirType = "Treasury MIR"
-  pretty ParamProposalType = "Param Proposal"
+instance Display CertificateType where
+  display DelegationCertificate = "Delegation"
+  display StakeRegistrationCertificate = "Stake Registration"
+  display StakeDeregistrationCertificate = "Stake Deregistration"
+  display PoolUpdateCertificate = "Pool Update"
+  display PoolRetireCertificate = "Pool Retirement"
+  display ParamProposalCertificate = "Parameter Proposal"
+  display ReserveMirCertificate = "Reserve MIR"
+  display TreasuryMirCertificate = "Treasury MIR"
 
-readCertificateType :: Text -> Maybe CertificateType
-readCertificateType "delegation" = Just DelegationType
-readCertificateType "stake_registration" = Just StakeRegistrationType
-readCertificateType "stake_deregistration" = Just StakeDeregistrationType
-readCertificateType "pool_update" = Just PoolUpdateType
-readCertificateType "pool_retire" = Just PoolRetireType
-readCertificateType "reserve_MIR" = Just ReserveMirType
-readCertificateType "treasury_MIR" = Just TreasuryMirType
-readCertificateType "param_proposal" = Just ParamProposalType
-readCertificateType _ = Nothing
+parseCertificateType :: Text -> Maybe CertificateType
+parseCertificateType "pool_delegation" = Just DelegationCertificate
+parseCertificateType "stake_registration" = Just StakeRegistrationCertificate
+parseCertificateType "stake_deregistration" = Just StakeDeregistrationCertificate
+parseCertificateType "pool_update" = Just PoolUpdateCertificate
+parseCertificateType "pool_retire" = Just PoolRetireCertificate
+parseCertificateType "reserve_MIR" = Just ReserveMirCertificate
+parseCertificateType "treasury_MIR" = Just TreasuryMirCertificate
+parseCertificateType "param_proposal" = Just ParamProposalCertificate
+parseCertificateType _ = Nothing
+
+showCertificateType :: CertificateType -> Text
+showCertificateType DelegationCertificate = "pool_delegation"
+showCertificateType StakeRegistrationCertificate = "stake_registration"
+showCertificateType StakeDeregistrationCertificate = "stake_deregistration"
+showCertificateType PoolUpdateCertificate = "pool_update"
+showCertificateType PoolRetireCertificate = "pool_retire"
+showCertificateType ParamProposalCertificate = "param_proposal"
+showCertificateType ReserveMirCertificate = "reserve_MIR"
+showCertificateType TreasuryMirCertificate = "treasury_MIR"
 
 data CertificateInfo
-  = DelegationInfo
-      { _poolId :: PoolID
-      , _stakeAddress :: StakeAddress
-      }
+  = DelegationInfo { poolId :: PoolID , stakeAddress :: StakeAddress }
   -- Both Registration and Deregistration have the same info.
-  | StakeRegistrationInfo
-      { _stakeAddress :: StakeAddress
-      }
+  | StakeRegistrationInfo { stakeAddress :: StakeAddress }
   | OtherInfo Value
   deriving (Show,Eq)
 
-instance Pretty CertificateInfo where
-  pretty (OtherInfo v) = "Info:" <+> pretty (showValue v)
-  pretty StakeRegistrationInfo{..} = "Stake Address:" <+> pretty (toText _stakeAddress)
-  pretty DelegationInfo{..} = 
-    vsep [ "Pool ID:" <+> pretty (toText _poolId)
-         , "Stake Address:" <+> pretty (toText _stakeAddress)
-         ]
+makePrisms ''CertificateInfo
 
 instance FromJSON CertificateInfo where
   parseJSON value = 
@@ -139,29 +130,47 @@ instance FromJSON CertificateInfo where
         StakeRegistrationInfo
           <$> o .: "stake_address"
 
+instance ToJSON CertificateInfo where
+  toJSON DelegationInfo{..} =
+    object [ "pool_id_bech32" .= poolId
+           , "stake_address" .= stakeAddress
+           ]
+
+  toJSON StakeRegistrationInfo{..} =
+    object [ "stake_address" .= stakeAddress ]
+
+  toJSON (OtherInfo value) = value
+
 data TransactionCertificate = TransactionCertificate
-  { _type :: CertificateType
-  , _info :: CertificateInfo
+  { certificateType :: CertificateType
+  , info :: CertificateInfo
   } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TransactionCertificate
 
 instance FromJSON TransactionCertificate where
   parseJSON =
     withObject "TransactionCertificate" $ \o ->
       TransactionCertificate
-        <$> (o .: "type" >>= maybe mzero return . readCertificateType)
+        <$> (o .: "type" >>= maybe mzero return . parseCertificateType)
         <*> o .: "info"
 
-instance Pretty TransactionCertificate where
-  pretty TransactionCertificate{..} =
-    vsep [ "Type:" <+> pretty _type
-         , pretty _info
-         ]
+instance ToJSON TransactionCertificate where
+  toJSON TransactionCertificate{..} =
+    object [ "type" .= showCertificateType certificateType
+           , "info" .= info
+           ]
 
+-------------------------------------------------
+-- TransactionWithdrawal
+-------------------------------------------------
 -- | The type representing withdrawal information in a transaction.
 data TransactionWithdrawal = TransactionWithdrawal
-  { _lovelaces :: Lovelace
-  , _stakeAddress :: StakeAddress
+  { lovelace :: Lovelace
+  , stakeAddress :: StakeAddress
   } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TransactionWithdrawal
 
 instance FromJSON TransactionWithdrawal where
   parseJSON = withObject "TransactionWithdrawal" $ \o ->
@@ -169,33 +178,97 @@ instance FromJSON TransactionWithdrawal where
       <$> o .: "amount"
       <*> o .: "stake_addr"
 
-instance Pretty TransactionWithdrawal where
-  pretty TransactionWithdrawal{..} =
-    vsep [ "Stake Address:" <+> pretty _stakeAddress
-         , "Value:" <+> fromString (printf "%D ADA" $ toADA _lovelaces)
-         ]
+instance ToJSON TransactionWithdrawal where
+  toJSON TransactionWithdrawal{..} =
+    object [ "amount" .= lovelace
+           , "stake_addr" .= stakeAddress
+           ]
 
+-------------------------------------------------
+-- TransactionPlutusContract
+-------------------------------------------------
+-- | The purpose for the contract execution.
+data ContractPurpose
+  = SpendPurpose
+  | MintPurpose
+  | RewardPurpose
+  | OtherPurpose Text
+  deriving (Show,Eq)
+
+instance FromJSON ContractPurpose where
+  parseJSON = withText "ContractPurpose" $ \case
+    "spend" -> return SpendPurpose
+    "mint" -> return MintPurpose
+    "reward" -> return RewardPurpose
+    x -> return $ OtherPurpose x
+
+instance ToJSON ContractPurpose where
+  toJSON SpendPurpose = toJSON @Text "spend"
+  toJSON MintPurpose = toJSON @Text "mint"
+  toJSON RewardPurpose = toJSON @Text "reward"
+  toJSON (OtherPurpose x) = toJSON x
+
+instance Display ContractPurpose where
+  display SpendPurpose = "Spending"
+  display MintPurpose = "Minting/Burning"
+  display RewardPurpose = "Rewards Withdrawal"
+  display (OtherPurpose x) = "Other Purpose: " <> x
+
+-- | The type representing plutus contract execution information.
+data TransactionPlutusContract = TransactionPlutusContract
+  { paymentAddress :: Maybe PaymentAddress
+  , spendsInput :: Maybe TxOutRef
+  , scriptHash :: Text
+  , datum :: Maybe Value
+  , redeemer :: Value
+  , purpose :: ContractPurpose
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''TransactionPlutusContract
+
+instance FromJSON TransactionPlutusContract where
+  parseJSON = withObject "TransactionPlutusContract" $ \o ->
+      TransactionPlutusContract
+        <$> o .: "address"
+        <*> (o .:? "spends_input" >>= parseInputRef)
+        <*> o .: "script_hash"
+        <*> (o .: "input" >>= (.: "datum") >>= maybe (return Nothing) (.: "value"))
+        <*> (o .: "input" >>= (.: "redeemer") >>= (.: "datum") >>= (.: "value"))
+        <*> (o .: "input" >>= (.: "redeemer") >>= (.: "purpose"))
+    where
+      concatRef :: Text -> Integer -> Text
+      concatRef hash idx = hash <> "#" <> show idx
+
+      parseInputRef :: Maybe Value -> Parser (Maybe TxOutRef)
+      parseInputRef Nothing = return Nothing
+      parseInputRef (Just val) = flip (withObject "spends_input") val $ \o -> do
+        res <- concatRef <$> o .: "tx_hash" <*> o .: "tx_index"
+        maybe mzero (return . Just) $ parseTxOutRef res
+
+-------------------------------------------------
+-- Transaction
+-------------------------------------------------
 -- | The type respesenting the overall information returned with the tx_info query.
 data Transaction = Transaction
-  { _txHash :: Text
-  , _blockTime :: POSIXTime
-  , _blockHeight :: Integer
-  , _fee :: Lovelace
-  , _size :: Integer
-  , _deposit :: Lovelace
-  , _invalidBefore :: Maybe Text
-  , _invalidAfter :: Maybe Text
-  , _collateralInputs :: [TransactionUTxO]
-  , _collateralOutput :: Maybe TransactionUTxO
-  , _referenceInputs :: [TransactionUTxO]
-  , _inputs :: [TransactionUTxO]
-  , _outputs :: [TransactionUTxO]
-  , _certificates :: [TransactionCertificate]
-  , _withdrawals :: [TransactionWithdrawal]
-  -- , _nativeAssetsMinted :: Value
-  -- , _nativeScripts :: Value
-  -- , _plutusContracts :: Value
+  { txHash :: Text
+  , blockTime :: POSIXTime
+  , blockHeight :: Integer
+  , fee :: Lovelace
+  , size :: Integer
+  , deposit :: Lovelace
+  , invalidBefore :: Maybe Text
+  , invalidAfter :: Maybe Text
+  , collateralInputs :: [TransactionUTxO]
+  , referenceInputs :: [TransactionUTxO]
+  , inputs :: [TransactionUTxO]
+  , outputs :: [TransactionUTxO]
+  , certificates :: [TransactionCertificate]
+  , withdrawals :: [TransactionWithdrawal]
+  , mints :: [NativeAsset]
+  , plutusContracts :: [TransactionPlutusContract]
   } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''Transaction
 
 instance FromJSON Transaction where
   parseJSON =
@@ -210,12 +283,39 @@ instance FromJSON Transaction where
         <*> o .: "invalid_before"
         <*> o .: "invalid_after"
         <*> o .: "collateral_inputs"
-        <*> o .: "collateral_output"
         <*> o .: "reference_inputs"
         <*> o .: "inputs"
         <*> o .: "outputs"
         <*> o .: "certificates"
         <*> o .: "withdrawals"
-        -- <*> o .: "assets_minted"
-        -- <*> o .: "native_scripts"
-        -- <*> o .: "plutus_contracts"
+        <*> o .: "assets_minted"
+        <*> o .: "plutus_contracts"
+
+-------------------------------------------------
+-- Event Transaction
+-------------------------------------------------
+-- | The type respesenting only some of the information returned with the tx_info query. This
+-- is useful for determining a chain of events for the protocols.
+data EventTransaction = EventTransaction
+  { txHash :: Text
+  , blockTime :: POSIXTime
+  , blockHeight :: Integer
+  , inputs :: [TransactionUTxO]
+  , outputs :: [TransactionUTxO]
+  , mints :: [NativeAsset]
+  , plutusContracts :: [TransactionPlutusContract]
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''EventTransaction
+
+instance FromJSON EventTransaction where
+  parseJSON =
+    withObject "EventTransaction" $ \o ->
+      EventTransaction
+        <$> o .: "tx_hash"
+        <*> o .: "tx_timestamp"
+        <*> o .: "block_height"
+        <*> o .: "inputs"
+        <*> o .: "outputs"
+        <*> o .: "assets_minted"
+        <*> o .: "plutus_contracts"
