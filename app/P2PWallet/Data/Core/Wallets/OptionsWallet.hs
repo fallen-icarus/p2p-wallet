@@ -193,7 +193,7 @@ instance TableName OptionsWallet where
 
 instance Creatable OptionsWallet where
   createStmt = Query $ unwords
-    [ "CREATE TABLE " <> tableName @OptionsWallet
+    [ "CREATE TABLE IF NOT EXISTS " <> tableName @OptionsWallet
     , "("
     , unwords $ intersperse ","
         [ "network TEXT NOT NULL"

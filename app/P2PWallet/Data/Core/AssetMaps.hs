@@ -48,7 +48,7 @@ instance TableName TickerInfo where
 
 instance Creatable TickerInfo where
   createStmt = Query $ unwords
-    [ "CREATE TABLE " <> tableName @TickerInfo
+    [ "CREATE TABLE IF NOT EXISTS " <> tableName @TickerInfo
     , "("
     , unwords $ intersperse ","
         [ "ticker TEXT PRIMARY KEY"
@@ -304,15 +304,15 @@ parseFormattedAssetQuantity reverseTickerMap asset@NativeAsset{policyId,tokenNam
 -- Showing Native Asset Balances
 -------------------------------------------------
 -- | Show the asset balance using the ticker if possible. If a ticker is not set,
--- using a fingerprint instead can be toggled with True/False. It is not always
--- desirable to use the fingerprint when a ticker is not set.
+-- using the full name instead can be toggled with True/False. It is not always
+-- desirable to use the name when a ticker is not set.
 showAssetBalance :: Bool -> ReverseTickerMap -> NativeAsset -> Text
-showAssetBalance withFingerprint reverseMap NativeAsset{..}
+showAssetBalance withFullName reverseMap NativeAsset{..}
   | policyId == "" = display $ Lovelace quantity 
   | otherwise = case Map.lookup (policyId,tokenName) reverseMap of
       Nothing ->
-        if withFingerprint
-        then show quantity <> " " <> display fingerprint
+        if withFullName
+        then show quantity <> " " <> display policyId <> "." <> display tokenName
         else show quantity
       Just (ticker,decimal) -> unwords
         [ show $ formatQuantity decimal quantity
@@ -328,12 +328,12 @@ showAssetQuantityOnly reverseMap NativeAsset{..}
       Just (_,decimal) -> show $ formatQuantity decimal quantity
 
 -- | Show the asset name using the ticker if possible. If a ticker is not set,
--- use the asset fingerprint.
+-- use the asset full name.
 showAssetNameOnly :: ReverseTickerMap -> NativeAsset -> Text
 showAssetNameOnly reverseMap NativeAsset{..}
   | policyId == "" = "ADA"
   | otherwise = case Map.lookup (policyId,tokenName) reverseMap of
-      Nothing -> display fingerprint
+      Nothing -> display policyId <> "." <> display tokenName
       Just (ticker,_) -> display ticker
 
 -------------------------------------------------

@@ -308,6 +308,22 @@ handleHomeEvent model@AppModel{..} evt = case evt of
             ]
 
   -----------------------------------------------
+  -- Add Multiple Personal UTxOs to Builder
+  -----------------------------------------------
+  AddMultipleSelectedUserInputs (mMsg, personalUTxOs) ->
+    let PaymentWallet{alias,paymentAddress,paymentKeyDerivation} = homeModel ^. #selectedWallet
+        newInputs = map (personalUTxOToUserInput alias paymentAddress paymentKeyDerivation) personalUTxOs
+     in case processMultipleNewUserInputs newInputs txBuilderModel of
+          Left err -> [ Task $ return $ Alert err ]
+          Right newTxModel ->
+            [ Model $ model & #txBuilderModel .~ newTxModel
+            , Event $ Alert $ unlines $ intersperse "" $ filter (/= "")
+                [ "Successfully added to builder!"
+                , fromMaybe "" mMsg
+                ]
+            ]
+
+  -----------------------------------------------
   -- Add Collateral UTxO to Builder
   -----------------------------------------------
   AddSelectedCollateralInput personalUTxO ->
@@ -337,11 +353,23 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   InspectCorrespondingLoan loanId -> 
     [ Model $ model & #homeModel % #inspectedLoan ?~ loanId 
     , Event $ case Map.lookup loanId (lendingModel ^. #cachedLoanHistories) of
-        Nothing -> LendingEvent $ LookupLoanHistory $ StartProcess $ Just loanId
+        Nothing -> LendingEvent $ LookupLoanHistories $ StartProcess $ Just [loanId]
         Just _ -> AppInit
     ]
   CloseInspectedCorrespondingLoan -> 
     [ Model $ model & #homeModel % #inspectedLoan .~ Nothing ]
+
+  -----------------------------------------------
+  -- Inspecting Borrower Loan
+  -----------------------------------------------
+  InspectBorrowerLoan loanId -> 
+    [ Model $ model & #homeModel % #inspectedBorrowerLoan ?~ loanId 
+    , Event $ case Map.lookup loanId (lendingModel ^. #cachedLoanHistories) of
+        Nothing -> LendingEvent $ LookupLoanHistories $ StartProcess $ Just [loanId]
+        Just _ -> AppInit
+    ]
+  CloseInspectedBorrowerLoan -> 
+    [ Model $ model & #homeModel % #inspectedBorrowerLoan .~ Nothing ]
 
   -----------------------------------------------
   -- Add Expired Collateral claim to builder
@@ -385,6 +413,28 @@ handleHomeEvent model@AppModel{..} evt = case evt of
                 ]
              ]
         else [Event $ HomeEvent $ AddSelectedUserInput (mMsg, newInput)]
+
+  -----------------------------------------------
+  -- Add Multiple Key Inputs
+  -----------------------------------------------
+  AddMultipleKeyInputs (mMsg, keys) ->
+    let PaymentWallet{utxos} = homeModel ^. #selectedWallet
+        currentInputs = map (view #utxoRef . snd) $ txBuilderModel ^. #userInputs
+        newInputs = filter ((`notElem` currentInputs) . view #utxoRef) 
+                  $ filter (any (`elem` keys) . view #nativeAssets) utxos
+     in if null newInputs
+        then [ Event $ Alert $ unlines $ intersperse "" $ filter (/= "")
+                [ "Successfully added to builder!"
+                , fromMaybe "" mMsg
+                ]
+             ]
+        else let newMsg = Just $ unlines 
+                        $ intersperse "" 
+                        $ filter (/= "") 
+                        [ fromMaybe "" mMsg
+                        , "Also added UTxOs with Key NFTs to builder."
+                        ] 
+              in [ Event $ HomeEvent $ AddMultipleSelectedUserInputs (newMsg, newInputs)]
 
   -----------------------------------------------
   -- Add Loan Key Burn to builder
@@ -478,7 +528,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   InspectCorrespondingOptionsContract contractId -> 
     [ Model $ model & #homeModel % #inspectedOptionsContract ?~ contractId
     , Event $ case Map.lookup contractId (optionsModel ^. #cachedKeyContracts) of
-        Nothing -> OptionsEvent $ LookupOptionsContract $ StartProcess $ Just contractId
+        Nothing -> OptionsEvent $ LookupOptionsContracts $ StartProcess $ Just [contractId]
         Just _ -> AppInit
     ]
   CloseInspectedCorrespondingOptionsContract -> 
@@ -529,6 +579,117 @@ handleHomeEvent model@AppModel{..} evt = case evt of
             else
               [ Event $ Alert onlyOneOptionsActiveBeaconActionError ]
 
+  -----------------------------------------------
+  -- Events for the NFT batches
+  -----------------------------------------------
+  NftBatchEvent modal ->  case modal of
+    AddNftToBatch nft ->
+      let currentQueue = homeModel ^. #queuedNFTs
+       in case maybeHead currentQueue of
+            Nothing -> 
+              [ Model $ model 
+                  & #homeModel % #queuedNFTs %~ flip snoc nft
+                  & #homeModel % #queuedNFTs %~ sort
+                  & #homeModel % #queuedNFTs %~ ordNub -- remove duplicates
+              , Event $ Alert "Successfully added to batch." 
+              ]
+            Just currentAsset -> 
+              if currentAsset ^. #policyId == nft ^. #policyId then
+                [ Model $ model 
+                    & #homeModel % #queuedNFTs %~ flip snoc nft
+                    & #homeModel % #queuedNFTs %~ sort
+                    & #homeModel % #queuedNFTs %~ ordNub -- remove duplicates
+                , Event $ Alert "Successfully added to batch." 
+                ]
+              else
+                [ Event $ Alert "All NFTs in the batch must have the same policy id." ]
+    ClearNftBatch -> [ Model $ model & #homeModel % #queuedNFTs .~ [] ]
+    ViewNftBatch -> 
+      [ Model $ model & #homeModel % #viewingQueue .~ True ]
+    CloseNftBatchView -> 
+      [ Model $ model & #homeModel % #viewingQueue .~ False ]
+    RemoveNftFromBatch nft -> 
+      [ Model $ model & #homeModel % #queuedNFTs %~ filter (/= nft) 
+      , Event $ Alert "Successfully removed from batch."
+      ]
+    ConfirmNftBatch modal' -> case modal' of
+      StartAdding mNfts ->
+        let nfts = fromMaybe [] mNfts
+            currentPaymentWallet = homeModel ^. #selectedWallet
+            firstMarketWallet@MarketWallet{alias,network} = 
+              fromMaybe def $ maybeHead $ knownWallets ^. #marketWallets
+            newSale = 
+              createNewSaleCreation network firstMarketWallet currentPaymentWallet alias nfts
+         in [ Model $ model
+                & #homeModel % #viewingQueue .~ False
+                & #homeModel % #newSaleCreation ?~ newSale
+            ]
+      CancelAdding -> 
+        [ Model $ model 
+            & #homeModel % #viewingQueue .~ True -- return to the batch view
+            & #homeModel % #newSaleCreation .~ Nothing
+        ]
+      ConfirmAdding ->
+        [ Model $ model & #waitingStatus % #addingToBuilder .~ True
+        , Task $ runActionOrAlert (HomeEvent . NftBatchEvent . ConfirmNftBatch . AddResult) $ do
+            newCreation <- fromJustOrAppError "homeModel newSaleCreation is Nothing" $ 
+              homeModel ^. #newSaleCreation
+
+            verifiedCreation <- fromRightOrAppError $ verifyNewSaleCreation tickerMap newCreation
+
+            -- There should only be one output in the `TxBody` for this action. The calculation must
+            -- be done twice because the datum must be updated with the minUTxOValue as well.
+            minUTxOValue <- do
+              minUTxOValue1 <- 
+                fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+                  calculateMinUTxOValue 
+                    (config ^. #network) 
+                    (txBuilderModel ^? #parameters % _Just % _1) 
+                    -- Use a blank aftermarketBuilderModel to calculate the minUTxOValue for the new
+                    -- sale.
+                    (emptyAftermarketBuilderModel & #saleCreations .~ [(0,verifiedCreation)])
+
+              fromJustOrAppError "`calculateMinUTxOValue` did not return results" . maybeHead =<<
+                calculateMinUTxOValue 
+                  (config ^. #network) 
+                  (txBuilderModel ^? #parameters % _Just % _1) 
+                  -- Use a blank aftermarketBuilderModel to calculate the minUTxOValue for the new
+                  -- sale.
+                  (emptyAftermarketBuilderModel & #saleCreations .~ 
+                    [(0,verifiedCreation & #deposit .~ minUTxOValue1)])
+
+            -- Return the `SaleCreation` with the updated deposit field.
+            return $ verifiedCreation & #deposit .~ minUTxOValue
+        ]
+      AddResult verifiedCreation ->
+        -- Get the index for the new creation.
+        let newIdx = length $ txBuilderModel ^. #aftermarketBuilderModel % #saleCreations 
+        in  [ Model $ model 
+                & #waitingStatus % #addingToBuilder .~ False
+                & #txBuilderModel % #aftermarketBuilderModel % #saleCreations %~ 
+                    flip snoc (newIdx,verifiedCreation)
+                & #homeModel % #newSaleCreation .~ Nothing
+                & #homeModel % #queuedNFTs .~ []
+                & #txBuilderModel %~ balanceTx
+            -- Find the required inputs and add them to the builder.
+            , Event $ HomeEvent $ AddMultipleKeyInputs
+                ( Just $ "This new sale requires a deposit of: " <> display (verifiedCreation ^. #deposit)
+                , verifiedCreation ^. #nfts
+                )
+            ]
+
+  -----------------------------------------------
+  -- Inspecting Borrower Info
+  -----------------------------------------------
+  InspectKeyBorrowerInformation borrower@(borrowerId,_) -> 
+    [ Model $ model & #homeModel % #inspectedBorrower ?~ borrower 
+    , Event $ case Map.lookup borrowerId (lendingModel ^. #cachedBorrowerInfo) of
+        Nothing -> LendingEvent $ LookupBorrowerInformation $ StartProcess $ Just borrower
+        Just _ -> AppInit
+    ]
+  CloseInspectedKeyBorrowerInformation -> 
+    [ Model $ model & #homeModel % #inspectedBorrower .~ Nothing ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
@@ -549,6 +710,27 @@ processNewUserInput u@UserInput{utxoRef} model@TxBuilderModel{userInputs, collat
 
   -- Add the new input to the end of the list of user inputs.
   return $ balanceTx $ model & #userInputs %~ flip snoc (newIdx,u)
+
+-- | Validate multiple new user inputs and add them to the builder. Balance the transaction after.
+processMultipleNewUserInputs :: [UserInput] -> TxBuilderModel -> Either Text TxBuilderModel
+processMultipleNewUserInputs newInputs model@TxBuilderModel{userInputs, collateralInput} = do
+  let newRefs = map (view #utxoRef) newInputs
+
+  -- Verify that the new utxo is not already being spent.
+  maybeToLeft () $ "An input is already being spent." <$
+    find (\(_,i) -> (i ^. #utxoRef) `elem` newRefs) userInputs
+
+  -- Verify that the new utxo is not being used as collateral.
+  whenJust collateralInput $ \collateral ->
+    when ((collateral ^. #utxoRef) `elem` newRefs) $ 
+      Left "An input is being used as collateral."
+
+  -- Get the input's new index.
+  let newIdx = length userInputs
+      indexedInputs = zip [newIdx..] newInputs
+
+  -- Add the new input to the end of the list of user inputs.
+  return $ balanceTx $ model & #userInputs %~ (<> indexedInputs)
 
 -- | Validate the new collateral input and add it to the builder. Balance the transaction after.
 processNewCollateralInput :: CollateralInput -> TxBuilderModel -> Either Text TxBuilderModel

@@ -1,6 +1,6 @@
 module P2PWallet.Actions.SyncOptions
   ( syncOptionsProposals
-  , syncOptionsContract
+  , syncOptionsContracts
   , syncActiveOptionsContracts
   ) where
 
@@ -28,18 +28,17 @@ syncOptionsProposals network key@(offerAsset, askAsset, mPremiumAsset) currentCa
     return $ currentCache
       & Map.insert key allProposals
 
-syncOptionsContract 
+syncOptionsContracts
   :: Network 
-  -> ContractId 
+  -> [ContractId]
   -> CachedKeyOptionsContracts 
   -> IO CachedKeyOptionsContracts
-syncOptionsContract network contractId currentCache = do
-  mUTxO <- runQuerySpecificOptionsContract network contractId >>= 
+syncOptionsContracts network contractIds currentCache = do
+  mUTxOs <- mapM (runQuerySpecificOptionsContract network) contractIds >>= 
     -- Throw an error if syncing failed.
-    fromRightOrAppError
+    fromRightOrAppError . sequence
 
-  return $ currentCache
-    & Map.insert contractId mUTxO
+  return $ foldl' (\acc (k,v) -> Map.insert k v acc) currentCache (zip contractIds mUTxOs)
 
 -- | This function gets all active options contracts for the specified assets.
 syncActiveOptionsContracts

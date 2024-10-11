@@ -122,16 +122,16 @@ handleLendingEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- Sync Loan History
   -----------------------------------------------
-  LookupLoanHistory modal -> case modal of
-    StartProcess mLoanId ->
-      [ Model $ model & #waitingStatus % #syncingLoanHistory .~ True
-      , Task $ runActionOrAlert (LendingEvent . LookupLoanHistory . ProcessResults) $ do
-          loanId <- fromJustOrAppError "mLoanId is Nothing"  mLoanId
-          syncLoanHistory (config ^. #network) loanId $ lendingModel ^. #cachedLoanHistories
+  LookupLoanHistories modal -> case modal of
+    StartProcess mLoanIds ->
+      [ Model $ model & #waitingStatus % #syncingLoanHistories .~ True
+      , Task $ runActionOrAlert (LendingEvent . LookupLoanHistories . ProcessResults) $ do
+          loanIds <- fromJustOrAppError "mLoanIds is Nothing" mLoanIds
+          syncLoanHistories (config ^. #network) loanIds $ lendingModel ^. #cachedLoanHistories
       ]
     ProcessResults newCachedLoanHistories ->
       [ Model $ model 
-          & #waitingStatus % #syncingLoanHistory .~ False
+          & #waitingStatus % #syncingLoanHistories .~ False
           & #lendingModel % #cachedLoanHistories .~ newCachedLoanHistories
       ]
 

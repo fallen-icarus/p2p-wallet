@@ -276,9 +276,9 @@ allActivesWidget AppModel{lendingModel=LendingModel{..},reverseTickerMap} =
                     `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             , spacer_ [width 5]
             , flip styleBasic [textSize 10] $ 
-                tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
+                tooltip_ ("Loan ID: " <> display loanId <> " (history)") [tooltipDelay 0] $
                   box_ [alignMiddle , onClick loanHistoryEvt] $
-                    label historyIcon
+                    label keyNftIcon
                       `styleBasic` 
                         [ bgColor black
                         , textMiddle

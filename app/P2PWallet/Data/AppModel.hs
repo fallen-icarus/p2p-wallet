@@ -19,9 +19,11 @@ module P2PWallet.Data.AppModel
   , swapBuilderEvent
   , loanBuilderEvent
   , optionsBuilderEvent
+  , aftermarketBuilderEvent
 
     -- * Re-exports
   , module P2PWallet.Data.AppModel.AddressBookModel
+  , module P2PWallet.Data.AppModel.AftermarketModel
   , module P2PWallet.Data.AppModel.Common
   , module P2PWallet.Data.AppModel.DelegationModel
   , module P2PWallet.Data.AppModel.DexModel
@@ -36,6 +38,7 @@ module P2PWallet.Data.AppModel
 import Monomer qualified
 
 import P2PWallet.Data.AppModel.AddressBookModel
+import P2PWallet.Data.AppModel.AftermarketModel
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.DelegationModel
 import P2PWallet.Data.AppModel.DexModel
@@ -95,14 +98,14 @@ data WaitingStatus = WaitingStatus
   , syncingLoanOffers :: Bool
   -- | The app is syncing the active loans for the selected active loan configuration.
   , syncingActiveLoans :: Bool
-  -- | The app is syncing the loan history for the selected loan.
-  , syncingLoanHistory :: Bool
+  -- | The app is syncing the loan history for the selected loans.
+  , syncingLoanHistories :: Bool
   -- | The app is syncing the borrower's information.
   , syncingBorrowerInfo :: Bool
   -- | The app is syncing the proposal contracts for the selected assets.
   , syncingOptionsProposals :: Bool
-  -- | The app is syncing the options contracts for the selected contract id.
-  , syncingOptionsContract :: Bool
+  -- | The app is syncing the options contracts for the selected contract ids.
+  , syncingOptionsContracts :: Bool
   -- | The app is syncing the active contracts for the selected assets.
   , syncingActiveOptionsContracts :: Bool
   -- | The app is building the transaction.
@@ -127,10 +130,10 @@ instance Default WaitingStatus where
     , syncingLoanAsks = False
     , syncingLoanOffers = False
     , syncingActiveLoans = False
-    , syncingLoanHistory = False
+    , syncingLoanHistories = False
     , syncingBorrowerInfo = False
     , syncingOptionsProposals = False
-    , syncingOptionsContract = False
+    , syncingOptionsContracts = False
     , syncingActiveOptionsContracts = False
     , building = False
     , loadingProfile = False
@@ -175,6 +178,8 @@ data AppEvent
   | DexEvent DexEvent 
   -- | An event for the Loans page.
   | LendingEvent LendingEvent 
+  -- | An event for the Resell page.
+  | AftermarketEvent AftermarketEvent
   -- | An event for the Options page.
   | OptionsEvent OptionsEvent 
   -- | An event for the Tx Builder page.
@@ -223,6 +228,8 @@ data AppModel = AppModel
   , lendingModel :: LendingModel
   -- | The options model.
   , optionsModel :: OptionsModel
+  -- | The aftermarket model.
+  , aftermarketModel :: AftermarketModel
   -- | The model for the tx builder scene.
   , txBuilderModel :: TxBuilderModel
   -- | The address book for this profile.
@@ -259,6 +266,7 @@ instance Default AppModel where
     , dexModel = def
     , lendingModel = def
     , optionsModel = def
+    , aftermarketModel = def
     , txBuilderModel = def
     , addressBook = []
     , tickerMap = mempty
@@ -285,6 +293,7 @@ configureSelectedDeFiWallets model@AppModel{..} =
     & #dexModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #dexWallets)
     & #lendingModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #loanWallets)
     & #optionsModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #optionsWallets)
+    & #aftermarketModel % #selectedWallet .~ fromMaybe def (maybeHead $ knownWallets ^. #marketWallets)
 
 -- | This is a useful alias for conciseness.
 swapBuilderEvent :: SwapBuilderEvent -> AppEvent
@@ -297,3 +306,7 @@ loanBuilderEvent = TxBuilderEvent . LoanBuilderEvent
 -- | This is a useful alias for conciseness.
 optionsBuilderEvent :: OptionsBuilderEvent -> AppEvent
 optionsBuilderEvent = TxBuilderEvent . OptionsBuilderEvent
+
+-- | This is a useful alias for conciseness.
+aftermarketBuilderEvent :: AftermarketBuilderEvent -> AppEvent
+aftermarketBuilderEvent = TxBuilderEvent . AftermarketBuilderEvent

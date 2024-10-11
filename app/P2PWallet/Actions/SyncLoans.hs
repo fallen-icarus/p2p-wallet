@@ -1,7 +1,7 @@
 module P2PWallet.Actions.SyncLoans
   (
     syncLoanAsks
-  , syncLoanHistory
+  , syncLoanHistories
   , syncBorrowerInfo
   , syncLoanOffers
   , syncActiveLoans
@@ -27,14 +27,13 @@ syncLoanAsks network askCfg currentCache = do
     return $ currentCache
       & Map.insert askCfg allAsks
 
-syncLoanHistory :: Network -> Loans.LoanId -> CachedLoanHistories -> IO CachedLoanHistories
-syncLoanHistory network loanId currentCache = do
-  (history,mUTxO) <- runQuerySpecificLoan network loanId >>= 
+syncLoanHistories :: Network -> [Loans.LoanId] -> CachedLoanHistories -> IO CachedLoanHistories
+syncLoanHistories network loanIds currentCache = do
+  info <- mapM (runQuerySpecificLoan network) loanIds >>= 
     -- Throw an error if syncing failed.
-    fromRightOrAppError
+    fromRightOrAppError . sequence
 
-  return $ currentCache
-    & Map.insert loanId (history, mUTxO)
+  return $ foldl' (\acc (k,v) -> Map.insert k v acc) currentCache (zip loanIds info)
 
 syncBorrowerInfo 
   :: Network 

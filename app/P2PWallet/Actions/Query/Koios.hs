@@ -26,6 +26,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryOptionsProposals
   , runQuerySpecificOptionsContract
   , runQueryActiveOptionsContracts
+  , runQueryMarketWallet
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
@@ -796,6 +797,66 @@ runQuerySpecificOptionsContract network contractId = do
       manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
       first show <$> handleTimeoutError (runClientM (querySpecificOptionsUTxO contractId) env)
+
+-- | Get all information for a particular aftermarket wallet.
+runQueryMarketWallet :: MarketWallet -> IO (Either Text MarketWallet)
+runQueryMarketWallet marketWallet@MarketWallet{..} = do
+    (txRes,salesRes) <- concurrently queryTxsConcurrently querySalesWithRedundancies
+
+    case (,) <$> txRes <*> salesRes of
+      Right (txs,marketUTxOs) -> do
+        return $ Right $ marketWallet
+          & #lovelace .~ sum (map (view #lovelace) marketUTxOs)
+          & #utxos .~ map fromAddressUTxO marketUTxOs
+          & populateNativeAssets
+          & #transactions %~ mappend (map P2P.toTransaction txs)
+      Left err -> return $ Left err
+  where
+    -- | Aggregate all native assets located at the wallet.
+    populateNativeAssets :: MarketWallet -> MarketWallet
+    populateNativeAssets s@MarketWallet{utxos=us} =
+      s & #nativeAssets .~ sumNativeAssets (concatMap (view #nativeAssets) us)
+
+    -- Add one to the blockHeight for the most recently recorded transaction for this wallet.
+    -- Koios will return any transactions for that block or later.
+    afterBlock :: Integer
+    afterBlock = (+1) $ maybe 0 (view #blockHeight) $ maybeHead transactions
+
+    -- Try to query the aftermarket address' utxos.
+    fetchMarketUTxOs :: IO (Either Text [AddressUTxO])
+    fetchMarketUTxOs = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryAddressUTxOs [marketAddress]) env)
+
+    -- Since Koios instances may occassionally return incorrect UTxOs if they are not
+    -- close enough to the chain tip, this would mess with the wallet's notifications.
+    -- To account for this, the UTxOs are queried three times and compared. At least
+    -- two responses must match to move on. The redundant queries occur concurrently.
+    querySalesWithRedundancies :: IO (Either Text [AddressUTxO])
+    querySalesWithRedundancies = queryWithRedundancies fetchMarketUTxOs
+
+    -- Try to query the tx hashes since last time. If a timeout error occurs, just try again.
+    fetchTxHashes :: IO (Either Text [Text])
+    fetchTxHashes = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> 
+        handleTimeoutError (runClientM (queryAddressTxHashes [marketAddress] afterBlock) env)
+
+    -- Try to query the transaction info concurrently. The transactions are grouped together,
+    -- 50 per response, since some transactions can be quite large.
+    queryTxsConcurrently :: IO (Either Text [Transaction])
+    queryTxsConcurrently = do
+      fetchTxHashes >>= \case
+        Left err -> return $ Left $ show err
+        Right hashes -> do
+          manager <- newManager customTlsSettings
+          let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+          bimap show concat . sequence <$> 
+            mapConcurrently 
+              (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
+              (groupInto 70 hashes)
 
 -------------------------------------------------
 -- Low-Level API

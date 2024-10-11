@@ -59,7 +59,7 @@ instance TableName Profile where
 
 instance Creatable Profile where
   createStmt = Query $ unwords
-    [ "CREATE TABLE " <> tableName @Profile
+    [ "CREATE TABLE IF NOT EXISTS " <> tableName @Profile
     , "("
     , unwords $ intersperse ","
         [ "network TEXT NOT NULL"

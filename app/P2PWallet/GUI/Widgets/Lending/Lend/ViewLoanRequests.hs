@@ -799,8 +799,13 @@ createNewOfferWidget AppModel{lendingModel, knownWallets, reverseTickerMap, tick
         , radius 10
         ]
 
-inspectBorrowerWidget :: AppModel -> AppNode
-inspectBorrowerWidget model@AppModel{lendingModel=LendingModel{..}} = do
+inspectBorrowerWidget 
+  :: (Loans.BorrowerId,PaymentAddress) 
+  -> AppEvent 
+  -> (Loans.LoanId -> AppEvent) 
+  -> AppModel 
+  -> AppNode
+inspectBorrowerWidget info@(target,_) closeEvt historyEvt model = do
     vstack
       [ vstack
           [ centerWidgetH $
@@ -824,23 +829,22 @@ inspectBorrowerWidget model@AppModel{lendingModel=LendingModel{..}} = do
                         , textSize 12
                         ]
                       `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-          , spacer_ [width 3]
+              , spacer_ [width 3]
               ]
           , spacer
           , vscroll_ [wheelRate 50] $ vstack
-              [ creditHistoryField model
+              [ creditHistoryField target historyEvt model
               , spacer
-              , openAsksField model
+              , openAsksField target model
               , spacer
-              , currentOffersField model
+              , currentOffersField target model
               , spacer
-              , activeLoansField model
+              , activeLoansField target historyEvt model
               ]
           , filler
           , hstack
               [ filler
-              , button "Close" $ LendingEvent $ 
-                  LendEvent CloseInspectedProspectiveBorrowerInformation
+              , button "Close" closeEvt
               ]
           ] `styleBasic`
               [ bgColor customGray3
@@ -852,8 +856,6 @@ inspectBorrowerWidget model@AppModel{lendingModel=LendingModel{..}} = do
           , padding 30
           , radius 10
           ]
-  where
-    info@(target,_) = fromMaybe ("","") $ lendModel ^. #inspectedBorrower
 
 moreOffStyle :: Style
 moreOffStyle = 
@@ -869,8 +871,8 @@ moreOffStyle =
       `styleHover`
         [ bgColor customGray1]
 
-creditHistoryField :: AppModel -> AppNode
-creditHistoryField AppModel{..} = do
+creditHistoryField :: Loans.BorrowerId -> (Loans.LoanId -> AppEvent) -> AppModel -> AppNode
+creditHistoryField target historyEvt AppModel{..} = do
     vstack
       [ hstack
           [ label ("Credit Score: " <> creditScore)
@@ -914,9 +916,6 @@ creditHistoryField AppModel{..} = do
             `styleBasic` [padding 10]
       ]
   where
-    target :: Loans.BorrowerId
-    target = maybe "" fst $ lendingModel ^. #lendModel % #inspectedBorrower
-
     BorrowerInformation{..} = fromMaybe def 
                             $ Map.lookup target (lendingModel ^. #cachedBorrowerInfo)
 
@@ -1016,7 +1015,6 @@ creditHistoryField AppModel{..} = do
             | isDefault = "Default"
             | otherwise = "Success"
           swapCollateralMsg = "Collateral could be swapped out for other approved collateral"
-          loanHistoryEvt = LendingEvent $ LendEvent $ InspectTargetLoanHistory loanId
       vstack
         [ hstack
             [ label defaultMsg
@@ -1026,9 +1024,9 @@ creditHistoryField AppModel{..} = do
                   ]
             , spacer_ [width 5]
             , flip styleBasic [textSize 10] $ 
-                tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
-                  box_ [alignMiddle , onClick loanHistoryEvt] $
-                    label historyIcon
+                tooltip_ ("Loan ID: " <> display loanId <> " (history)") [tooltipDelay 0] $
+                  box_ [alignMiddle , onClick $ historyEvt loanId] $
+                    label keyNftIcon
                       `styleBasic` 
                         [ bgColor black
                         , textMiddle
@@ -1108,8 +1106,8 @@ creditHistoryField AppModel{..} = do
               , border 1 black
               ]
 
-openAsksField :: AppModel -> AppNode
-openAsksField AppModel{..} = do
+openAsksField :: Loans.BorrowerId -> AppModel -> AppNode
+openAsksField target AppModel{..} = do
     vstack
       [ hstack
           [ label "Current Loan Requests:"
@@ -1142,9 +1140,6 @@ openAsksField AppModel{..} = do
             `styleBasic` [padding 10]
       ]
   where
-    target :: Loans.BorrowerId
-    target = maybe "" fst $ lendingModel ^. #lendModel % #inspectedBorrower
-
     BorrowerInformation{..} = fromMaybe def 
                             $ Map.lookup target (lendingModel ^. #cachedBorrowerInfo)
 
@@ -1224,8 +1219,8 @@ openAsksField AppModel{..} = do
             , border 1 customGray1
             ]
 
-currentOffersField :: AppModel -> AppNode
-currentOffersField AppModel{..} = do
+currentOffersField :: Loans.BorrowerId -> AppModel -> AppNode
+currentOffersField target AppModel{..} = do
     vstack
       [ hstack
           [ label "Current Offers:"
@@ -1258,9 +1253,6 @@ currentOffersField AppModel{..} = do
             `styleBasic` [padding 10]
       ]
   where
-    target :: Loans.BorrowerId
-    target = maybe "" fst $ lendingModel ^. #lendModel % #inspectedBorrower
-
     BorrowerInformation{..} = fromMaybe def 
                             $ Map.lookup target (lendingModel ^. #cachedBorrowerInfo)
 
@@ -1427,8 +1419,8 @@ currentOffersField AppModel{..} = do
               , border 1 black
               ]
 
-activeLoansField :: AppModel -> AppNode
-activeLoansField AppModel{..} = do
+activeLoansField :: Loans.BorrowerId -> (Loans.LoanId -> AppEvent) -> AppModel -> AppNode
+activeLoansField target historyEvt AppModel{..} = do
     vstack
       [ hstack
           [ label "Active Loans:"
@@ -1461,9 +1453,6 @@ activeLoansField AppModel{..} = do
             `styleBasic` [padding 10]
       ]
   where
-    target :: Loans.BorrowerId
-    target = maybe "" fst $ lendingModel ^. #lendModel % #inspectedBorrower
-
     BorrowerInformation{..} = fromMaybe def 
                             $ Map.lookup target (lendingModel ^. #cachedBorrowerInfo)
 
@@ -1549,7 +1538,6 @@ activeLoansField AppModel{..} = do
             (lovelaceAsNativeAsset & #quantity .~ unLovelace utxoLovelace) : utxoNativeAssets
           lockedCollateral = 
             filter ((/= Loans.activeBeaconCurrencySymbol) . view #policyId) allAssets
-          loanHistoryEvt = LendingEvent $ LendEvent $ InspectTargetLoanHistory loanId
       vstack
         [ hstack
             [ label ("Balance: " <> showAssetBalance True reverseTickerMap loanBalance)
@@ -1584,9 +1572,9 @@ activeLoansField AppModel{..} = do
                           ]
             , spacer_ [width 5]
             , flip styleBasic [textSize 10] $ 
-                tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
-                  box_ [alignMiddle , onClick loanHistoryEvt] $
-                    label historyIcon
+                tooltip_ ("Loan ID: " <> display loanId <> " (history)") [tooltipDelay 0] $
+                  box_ [alignMiddle , onClick $ historyEvt loanId] $
+                    label keyNftIcon
                       `styleBasic` 
                         [ bgColor black
                         , textMiddle
@@ -1648,8 +1636,8 @@ activeLoansField AppModel{..} = do
               , border 1 black
               ]
 
-inspectLoanWidget :: AppModel -> AppNode
-inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
+inspectLoanWidget :: Loans.LoanId -> AppEvent -> AppModel -> AppNode
+inspectLoanWidget targetId closeEvt AppModel{lendingModel=LendingModel{..},scene=_,..} = do
     vstack
       [ vstack
           [ centerWidgetH $
@@ -1660,7 +1648,8 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
               [ copyableLabelSelf (display targetId) lightGray 12
               , spacer_ [width 3]
               , tooltip_ "Resync History" [tooltipDelay 0] $
-                  box_ [alignMiddle, onClick $ LendingEvent $ LookupLoanHistory $ StartProcess $ Just targetId] $
+                  box_ [alignMiddle
+                       , onClick $ LendingEvent $ LookupLoanHistories $ StartProcess $ Just [targetId]] $
                     label refreshIcon
                       `styleBasic` 
                         [ border 0 transparent
@@ -1680,7 +1669,7 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
           , filler
           , hstack
               [ filler
-              , button "Close" $ LendingEvent $ LendEvent CloseInspectedTargetLoanHistory
+              , button "Close" closeEvt
               ]
           ] `styleBasic`
               [ bgColor customGray3
@@ -1693,9 +1682,6 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
           , radius 10
           ]
   where
-    targetId :: Loans.LoanId
-    targetId = fromMaybe "" $ lendModel ^. #inspectedLoan
-
     history :: [LoanEvent]
     history = maybe [] fst $ Map.lookup targetId cachedLoanHistories
 

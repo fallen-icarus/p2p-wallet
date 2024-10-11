@@ -42,7 +42,7 @@ borrowWidget model@AppModel{lendingModel} = do
           `nodeVisible` and
             [ isJust $ lendingModel ^. #borrowModel % #inspectedLoan
             -- Hide until after syncing is complete.
-            , not $ model ^. #waitingStatus % #syncingLoanHistory
+            , not $ model ^. #waitingStatus % #syncingLoanHistories
             ]
       ]
   where

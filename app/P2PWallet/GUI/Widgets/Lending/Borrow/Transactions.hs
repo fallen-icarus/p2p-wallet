@@ -718,7 +718,7 @@ loanInputs AppModel{..} = do
             , flip styleBasic [textSize 10] $ 
                 tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
                   box_ [alignMiddle , onClick $ CopyText $ display loanId] $
-                    label historyIcon
+                    label keyNftIcon
                       `styleBasic` 
                         [ bgColor black
                         , textMiddle
@@ -1187,7 +1187,7 @@ loanOutputs AppModel{..} = do
             , flip styleBasic [textSize 10] $ 
                 tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
                   box_ [alignMiddle , onClick $ CopyText $ display loanId] $
-                    label historyIcon
+                    label keyNftIcon
                       `styleBasic` 
                         [ bgColor black
                         , textMiddle

@@ -566,7 +566,6 @@ addressObserverStakeAddress network =
 -- addr_test1wprnu4c2twkgwep43eytwlhlfmc8ezv85q3cvnrslnxfsaga0t5pn
 --
 -- The scripts are deliberately stored with an invalid datum so that they are locked forever.
-
 getScriptRef :: Network -> ScriptHash -> (TxOutRef,Integer)
 getScriptRef network scriptHash = (referenceScriptMap Map.! network) Map.! scriptHash
 

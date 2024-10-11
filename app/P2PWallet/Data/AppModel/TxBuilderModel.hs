@@ -13,6 +13,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel
   , canBeBuilt
   , hasInputs
 
+  , module P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel
   , module P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
   , module P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
   , module P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
@@ -26,6 +27,7 @@ module P2PWallet.Data.AppModel.TxBuilderModel
   ) where
 
 import P2PWallet.Data.AppModel.Common
+import P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel
 import P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
 import P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
@@ -83,6 +85,8 @@ data TxBuilderEvent
   | LoanBuilderEvent LoanBuilderEvent
   -- | Builder events for options.
   | OptionsBuilderEvent OptionsBuilderEvent
+  -- | Builder events for the aftermarket.
+  | AftermarketBuilderEvent AftermarketBuilderEvent
   -- | Build the transaction while also estimating the execution budgets and tx fee. Return the
   -- updated TxBuilderModel.
   | BuildTx (ProcessEvent () TxBuilderModel)
@@ -162,6 +166,8 @@ data TxBuilderModel = TxBuilderModel
   , loanBuilderModel :: LoanBuilderModel
   -- | The options builder sub model for options related builder information.
   , optionsBuilderModel :: OptionsBuilderModel
+  -- | The aftermarket builder sub model for options related builder information.
+  , aftermarketBuilderModel :: AftermarketBuilderModel
   -- | The transaction fee for the built transaction.
   , fee :: Lovelace
   -- | A list of required witnesses. This is used to determine whether the transaction can be signed
@@ -218,6 +224,7 @@ instance Default TxBuilderModel where
     , swapBuilderModel = def
     , loanBuilderModel = def
     , optionsBuilderModel = def
+    , aftermarketBuilderModel = def
     , fee = 0
     , keyWitnesses = []
     , txType = PairedTx -- This is set so the default GUI button is to submit.
@@ -250,6 +257,7 @@ isEmptyBuilder TxBuilderModel{..} = and
   , isEmptySwapBuilderModel swapBuilderModel
   , isEmptyLoanBuilderModel loanBuilderModel
   , isEmptyOptionsBuilderModel optionsBuilderModel
+  , isEmptyAftermarketBuilderModel aftermarketBuilderModel
   ]
 
 -- | Convert the `TxBuilderModel` to a `TxBody`.
@@ -276,6 +284,8 @@ convertToTxBody TxBuilderModel{..} =
     , addToTxBody mempty loanBuilderModel
     -- Add any options actions.
     , addToTxBody mempty optionsBuilderModel
+    -- Add any aftermarket actions.
+    , addToTxBody mempty aftermarketBuilderModel
     -- Add the collateral and the fee to the transaction. This is done together because
     -- the amount of collateral required depends on the fee.
     , let txWithFee = mempty & #fee .~ fee in
@@ -324,4 +334,5 @@ hasInputs TxBuilderModel{..} = or
   , optionsBuilderModel ^. #expiredCloses /= []
   , optionsBuilderModel ^. #addressUpdates /= []
   , optionsBuilderModel ^. #contractExecutions /= []
+  , aftermarketBuilderModel ^. #saleCloses /= []
   ]

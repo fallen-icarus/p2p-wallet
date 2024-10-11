@@ -229,9 +229,9 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
                           ]
                 , spacer_ [width 5]
                 , flip styleBasic [textSize 10] $ 
-                    tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
+                    tooltip_ ("Loan ID: " <> display loanId <> " (history)") [tooltipDelay 0] $
                       box_ [alignMiddle , onClick loanHistoryEvt] $
-                        label historyIcon
+                        label keyNftIcon
                           `styleBasic` 
                             [ bgColor black
                             , textMiddle
@@ -448,7 +448,8 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
               [ copyableLabelSelf (display targetId) lightGray 12
               , spacer_ [width 3]
               , tooltip_ "Resync History" [tooltipDelay 0] $
-                  box_ [alignMiddle, onClick $ LendingEvent $ LookupLoanHistory $ StartProcess $ Just targetId] $
+                  box_ [alignMiddle
+                       , onClick $ LendingEvent $ LookupLoanHistories $ StartProcess $ Just [targetId]] $
                     label refreshIcon
                       `styleBasic` 
                         [ border 0 transparent

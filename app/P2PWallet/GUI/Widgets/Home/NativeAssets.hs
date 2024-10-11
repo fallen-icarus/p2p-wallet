@@ -16,8 +16,10 @@ import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Home.NativeAssets.LoanKeys
+import P2PWallet.GUI.Widgets.Home.NativeAssets.NftBatch
 import P2PWallet.GUI.Widgets.Home.NativeAssets.OptionsKeys
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.GUI.Widgets.Lending.Lend.ViewLoanRequests qualified as View
 import P2PWallet.Prelude
 
 nativeAssetsWidget :: AppModel -> AppNode
@@ -90,22 +92,58 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
               centerWidget $
                 label "This address does not have any native assets."
                  `styleBasic` [textFont "Italics"]
+          , flip nodeVisible (homeModel ^. #queuedNFTs /= []) $ centerWidgetH $
+              hstack
+                [ button "Cancel" (HomeEvent $ NftBatchEvent ClearNftBatch) 
+                    `styleBasic` [textMiddle, textSize 12]
+                , spacer
+                , label (show nftCount <> " Key NFT(s)")
+                    `styleBasic` [radius 5, textSize 10, textMiddle, padding 5, border 1 customBlue]
+                , spacer
+                , mainButton "View Batch" (HomeEvent $ NftBatchEvent ViewNftBatch)
+                    `styleBasic` [textMiddle, textSize 12]
+                ]
+          , spacer
           ]
       , assetFilterWidget model `nodeVisible` (homeModel ^. #showAssetFilter)
       , inspectLoanWidget model
           `nodeVisible` and
             [ isJust $ homeModel ^. #inspectedLoan
             -- Hide until after syncing is complete.
-            , not $ model ^. #waitingStatus % #syncingLoanHistory
+            , not $ model ^. #waitingStatus % #syncingLoanHistories
             ]
+      , widgetMaybe (homeModel ^. #inspectedBorrower) $ \info ->
+          let closeEvt = HomeEvent CloseInspectedKeyBorrowerInformation
+              historyEvt = HomeEvent . InspectBorrowerLoan
+           in View.inspectBorrowerWidget info closeEvt historyEvt model
+                `nodeVisible` and
+                  [ -- Hide until after syncing is complete.
+                    not $ model ^. #waitingStatus % #syncingBorrowerInfo
+                  ]
+      , widgetMaybe (homeModel ^. #inspectedBorrowerLoan) $ \targetId ->
+          let closeEvt = HomeEvent CloseInspectedBorrowerLoan in
+          View.inspectLoanWidget targetId closeEvt model
+            `nodeVisible` and
+              [ -- Hide until after syncing is complete.
+                not $ model ^. #waitingStatus % #syncingLoanHistories
+              ]
       , inspectOptionsContractWidget model
           `nodeVisible` and
             [ isJust $ homeModel ^. #inspectedOptionsContract
             -- Hide until after syncing is complete.
-            , not $ model ^. #waitingStatus % #syncingOptionsContract
+            , not $ model ^. #waitingStatus % #syncingOptionsContracts
             ]
+      , viewBatchWidget model
+          `nodeVisible` and
+            [ homeModel ^. #viewingQueue
+            , isNothing $ homeModel ^. #newSaleCreation
+            ]
+      , createSaleWidget model
+          `nodeVisible` isJust (homeModel ^. #newSaleCreation)
       ]
   where
+    nftCount = length $ homeModel ^. #queuedNFTs
+      
     wallet :: PaymentWallet
     wallet = homeModel ^. #selectedWallet
 
@@ -136,9 +174,9 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
 
     keyNftFilter :: [NativeAsset] -> [NativeAsset]
     keyNftFilter xs = case keyNftType of
-      Nothing -> xs
       Just LoanKey -> filter ((Loans.activeBeaconCurrencySymbol==) . view #policyId) xs
       Just OptionsKey -> filter ((Options.activeBeaconCurrencySymbol==) . view #policyId) xs
+      _ -> xs
 
     searchFilter :: [NativeAsset] -> [NativeAsset]
     searchFilter xs
@@ -173,7 +211,7 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
                 , flip styleBasic [textSize 10] $ 
                     tooltip_ ("Loan ID: " <> display tokenName) [tooltipDelay 0] $
                       box_ [alignMiddle , onClick loanHistoryEvt] $
-                        label historyIcon
+                        label keyNftIcon
                           `styleBasic` 
                             [ bgColor black
                             , textMiddle
@@ -187,13 +225,17 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
                             , radius 5
                             ]
                           `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , filler
+                , label "Loan Key"
+                    `styleBasic` [textSize 10, textFont "Italics", textColor customRed]
+                , filler
                 ]
             , widgetIf (policyId == Options.activeBeaconCurrencySymbol) $ hstack
                 [ spacer_ [width 5]
                 , flip styleBasic [textSize 10] $ 
                     tooltip_ ("Options Contract ID: " <> display tokenName) [tooltipDelay 0] $
                       box_ [alignMiddle , onClick optionsKeyEvt] $
-                        label idCardIcon
+                        label keyNftIcon
                           `styleBasic` 
                             [ bgColor black
                             , textMiddle
@@ -207,6 +249,10 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
                             , radius 5
                             ]
                           `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , filler
+                , label "Options Key"
+                    `styleBasic` [textSize 10, textFont "Italics", textColor customRed]
+                , filler
                 ]
             , filler
               -- Show the asset name with the ticker if set. Do not use the fingerprint otherwise.

@@ -9,6 +9,7 @@ import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.AddressBook
+import P2PWallet.GUI.Widgets.Aftermarket
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Delegation
 import P2PWallet.GUI.Widgets.Dex
@@ -46,6 +47,7 @@ buildUI _ model@AppModel{..} = do
             , dexWidget model `nodeVisible` (DexScene == scene)
             , lendingWidget model `nodeVisible` (LendingScene == scene)
             , optionsWidget model `nodeVisible` (OptionsScene == scene)
+            , aftermarketWidget model `nodeVisible` (AftermarketScene == scene)
             , notificationsWidget model `nodeVisible` (NotificationsScene == scene)
             ]
         ] `nodeVisible` isJust selectedProfile
@@ -61,12 +63,12 @@ buildUI _ model@AppModel{..} = do
     , waitingOverlay "Syncing Loan Requests..." `nodeVisible` waitingStatus ^. #syncingLoanAsks
     , waitingOverlay "Syncing Loan Offers..." `nodeVisible` waitingStatus ^. #syncingLoanOffers
     , waitingOverlay "Syncing Active Loans..." `nodeVisible` waitingStatus ^. #syncingActiveLoans
-    , waitingOverlay "Syncing Loan History..." `nodeVisible` waitingStatus ^. #syncingLoanHistory
+    , waitingOverlay "Syncing Loan Histories..." `nodeVisible` waitingStatus ^. #syncingLoanHistories
     , waitingOverlay "Syncing Borrower Info..." `nodeVisible` waitingStatus ^. #syncingBorrowerInfo
     , waitingOverlay "Syncing Proposed Options Contracts..." 
         `nodeVisible` waitingStatus ^. #syncingOptionsProposals
-    , waitingOverlay "Syncing the Options Contract..." 
-        `nodeVisible` waitingStatus ^. #syncingOptionsContract
+    , waitingOverlay "Syncing the Options Contract(s)..." 
+        `nodeVisible` waitingStatus ^. #syncingOptionsContracts
     , waitingOverlay "Syncing Active Options Contracts..." 
         `nodeVisible` waitingStatus ^. #syncingActiveOptionsContracts
     ] `styleBasic` [bgColor customGray4]

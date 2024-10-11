@@ -106,6 +106,15 @@ mainWidget model@AppModel{scene=_,..} =
       | oldHome ^. #assetFilterModel % #search /= newHome ^. #assetFilterModel % #search = False
       | oldHome ^. #txFilterModel % #search /= newHome ^. #txFilterModel % #search = False
       | oldHome ^. #txFilterModel % #dateRange /= newHome ^. #txFilterModel % #dateRange = False
+      | oldHome ^. #txFilterModel % #dateRange /= newHome ^. #txFilterModel % #dateRange = False
+      | old ^. #lendingModel % #cachedBorrowerInfo
+      /= new ^. #lendingModel % #cachedBorrowerInfo = True
+      | old ^. #waitingStatus % #syncingBorrowerInfo 
+      /= new ^. #waitingStatus % #syncingBorrowerInfo = True
+      | old ^. #waitingStatus % #syncingLoanHistories 
+      /= new ^. #waitingStatus % #syncingLoanHistories = True
+      | old ^. #waitingStatus % #syncingOptionsContracts 
+      /= new ^. #waitingStatus % #syncingOptionsContracts = True
       | otherwise = oldHome /= newHome
 
     (walletTypeTip,walletTypeIcon)

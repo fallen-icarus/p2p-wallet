@@ -34,7 +34,7 @@ instance TableName AddressEntry where
 
 instance Creatable AddressEntry where
   createStmt = Query $ unwords
-    [ "CREATE TABLE " <> tableName @AddressEntry
+    [ "CREATE TABLE IF NOT EXISTS " <> tableName @AddressEntry
     , "("
     , unwords $ intersperse ","
         [ "profile_id INTEGER REFERENCES profiles (profile_id)"

@@ -135,7 +135,7 @@ instance TableName PaymentWallet where
 
 instance Creatable PaymentWallet where
   createStmt = Query $ unwords
-    [ "CREATE TABLE " <> tableName @PaymentWallet
+    [ "CREATE TABLE IF NOT EXISTS " <> tableName @PaymentWallet
     , "("
     , unwords $ intersperse ","
         [ "network TEXT NOT NULL"

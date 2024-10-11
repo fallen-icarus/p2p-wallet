@@ -59,7 +59,7 @@ instance TableName StakeWallet where
 
 instance Creatable StakeWallet where
   createStmt = Query $ unwords
-    [ "CREATE TABLE " <> tableName @StakeWallet
+    [ "CREATE TABLE IF NOT EXISTS " <> tableName @StakeWallet
     , "("
     , unwords $ intersperse ","
         [ "network TEXT NOT NULL"

@@ -77,8 +77,8 @@ data LendingEvent
   | LendEvent LendEvent
   -- | An event for the LoanResearchModel.
   | LoanResearchEvent LoanResearchEvent
-  -- | Lookup a specific loan's event history.
-  | LookupLoanHistory (ProcessEvent Loans.LoanId CachedLoanHistories)
+  -- | Lookup a specific loans' event histories.
+  | LookupLoanHistories (ProcessEvent [Loans.LoanId] CachedLoanHistories)
   -- | Lookup a specific borrower's information.
   | LookupBorrowerInformation (ProcessEvent (Loans.BorrowerId,PaymentAddress) CachedBorrowerInfo)
 
