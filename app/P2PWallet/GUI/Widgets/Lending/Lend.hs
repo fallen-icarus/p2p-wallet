@@ -32,20 +32,23 @@ lendWidget model@AppModel{lendingModel} = do
           offerTxInspectionWidget model
       -- The inspected borrower is here since only one borrower can be inspected at a time.
       -- It doesn't make sense to move to other lend scenes while inspecting a borrower.
-      , inspectBorrowerWidget model
-          `nodeVisible` and
-            [ isJust $ lendingModel ^. #lendModel % #inspectedBorrower
-            -- Hide until after syncing is complete.
-            , not $ model ^. #waitingStatus % #syncingBorrowerInfo
-            ]
+      , widgetMaybe (lendingModel ^. #lendModel % #inspectedBorrower) $ \info ->
+          let closeEvt = LendingEvent $ LendEvent CloseInspectedProspectiveBorrowerInformation
+              historyEvt = LendingEvent . LendEvent . InspectTargetLoanHistory
+           in inspectBorrowerWidget info closeEvt historyEvt model
+                `nodeVisible` and
+                  [ -- Hide until after syncing is complete.
+                    not $ model ^. #waitingStatus % #syncingBorrowerInfo
+                  ]
       -- The inspected loan is here since only one loan can be inspected at a time.
       -- It doesn't make sense to move to other borrower scenes while inspecting a loan.
-      , inspectLoanWidget model
-          `nodeVisible` and
-            [ isJust $ lendingModel ^. #lendModel % #inspectedLoan
-            -- Hide until after syncing is complete.
-            , not $ model ^. #waitingStatus % #syncingLoanHistory
-            ]
+      , widgetMaybe (lendingModel ^. #lendModel % #inspectedLoan) $ \targetId ->
+          let closeEvt = LendingEvent $ LendEvent CloseInspectedTargetLoanHistory in
+          inspectLoanWidget targetId closeEvt model
+            `nodeVisible` and
+              [ -- Hide until after syncing is complete.
+                not $ model ^. #waitingStatus % #syncingLoanHistories
+              ]
       ]
   where
     lendSceneButton :: Text -> LendScene -> AppNode

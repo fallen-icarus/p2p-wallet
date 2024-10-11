@@ -30,7 +30,7 @@ inspectOptionsContractWidget AppModel{optionsModel=OptionsModel{..},scene=_,..} 
                 [ copyableLabelSelf (display targetId) lightGray 12
                 , spacer_ [width 3]
                 , tooltip_ "Resync State" [tooltipDelay 0] $
-                    let evt = OptionsEvent $ LookupOptionsContract $ StartProcess $ Just targetId
+                    let evt = OptionsEvent $ LookupOptionsContracts $ StartProcess $ Just [targetId]
                      in box_ [alignMiddle, onClick evt] $
                           label refreshIcon
                             `styleBasic` 
@@ -78,7 +78,22 @@ inspectOptionsContractWidget AppModel{optionsModel=OptionsModel{..},scene=_,..} 
                   ]
             , filler
             , hstack
-                [ filler
+                [ tooltip_ saleTip [tooltipDelay 0] $ 
+                    mainButton nftBasketIcon (HomeEvent $ NftBatchEvent $ AddNftToBatch targetNFT)
+                      `nodeVisible` (not isExpired && hasMarketWallet)
+                      `styleBasic` 
+                        [ textFont "Remix"
+                        , textMiddle
+                        ]
+                , tooltip_ saleTip [tooltipDelay 0] $ 
+                    button nftBasketIcon AppInit -- This is a better looking disabled button.
+                      `nodeVisible` (isExpired || not hasMarketWallet)
+                      `nodeEnabled` False
+                      `styleBasic` 
+                        [ textFont "Remix"
+                        , textMiddle
+                        ]
+                , filler
                 , button "Close" $ HomeEvent CloseInspectedCorrespondingOptionsContract
                 , spacer
                 , tooltip_ actionTip [tooltipDelay 0] $ mainButton actionIcon actionEvt
@@ -101,6 +116,10 @@ inspectOptionsContractWidget AppModel{optionsModel=OptionsModel{..},scene=_,..} 
     targetId :: Options.ContractId
     targetId = fromMaybe "" $ homeModel ^. #inspectedOptionsContract
 
+    targetNFT :: NativeAsset
+    targetNFT = 
+      mkNativeAsset Options.activeBeaconCurrencySymbol (targetId ^. #unContractId) & #quantity .~ 1
+
     Config{network} = config
 
     mOptionsUTxO = fromMaybe Nothing
@@ -111,6 +130,13 @@ inspectOptionsContractWidget AppModel{optionsModel=OptionsModel{..},scene=_,..} 
     Options.ActiveDatum{..} = fromMaybe def $ mOptionsUTxO >>= optionsUTxOActiveDatum
 
     isExpired = expiration <= toPlutusTime (config ^. #currentTime)
+
+    hasMarketWallet = isJust $ maybeHead $ knownWallets ^. #marketWallets
+
+    saleTip
+      | isExpired = "Cannot sell Key NFT for expired contract."
+      | hasMarketWallet = "Add Key NFT to aftermarket sale basket."
+      | otherwise = "Add a wallet under the 'Resell' page to use the aftermarket."
 
     (actionEvt, actionTip, actionIcon)
       | isExpired =

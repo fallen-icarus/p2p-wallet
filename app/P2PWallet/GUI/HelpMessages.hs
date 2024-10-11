@@ -1279,3 +1279,60 @@ optionsTxFilterPremiumAssetMsg = unlines
   , ""
   , "Fingerprints are not supported."
   ]
+
+whatIsSpotSaleMsg :: Text
+whatIsSpotSaleMsg = unwords
+  [ "A spot sale is a sale where buyers can immediately purchase the NFTs at the set price,"
+  , "provided the payment goes to the correct address."
+  ]
+
+sellerCredentialMsg :: Text
+sellerCredentialMsg = unwords
+  [ "Which staking credential do you want to use to protect the sale? The open sale will be located"
+  , "under this credential in the `Resell` page."
+  ]
+
+salePaymentAddressMsg :: Text
+salePaymentAddressMsg = unwords
+  [ "Which payment address should the proceeds be sent to?"
+  ]
+
+salePriceMsg :: Text
+salePriceMsg = unwords
+  [ "What is the requested price for this batch of NFTs? The payment can be a multi-asset payment."
+  , "The assets must be separated with newlines, and in one of the following formats:"
+  , "1. '# policy_id.asset_name'"
+  , "2. '# ticker' - if in Ticker Registry"
+  , "3. '# ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+whatIsAuctionSaleMsg :: Text
+whatIsAuctionSaleMsg = unwords
+  [ "An auction sale is a sale where you specify a starting price and bidders can bid on the NFTs."
+  , "You can then accept one of the bids."
+  ]
+
+startingPriceMsg :: Text
+startingPriceMsg = unwords
+  [ "What is the auction's starting price for this batch of NFTs? The price can be a multi-asset price."
+  , "The assets must be separated with newlines, and in one of the following formats:"
+  , "1. '# policy_id.asset_name'"
+  , "2. '# ticker' - if in Ticker Registry"
+  , "3. '# ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+nftTypeFilterMsg :: Text
+nftTypeFilterMsg = unwords
+  [ "What type of NFT is being sold in the batch?" ]
+
+saleFilterSortMsg :: Text
+saleFilterSortMsg = unlines
+  [ "Open aftermarket sales can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Chronologically based on the time the UTxO was created"
+  , "3. Based on the number of NFTs being sold in the batch"
+  ]

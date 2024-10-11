@@ -31,7 +31,8 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
                   [ copyableLabelSelf (display targetId) lightGray 12
                   , spacer_ [width 3]
                   , tooltip_ "Resync History" [tooltipDelay 0] $
-                      box_ [alignMiddle, onClick $ LendingEvent $ LookupLoanHistory $ StartProcess $ Just targetId] $
+                      box_ [ alignMiddle
+                           , onClick $ LendingEvent $ LookupLoanHistories $ StartProcess $ Just [targetId]] $
                         label refreshIcon
                           `styleBasic` 
                             [ border 0 transparent
@@ -84,7 +85,22 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
                   vstack_ [childSpacing] (map (hstack . (spacer:) . pure . eventRow) history)
               , filler
               , hstack
-                  [ filler
+                  [ tooltip_ saleTip [tooltipDelay 0] $ 
+                      mainButton nftBasketIcon (HomeEvent $ NftBatchEvent $ AddNftToBatch targetNFT)
+                        `nodeVisible` (isJust mLoanUTxO && hasMarketWallet)
+                        `styleBasic` 
+                          [ textFont "Remix"
+                          , textMiddle
+                          ]
+                  , tooltip_ saleTip [tooltipDelay 0] $ 
+                      button nftBasketIcon AppInit -- This is a better looking disabled button.
+                        `nodeVisible` (isNothing mLoanUTxO || not hasMarketWallet)
+                        `nodeEnabled` False
+                        `styleBasic` 
+                          [ textFont "Remix"
+                          , textMiddle
+                          ]
+                  , filler
                   , button "Close" $ HomeEvent CloseInspectedCorrespondingLoan
                   , spacer
                   , tooltip_ actionTip [tooltipDelay 0] $ mainButton actionIcon actionEvt
@@ -110,6 +126,10 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
     targetId :: Loans.LoanId
     targetId = fromMaybe "" $ homeModel ^. #inspectedLoan
 
+    targetNFT :: NativeAsset
+    targetNFT = 
+      mkNativeAsset Loans.activeBeaconCurrencySymbol (targetId ^. #unLoanId) & #quantity .~ 1
+
     (history, mLoanUTxO) = fromMaybe ([],Nothing) 
                          $ Map.lookup targetId cachedLoanHistories
 
@@ -121,6 +141,13 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
     activeDatum = fromMaybe def $ mPreviousDatum <|> mCurrentDatum
 
     isExpired = activeDatum ^. #loanExpiration <= toPlutusTime (config ^. #currentTime)
+
+    hasMarketWallet = isJust $ maybeHead $ knownWallets ^. #marketWallets
+
+    saleTip
+      | isNothing mLoanUTxO = "Cannot sell Key NFT for finished loan."
+      | hasMarketWallet = "Add Key NFT to aftermarket sale basket."
+      | otherwise = "Add a wallet under the 'Resell' page to use the aftermarket."
 
     (actionEvt, actionTip, actionIcon)
       | isNothing mLoanUTxO =
@@ -238,7 +265,7 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
             ]
 
     activeStatus :: LoanUTxO -> AppNode
-    activeStatus u@LoanUTxO{utxoRef,lovelace=utxoLovelace,nativeAssets=utxoNativeAssets} = do
+    activeStatus u@LoanUTxO{loanAddress,utxoRef,lovelace=utxoLovelace,nativeAssets=utxoNativeAssets} = do
       let Loans.ActiveDatum{..} = fromMaybe def $ loanUTxOActiveDatum u
           loanBalance = toNativeAsset loanAsset & #quantity .~ roundUp (toRational loanOutstanding)
           expiration = fromPlutusTime loanExpiration
@@ -311,6 +338,8 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
             , maybe ":" ((<> ":") . view #alias) mTargetWallet
             , display payToAddress
             ]
+          lookupBorrowerEvt = HomeEvent 
+                            $ InspectKeyBorrowerInformation (borrowerId, loanAddress)
       vstack
         [ hstack
             [ label ("Balance: " <> showAssetBalance True reverseTickerMap loanBalance)
@@ -360,6 +389,24 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
                       , radius 5
                       ]
                     `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+            , spacer_ [width 5]
+            , flip styleBasic [textSize 10] $ 
+                tooltip_ "Lookup Borrower Information" [tooltipDelay 0] $
+                  box_ [alignMiddle , onClick lookupBorrowerEvt] $
+                    label idCardIcon
+                      `styleBasic` 
+                        [ bgColor black
+                        , textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        , paddingT 1
+                        , paddingB 1
+                        , paddingL 3
+                        , paddingR 3
+                        , radius 5
+                        ]
+                      `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             , filler
             , label prettyNextPaymentDueDate
                 `styleBasic` [textSize 10, textColor white]

@@ -52,6 +52,12 @@ module P2PWallet.Actions.Database
   , insertOptionsWallet
   , deleteOptionsWallet
   , getNextOptionsWalletId
+
+    -- * Aftermarket Wallets
+  , loadAftermarketWallets
+  , insertAftermarketWallet
+  , deleteAftermarketWallet
+  , getNextAftermarketWalletId
   ) where
 
 import System.Directory qualified as Dir
@@ -71,21 +77,18 @@ import P2PWallet.Prelude
 -------------------------------------------------
 initializeDatabase :: FilePath -> IO (Either Text ())
 initializeDatabase dbFile = do
-  -- Check if the database already exists.
-  exists <- Dir.doesFileExist dbFile
-
-  if exists then return $ Right () else do
-    handle @SomeException (return . Left . ("Could not create database: " <>) . show) $ do
-      -- Create the tables in the database.
-      create @Profile dbFile
-      create @PaymentWallet dbFile
-      create @StakeWallet dbFile
-      create @AddressEntry dbFile
-      create @TickerInfo dbFile
-      create @DexWallet dbFile
-      create @LoanWallet dbFile
-      create @OptionsWallet dbFile
-      return $ Right ()
+  handle @SomeException (return . Left . ("Could not initialize database: " <>) . show) $ do
+    -- Create the tables in the database if they don't already exist.
+    create @Profile dbFile
+    create @PaymentWallet dbFile
+    create @StakeWallet dbFile
+    create @AddressEntry dbFile
+    create @TickerInfo dbFile
+    create @DexWallet dbFile
+    create @LoanWallet dbFile
+    create @OptionsWallet dbFile
+    create @MarketWallet dbFile
+    return $ Right ()
 
 -------------------------------------------------
 -- Profiles
@@ -135,6 +138,7 @@ deleteProfile dbFile (ProfileId profileId) =
         , tableName @DexWallet
         , tableName @LoanWallet
         , tableName @OptionsWallet
+        , tableName @MarketWallet
         -- The ticker registry is global (it applies to all profiles and networks).
         ]
   where
@@ -239,6 +243,7 @@ deleteStakeWallet dbFile (StakeWalletId stakeWalletId) =
         , tableName @DexWallet
         , tableName @LoanWallet
         , tableName @OptionsWallet
+        , tableName @MarketWallet
         ]
   where
     deleteStmt :: Text -> Query
@@ -256,6 +261,7 @@ changeDeFiWalletAliases dbFile (StakeWalletId stakeWalletId) newAlias =
         [ tableName @DexWallet
         , tableName @LoanWallet
         , tableName @OptionsWallet
+        , tableName @MarketWallet
         ]
   where
     updateStmt :: Text -> Query
@@ -287,12 +293,16 @@ loadWallets dbFile Profile{..} = do
     -- Load the options wallets.
     optionsWallets <- loadOptionsWallets dbFile profileId >>= fromRightOrAppError
 
+    -- Load the aftermarket wallets.
+    aftermarketWallets <- loadAftermarketWallets dbFile profileId >>= fromRightOrAppError
+
     return $ Right $ Wallets
       { paymentWallets = paymentWallets
       , stakeWallets = stakeWallets
       , dexWallets = dexWallets
       , loanWallets = loanWallets
       , optionsWallets = optionsWallets
+      , marketWallets = aftermarketWallets
       }
 
 -------------------------------------------------
@@ -523,5 +533,55 @@ getNextOptionsWalletId dbFile =
       [ "SELECT options_wallet_id FROM"
       , tableName @OptionsWallet
       , "ORDER BY options_wallet_id DESC"
+      , "LIMIT 1;"
+      ]
+
+-------------------------------------------------
+-- Aftermarket Wallet
+-------------------------------------------------
+-- | Load the aftermarket wallets for the specified profile.
+loadAftermarketWallets :: FilePath -> ProfileId -> IO (Either Text [MarketWallet])
+loadAftermarketWallets dbFile (ProfileId profileId) = do
+    handle @SomeException (return . Left . ("Could not load aftermarket wallets: " <>) . show) $
+      Right <$> query dbFile queryStmt
+  where
+    queryStmt :: Query
+    queryStmt = Query $ unwords
+      [ "SELECT * FROM " <> tableName @MarketWallet
+      , "WHERE profile_id = " <> show profileId
+      , "ORDER BY market_wallet_id ASC;"
+      ]
+
+-- | Add a new market wallet to the database. This also updates market wallets.
+insertAftermarketWallet :: FilePath -> MarketWallet -> IO (Either Text ())
+insertAftermarketWallet dbFile marketWallet = do
+  handle @SomeException (return . Left . ("Failed to insert aftermarket wallet: " <>) . show) $
+    Right <$> insert @MarketWallet dbFile marketWallet
+
+-- | Delete an aftermarket wallet and all of its entries across the database.
+deleteAftermarketWallet :: FilePath -> MarketWalletId -> IO (Either Text ())
+deleteAftermarketWallet dbFile (MarketWalletId marketWalletId) = 
+    handle @SomeException (return . Left . ("Failed to delete aftermarket wallet: " <>) . show) $ do
+      Right <$> mapM_ (delete dbFile . deleteStmt)
+        [ tableName @MarketWallet
+        ]
+  where
+    deleteStmt :: Text -> Query
+    deleteStmt table = Query $ unwords
+      [ "DELETE FROM " <> table
+      , "WHERE market_wallet_id = " <> show marketWalletId
+      ]
+
+getNextAftermarketWalletId :: FilePath -> IO (Either Text MarketWalletId)
+getNextAftermarketWalletId dbFile =
+    handle @SomeException (return . Left . ("Could not get next aftermarket wallet id: " <>) . show) $
+      -- If the result is the empty list, this is the first entry.
+      maybe (Right 0) (Right . MarketWalletId . (+1) . Sqlite.fromOnly) . maybeHead <$> 
+        query dbFile stmt
+  where
+    stmt = Sqlite.Query $ mconcat $ intersperse " "
+      [ "SELECT market_wallet_id FROM"
+      , tableName @MarketWallet
+      , "ORDER BY market_wallet_id DESC"
       , "LIMIT 1;"
       ]

@@ -90,8 +90,8 @@ data OptionsEvent
   | OptionsResearchEvent OptionsResearchEvent
   -- | Sync the proposals for the selected contract assets.
   | SyncOptionsProposals (ProcessEvent (OfferAsset, AskAsset, Maybe PremiumAsset) CachedOptionsProposals)
-  -- | Sync the options contract for the selected options key nft.
-  | LookupOptionsContract (ProcessEvent ContractId CachedKeyOptionsContracts)
+  -- | Sync the options contracts for the selected options key nfts.
+  | LookupOptionsContracts (ProcessEvent [ContractId] CachedKeyOptionsContracts)
   -- | Sync the active contracts for the selected trading pair.
   | SyncActiveOptionsContracts (ProcessEvent (OfferAsset, AskAsset) CachedActiveOptionsContracts)
 

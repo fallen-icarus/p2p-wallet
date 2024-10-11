@@ -410,7 +410,7 @@ instance TableName LoanWallet where
 
 instance Creatable LoanWallet where
   createStmt = Query $ unwords
-    [ "CREATE TABLE " <> tableName @LoanWallet
+    [ "CREATE TABLE IF NOT EXISTS " <> tableName @LoanWallet
     , "("
     , unwords $ intersperse ","
         [ "network TEXT NOT NULL"

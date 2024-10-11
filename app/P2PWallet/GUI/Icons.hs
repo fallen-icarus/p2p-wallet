@@ -187,7 +187,10 @@ acceptIcon :: Text
 acceptIcon = toGlyph 0XF3AB
 
 targetAddressIcon :: Text
-targetAddressIcon = remixFocus3Line
+targetAddressIcon = toGlyph 0XF48E
+
+keyNftIcon :: Text
+keyNftIcon = toGlyph 0XEFD2
 
 rolloverLoanIcon :: Text
 rolloverLoanIcon = remixDraftLine
@@ -209,3 +212,6 @@ historyIcon = remixFileHistoryLine
 
 swapIcon :: Text
 swapIcon = remixHandCoinLine
+
+nftBasketIcon :: Text
+nftBasketIcon = remixShoppingBasketLine

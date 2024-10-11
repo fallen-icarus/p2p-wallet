@@ -150,7 +150,6 @@ hasOnlyOneOptionsActiveBeaconAction OptionsBuilderModel{..}
       , proposalPurchases /= []
       , contractExecutions /= []
       ]
-  
 
 -------------------------------------------------
 -- OptionsBuilderModel --> TxBody

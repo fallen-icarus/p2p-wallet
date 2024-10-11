@@ -151,7 +151,7 @@ handleResearchEvent model@AppModel{..} evt = case evt of
   InspectResearchLoanHistory loanId -> 
     [ Model $ model & #lendingModel % #researchModel % #inspectedLoan ?~ loanId 
     , Event $ case Map.lookup loanId (lendingModel ^. #cachedLoanHistories) of
-        Nothing -> LendingEvent $ LookupLoanHistory $ StartProcess $ Just loanId
+        Nothing -> LendingEvent $ LookupLoanHistories $ StartProcess $ Just [loanId]
         Just _ -> AppInit
     ]
   CloseInspectedResearchLoanHistory -> 

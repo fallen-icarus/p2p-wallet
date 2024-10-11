@@ -244,7 +244,7 @@ instance TableName DexWallet where
 
 instance Creatable DexWallet where
   createStmt = Query $ unwords
-    [ "CREATE TABLE " <> tableName @DexWallet
+    [ "CREATE TABLE IF NOT EXISTS " <> tableName @DexWallet
     , "("
     , unwords $ intersperse ","
         [ "network TEXT NOT NULL"

@@ -9,6 +9,7 @@ import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.GUI.Widgets.Lending.Lend.ViewLoanRequests (inspectBorrowerWidget,inspectLoanWidget)
 import P2PWallet.GUI.Widgets.Lending.Research.Actives
 import P2PWallet.GUI.Widgets.Lending.Research.Offers
 import P2PWallet.Prelude
@@ -27,20 +28,23 @@ researchWidget model@AppModel{lendingModel} = do
           ]
       -- The inspected borrower is here since only one borrower can be inspected at a time.
       -- It doesn't make sense to move to other scenes while inspecting a borrower.
-      , inspectBorrowerWidget model
-          `nodeVisible` and
-            [ isJust $ lendingModel ^. #researchModel % #inspectedBorrower
-            -- Hide until after syncing is complete.
-            , not $ model ^. #waitingStatus % #syncingBorrowerInfo
-            ]
+      , widgetMaybe (lendingModel ^. #researchModel % #inspectedBorrower) $ \info ->
+          let closeEvt = LendingEvent $ LoanResearchEvent CloseInspectedResearchBorrowerInformation 
+              historyEvt = LendingEvent . LoanResearchEvent . InspectResearchLoanHistory
+           in inspectBorrowerWidget info closeEvt historyEvt model
+                `nodeVisible` and
+                  [ -- Hide until after syncing is complete.
+                    not $ model ^. #waitingStatus % #syncingBorrowerInfo
+                  ]
       -- The inspected loan is here since only one loan can be inspected at a time.
       -- It doesn't make sense to move to other scenes while inspecting a loan.
-      , inspectLoanWidget model
-          `nodeVisible` and
-            [ isJust $ lendingModel ^. #researchModel % #inspectedLoan
-            -- Hide until after syncing is complete.
-            , not $ model ^. #waitingStatus % #syncingLoanHistory
-            ]
+      , widgetMaybe (lendingModel ^. #researchModel % #inspectedLoan) $ \targetId ->
+          let closeEvt = LendingEvent $ LoanResearchEvent CloseInspectedResearchLoanHistory in
+          inspectLoanWidget targetId closeEvt model
+            `nodeVisible` and
+              [ -- Hide until after syncing is complete.
+                not $ model ^. #waitingStatus % #syncingLoanHistories
+              ]
       ]
   where
     researchSceneButton :: Text -> LoanResearchScene -> AppNode

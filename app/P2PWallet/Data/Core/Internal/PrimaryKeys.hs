@@ -64,3 +64,10 @@ newtype OptionsWalletId = OptionsWalletId { unOptionsWalletId :: Int }
   deriving newtype (Eq,Ord,Num,ToField,FromField)
 
 makeFieldLabelsNoPrefix ''OptionsWalletId
+
+-- | The row id for the market_wallets sqlite table.
+newtype MarketWalletId = MarketWalletId { unMarketWalletId :: Int }
+  deriving (Show)
+  deriving newtype (Eq,Ord,Num,ToField,FromField)
+
+makeFieldLabelsNoPrefix ''MarketWalletId

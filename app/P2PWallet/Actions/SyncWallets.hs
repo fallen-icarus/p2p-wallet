@@ -30,7 +30,12 @@ syncWallets databaseFile network ws@Wallets{..} = do
     -- These are queried separately to minimize the chance of exceeding Koios' burst limit.
     (updatedDexWallets, updatedLoanWallets) <- concurrently fetchDexWallets fetchLoanWallets
 
-    updatedOptionsWallets <- fetchOptionsWallets
+    -- Wait 5 seconds so as to not exceed Koios' burst limit of 100 request within 10 seconds.
+    -- Each batch of requests goes to a separate instance so this should be enough.
+    threadDelay 5_000_000
+
+    (updatedOptionsWallets, updatedMarketWallets) <- 
+      concurrently fetchOptionsWallets fetchMarketWallets
     
     -- Save the new payment wallet states and throw an error if there is an issue saving.
     forM_ updatedPaymentWallets $ \paymentWallet -> do
@@ -52,6 +57,10 @@ syncWallets databaseFile network ws@Wallets{..} = do
     forM_ updatedOptionsWallets $ \optionsWallet -> do
       insertOptionsWallet databaseFile optionsWallet >>= fromRightOrAppError
 
+    -- Save the new market wallet states and throw an error if there is an issue saving.
+    forM_ updatedMarketWallets $ \marketWallet -> do
+      insertAftermarketWallet databaseFile marketWallet >>= fromRightOrAppError
+
     let newNotifications = catMaybes $ mconcat
           [ zipWith notify paymentWallets updatedPaymentWallets
           , zipWith notify stakeWallets updatedStakeWallets
@@ -67,6 +76,7 @@ syncWallets databaseFile network ws@Wallets{..} = do
       & #dexWallets .~ updatedDexWallets
       & #loanWallets .~ updatedLoanWallets
       & #optionsWallets .~ updatedOptionsWallets
+      & #marketWallets .~ updatedMarketWallets
   where
     fetchPaymentWallets :: IO [PaymentWallet]
     fetchPaymentWallets =
@@ -95,6 +105,12 @@ syncWallets databaseFile network ws@Wallets{..} = do
     fetchOptionsWallets :: IO [OptionsWallet]
     fetchOptionsWallets =
       pooledMapConcurrently runQueryOptionsWallet optionsWallets >>= 
+        -- Throw an error if syncing failed.
+        mapM fromRightOrAppError
+
+    fetchMarketWallets :: IO [MarketWallet]
+    fetchMarketWallets =
+      pooledMapConcurrently runQueryMarketWallet marketWallets >>= 
         -- Throw an error if syncing failed.
         mapM fromRightOrAppError
 

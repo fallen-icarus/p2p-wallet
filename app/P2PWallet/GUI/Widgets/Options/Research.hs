@@ -384,7 +384,7 @@ allActivesWidget AppModel{optionsModel=OptionsModel{scene=_,..},..} =
             , flip styleBasic [textSize 10] $ 
                 tooltip_ ("Contract ID: " <> display contractId) [tooltipDelay 0] $
                   box_ [alignMiddle , onClick $ CopyText $ display contractId] $
-                    label idCardIcon
+                    label keyNftIcon
                       `styleBasic` 
                         [ bgColor black
                         , textMiddle

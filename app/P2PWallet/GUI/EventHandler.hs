@@ -14,6 +14,7 @@ import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.GUI.EventHandler.AddressBookEvent
+import P2PWallet.GUI.EventHandler.AftermarketEvent
 import P2PWallet.GUI.EventHandler.DelegationEvent
 import P2PWallet.GUI.EventHandler.DexEvent
 import P2PWallet.GUI.EventHandler.HomeEvent
@@ -129,6 +130,11 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   OptionsEvent modal -> handleOptionsEvent model modal
 
   -----------------------------------------------
+  -- Aftermarket Events
+  -----------------------------------------------
+  AftermarketEvent modal -> handleAftermarketEvent model modal
+
+  -----------------------------------------------
   -- TxBuilder Events
   -----------------------------------------------
   TxBuilderEvent modal -> handleTxBuilderEvent model modal
@@ -185,6 +191,9 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
           optionsTarget = model ^. #optionsModel % #selectedWallet % #optionsWalletId
           updatedOptionsTarget = 
             fromMaybe def $ find (\w -> w ^. #optionsWalletId == optionsTarget) optionsWallets
+          marketTarget = model ^. #aftermarketModel % #selectedWallet % #marketWalletId
+          updateMarketTarget = 
+            fromMaybe def $ find (\w -> w ^. #marketWalletId == marketTarget) marketWallets
       in  [ Model $ model 
               & #waitingStatus % #syncingWallets .~ False
               & #knownWallets .~ resp
@@ -193,6 +202,7 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
               & #dexModel % #selectedWallet .~ updatedDexTarget
               & #lendingModel % #selectedWallet .~ updatedLoanTarget
               & #optionsModel % #selectedWallet .~ updatedOptionsTarget
+              & #aftermarketModel % #selectedWallet .~ updateMarketTarget
               & #txBuilderModel % #parameters ?~ networkParams
               & #fingerprintMap .~ 
                   toFingerprintMap (concatMap (view #nativeAssets) paymentWallets)

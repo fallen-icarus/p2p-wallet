@@ -12,6 +12,7 @@ The Home scene is dedicated to `PaymentWallet`s.
 module P2PWallet.Data.AppModel.HomeModel where
 
 import P2PWallet.Data.AppModel.Common
+import P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.SaleCreation
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LenderAddressUpdate
 import P2PWallet.Data.Core.Internal.Assets
 import P2PWallet.Data.Core.Internal.Bech32Address
@@ -72,6 +73,9 @@ data HomeEvent
   -- | Add the selected user input to the tx builder.
   -- The `Maybe Text` is an options message to go along with the final message.
   | AddSelectedUserInput (Maybe Text, PersonalUTxO)
+  -- | Add multiple selected user inputs to the tx builder.
+  -- The `Maybe Text` is an options message to go along with the final message.
+  | AddMultipleSelectedUserInputs (Maybe Text, [PersonalUTxO])
   -- | Add the selected collateral input to the tx builder.
   | AddSelectedCollateralInput PersonalUTxO
   -- | Add the selected change address to the tx builder.
@@ -80,11 +84,22 @@ data HomeEvent
   | InspectCorrespondingLoan Loans.LoanId
   -- | Stop inspecting the loan's history.
   | CloseInspectedCorrespondingLoan
+  -- | Lookup borrower information.
+  | InspectKeyBorrowerInformation (Loans.BorrowerId, PaymentAddress)
+  -- | Stop inspecting the borrower's information.
+  | CloseInspectedKeyBorrowerInformation
+  -- | Inspect loan for corresponding borrower.
+  | InspectBorrowerLoan Loans.LoanId
+  -- | Stop inspecting the borrower's loan's history.
+  | CloseInspectedBorrowerLoan
   -- | Claim collateral from an expired loan.
   | ClaimExpiredCollateral LoanUTxO
   -- | Add the required input for the Key burn if it is not already in the tx builder.
   -- The `Maybe Text` is an options message to go along with the final message.
   | AddKeyInput (Maybe Text, NativeAsset)
+  -- | Add multiple required inputs for the Keys if they are not already in the tx builder.
+  -- The `Maybe Text` is an options message to go along with the final message.
+  | AddMultipleKeyInputs (Maybe Text, [NativeAsset])
   -- | Burn leftover Key NFT.
   | BurnLoanKeyNFT Loans.LoanId
   -- | Update lender payment address.
@@ -97,6 +112,23 @@ data HomeEvent
   | ExecuteOptionsContract OptionsUTxO
   -- | Burn leftover Key NFT.
   | BurnOptionsKeyNFT Options.ContractId
+  -- | Create a sale for the current batch.
+  | NftBatchEvent NftBatchEvent
+
+-- | Creating a sale/auction for a batch of NFTs in the queue.
+data NftBatchEvent
+  -- | Show the current basket.
+  = ViewNftBatch
+  -- | Remove item from queue.
+  | RemoveNftFromBatch NativeAsset
+  -- | Close the view of the current basket so that other NFTs can be added.
+  | CloseNftBatchView
+  -- | Confirm the batch for sale.
+  | ConfirmNftBatch (AddEvent [NativeAsset] SaleCreation)
+  -- | Add the NFT to the batch.
+  | AddNftToBatch NativeAsset
+  -- | Clear the NFT batch.
+  | ClearNftBatch
 
 -------------------------------------------------
 -- UTxO Filter Model
@@ -153,6 +185,7 @@ instance Default UTxOFilterModel where
 data KeyNftType
   = LoanKey
   | OptionsKey
+  | OtherNft
   deriving (Show,Eq)
 
 data AssetFilterModel = AssetFilterModel
@@ -227,10 +260,22 @@ data HomeModel = HomeModel
   , newAliasField :: Text
   -- | Focused loan history.
   , inspectedLoan :: Maybe Loans.LoanId
+  -- | Focused borrower.
+  , inspectedBorrower :: Maybe (Loans.BorrowerId,PaymentAddress)
+  -- | Focused borrower loan history. Since the borrower history is gotten from the inspect loan, if
+  -- the user wanted to view another loan in the borrower's history, this would be a cycle. This
+  -- extra field enables viewing those loans without causing a cycle.
+  , inspectedBorrowerLoan :: Maybe Loans.LoanId
   -- | The new loan address update.
   , newLenderAddressUpdate :: Maybe NewLenderAddressUpdate
   -- | Focused options contract.
   , inspectedOptionsContract :: Maybe Options.ContractId
+  -- | Queued NFTs that are meant to be sold together. They must all have the same policy id.
+  , queuedNFTs :: [NativeAsset]
+  -- | Whether the viewQueue widget should be open.
+  , viewingQueue :: Bool
+  -- | The new sale creation.
+  , newSaleCreation :: Maybe NewSaleCreation
   } deriving (Eq,Show)
 
 instance Default HomeModel where
@@ -253,8 +298,13 @@ instance Default HomeModel where
     , txFilterScene = FilterScene
     , newAliasField = ""
     , inspectedLoan = Nothing
+    , inspectedBorrower = Nothing
+    , inspectedBorrowerLoan = Nothing
     , newLenderAddressUpdate = Nothing
     , inspectedOptionsContract = Nothing
+    , queuedNFTs = []
+    , viewingQueue = False
+    , newSaleCreation = Nothing
     }
 
 makeFieldLabelsNoPrefix ''HomeModel

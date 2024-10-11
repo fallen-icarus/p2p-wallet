@@ -49,6 +49,7 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ loanBuilderModel ^. #offerCloses
       , assetBalancesForChange $ optionsBuilderModel ^. #proposalCloses
       , assetBalancesForChange $ optionsBuilderModel ^. #expiredCloses
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #saleCloses
       ]
 
     -- The amount of ADA and native assets from the output sources. All quantities in this list must
@@ -60,6 +61,7 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ loanBuilderModel ^. #askCreations
       , assetBalancesForChange $ loanBuilderModel ^. #offerCreations
       , assetBalancesForChange $ optionsBuilderModel ^. #proposalCreations
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #saleCreations
       , (-requiredDeposits, [])
       , (-fee, [])
       ]
@@ -83,6 +85,7 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ optionsBuilderModel ^. #addressUpdates
       , assetBalancesForChange $ optionsBuilderModel ^. #keyBurns
       , assetBalancesForChange $ optionsBuilderModel ^. #contractExecutions
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #saleUpdates
       ]
 
     newChange :: ChangeOutput
@@ -124,6 +127,9 @@ balanceTx tx@TxBuilderModel{..} =
       , optionsBuilderModel ^. #addressUpdates /= []
       , optionsBuilderModel ^. #keyBurns /= []
       , optionsBuilderModel ^. #contractExecutions /= []
+      , aftermarketBuilderModel ^. #saleCreations /= []
+      , aftermarketBuilderModel ^. #saleCloses /= []
+      , aftermarketBuilderModel ^. #saleUpdates /= []
       ]
 
     -- What kind of transaction this is.
@@ -157,4 +163,6 @@ balanceTx tx@TxBuilderModel{..} =
       , map (view $ _2 % #oldProposal % #stakeKeyDerivation) $ optionsBuilderModel ^. #proposalUpdates
       , map (view $ _2 % #stakeKeyDerivation) $ optionsBuilderModel ^. #expiredCloses
       , map (view $ _2 % #stakeKeyDerivation) $ optionsBuilderModel ^. #addressUpdates
+      , map (view $ _2 % #stakeKeyDerivation) $ aftermarketBuilderModel ^. #saleCloses
+      , map (view $ _2 % #oldSale % #stakeKeyDerivation) $ aftermarketBuilderModel ^. #saleUpdates
       ]

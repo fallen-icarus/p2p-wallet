@@ -20,6 +20,7 @@ import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
+import P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder
 import P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder
 import P2PWallet.GUI.Widgets.TxBuilder.OptionsBuilder
 import P2PWallet.GUI.Widgets.TxBuilder.StatusBar
@@ -110,6 +111,8 @@ txBuilderWidget model@AppModel{..} = do
               , isNothing (optionsBuilderModel ^. #targetProposalCreation)
               , isNothing (optionsBuilderModel ^. #targetProposalUpdate)
               , isNothing (optionsBuilderModel ^. #targetAddressUpdate)
+              , isNothing (aftermarketBuilderModel ^. #targetSaleCreation)
+              , isNothing (aftermarketBuilderModel ^. #targetSaleUpdate)
               , not addingChangeOutput
               , not addingExternalUserOutput
               , not addingTestMint
@@ -144,6 +147,10 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (optionsBuilderModel ^. #targetProposalUpdate)
       , editWriterAddressUpdateWidget
           `nodeVisible` isJust (optionsBuilderModel ^. #targetAddressUpdate)
+      , editSaleCreationWidget model
+          `nodeVisible` isJust (aftermarketBuilderModel ^. #targetSaleCreation)
+      , editSaleUpdateWidget model
+          `nodeVisible` isJust (aftermarketBuilderModel ^. #targetSaleUpdate)
       , addExternalUserOutputWidget
           `nodeVisible` addingExternalUserOutput
       , addChangeOutputWidget
@@ -276,6 +283,7 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap,config} 
                  + swapsActionCount swapBuilderModel
                  + loanActionCount loanBuilderModel
                  + optionsActionCount optionsBuilderModel
+                 + aftermarketActionCount aftermarketBuilderModel
   vstack
     [ label ("Actions " <> show (tupled [pretty numActions]))
         `styleBasic` [textSize 12]
@@ -315,6 +323,10 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap,config} 
         , optionsKeyBurnsList $ optionsBuilderModel ^. #keyBurns
         , optionsContractExecutionsList reverseTickerMap (config ^. #timeZone) $ 
             optionsBuilderModel ^. #contractExecutions
+        -- Aftermarket
+        , saleCreationsList $ aftermarketBuilderModel ^. #saleCreations
+        , saleClosesList $ aftermarketBuilderModel ^. #saleCloses
+        , saleUpdatesList $ aftermarketBuilderModel ^. #saleUpdates
         -- Certificates
         , userCertificatesList userCertificates
         -- Withdrawals
