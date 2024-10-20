@@ -80,6 +80,10 @@ handleProfileEvent model@AppModel{..} evt = case evt of
             addDays (-30) (config ^. #currentDay)
         & #optionsModel % #writerModel % #txFilterModel % #dateRange % _1 ?~ 
             addDays (-30) (config ^. #currentDay)
+        & #aftermarketModel % #buyerModel % #txFilterModel % #dateRange % _1 ?~ 
+            addDays (-30) (config ^. #currentDay)
+        & #aftermarketModel % #sellerModel % #txFilterModel % #dateRange % _1 ?~ 
+            addDays (-30) (config ^. #currentDay)
         & #knownWallets .~ def
         & #txBuilderModel .~ def
         & #notifications .~ []

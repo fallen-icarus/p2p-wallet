@@ -67,6 +67,7 @@ syncWallets databaseFile network ws@Wallets{..} = do
           , zipWith notify dexWallets updatedDexWallets
           , zipWith notify loanWallets updatedLoanWallets
           , zipWith notify optionsWallets updatedOptionsWallets
+          , zipWith notify marketWallets updatedMarketWallets
           ]
 
     -- Return the updated wallets and network parameters.

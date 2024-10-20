@@ -7,6 +7,7 @@ import Monomer
 import Data.Map.Strict qualified as Map
 
 import P2PWallet.Actions.Database
+import P2PWallet.Actions.SyncAftermarket
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
@@ -14,6 +15,7 @@ import P2PWallet.Data.Core.Wallets
 import P2PWallet.Data.DeFi.CardanoAftermarket qualified as Aftermarket
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
+import P2PWallet.GUI.EventHandler.AftermarketEvent.BuyerEvent
 import P2PWallet.GUI.EventHandler.AftermarketEvent.SellerEvent
 import P2PWallet.Prelude
 
@@ -109,6 +111,11 @@ handleAftermarketEvent model@AppModel{..} evt = case evt of
   ---------------------------------------------
   AftermarketSellerEvent sellerEvt -> handleSellerEvent model sellerEvt
 
+  ---------------------------------------------
+  -- Buyer Event
+  ---------------------------------------------
+  AftermarketBuyerEvent buyerEvt -> handleBuyerEvent model buyerEvt
+
   -----------------------------------------------
   -- Lookup Key Info
   -----------------------------------------------
@@ -132,6 +139,24 @@ handleAftermarketEvent model@AppModel{..} evt = case evt of
       ]
     else
       [ Event AppInit ]
+
+  -----------------------------------------------
+  -- Sync Sales
+  -----------------------------------------------
+  SyncAftermarketSales modal -> case modal of
+    StartProcess mNftPolicyId ->
+      [ Model $ model & #waitingStatus % #syncingAftermarketSales .~ True
+      , Task $ runActionOrAlert (AftermarketEvent . SyncAftermarketSales . ProcessResults) $ do
+          nftPolicyId <- 
+            fromJustOrAppError "mNftPolicyId is Nothing" mNftPolicyId
+
+          syncAftermarketSales (config ^. #network) nftPolicyId $ aftermarketModel ^. #cachedSales
+      ]
+    ProcessResults newCache ->
+      [ Model $ model 
+          & #waitingStatus % #syncingAftermarketSales .~ False
+          & #aftermarketModel % #cachedSales .~ newCache
+      ]
 
 -------------------------------------------------
 -- Helper Functions

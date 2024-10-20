@@ -7,7 +7,7 @@
 module P2PWallet.Data.AppModel.AftermarketModel.SellerModel.OpenSalesFilterModel where
 
 import P2PWallet.Data.AppModel.Common
-import P2PWallet.Data.AppModel.HomeModel (KeyNftType(..))
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 

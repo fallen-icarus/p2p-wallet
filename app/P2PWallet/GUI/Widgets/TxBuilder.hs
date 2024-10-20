@@ -113,6 +113,13 @@ txBuilderWidget model@AppModel{..} = do
               , isNothing (optionsBuilderModel ^. #targetAddressUpdate)
               , isNothing (aftermarketBuilderModel ^. #targetSaleCreation)
               , isNothing (aftermarketBuilderModel ^. #targetSaleUpdate)
+              , isNothing (aftermarketBuilderModel ^. #targetLoanKeySpotPurchase)
+              , isNothing (aftermarketBuilderModel ^. #targetBidCreation)
+              , isNothing (aftermarketBuilderModel ^. #targetBidUpdate)
+              , isNothing (aftermarketBuilderModel ^. #targetClaimBidAcceptance)
+              , isNothing (aftermarketBuilderModel ^. #targetLoanKeyBidClaim)
+              , isNothing (aftermarketBuilderModel ^. #targetOptionsKeySpotPurchase)
+              , isNothing (aftermarketBuilderModel ^. #targetOptionsKeyBidClaim)
               , not addingChangeOutput
               , not addingExternalUserOutput
               , not addingTestMint
@@ -151,6 +158,20 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetSaleCreation)
       , editSaleUpdateWidget model
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetSaleUpdate)
+      , editLoanKeySpotPurchase
+          `nodeVisible` isJust (aftermarketBuilderModel ^. #targetLoanKeySpotPurchase)
+      , editBidCreationWidget model
+          `nodeVisible` isJust (aftermarketBuilderModel ^. #targetBidCreation)
+      , editBidUpdateWidget model
+          `nodeVisible` isJust (aftermarketBuilderModel ^. #targetBidUpdate)
+      , editClaimBidAcceptance model
+          `nodeVisible` isJust (aftermarketBuilderModel ^. #targetClaimBidAcceptance)
+      , editLoanKeyBidClaim
+          `nodeVisible` isJust (aftermarketBuilderModel ^. #targetLoanKeyBidClaim)
+      , editOptionsKeySpotPurchase model
+          `nodeVisible` isJust (aftermarketBuilderModel ^. #targetOptionsKeySpotPurchase)
+      , editOptionsKeyBidClaim model
+          `nodeVisible` isJust (aftermarketBuilderModel ^. #targetOptionsKeyBidClaim)
       , addExternalUserOutputWidget
           `nodeVisible` addingExternalUserOutput
       , addChangeOutputWidget
@@ -327,6 +348,16 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap,config} 
         , saleCreationsList $ aftermarketBuilderModel ^. #saleCreations
         , saleClosesList $ aftermarketBuilderModel ^. #saleCloses
         , saleUpdatesList $ aftermarketBuilderModel ^. #saleUpdates
+        , loanKeySpotPurchasesList reverseTickerMap $ aftermarketBuilderModel ^. #loanKeySpotPurchases
+        , bidCreationsList $ aftermarketBuilderModel ^. #bidCreations
+        , bidClosesList $ aftermarketBuilderModel ^. #bidCloses
+        , bidUpdatesList $ aftermarketBuilderModel ^. #bidUpdates
+        , claimBidAcceptancesList reverseTickerMap $ aftermarketBuilderModel ^. #claimBidAcceptances
+        , loanKeyBidClaimsList reverseTickerMap $ aftermarketBuilderModel ^. #loanKeyBidClaims
+        , optionsKeySpotPurchasesList reverseTickerMap $ aftermarketBuilderModel ^. #optionsKeySpotPurchases
+        , spotBidAcceptancesList reverseTickerMap $ aftermarketBuilderModel ^. #spotBidAcceptances
+        , optionsKeyBidClaimsList reverseTickerMap $ aftermarketBuilderModel ^. #optionsKeyBidClaims
+        , bidUnlocksList $ aftermarketBuilderModel ^. #bidUnlocks
         -- Certificates
         , userCertificatesList userCertificates
         -- Withdrawals

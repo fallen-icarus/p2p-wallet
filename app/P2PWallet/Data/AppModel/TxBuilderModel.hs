@@ -260,37 +260,83 @@ isEmptyBuilder TxBuilderModel{..} = and
   , isEmptyAftermarketBuilderModel aftermarketBuilderModel
   ]
 
+instance AddToTxBody TxBuilderModel where
+  addToTxBody _ = convertToTxBody
+
 -- | Convert the `TxBuilderModel` to a `TxBody`.
 convertToTxBody :: TxBuilderModel -> TxBody
-convertToTxBody TxBuilderModel{..} = 
-  -- A strict fold that merges all pieces. The `Semigroup` instance can be found in 
-  -- `P2PWallet.Data.Core.TxBody`.
-  foldMap' id 
-    -- Add the normal user inputs to the list of inputs.
-    [ foldMap' (addToTxBody mempty . snd) userInputs
-    -- Add the normal user outputs to the list of outputs.
-    , foldMap' (addToTxBody mempty . snd) userOutputs
-    -- Add the change output to the list of outputs.
-    , maybe mempty (addToTxBody mempty) changeOutput
-    -- Add the certificates to the list of certificates.
-    , foldMap' (addToTxBody mempty . snd) userCertificates
-    -- Add the withdrawals to the list of withdrawals.
-    , foldMap' (addToTxBody mempty . snd) userWithdrawals
-    -- Add the testMint to the list of mints.
-    , maybe mempty (addToTxBody mempty) testMint
-    -- Add any swap actions.
-    , addToTxBody mempty swapBuilderModel
-    -- Add any loan actions.
-    , addToTxBody mempty loanBuilderModel
-    -- Add any options actions.
-    , addToTxBody mempty optionsBuilderModel
-    -- Add any aftermarket actions.
-    , addToTxBody mempty aftermarketBuilderModel
-    -- Add the collateral and the fee to the transaction. This is done together because
-    -- the amount of collateral required depends on the fee.
-    , let txWithFee = mempty & #fee .~ fee in
-      maybe txWithFee (addToTxBody txWithFee) collateralInput
-    ]
+convertToTxBody txBuilder = convert $ groupAftermarketActions txBuilder
+  where
+    -- Since some aftermarket purchases require updates to the primary markets, these updates need
+    -- to be accounted for in the respective sub-builders.
+    groupAftermarketActions b@TxBuilderModel{..} = b
+      & #loanBuilderModel % #addressUpdates %~
+          groupLenderAddressUpdates (aftermarketBuilderModel ^. #loanKeySpotPurchases)
+      & #loanBuilderModel % #addressUpdates %~
+          groupLenderAddressUpdates (aftermarketBuilderModel ^. #loanKeyBidClaims)
+      & #loanBuilderModel % #expiredClaims %~
+          groupExpiredClaims (aftermarketBuilderModel ^. #loanKeySpotPurchases)
+      & #loanBuilderModel % #expiredClaims %~
+          groupExpiredClaims (aftermarketBuilderModel ^. #loanKeyBidClaims)
+      & #optionsBuilderModel % #contractExecutions %~
+          groupExecutions (aftermarketBuilderModel ^. #optionsKeySpotPurchases)
+      & #optionsBuilderModel % #contractExecutions %~
+          groupExecutions (aftermarketBuilderModel ^. #optionsKeyBidClaims)
+
+    groupLenderAddressUpdates
+      :: LabelOptic "lenderAddressUpdates" A_Lens a a [LenderAddressUpdate] [LenderAddressUpdate]
+      => [(Int,a)] 
+      -> [(Int,LenderAddressUpdate)]
+      -> [(Int,LenderAddressUpdate)]
+    groupLenderAddressUpdates loanAftermarketAction updates =
+      sortOn (view $ _2 % #loanUTxO % #utxoRef) $
+        updates <> concatMap (map (0::Int,) . view (_2 % #lenderAddressUpdates)) loanAftermarketAction
+
+    groupExpiredClaims
+      :: LabelOptic "expiredClaims" A_Lens a a [ExpiredClaim] [ExpiredClaim]
+      => [(Int,a)] 
+      -> [(Int,ExpiredClaim)]
+      -> [(Int,ExpiredClaim)]
+    groupExpiredClaims loanAftermarketAction claims =
+      claims <> concatMap (map (0::Int,) . view (_2 % #expiredClaims)) loanAftermarketAction
+
+    groupExecutions
+      :: LabelOptic "executions" A_Lens a a [OptionsContractExecution] [OptionsContractExecution]
+      => [(Int,a)] 
+      -> [(Int,OptionsContractExecution)]
+      -> [(Int,OptionsContractExecution)]
+    groupExecutions optionsAftermarketAction executions =
+      sortOn (view $ _2 % #optionsUTxO % #utxoRef) $
+        executions <> concatMap (map (0::Int,) . view (_2 % #executions)) optionsAftermarketAction
+
+    -- A strict fold that merges all pieces. The `Semigroup` instance can be found in 
+    -- `P2PWallet.Data.Core.TxBody`.
+    convert TxBuilderModel{..} = foldMap' id 
+      -- Add the normal user inputs to the list of inputs.
+      [ foldMap' (addToTxBody mempty . snd) userInputs
+      -- Add the normal user outputs to the list of outputs.
+      , foldMap' (addToTxBody mempty . snd) userOutputs
+      -- Add the change output to the list of outputs.
+      , maybe mempty (addToTxBody mempty) changeOutput
+      -- Add the certificates to the list of certificates.
+      , foldMap' (addToTxBody mempty . snd) userCertificates
+      -- Add the withdrawals to the list of withdrawals.
+      , foldMap' (addToTxBody mempty . snd) userWithdrawals
+      -- Add the testMint to the list of mints.
+      , maybe mempty (addToTxBody mempty) testMint
+      -- Add any swap actions.
+      , addToTxBody mempty swapBuilderModel
+      -- Add any loan actions.
+      , addToTxBody mempty loanBuilderModel
+      -- Add any options actions.
+      , addToTxBody mempty optionsBuilderModel
+      -- Add any aftermarket actions.
+      , addToTxBody mempty aftermarketBuilderModel
+      -- Add the collateral and the fee to the transaction. This is done together because
+      -- the amount of collateral required depends on the fee.
+      , let txWithFee = mempty & #fee .~ fee in
+        maybe txWithFee (addToTxBody txWithFee) collateralInput
+      ]
 
 -- | Since `cardano-cli transaction build-raw` can throw confusing error messages if certain pieces
 -- are missing from the transaction, this check validates those cases will not occur. 
@@ -335,4 +381,12 @@ hasInputs TxBuilderModel{..} = or
   , optionsBuilderModel ^. #addressUpdates /= []
   , optionsBuilderModel ^. #contractExecutions /= []
   , aftermarketBuilderModel ^. #saleCloses /= []
+  , aftermarketBuilderModel ^. #loanKeySpotPurchases /= []
+  , aftermarketBuilderModel ^. #bidCloses /= []
+  , aftermarketBuilderModel ^. #claimBidAcceptances /= []
+  , aftermarketBuilderModel ^. #loanKeyBidClaims /= []
+  , aftermarketBuilderModel ^. #optionsKeySpotPurchases /= []
+  , aftermarketBuilderModel ^. #spotBidAcceptances /= []
+  , aftermarketBuilderModel ^. #optionsKeyBidClaims /= []
+  , aftermarketBuilderModel ^. #bidUnlocks /= []
   ]

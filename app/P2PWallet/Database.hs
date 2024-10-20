@@ -72,7 +72,7 @@ class Insertable a where
   insertStmt :: Sqlite.Query
 
 insert :: forall a. (Sqlite.ToRow a, Insertable a) => String -> a -> IO ()
-insert dbName info = Sqlite.withConnection dbName $ \conn ->
+insert dbName info = Sqlite.withConnection dbName $ \conn -> do
   Sqlite.execute conn (insertStmt @a) info
 
 insertMany :: forall a. (Sqlite.ToRow a, Insertable a) => String -> [a] -> IO ()

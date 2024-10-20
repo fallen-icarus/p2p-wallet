@@ -46,6 +46,8 @@ main = do
               & #lendingModel % #borrowModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
               & #lendingModel % #lendModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
               & #optionsModel % #writerModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
+              & #aftermarketModel % #buyerModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
+              & #aftermarketModel % #sellerModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
     startApp initModel handleEvent buildUI $ appCfg AppInit
 
   where

@@ -7,7 +7,9 @@ import Monomer as M hiding (duration)
 import P2PWallet.Data.AppModel
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.MonomerOptics()
+import P2PWallet.GUI.Widgets.Aftermarket.Seller.CurrentBids
 import P2PWallet.GUI.Widgets.Aftermarket.Seller.OpenSales
+import P2PWallet.GUI.Widgets.Aftermarket.Seller.TransactionHistory
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Lending.Lend.ViewLoanRequests (inspectLoanWidget, inspectBorrowerWidget)
 import P2PWallet.Prelude
@@ -21,18 +23,13 @@ sellerWidget model@AppModel{aftermarketModel} = do
           , spacer
           , box_ [mergeRequired reqUpdate] (openSalesWidget model)
               `nodeVisible` (aftermarketModel ^. #sellerModel % #scene == OpenAftermarketSales)
-          -- , box_ [mergeRequired reqUpdate] (activeContractsWidget model)
-          --     `nodeVisible` (optionsModel ^. #writerModel % #scene == ActiveOptionsContracts)
-          -- , box_ [mergeRequired reqUpdate] (transactionsWidget model)
-          --     `nodeVisible` (optionsModel ^. #writerModel % #scene == OptionsTransactions)
+          , box_ [mergeRequired reqUpdate] (currentBidsWidget model)
+              `nodeVisible` (aftermarketModel ^. #sellerModel % #scene == CurrentAftermarketBids)
+          , box_ [mergeRequired reqUpdate] (transactionsWidget model)
+              `nodeVisible` (aftermarketModel ^. #sellerModel % #scene == AftermarketTransactions)
           ]
-      , inspectSaleWidget model
-          `nodeVisible` and
-            [ isJust $ aftermarketModel ^. #sellerModel % #inspectedSale
-            -- Hide until after syncing is complete.
-            , not $ model ^. #waitingStatus % #syncingLoanHistories
-            , not $ model ^. #waitingStatus % #syncingOptionsContracts
-            ]
+      , widgetIf (isJust $ aftermarketModel ^. #sellerModel % #inspectedTransaction) $
+          txInspectionWidget model
       , widgetMaybe (aftermarketModel ^. #sellerModel % #inspectedBorrower) $ \info ->
           let closeEvt = AftermarketEvent $ AftermarketSellerEvent CloseInspectedSellerBorrowerInformation
               historyEvt = AftermarketEvent . AftermarketSellerEvent . InspectSellerLoanHistory
@@ -73,7 +70,7 @@ sellerWidget model@AppModel{aftermarketModel} = do
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer
-      , sellerSceneButton "Aftermarket History" AftermarketTransactions
+      , sellerSceneButton "Store History" AftermarketTransactions
       , spacer
       ] `styleBasic`
           [ bgColor customGray2
@@ -84,23 +81,30 @@ sellerWidget model@AppModel{aftermarketModel} = do
     reqUpdate :: AppWenv -> AppModel -> AppModel -> Bool
     reqUpdate _ old@AppModel{aftermarketModel=oldMarket} new@AppModel{aftermarketModel=newMarket} 
       | old ^. #forceRedraw /= new ^. #forceRedraw = True
+
       | old ^. #waitingStatus % #syncingLoanHistories 
       /= new ^. #waitingStatus % #syncingLoanHistories = True
+
       | old ^. #waitingStatus % #syncingOptionsContracts 
       /= new ^. #waitingStatus % #syncingOptionsContracts = True
+
       | old ^. #waitingStatus % #syncingBorrowerInfo 
       /= new ^. #waitingStatus % #syncingBorrowerInfo = True
+
       | old ^. #lendingModel % #cachedBorrowerInfo
       /= new ^. #lendingModel % #cachedBorrowerInfo = True
-      -- | oldOptions ^. #writerModel % #proposalsFilterModel /=
-      --   newOptions ^. #writerModel % #proposalsFilterModel =
-      --     openProposalsFilterModelRequiresUpdate
-      --         (oldOptions ^. #writerModel % #proposalsFilterModel)
-      --         (newOptions ^. #writerModel % #proposalsFilterModel)
-      -- | oldOptions ^. #writerModel % #txFilterModel /=
-      --   newOptions ^. #writerModel % #txFilterModel =
-      --     txFilterModelRequiresUpdate
-      --         (oldOptions ^. #writerModel % #txFilterModel)
-      --         (newOptions ^. #writerModel % #txFilterModel)
+
+      | oldMarket ^. #sellerModel % #txFilterModel 
+      /= newMarket ^. #sellerModel % #txFilterModel =
+          txHistoryRequiresUpdate
+              (oldMarket ^. #sellerModel % #txFilterModel)
+              (newMarket ^. #sellerModel % #txFilterModel)
+
       | otherwise = oldMarket /= newMarket
 
+-- Entering text fields can be laggy so updating the UI is delayed until the last possible second.
+txHistoryRequiresUpdate :: SellerTxFilterModel -> SellerTxFilterModel -> Bool
+txHistoryRequiresUpdate old new
+  | old ^. #policyId /= new ^. #policyId = False
+  | old ^. #dateRange /= new ^. #dateRange = False
+  | otherwise = old /= new

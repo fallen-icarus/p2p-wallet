@@ -1289,7 +1289,7 @@ whatIsSpotSaleMsg = unwords
 sellerCredentialMsg :: Text
 sellerCredentialMsg = unwords
   [ "Which staking credential do you want to use to protect the sale? The open sale will be located"
-  , "under this credential in the `Resell` page."
+  , "under this credential in the `Reseller` page."
   ]
 
 salePaymentAddressMsg :: Text
@@ -1335,4 +1335,84 @@ saleFilterSortMsg = unlines
   , "1. Lexicographically based on the UTxO's output reference"
   , "2. Chronologically based on the time the UTxO was created"
   , "3. Based on the number of NFTs being sold in the batch"
+  ]
+
+whatIsSpotBidMsg :: Text
+whatIsSpotBidMsg = unwords
+  [ "A spot bid is a bid where the seller can immediately accept your bid and send you the NFTs."
+  , "The NFTs will be sent to the specified address. This bid must be stored with the specified"
+  , "bid amount."
+  ]
+
+whatIsClaimBidMsg :: Text
+whatIsClaimBidMsg = unwords
+  [ "A claim bid is a bid where the seller can lock up the NFTs for you to come claim."
+  , "You have until the claim expiration to claim the NFTs and send the bid amount to the seller."
+  , "If you do not claim the NFTs by then, the seller can reclaim the NFTs and confiscate your"
+  , "bid's deposit. The bid amount will not be stored with the bid."
+  ]
+
+bidderCredentialMsg :: Text
+bidderCredentialMsg = unwords
+  [ "Which staking credential do you want to use to protect the bids? The bids will be located"
+  , "under this credential in the `Reseller` page."
+  ]
+
+bidderPaymentAddressMsg :: Text
+bidderPaymentAddressMsg = unwords
+  [ "Which payment address should the nfts be sent to?"
+  ]
+
+bidPriceMsg :: Text
+bidPriceMsg = unwords
+  [ "What is the offered price for this batch of NFTs? The payment can be a multi-asset payment."
+  , "The assets must be separated with newlines, and in one of the following formats:"
+  , "1. '# policy_id.asset_name'"
+  , "2. '# ticker' - if in Ticker Registry"
+  , "3. '# ADA' - if the asset is ada."
+  , ""
+  , "Fingerprints are not supported."
+  ]
+
+bidExpirationMsg :: Text
+bidExpirationMsg = unlines
+  [ "When must the seller accept your bid by? The bid expires at the end of the day (ie, midnight)."
+  , ""
+  , "The date must be in the format of 'MM/DD/YY'. Some examples:"
+  , "12/02/24"
+  , "12/21/24"
+  , "01/01/25"
+  , ""
+  , "If you do not want to set an expiration for the bid, leave this field blank."
+  ]
+
+claimExpirationMsg :: Text
+claimExpirationMsg = unlines
+  [ unwords
+      [ "Once your bid is accepted, when will you claim the NFTs by?"
+      , "The claim period expires at the end of the day (ie, midnight)."
+      ]
+  , ""
+  , "The date must be in the format of 'MM/DD/YY'. Some examples:"
+  , "12/02/24"
+  , "12/21/24"
+  , "01/01/25"
+  ]
+
+claimBidPaymentAddressMsg :: Text
+claimBidPaymentAddressMsg = unwords
+  [ "Which payment address should the proceeds be sent to?"
+  ]
+
+bidTypeFilterMsg :: Text
+bidTypeFilterMsg = unwords
+  [ "What type of bid are you interested in?" ]
+
+bidFilterSortMsg :: Text
+bidFilterSortMsg = unlines
+  [ "Your bids can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Chronologically based on the time the UTxO was created"
+  , "3. Based on the number of NFTs being sold in the batch"
+  , "4. Based on the expiration of the bid."
   ]

@@ -59,9 +59,10 @@ calculateMinUTxOValue network mParameters newOutputAction = do
   mapM_ exportContractFiles outputs
 
   -- Calculate the min required UTxO value for each of the new outputs.
-  forM outputs $ \output ->
-    fromJustOrAppError "Could not parse min required value." . fmap Lovelace . readMaybe =<<
-      runCmd (calculateCmd tmpDir paramsFile output)
+  forM outputs $ \output -> do
+    res <- runCmd (calculateCmd tmpDir paramsFile output)
+    fromJustOrAppError ("Could not parse min required value: '" <> fromString res <> "'") $ 
+      Lovelace <$> readMaybe res
 
 -- | The actual command used to calculate the required minUTxO.
 calculateCmd :: TmpDirectory -> ParamsFile -> TxBodyOutput -> String

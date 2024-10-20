@@ -10,6 +10,7 @@ import P2PWallet.Data.Core.Wallets
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
+import P2PWallet.GUI.Widgets.Aftermarket.Buyer
 import P2PWallet.GUI.Widgets.Aftermarket.Seller
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Internal.Popup
@@ -62,8 +63,7 @@ mainWidget model@AppModel{scene=_,..} =
           ]
       , spacer_ [width 5]
       , sellerWidget model `nodeVisible` (aftermarketModel ^. #scene == AftermarketSellerScene)
-      -- , lendWidget model `nodeVisible` (lendingModel ^. #scene == LendScene)
-      -- , researchWidget model `nodeVisible` (lendingModel ^. #scene == ResearchLoansScene)
+      , buyerWidget model `nodeVisible` (aftermarketModel ^. #scene == AftermarketBuyerScene)
       ] 
   where
     marketMainSceneButton :: Text -> AftermarketScene -> AppNode
@@ -89,7 +89,7 @@ mainWidget model@AppModel{scene=_,..} =
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer
-      , marketMainSceneButton "Buy" AftermarketBidderScene
+      , marketMainSceneButton "Buy" AftermarketBuyerScene
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer

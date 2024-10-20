@@ -27,6 +27,7 @@ module P2PWallet.Actions.Query.Koios
   , runQuerySpecificOptionsContract
   , runQueryActiveOptionsContracts
   , runQueryMarketWallet
+  , runQueryAftermarketSales
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
@@ -68,6 +69,7 @@ import P2PWallet.Data.Koios.Transaction
 import P2PWallet.Data.Core.Transaction qualified as P2P
 import P2PWallet.Data.Core.StakeReward qualified as P2P
 import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.DeFi.CardanoAftermarket qualified as Aftermarket
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
 import P2PWallet.Data.DeFi.CardanoSwaps.Common qualified as Swaps
@@ -803,13 +805,17 @@ runQueryMarketWallet :: MarketWallet -> IO (Either Text MarketWallet)
 runQueryMarketWallet marketWallet@MarketWallet{..} = do
     (txRes,salesRes) <- concurrently queryTxsConcurrently querySalesWithRedundancies
 
-    case (,) <$> txRes <*> salesRes of
-      Right (txs,marketUTxOs) -> do
+    (bidRes,bidTxRes) <- concurrently queryOwnBidsWithRedundancies queryOwnBidTxsConcurrently
+
+    case (,,,) <$> txRes <*> salesRes <*> bidRes <*> bidTxRes of
+      Right (txs,marketUTxOs,bids,bidTxs) -> do
         return $ Right $ marketWallet
           & #lovelace .~ sum (map (view #lovelace) marketUTxOs)
           & #utxos .~ map fromAddressUTxO marketUTxOs
           & populateNativeAssets
           & #transactions %~ mappend (map P2P.toTransaction txs)
+          & #bidUTxOs .~ map fromAddressUTxO bids
+          & #bidTransactions %~ mappend (map P2P.toTransaction bidTxs)
       Left err -> return $ Left err
   where
     -- | Aggregate all native assets located at the wallet.
@@ -821,6 +827,11 @@ runQueryMarketWallet marketWallet@MarketWallet{..} = do
     -- Koios will return any transactions for that block or later.
     afterBlock :: Integer
     afterBlock = (+1) $ maybe 0 (view #blockHeight) $ maybeHead transactions
+
+    -- Add one to the blockHeight for the most recently recorded transaction for this wallet.
+    -- Koios will return any transactions for that block or later.
+    afterBidBlock :: Maybe Integer
+    afterBidBlock = (+1) . view #blockHeight <$> maybeHead bidTransactions
 
     -- Try to query the aftermarket address' utxos.
     fetchMarketUTxOs :: IO (Either Text [AddressUTxO])
@@ -857,6 +868,72 @@ runQueryMarketWallet marketWallet@MarketWallet{..} = do
             mapConcurrently 
               (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
               (groupInto 70 hashes)
+
+    -- Try to query the bid utxos tied to this user's credential.
+    fetchOwnBidUTxOs :: IO (Either Text [AddressUTxO])
+    fetchOwnBidUTxOs = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryOwnBids stakeCredential) env)
+
+    -- Since Koios instances may occassionally return incorrect UTxOs if they are not
+    -- close enough to the chain tip, this would mess with the wallet's notifications.
+    -- To account for this, the UTxOs are queried three times and compared. At least
+    -- two responses must match to move on. The redundant queries occur concurrently.
+    queryOwnBidsWithRedundancies :: IO (Either Text [AddressUTxO])
+    queryOwnBidsWithRedundancies = queryWithRedundancies fetchOwnBidUTxOs
+
+    -- Try to query the offer tx hashes since last time. If a timeout error occurs, just try 
+    -- again.
+    fetchOwnBidTxHashes :: IO (Either Text [Text])
+    fetchOwnBidTxHashes = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+          bidderId = Aftermarket.unBidderId $ Aftermarket.genBidderId stakeCredential
+          policyId = Aftermarket.beaconCurrencySymbol
+      first show <$> 
+        handleTimeoutError (runClientM (queryAssetTxHashes policyId bidderId afterBidBlock) env)
+
+    -- Try to query the transaction info concurrently. The transactions are grouped together,
+    -- 50 per response, since some transactions can be quite large.
+    queryOwnBidTxsConcurrently :: IO (Either Text [Transaction])
+    queryOwnBidTxsConcurrently = do
+      fetchOwnBidTxHashes >>= \case
+        Left err -> return $ Left $ show err
+        Right hashes -> do
+          manager <- newManager customTlsSettings
+          let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+          bimap show concat . sequence <$> 
+            mapConcurrently 
+              (\hs -> handleTimeoutError $ runClientM (queryAddressTransactions hs) env)
+              (groupInto 70 hashes)
+
+-- | Get the current sales for a specific policy id.
+runQueryAftermarketSales
+  :: Network 
+  -> CurrencySymbol
+  -> IO (Either Text [AftermarketUTxO])
+runQueryAftermarketSales network nftPolicyId = do
+    (spotRes,auctionRes) <- concurrently fetchSpotSales fetchAuctionSales
+
+    case (<>) <$> spotRes <*> auctionRes of
+      Right sales -> do
+        return $ Right $ sortOn (view #utxoRef) $ map fromAddressUTxO sales
+      Left err -> return $ Left err
+  where
+    -- Try to query the open spots.
+    fetchSpotSales :: IO (Either Text [AddressUTxO])
+    fetchSpotSales = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (querySpotSales nftPolicyId) env)
+
+    -- Try to query the open auctions.
+    fetchAuctionSales :: IO (Either Text [AddressUTxO])
+    fetchAuctionSales = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryAuctionSales nftPolicyId) env)
 
 -------------------------------------------------
 -- Low-Level API
@@ -1737,6 +1814,134 @@ queryActiveOptionsContracts offerAsset askAsset currentTime = queryApi 0 []
     queryApi offset !acc = do
       res <- optionsActiveUTxOsApi select offset "eq.false" expirationFilter Nothing $ 
         AssetList [(Options.activeBeaconCurrencySymbol, tradingPairBeacon)]
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+    select :: SelectParam
+    select = fromString $ intercalate ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]
+
+querySpotSales :: CurrencySymbol -> ClientM [AddressUTxO]
+querySpotSales nftPolicyId = queryApi 0 []
+  where
+    spotFilter :: Maybe AssetListFilterParam
+    spotFilter = Just 
+               $ AssetListFilterParam 
+               $ ("cs." <>) 
+               $ assetToQueryParam 
+               $ mkNativeAsset Aftermarket.beaconCurrencySymbol Aftermarket.spotBeaconName
+    
+    policyBeacon = Aftermarket.unPolicyBeacon $ Aftermarket.genPolicyBeacon nftPolicyId
+
+    assetToQueryParam :: NativeAsset -> Text
+    assetToQueryParam NativeAsset{policyId,tokenName} = mconcat
+      [ "[{\"policy_id\":\""
+      , display policyId
+      , "\",\"asset_name\":\""
+      , display tokenName
+      , "\"}]"
+      ]
+
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- assetUTxOsApi select offset "eq.false" spotFilter $ 
+        AssetList [(Aftermarket.beaconCurrencySymbol, policyBeacon)]
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+    select :: SelectParam
+    select = fromString $ intercalate ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]
+
+queryAuctionSales :: CurrencySymbol -> ClientM [AddressUTxO]
+queryAuctionSales nftPolicyId = queryApi 0 []
+  where
+    auctionFilter :: Maybe AssetListFilterParam
+    auctionFilter = Just 
+                  $ AssetListFilterParam 
+                  $ ("cs." <>) 
+                  $ assetToQueryParam 
+                  $ mkNativeAsset Aftermarket.beaconCurrencySymbol Aftermarket.auctionBeaconName
+    
+    policyBeacon = Aftermarket.unPolicyBeacon $ Aftermarket.genPolicyBeacon nftPolicyId
+
+    assetToQueryParam :: NativeAsset -> Text
+    assetToQueryParam NativeAsset{policyId,tokenName} = mconcat
+      [ "[{\"policy_id\":\""
+      , display policyId
+      , "\",\"asset_name\":\""
+      , display tokenName
+      , "\"}]"
+      ]
+
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- assetUTxOsApi select offset "eq.false" auctionFilter $ 
+        AssetList [(Aftermarket.beaconCurrencySymbol, policyBeacon)]
+      if length res == 1000 then
+        -- Query again since there may be more.
+        queryApi (offset + 1000) $ acc <> res
+      else
+        -- That should be the last of the results.
+        return $ acc <> res
+
+    select :: SelectParam
+    select = fromString $ intercalate ","
+      [ "is_spent"
+      , "tx_hash"
+      , "tx_index"
+      , "address"
+      , "stake_address"
+      , "value"
+      , "datum_hash"
+      , "inline_datum"
+      , "asset_list"
+      , "reference_script"
+      , "block_time"
+      , "block_height"
+      ]
+
+queryOwnBids :: Credential -> ClientM [AddressUTxO]
+queryOwnBids bidderCred = queryApi 0 []
+  where
+    bidderId = Aftermarket.unBidderId $ Aftermarket.genBidderId bidderCred
+
+    queryApi :: OffsetParam -> [AddressUTxO] -> ClientM [AddressUTxO]
+    queryApi offset !acc = do
+      res <- assetUTxOsApi select offset "eq.false" Nothing $ 
+        AssetList [(Aftermarket.beaconCurrencySymbol, bidderId)]
       if length res == 1000 then
         -- Query again since there may be more.
         queryApi (offset + 1000) $ acc <> res

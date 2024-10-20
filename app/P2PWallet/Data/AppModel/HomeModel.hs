@@ -181,13 +181,6 @@ instance Default UTxOFilterModel where
 -------------------------------------------------
 -- Asset Filter Model
 -------------------------------------------------
--- | The types of Key NFTs.
-data KeyNftType
-  = LoanKey
-  | OptionsKey
-  | OtherNft
-  deriving (Show,Eq)
-
 data AssetFilterModel = AssetFilterModel
   -- | The targets to search for.
   { search :: Text
