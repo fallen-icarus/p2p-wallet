@@ -62,6 +62,7 @@ executable p2p-wallet
       P2PWallet.Actions.Query.Koios
       P2PWallet.Actions.Utils
       P2PWallet.Actions.SubmitTx
+      P2PWallet.Actions.SyncAftermarket
       P2PWallet.Actions.SyncLoans
       P2PWallet.Actions.SyncOptions
       P2PWallet.Actions.SyncOrderBooks
@@ -70,8 +71,11 @@ executable p2p-wallet
       P2PWallet.Data.AppModel
       P2PWallet.Data.AppModel.AddressBookModel
       P2PWallet.Data.AppModel.AftermarketModel
-      P2PWallet.Data.AppModel.AftermarketModel.BidderModel
+      P2PWallet.Data.AppModel.AftermarketModel.BuyerModel
+      P2PWallet.Data.AppModel.AftermarketModel.BuyerModel.AllSalesFilterModel
+      P2PWallet.Data.AppModel.AftermarketModel.BuyerModel.OwnBidsFilterModel
       P2PWallet.Data.AppModel.AftermarketModel.SellerModel
+      P2PWallet.Data.AppModel.AftermarketModel.SellerModel.CurrentBidsFilterModel
       P2PWallet.Data.AppModel.AftermarketModel.SellerModel.OpenSalesFilterModel
       P2PWallet.Data.AppModel.Common
       P2PWallet.Data.AppModel.DelegationModel
@@ -101,9 +105,21 @@ executable p2p-wallet
       P2PWallet.Data.AppModel.TickerRegistryModel
       P2PWallet.Data.AppModel.TxBuilderModel
       P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.AcceptedBidClaim
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.BidClose
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.BidCreation
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.BidUnlock
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.BidUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.ClaimBidAcceptance
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.LoanKeyAcceptedBidClaim
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.LoanKeySpotPurchase
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.OptionsKeyAcceptedBidClaim
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.OptionsKeySpotPurchase
       P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.SaleClose
       P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.SaleCreation
       P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.SaleUpdate
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.SpotBidAcceptance
+      P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.SpotPurchase
       P2PWallet.Data.AppModel.TxBuilderModel.ChangeOutput
       P2PWallet.Data.AppModel.TxBuilderModel.CollateralInput
       P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel
@@ -193,6 +209,7 @@ executable p2p-wallet
       P2PWallet.GUI.EventHandler
       P2PWallet.GUI.EventHandler.AddressBookEvent
       P2PWallet.GUI.EventHandler.AftermarketEvent
+      P2PWallet.GUI.EventHandler.AftermarketEvent.BuyerEvent
       P2PWallet.GUI.EventHandler.AftermarketEvent.SellerEvent
       P2PWallet.GUI.EventHandler.DelegationEvent
       P2PWallet.GUI.EventHandler.DexEvent
@@ -218,8 +235,15 @@ executable p2p-wallet
       P2PWallet.GUI.UIBuilder
       P2PWallet.GUI.Widgets.AddressBook
       P2PWallet.GUI.Widgets.Aftermarket
+      P2PWallet.GUI.Widgets.Aftermarket.Buyer
+      P2PWallet.GUI.Widgets.Aftermarket.Buyer.Aftermarket
+      P2PWallet.GUI.Widgets.Aftermarket.Buyer.BidHistory
+      P2PWallet.GUI.Widgets.Aftermarket.Buyer.OwnBids
+      P2PWallet.GUI.Widgets.Aftermarket.Common
       P2PWallet.GUI.Widgets.Aftermarket.Seller
+      P2PWallet.GUI.Widgets.Aftermarket.Seller.CurrentBids
       P2PWallet.GUI.Widgets.Aftermarket.Seller.OpenSales
+      P2PWallet.GUI.Widgets.Aftermarket.Seller.TransactionHistory
       P2PWallet.GUI.Widgets.Delegation
       P2PWallet.GUI.Widgets.Delegation.AddStakeWallet
       P2PWallet.GUI.Widgets.Delegation.PoolPicker
@@ -267,9 +291,19 @@ executable p2p-wallet
       P2PWallet.GUI.Widgets.TickerRegistry
       P2PWallet.GUI.Widgets.TxBuilder
       P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder
+      P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.BidCloses
+      P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.BidCreations
+      P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.BidUnlocks
+      P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.BidUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.ClaimBidAcceptances
+      P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.LoanKeyBidClaims
+      P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.LoanKeySpotPurchases
+      P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.OptionsKeyBidClaims
+      P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.OptionsKeySpotPurchases
       P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.SaleCloses
       P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.SaleCreations
       P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.SaleUpdates
+      P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.SpotBidAcceptances
       P2PWallet.GUI.Widgets.TxBuilder.Internal
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder
       P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.AskCloses

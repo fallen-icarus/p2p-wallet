@@ -215,3 +215,6 @@ swapIcon = remixHandCoinLine
 
 nftBasketIcon :: Text
 nftBasketIcon = remixShoppingBasketLine
+
+counterOfferIcon :: Text
+counterOfferIcon = remixArrowGoBackLine

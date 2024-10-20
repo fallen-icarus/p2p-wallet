@@ -245,6 +245,13 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
                             , radius 5
                             ]
                           `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , widgetIf (loanExpiration <= toPlutusTime currentTime) $
+                    hstack
+                      [ filler
+                      , label "Expired"
+                          `styleBasic` [textSize 12, textColor customRed, textFont "Italics"]
+                      , filler
+                      ]
                 , filler
                 , label prettyNextPaymentDueDate
                     `styleBasic` [textSize 10, textColor white]

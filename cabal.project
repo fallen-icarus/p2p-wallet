@@ -66,4 +66,4 @@ source-repository-package
     type: git
     location: https://github.com/fallen-icarus/cardano-aftermarket
     -- v2.0.0.0rc
-    tag: 649db72ae9951929b1f3ebbefd17070d77e96345
+    tag: ba6ee294584debbf9f2f00175fd73fb293cf2972

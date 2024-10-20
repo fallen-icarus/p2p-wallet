@@ -14,19 +14,26 @@ module P2PWallet.Data.AppModel.AftermarketModel
   , AftermarketEvent(..)
   , AftermarketModel(..)
 
-  , module P2PWallet.Data.AppModel.AftermarketModel.BidderModel
+  , CachedAftermarketSales
+
+  , module P2PWallet.Data.AppModel.AftermarketModel.BuyerModel
   , module P2PWallet.Data.AppModel.AftermarketModel.SellerModel
   ) where
 
 import Data.Map.Strict qualified as Map
 
 import P2PWallet.Data.AppModel.Common
-import P2PWallet.Data.AppModel.AftermarketModel.BidderModel
+import P2PWallet.Data.AppModel.AftermarketModel.BuyerModel
 import P2PWallet.Data.AppModel.AftermarketModel.SellerModel
-import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.Wallets
-import P2PWallet.Data.DeFi.CardanoAftermarket qualified as Aftermarket
+import P2PWallet.Plutus
 import P2PWallet.Prelude
+
+-------------------------------------------------
+-- Cached Sales
+-------------------------------------------------
+-- | A type alias for a map from policy id to aftermarket sales.
+type CachedAftermarketSales = Map.Map CurrencySymbol [AftermarketUTxO]
 
 -------------------------------------------------
 -- Aftermarket Scenes and Overlays
@@ -36,7 +43,7 @@ data AftermarketScene
   -- | Information for the staking credential used as a seller.
   = AftermarketSellerScene
   -- | Information for the staking credential used as a bidder.
-  | AftermarketBidderScene
+  | AftermarketBuyerScene
   deriving (Eq,Show)
 
 -------------------------------------------------
@@ -54,9 +61,13 @@ data AftermarketEvent
   | ShowAftermarketMorePopup
   -- | Sell Event.
   | AftermarketSellerEvent AftermarketSellerEvent
+  -- | Buy Event.
+  | AftermarketBuyerEvent AftermarketBuyerEvent
   -- | Lookup the info for the Keys in a specific sale. The bool is whether to force resyncing the
   -- info.
   | LookupKeyInfo (Bool,AftermarketUTxO)
+  -- | Sync the sales for the selected policy id.
+  | SyncAftermarketSales (ProcessEvent CurrencySymbol CachedAftermarketSales)
 
 -------------------------------------------------
 -- Aftermarket State
@@ -77,6 +88,10 @@ data AftermarketModel = AftermarketModel
   , showMorePopup :: Bool
   -- | The seller model.
   , sellerModel :: AftermarketSellerModel
+  -- | The buyer model.
+  , buyerModel :: AftermarketBuyerModel
+  -- | Cached aftermarket sales.
+  , cachedSales :: CachedAftermarketSales
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''AftermarketModel
@@ -90,4 +105,6 @@ instance Default AftermarketModel where
     , deletingWallet = False
     , showMorePopup = False
     , sellerModel = def
+    , buyerModel = def
+    , cachedSales = mempty
     }

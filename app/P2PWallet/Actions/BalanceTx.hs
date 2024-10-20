@@ -50,6 +50,8 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ optionsBuilderModel ^. #proposalCloses
       , assetBalancesForChange $ optionsBuilderModel ^. #expiredCloses
       , assetBalancesForChange $ aftermarketBuilderModel ^. #saleCloses
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #bidCloses
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #bidUnlocks
       ]
 
     -- The amount of ADA and native assets from the output sources. All quantities in this list must
@@ -62,6 +64,7 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ loanBuilderModel ^. #offerCreations
       , assetBalancesForChange $ optionsBuilderModel ^. #proposalCreations
       , assetBalancesForChange $ aftermarketBuilderModel ^. #saleCreations
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #bidCreations
       , (-requiredDeposits, [])
       , (-fee, [])
       ]
@@ -86,6 +89,13 @@ balanceTx tx@TxBuilderModel{..} =
       , assetBalancesForChange $ optionsBuilderModel ^. #keyBurns
       , assetBalancesForChange $ optionsBuilderModel ^. #contractExecutions
       , assetBalancesForChange $ aftermarketBuilderModel ^. #saleUpdates
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #loanKeySpotPurchases
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #bidUpdates
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #claimBidAcceptances
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #loanKeyBidClaims
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #optionsKeySpotPurchases
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #spotBidAcceptances
+      , assetBalancesForChange $ aftermarketBuilderModel ^. #optionsKeyBidClaims
       ]
 
     newChange :: ChangeOutput
@@ -130,6 +140,16 @@ balanceTx tx@TxBuilderModel{..} =
       , aftermarketBuilderModel ^. #saleCreations /= []
       , aftermarketBuilderModel ^. #saleCloses /= []
       , aftermarketBuilderModel ^. #saleUpdates /= []
+      , aftermarketBuilderModel ^. #loanKeySpotPurchases /= []
+      , aftermarketBuilderModel ^. #bidCreations /= []
+      , aftermarketBuilderModel ^. #bidCloses /= []
+      , aftermarketBuilderModel ^. #bidUpdates /= []
+      , aftermarketBuilderModel ^. #claimBidAcceptances /= []
+      , aftermarketBuilderModel ^. #loanKeyBidClaims /= []
+      , aftermarketBuilderModel ^. #optionsKeySpotPurchases /= []
+      , aftermarketBuilderModel ^. #spotBidAcceptances /= []
+      , aftermarketBuilderModel ^. #optionsKeyBidClaims /= []
+      , aftermarketBuilderModel ^. #bidUnlocks /= []
       ]
 
     -- What kind of transaction this is.
@@ -165,4 +185,14 @@ balanceTx tx@TxBuilderModel{..} =
       , map (view $ _2 % #stakeKeyDerivation) $ optionsBuilderModel ^. #addressUpdates
       , map (view $ _2 % #stakeKeyDerivation) $ aftermarketBuilderModel ^. #saleCloses
       , map (view $ _2 % #oldSale % #stakeKeyDerivation) $ aftermarketBuilderModel ^. #saleUpdates
+      , map (view $ _2 % #marketWallet % #stakeKeyDerivation) $ aftermarketBuilderModel ^. #bidCreations
+      , map (view $ _2 % #stakeKeyDerivation) $ aftermarketBuilderModel ^. #bidCloses
+      , map (view $ _2 % #oldBid % #stakeKeyDerivation) $ aftermarketBuilderModel ^. #bidUpdates
+      , map (view $ _2 % #bidClaim % #marketWallet % #stakeKeyDerivation) $ 
+          aftermarketBuilderModel ^. #loanKeyBidClaims
+      , map (view $ _2 % #marketWallet % #stakeKeyDerivation) $ 
+          aftermarketBuilderModel ^. #spotBidAcceptances
+      , map (view $ _2 % #bidClaim % #marketWallet % #stakeKeyDerivation) $ 
+          aftermarketBuilderModel ^. #optionsKeyBidClaims
+      , map (view $ _2 % #sellerWallet % #stakeKeyDerivation) $ aftermarketBuilderModel ^. #bidUnlocks
       ]

@@ -574,6 +574,9 @@ instance ExportContractFiles TxBody where
     -- Export all files for the necessary staking scritps.
     mapM_ exportContractFiles withdrawals
 
+    -- Export all files for the necessary outputs.
+    mapM_ exportContractFiles outputs
+
 -------------------------------------------------
 -- `AddToTxBody` Class
 -------------------------------------------------

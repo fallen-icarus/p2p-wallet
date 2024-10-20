@@ -108,6 +108,8 @@ data WaitingStatus = WaitingStatus
   , syncingOptionsContracts :: Bool
   -- | The app is syncing the active contracts for the selected assets.
   , syncingActiveOptionsContracts :: Bool
+  -- | The app is syncing the sales for the selected nft policy id.
+  , syncingAftermarketSales :: Bool
   -- | The app is building the transaction.
   , building :: Bool
   -- | The app is loading the profile.
@@ -135,6 +137,7 @@ instance Default WaitingStatus where
     , syncingOptionsProposals = False
     , syncingOptionsContracts = False
     , syncingActiveOptionsContracts = False
+    , syncingAftermarketSales = False
     , building = False
     , loadingProfile = False
     , submitting = False

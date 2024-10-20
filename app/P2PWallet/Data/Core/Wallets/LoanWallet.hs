@@ -195,6 +195,12 @@ loanUTxOLoanBalance LoanUTxO{loanDatum} = case loanDatum of
     Just $ toNativeAsset loanAsset & #quantity .~ roundUp (toRational loanOutstanding)
   _ -> Nothing
 
+-- | Get the expiration from a LoanUTxO.
+loanUTxOExpiration :: LoanUTxO -> Maybe PlutusTime
+loanUTxOExpiration LoanUTxO{loanDatum} = case loanDatum of
+  Just (ActiveDatum Loans.ActiveDatum{loanExpiration}) -> Just loanExpiration
+  _ -> Nothing
+
 -------------------------------------------------
 -- Loan Event
 -------------------------------------------------

@@ -60,7 +60,6 @@ module P2PWallet.Actions.Database
   , getNextAftermarketWalletId
   ) where
 
-import System.Directory qualified as Dir
 import Database.SQLite.Simple qualified as Sqlite
 
 import P2PWallet.Actions.Utils

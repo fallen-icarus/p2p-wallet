@@ -20,6 +20,32 @@ import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------
+-- Key Types
+-------------------------------------------------
+-- | The types of Key NFTs.
+data KeyNftType
+  = LoanKey
+  | OptionsKey
+  | OtherNft
+  deriving (Show,Eq)
+
+instance Default KeyNftType where
+  def = OtherNft
+
+-------------------------------------------------
+-- Bid Types
+-------------------------------------------------
+-- | The types of possible bid UTxOs.
+data BidType
+  = SpotBid
+  | ClaimBid
+  | AcceptedBid
+  deriving (Show,Eq)
+
+instance Default BidType where
+  def = SpotBid
+
+-------------------------------------------------
 -- Aftermarket Datum
 -------------------------------------------------
 -- | The aftermarket datum used for the aftermarket address UTxO.
@@ -39,17 +65,19 @@ instance FromJSON AftermarketDatum where
   parseJSON value = pure $ fromMaybe (AftermarketDatumError value) $ asum
     [ SpotDatum <$> parseMaybe (parseJSON @Aftermarket.SpotDatum) value
     , AuctionDatum <$> parseMaybe (parseJSON @Aftermarket.AuctionDatum) value
+    -- This must be tried before SpotBidDatum because SpotBidDatum is a subset of AcceptedBidDatum
+    -- and decoding will stop despite more fields remaining.
+    , AcceptedBidDatum <$> parseMaybe (parseJSON @Aftermarket.AcceptedBidDatum) value
     , SpotBidDatum <$> parseMaybe (parseJSON @Aftermarket.SpotBidDatum) value
     , ClaimBidDatum <$> parseMaybe (parseJSON @Aftermarket.ClaimBidDatum) value
-    , AcceptedBidDatum <$> parseMaybe (parseJSON @Aftermarket.AcceptedBidDatum) value
     ]
 
 instance ToJSON AftermarketDatum where
   toJSON (SpotDatum datum) = toJSON datum
   toJSON (AuctionDatum datum) = toJSON datum
   toJSON (SpotBidDatum datum) = toJSON datum
-  toJSON (ClaimBidDatum value) = toJSON value
-  toJSON (AcceptedBidDatum value) = toJSON value
+  toJSON (ClaimBidDatum datum) = toJSON datum
+  toJSON (AcceptedBidDatum datum) = toJSON datum
   toJSON (AftermarketDatumError value) = toJSON value
 
 parseInlineAftermarketDatum :: Value -> AftermarketDatum
@@ -61,6 +89,17 @@ parseInlineAftermarketDatum value =
     , ClaimBidDatum <$> decodeData @Aftermarket.ClaimBidDatum value
     , AcceptedBidDatum <$> decodeData @Aftermarket.AcceptedBidDatum value
     ]
+
+-- | Get the bidderId from an aftermarket datum.
+aftermarketDatumBidderId :: AftermarketDatum -> Maybe Aftermarket.BidderId
+aftermarketDatumBidderId marketDatum = case marketDatum of
+  SpotBidDatum Aftermarket.SpotBidDatum{bidderCredential} -> 
+    Just $ Aftermarket.genBidderId bidderCredential
+  ClaimBidDatum Aftermarket.ClaimBidDatum{bidderCredential} ->
+    Just $ Aftermarket.genBidderId bidderCredential
+  AcceptedBidDatum Aftermarket.AcceptedBidDatum{bidderCredential} ->
+    Just $ Aftermarket.genBidderId bidderCredential
+  _ -> Nothing
 
 -- | Get the NFTs from an aftermarket datum.
 aftermarketDatumNfts :: AftermarketDatum -> Maybe (CurrencySymbol,[TokenName])
@@ -79,12 +118,65 @@ aftermarketDatumSellerPrice marketDatum = case marketDatum of
   AuctionDatum Aftermarket.AuctionDatum{startingPrice} -> Just startingPrice
   _ -> Nothing
 
+-- | Get the buyer's price from an aftermarket datum.
+aftermarketDatumBuyerPrice :: AftermarketDatum -> Maybe Aftermarket.Prices
+aftermarketDatumBuyerPrice marketDatum = case marketDatum of
+  SpotBidDatum Aftermarket.SpotBidDatum{bid} -> Just bid
+  ClaimBidDatum Aftermarket.ClaimBidDatum{bid} -> Just bid
+  AcceptedBidDatum Aftermarket.AcceptedBidDatum{bid} -> Just bid
+  _ -> Nothing
+
+-- | Get the price from an aftermarket datum. It does not matter if it is the sale price or bid.
+aftermarketDatumPrice :: AftermarketDatum -> Maybe Aftermarket.Prices
+aftermarketDatumPrice marketDatum = case marketDatum of
+  SpotDatum Aftermarket.SpotDatum{salePrice} -> Just salePrice
+  AuctionDatum Aftermarket.AuctionDatum{startingPrice} -> Just startingPrice
+  ClaimBidDatum Aftermarket.ClaimBidDatum{bid} -> Just bid
+  SpotBidDatum Aftermarket.SpotBidDatum{bid} -> Just bid
+  AcceptedBidDatum Aftermarket.AcceptedBidDatum{bid} -> Just bid
+  _ -> Nothing
+
 -- | Get the seller's payment address from an aftermarket datum.
 aftermarketDatumSellerAddress :: AftermarketDatum -> Maybe Address
 aftermarketDatumSellerAddress marketDatum = case marketDatum of
   SpotDatum Aftermarket.SpotDatum{paymentAddress} -> Just paymentAddress
   AcceptedBidDatum Aftermarket.AcceptedBidDatum{paymentAddress} -> Just paymentAddress
   _ -> Nothing
+
+-- | Get the seller's deposit from an aftermarket datum.
+aftermarketDatumSellerDeposit :: AftermarketDatum -> Maybe Integer
+aftermarketDatumSellerDeposit marketDatum = case marketDatum of
+  SpotDatum Aftermarket.SpotDatum{saleDeposit} -> Just saleDeposit
+  AcceptedBidDatum Aftermarket.AcceptedBidDatum{sellerDeposit} -> Just sellerDeposit
+  _ -> Nothing
+
+-- | Get the seller's deposit from an aftermarket datum.
+aftermarketDatumBuyerDeposit :: AftermarketDatum -> Maybe Integer
+aftermarketDatumBuyerDeposit marketDatum = case marketDatum of
+  SpotBidDatum Aftermarket.SpotBidDatum{bidDeposit} -> Just bidDeposit
+  AcceptedBidDatum Aftermarket.AcceptedBidDatum{bidDeposit} -> Just bidDeposit
+  ClaimBidDatum Aftermarket.ClaimBidDatum{bidDeposit} -> Just bidDeposit
+  _ -> Nothing
+
+isBidDatum :: AftermarketDatum -> Bool
+isBidDatum (SpotBidDatum _) = True
+isBidDatum (ClaimBidDatum _) = True
+isBidDatum (AcceptedBidDatum _) = True
+isBidDatum _ = False
+
+isSellerDatum :: AftermarketDatum -> Bool
+isSellerDatum (SpotDatum _) = True
+isSellerDatum (AuctionDatum _) = True
+isSellerDatum _ = False
+
+bidDatumBidExpiration :: AftermarketDatum -> Maybe PlutusTime
+bidDatumBidExpiration (ClaimBidDatum Aftermarket.ClaimBidDatum{bidExpiration}) = bidExpiration
+bidDatumBidExpiration _ = Nothing
+
+bidDatumExpiration :: AftermarketDatum -> Maybe PlutusTime
+bidDatumExpiration (ClaimBidDatum Aftermarket.ClaimBidDatum{bidExpiration}) = bidExpiration
+bidDatumExpiration (AcceptedBidDatum Aftermarket.AcceptedBidDatum{claimExpiration}) = Just claimExpiration
+bidDatumExpiration _ = Nothing
 
 -------------------------------------------------
 -- Aftermarket UTxO
@@ -167,10 +259,39 @@ aftermarketUTxOSellerPrice :: AftermarketUTxO -> Maybe Aftermarket.Prices
 aftermarketUTxOSellerPrice AftermarketUTxO{marketDatum} = 
   marketDatum >>= aftermarketDatumSellerPrice
 
+-- | Get the buyer's price from an AftermarketUTxO.
+aftermarketUTxOBuyerPrice :: AftermarketUTxO -> Maybe Aftermarket.Prices
+aftermarketUTxOBuyerPrice AftermarketUTxO{marketDatum} = 
+  marketDatum >>= aftermarketDatumBuyerPrice
+
+-- | Get the price from an AftermarketUTxO. It does not matter whether it is the sale price or bid.
+aftermarketUTxOPrice :: AftermarketUTxO -> Maybe Aftermarket.Prices
+aftermarketUTxOPrice AftermarketUTxO{marketDatum} = 
+  marketDatum >>= aftermarketDatumPrice
+
 -- | Get the seller's payment address from an AftermarketUTxO.
 aftermarketUTxOSellerAddress :: AftermarketUTxO -> Maybe Address
 aftermarketUTxOSellerAddress AftermarketUTxO{marketDatum} = 
   marketDatum >>= aftermarketDatumSellerAddress
+
+-- | Get the seller's deposit from an AftermarketUTxO.
+aftermarketUTxOSellerDeposit :: AftermarketUTxO -> Maybe Integer
+aftermarketUTxOSellerDeposit AftermarketUTxO{marketDatum} = 
+  marketDatum >>= aftermarketDatumSellerDeposit
+
+-- | Get the bid's expiration from an AftermarketUTxO. 
+aftermarketUTxOBidExpiration :: AftermarketUTxO -> Maybe PlutusTime
+aftermarketUTxOBidExpiration AftermarketUTxO{marketDatum} = marketDatum >>= bidDatumBidExpiration
+
+-- | Get the bid's expiration from an AftermarketUTxO. This is the bidExpiration for ClaimBid UTxOs
+-- and claimExpiration for AcceptedBid UTxOs.
+aftermarketUTxOExpiration :: AftermarketUTxO -> Maybe PlutusTime
+aftermarketUTxOExpiration AftermarketUTxO{marketDatum} = marketDatum >>= bidDatumExpiration
+
+-- | Get the buyer's deposit from an AftermarketUTxO.
+aftermarketUTxOBuyerDeposit :: AftermarketUTxO -> Maybe Integer
+aftermarketUTxOBuyerDeposit AftermarketUTxO{marketDatum} = 
+  marketDatum >>= aftermarketDatumBuyerDeposit
 
 -------------------------------------------------
 -- Aftermarket Wallet
@@ -288,3 +409,87 @@ instance Insertable MarketWallet where
     , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
+instance Notify MarketWallet where
+  notify oldState newState
+    | msg /= [] =
+        Just $ Notification
+          { notificationType = AftermarketNotification
+          , alias = oldState ^. #alias
+          , message = unlines msg
+          , markedAsRead = False
+          }
+    | otherwise = Nothing
+    where
+      msg :: [Text]
+      msg = filter (/= "")
+        [ spotMsg
+        , auctionMsg
+        , sellerBidMsg
+        , buyerBidMsg
+        , sellerAcceptedBidMsg
+        , buyerAcceptedBidMsg
+        ]
+
+      spotOnly :: [AftermarketUTxO] -> [TxOutRef]
+      spotOnly = sort
+              . map (view #utxoRef) 
+              . filter (isJust . preview (#marketDatum % _Just % _SpotDatum))
+
+      auctionOnly :: [AftermarketUTxO] -> [TxOutRef]
+      auctionOnly = sort
+                  . map (view #utxoRef) 
+                  . filter (isJust . preview (#marketDatum % _Just % _AuctionDatum))
+
+      spotBidOnly :: [AftermarketUTxO] -> [TxOutRef]
+      spotBidOnly = sort
+                  . map (view #utxoRef) 
+                  . filter (isJust . preview (#marketDatum % _Just % _SpotBidDatum))
+
+      claimBidOnly :: [AftermarketUTxO] -> [TxOutRef]
+      claimBidOnly = sort
+                   . map (view #utxoRef) 
+                   . filter (isJust . preview (#marketDatum % _Just % _ClaimBidDatum))
+
+      acceptedBidOnly :: [AftermarketUTxO] -> [TxOutRef]
+      acceptedBidOnly = sort
+                      . map (view #utxoRef) 
+                      . filter (isJust . preview (#marketDatum % _Just % _AcceptedBidDatum))
+
+      spotMsg :: Text
+      spotMsg
+        | spotOnly (oldState ^. #utxos) /= spotOnly (newState ^. #utxos) = 
+            "Spot sale statuses have changed."
+        | otherwise = ""
+
+      auctionMsg :: Text
+      auctionMsg
+        | auctionOnly (oldState ^. #utxos) /= auctionOnly (newState ^. #utxos) = 
+            "Auction sale statuses have changed."
+        | otherwise = ""
+
+      sellerBidMsg :: Text
+      sellerBidMsg
+        | spotBidOnly (oldState ^. #utxos) /= spotBidOnly (newState ^. #utxos) = 
+            "Bids from potential buyers have changed."
+        | claimBidOnly (oldState ^. #utxos) /= claimBidOnly (newState ^. #utxos) = 
+            "Bids from potential buyers have changed."
+        | otherwise = ""
+
+      buyerBidMsg :: Text
+      buyerBidMsg
+        | spotBidOnly (oldState ^. #bidUTxOs) /= spotBidOnly (newState ^. #bidUTxOs) = 
+            "Bids to to sellers have changed."
+        | claimBidOnly (oldState ^. #bidUTxOs) /= claimBidOnly (newState ^. #bidUTxOs) = 
+            "Bids to to sellers have changed."
+        | otherwise = ""
+
+      sellerAcceptedBidMsg :: Text
+      sellerAcceptedBidMsg
+        | acceptedBidOnly (oldState ^. #utxos) /= acceptedBidOnly (newState ^. #utxos) = 
+            "AcceptedBid statuses have changed."
+        | otherwise = ""
+
+      buyerAcceptedBidMsg :: Text
+      buyerAcceptedBidMsg
+        | acceptedBidOnly (newState ^. #bidUTxOs) /= [] = "AcceptedBids available to claim."
+        | otherwise = ""

@@ -43,6 +43,7 @@ module P2PWallet.Prelude
   , valueAsByteString
   , maybeHead
   , maybeLast
+  , maybeInit
   , groupInto
   , mkScaleFactor
   , formatQuantity
@@ -64,7 +65,10 @@ module P2PWallet.Prelude
   , catch
   , handle
 
-  -- Display Class
+    -- * NothingLast
+  , NothingLast(..)
+
+    -- * Display Class
   , Display(..)
 
     -- * Other useful re-exports
@@ -112,6 +116,9 @@ maybeLast :: [a] -> Maybe a
 maybeLast [] = Nothing
 maybeLast [x] = Just x
 maybeLast (_:xs) = maybeLast xs
+
+maybeInit :: [a] -> Maybe [a]
+maybeInit = viaNonEmpty init
 
 -- | Break a list into sublists of the specified length.
 groupInto :: Int -> [a] -> [[a]]
@@ -259,6 +266,19 @@ parsePercentage = fmap (toRational . (/100))
 -- | Show a `Rational` as a percentage. This shows four decimal places.
 displayPercentage :: Rational -> Text
 displayPercentage = show @_ @Decimal . (*100) . realFracToDecimal 4
+
+-------------------------------------------------
+-- NothingLast
+-------------------------------------------------
+-- | Sometimes, when a `Maybe a` needs to be sorted, the `Nothing` should appear last while the
+-- `Just a` should be sorted normally.
+newtype NothingLast a = NothingLast (Maybe a)
+  deriving newtype (Show,Eq)
+
+instance (Ord a) => Ord (NothingLast a) where
+  NothingLast (Just _) <= NothingLast Nothing = True
+  NothingLast Nothing <= NothingLast (Just _) = False
+  NothingLast x <= NothingLast y = x <= y
 
 -------------------------------------------------
 -- Display Class

@@ -44,6 +44,9 @@ module P2PWallet.Data.DeFi.CardanoAftermarket
     -- * Creating Datums
   , createSpotDatum
   , createAuctionDatum
+  , createSpotBidDatum
+  , createClaimBidDatum
+  , createAcceptedBidDatum
 
     -- * Protocol Addresses
   , genProxyAddress
@@ -412,18 +415,18 @@ instance FromJSON AcceptedBidDatum where
 -------------------------------------------------
 -- Payment Datum
 -------------------------------------------------
-newtype PaymentDatum = PaymentDatum (CurrencySymbol,TokenName)
+newtype PaymentDatum = PaymentDatum (CurrencySymbol,TxOutRef)
   deriving (Show,Eq)
 
 instance ToData PaymentDatum where
-  toBuiltinData (PaymentDatum (sym,name)) = 
-    PV2.BuiltinData $ PV2.List [PV2.toData sym, PV2.toData name]
+  toBuiltinData (PaymentDatum (sym,ref)) = 
+    PV2.BuiltinData $ PV2.List [PV2.toData sym, PV2.toData ref]
 
 instance FromData PaymentDatum where
-  fromBuiltinData (PV2.BuiltinData (PV2.List [sym,tok])) =
+  fromBuiltinData (PV2.BuiltinData (PV2.List [sym,ref])) =
     fmap PaymentDatum . (,) 
       <$> PV2.fromData sym 
-      <*> PV2.fromData tok
+      <*> PV2.fromData ref
   fromBuiltinData _ = Nothing
 
 -------------------------------------------------
@@ -450,6 +453,15 @@ data MarketRedeemer
   deriving (Generic,Show)
 
 makeFieldLabelsNoPrefix ''MarketRedeemer
+
+instance Display MarketRedeemer where
+  display CloseOrUpdateSellerUTxO = "Closed/Updated Seller UTxO"
+  display CloseOrUpdateBidderUTxO = "Closed/Updated Buyer UTxO"
+  display PurchaseSpot = "Spot Purchased"
+  display AcceptSpotBid = "SpotBid Accepted"
+  display (AcceptClaimBid _ _) = "ClaimBid Accepted"
+  display ClaimAcceptedBid = "AcceptedBid Claimed"
+  display UnlockUnclaimedAcceptedBid = "Unclaimed AcceptedBid Confiscated"
 
 data MarketObserverRedeemer
   -- | Observe a market payment/acceptance transaction. 
@@ -581,6 +593,76 @@ createAuctionDatum nfts price = AuctionDatum
     nftPolicyId = maybe (error "createAuctionDatum nfts") (view #policyId) $ maybeHead nfts
     nftNames = map (view #tokenName) nfts
 
+-- | Create a new SpotBidDatum.
+createSpotBidDatum 
+  :: [NativeAsset] -- ^ NFTs
+  -> Lovelace -- ^ Deposit.
+  -> PaymentAddress -- ^ The address where the NFTs must go.
+  -> [NativeAsset] -- ^ Bid.
+  -> Credential -- ^ Bidder's credential.
+  -> SpotBidDatum
+createSpotBidDatum nfts deposit paymentAddress price bidderCred = SpotBidDatum
+    { beaconId = BeaconId beaconCurrencySymbol
+    , aftermarketObserverHash = aftermarketObserverScriptHash
+    , nftPolicyId = nftPolicyId
+    , nftNames = nftNames
+    , bidderCredential = bidderCred
+    , bidDeposit = unLovelace deposit
+    , bid = Prices $ map fromNativeAsset price
+    , paymentAddress = address
+    }
+  where
+    nftPolicyId = maybe (error "createSpotBidDatum nfts") (view #policyId) $ maybeHead nfts
+    nftNames = map (view #tokenName) nfts
+    address = fromRight (error "createSpotBidDatum paymentAddress") -- This should never return left.
+            $ paymentAddressToPlutusAddress paymentAddress
+
+-- | Create a new ClaimBidDatum.
+createClaimBidDatum 
+  :: [NativeAsset] -- ^ NFTs
+  -> Lovelace -- ^ Deposit.
+  -> [NativeAsset] -- ^ Bid.
+  -> Maybe PlutusTime -- ^ Bid expiration.
+  -> PlutusTime -- Claim expiration.
+  -> Credential -- Bidder's credential.
+  -> ClaimBidDatum
+createClaimBidDatum nfts deposit price bidExpiration claimExpiration bidderCred = ClaimBidDatum
+    { beaconId = BeaconId beaconCurrencySymbol
+    , aftermarketObserverHash = aftermarketObserverScriptHash
+    , nftPolicyId = nftPolicyId
+    , nftNames = nftNames
+    , bidderCredential = bidderCred
+    , bidDeposit = unLovelace deposit
+    , bid = Prices $ map fromNativeAsset price
+    , bidExpiration = bidExpiration
+    , claimExpiration = claimExpiration
+    }
+  where
+    nftPolicyId = maybe (error "createClaimBidDatum nfts") (view #policyId) $ maybeHead nfts
+    nftNames = map (view #tokenName) nfts
+
+-- | Create a new AcceptedBidDatum from a ClaimBidDatum.
+createAcceptedBidDatum
+  :: ClaimBidDatum
+  -> Lovelace -- ^ Deposit.
+  -> PaymentAddress
+  -> AcceptedBidDatum
+createAcceptedBidDatum ClaimBidDatum{..} sellerDeposit sellerPayAddr = AcceptedBidDatum
+    { beaconId = BeaconId beaconCurrencySymbol
+    , aftermarketObserverHash = aftermarketObserverScriptHash
+    , nftPolicyId = nftPolicyId
+    , nftNames = nftNames
+    , bidderCredential = bidderCredential
+    , bidDeposit = bidDeposit
+    , sellerDeposit = unLovelace sellerDeposit
+    , bid = bid
+    , claimExpiration = claimExpiration
+    , paymentAddress = address
+    }
+  where
+    address = fromRight (error "createAcceptedBidDatum sellerPayAddr") -- This should never return left.
+            $ paymentAddressToPlutusAddress sellerPayAddr
+
 -------------------------------------------------
 -- Protocol Addresses
 -------------------------------------------------
@@ -628,6 +710,7 @@ observerStakeAddress network =
 -------------------------------------------------
 -- The reference scripts are locked at the options address without any staking credential.
 -- For testnet, that address is: 
+-- addr_test1wrs8a6yhjamxjt8rgaascr2nknr9pmmvett4cfvkmg3gglqrqjydc
 --
 -- The scripts are deliberately stored with an invalid datum so that they are locked forever.
 getScriptRef :: Network -> ScriptHash -> (TxOutRef,Integer)
@@ -645,12 +728,12 @@ referenceScriptMap = Map.fromList
 
 beaconScriptTestnetRef :: TxOutRef
 beaconScriptTestnetRef = 
-  TxOutRef "e7b3cd91a7127607fb2fddf2efe78559321175c8660e47350bc5f8e91a90c4d5" 0
+  TxOutRef "6c402050892c8cb0e3e54f803d7ae292d6f5f90745b7f76722f7c303c7085d50" 0
 
 aftermarketScriptTestnetRef :: TxOutRef
 aftermarketScriptTestnetRef = 
-  TxOutRef "41aa389294c7dd41edfe993df3e2224c70e88212888cfdcbcea6529f5abd3a9e" 0
+  TxOutRef "e95a73a1e03afdf74b86d10e504b64285f7afdfab7f7021a41054ae4b377ca9f" 0
 
 aftermarketObserverScriptTestnetRef :: TxOutRef
 aftermarketObserverScriptTestnetRef = 
-  TxOutRef "7ede060e563b49e36ea0efe17d93bb83353d560f18c8b6fdaa696475babe6575" 0
+  TxOutRef "b6b5bd23fa762b2630dc9dedc10d0bac61d6ffa3617f451df8a8ee31a83c441f" 0
