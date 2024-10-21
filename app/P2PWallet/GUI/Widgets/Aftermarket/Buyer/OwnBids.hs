@@ -39,23 +39,6 @@ ownBidsWidget model@AppModel{scene=_,..} =
             ]
       , optionsAcceptedClaimExecutionWidget model
           `nodeVisible` isJust (aftermarketModel ^. #buyerModel % #newOptionsKeyAcceptedBidClaim)
-      , widgetMaybe (buyerModel ^. #inspectedBid) $ \bidUTxO ->
-          inspectBatchWidget model 
-            InspectBatchConfig
-              { batchUTxO = bidUTxO
-              , closeEvent = 
-                  AftermarketEvent $ AftermarketBuyerEvent CloseInspectedAftermarketBid
-              , inspectLoanHistoryEvent =
-                  AftermarketEvent . AftermarketBuyerEvent . InspectBuyerLoanHistory
-              , lookupBorrowerEvent =
-                  AftermarketEvent . AftermarketBuyerEvent . InspectBuyerBorrowerInformation
-              , mAddToHomeEvent = Nothing
-              }
-          `nodeVisible` and
-            -- Hide until after syncing is complete.
-            [ not $ model ^. #waitingStatus % #syncingLoanHistories
-            , not $ model ^. #waitingStatus % #syncingOptionsContracts
-            ]
       ]
   where
     AftermarketModel{..} = aftermarketModel
@@ -160,6 +143,10 @@ ownBidsWidget model@AppModel{scene=_,..} =
                     $ AddSelectedBidUpdate 
                     $ StartAdding 
                     $ Just u
+          lookupEvt = AftermarketEvent 
+                    $ AftermarketBuyerEvent
+                    $ InspectSellerInformation
+                    $ u ^. #marketAddress
       hstack
         [ vstack
             [ hstack
@@ -226,6 +213,24 @@ ownBidsWidget model@AppModel{scene=_,..} =
                           , radius 5
                           ]
                         `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ 
+                    tooltip_ "Lookup Seller Information" [tooltipDelay 0] $
+                      box_ [alignMiddle , onClick lookupEvt] $
+                        label idCardIcon
+                          `styleBasic` 
+                            [ bgColor black
+                            , textMiddle
+                            , textFont "Remix"
+                            , textSize 8
+                            , textColor customBlue
+                            , paddingT 1
+                            , paddingB 1
+                            , paddingL 3
+                            , paddingR 3
+                            , radius 5
+                            ]
+                          `styleHover` [bgColor customGray1, cursorIcon CursorHand]
                 , filler
                 , label (show numNfts <> " " <> keyTypeLabel)
                     `styleBasic` [textSize 10, textColor white]
@@ -313,6 +318,10 @@ ownBidsWidget model@AppModel{scene=_,..} =
                     $ AddSelectedBidUpdate 
                     $ StartAdding 
                     $ Just u
+          lookupEvt = AftermarketEvent 
+                    $ AftermarketBuyerEvent
+                    $ InspectSellerInformation
+                    $ u ^. #marketAddress
       hstack
         [ vstack
             [ hstack
@@ -372,6 +381,24 @@ ownBidsWidget model@AppModel{scene=_,..} =
                           , radius 5
                           ]
                         `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ 
+                    tooltip_ "Lookup Seller Information" [tooltipDelay 0] $
+                      box_ [alignMiddle , onClick lookupEvt] $
+                        label idCardIcon
+                          `styleBasic` 
+                            [ bgColor black
+                            , textMiddle
+                            , textFont "Remix"
+                            , textSize 8
+                            , textColor customBlue
+                            , paddingT 1
+                            , paddingB 1
+                            , paddingL 3
+                            , paddingR 3
+                            , radius 5
+                            ]
+                          `styleHover` [bgColor customGray1, cursorIcon CursorHand]
                 , widgetIf (maybe False (<= toPlutusTime currentTime) bidExpiration) $
                     hstack
                       [ filler

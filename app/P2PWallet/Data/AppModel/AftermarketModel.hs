@@ -15,6 +15,7 @@ module P2PWallet.Data.AppModel.AftermarketModel
   , AftermarketModel(..)
 
   , CachedAftermarketSales
+  , CachedSellerInfo
 
   , module P2PWallet.Data.AppModel.AftermarketModel.BuyerModel
   , module P2PWallet.Data.AppModel.AftermarketModel.SellerModel
@@ -25,6 +26,8 @@ import Data.Map.Strict qualified as Map
 import P2PWallet.Data.AppModel.Common
 import P2PWallet.Data.AppModel.AftermarketModel.BuyerModel
 import P2PWallet.Data.AppModel.AftermarketModel.SellerModel
+import P2PWallet.Data.Core.Internal.Bech32Address
+import P2PWallet.Data.Core.SellerInformation
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.Plutus
 import P2PWallet.Prelude
@@ -34,6 +37,13 @@ import P2PWallet.Prelude
 -------------------------------------------------
 -- | A type alias for a map from policy id to aftermarket sales.
 type CachedAftermarketSales = Map.Map CurrencySymbol [AftermarketUTxO]
+
+-------------------------------------------------
+-- Cached Seller Information
+-------------------------------------------------
+-- | A type alias for a map from seller address to seller UTxOs. The UTxOs include sale UTxOs and
+-- bid UTxOs.
+type CachedSellerInfo = Map.Map PaymentAddress SellerInformation
 
 -------------------------------------------------
 -- Aftermarket Scenes and Overlays
@@ -68,6 +78,8 @@ data AftermarketEvent
   | LookupKeyInfo (Bool,AftermarketUTxO)
   -- | Sync the sales for the selected policy id.
   | SyncAftermarketSales (ProcessEvent CurrencySymbol CachedAftermarketSales)
+  -- | Lookup the seller's info. The bool is whether to force resyncing the info.
+  | LookupSellerInfo (ProcessEvent PaymentAddress CachedSellerInfo)
 
 -------------------------------------------------
 -- Aftermarket State
@@ -92,6 +104,8 @@ data AftermarketModel = AftermarketModel
   , buyerModel :: AftermarketBuyerModel
   -- | Cached aftermarket sales.
   , cachedSales :: CachedAftermarketSales
+  -- | Cached seller info.
+  , cachedSellerInfo :: CachedSellerInfo
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''AftermarketModel
@@ -107,4 +121,5 @@ instance Default AftermarketModel where
     , sellerModel = def
     , buyerModel = def
     , cachedSales = mempty
+    , cachedSellerInfo = mempty
     }

@@ -10,6 +10,7 @@ import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Aftermarket.Buyer.Aftermarket
 import P2PWallet.GUI.Widgets.Aftermarket.Buyer.BidHistory
 import P2PWallet.GUI.Widgets.Aftermarket.Buyer.OwnBids
+import P2PWallet.GUI.Widgets.Aftermarket.Common
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.GUI.Widgets.Lending.Lend.ViewLoanRequests (inspectLoanWidget, inspectBorrowerWidget)
 import P2PWallet.Prelude
@@ -30,6 +31,49 @@ buyerWidget model@AppModel{aftermarketModel} = do
           ]
       , widgetIf (isJust $ aftermarketModel ^. #buyerModel % #inspectedBidTransaction) $
           bidTxInspectionWidget model
+      , widgetMaybe (aftermarketModel ^. #buyerModel % #inspectedSeller) $ \sellerAddr ->
+          let closeEvt = AftermarketEvent $ AftermarketBuyerEvent CloseInspectedSellerInformation
+              inspectSaleEvt = AftermarketEvent . AftermarketBuyerEvent . InspectAftermarketBuyerSale
+              inspectBidEvt = AftermarketEvent . AftermarketBuyerEvent . InspectAftermarketBid
+           in inspectSellerWidget sellerAddr closeEvt inspectSaleEvt inspectBidEvt model
+                `nodeVisible` and
+                  [ -- Hide until after syncing is complete.
+                    not $ model ^. #waitingStatus % #syncingSellerInfo
+                  ]
+      , widgetMaybe (aftermarketModel ^. #buyerModel % #inspectedSale) $ \saleUTxO ->
+          inspectBatchWidget model 
+            InspectBatchConfig
+              { batchUTxO = saleUTxO
+              , closeEvent = 
+                  AftermarketEvent $ AftermarketBuyerEvent CloseInspectedAftermarketBuyerSale
+              , inspectLoanHistoryEvent =
+                  AftermarketEvent . AftermarketBuyerEvent . InspectBuyerLoanHistory
+              , lookupBorrowerEvent =
+                  AftermarketEvent . AftermarketBuyerEvent . InspectBuyerBorrowerInformation
+              , mAddToHomeEvent = Nothing
+              }
+          `nodeVisible` and
+            -- Hide until after syncing is complete.
+            [ not $ model ^. #waitingStatus % #syncingLoanHistories
+            , not $ model ^. #waitingStatus % #syncingOptionsContracts
+            ]
+      , widgetMaybe (aftermarketModel ^. #buyerModel % #inspectedBid) $ \bidUTxO ->
+          inspectBatchWidget model 
+            InspectBatchConfig
+              { batchUTxO = bidUTxO
+              , closeEvent = 
+                  AftermarketEvent $ AftermarketBuyerEvent CloseInspectedAftermarketBid
+              , inspectLoanHistoryEvent =
+                  AftermarketEvent . AftermarketBuyerEvent . InspectBuyerLoanHistory
+              , lookupBorrowerEvent =
+                  AftermarketEvent . AftermarketBuyerEvent . InspectBuyerBorrowerInformation
+              , mAddToHomeEvent = Nothing
+              }
+          `nodeVisible` and
+            -- Hide until after syncing is complete.
+            [ not $ model ^. #waitingStatus % #syncingLoanHistories
+            , not $ model ^. #waitingStatus % #syncingOptionsContracts
+            ]
       , widgetMaybe (aftermarketModel ^. #buyerModel % #inspectedBorrower) $ \info ->
           let closeEvt = AftermarketEvent $ AftermarketBuyerEvent CloseInspectedBuyerBorrowerInformation
               historyEvt = AftermarketEvent . AftermarketBuyerEvent . InspectBuyerLoanHistory

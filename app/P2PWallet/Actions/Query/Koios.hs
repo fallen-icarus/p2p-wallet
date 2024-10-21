@@ -28,6 +28,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryActiveOptionsContracts
   , runQueryMarketWallet
   , runQueryAftermarketSales
+  , runQuerySellerInformation
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
@@ -934,6 +935,25 @@ runQueryAftermarketSales network nftPolicyId = do
       manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
       first show <$> handleTimeoutError (runClientM (queryAuctionSales nftPolicyId) env)
+
+-- | Get all UTxOs for a particular seller.
+runQuerySellerInformation :: Network -> PaymentAddress -> IO (Either Text [AftermarketUTxO])
+runQuerySellerInformation network sellerAddr = 
+    fmap (map fromAddressUTxO) <$> queryUTxOsWithRedundancies
+  where
+    -- Try to query the aftermarket address' utxos.
+    fetchMarketUTxOs :: IO (Either Text [AddressUTxO])
+    fetchMarketUTxOs = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryAddressUTxOs [sellerAddr]) env)
+
+    -- Since Koios instances may occassionally return incorrect UTxOs if they are not
+    -- close enough to the chain tip, this would mess with the wallet's notifications.
+    -- To account for this, the UTxOs are queried three times and compared. At least
+    -- two responses must match to move on. The redundant queries occur concurrently.
+    queryUTxOsWithRedundancies :: IO (Either Text [AddressUTxO])
+    queryUTxOsWithRedundancies = queryWithRedundancies fetchMarketUTxOs
 
 -------------------------------------------------
 -- Low-Level API

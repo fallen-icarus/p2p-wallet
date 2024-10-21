@@ -44,23 +44,6 @@ aftermarketWidget model@AppModel{aftermarketModel} =
             ]
       , optionsSpotPurchaseExecutionWidget model
           `nodeVisible` isJust newOptionsKeySpotPurchase
-      , widgetMaybe (aftermarketModel ^. #buyerModel % #inspectedSale) $ \saleUTxO ->
-          inspectBatchWidget model 
-            InspectBatchConfig
-              { batchUTxO = saleUTxO
-              , closeEvent = 
-                  AftermarketEvent $ AftermarketBuyerEvent CloseInspectedAftermarketBuyerSale
-              , inspectLoanHistoryEvent =
-                  AftermarketEvent . AftermarketBuyerEvent . InspectBuyerLoanHistory
-              , lookupBorrowerEvent =
-                  AftermarketEvent . AftermarketBuyerEvent . InspectBuyerBorrowerInformation
-              , mAddToHomeEvent = Nothing
-              }
-          `nodeVisible` and
-            -- Hide until after syncing is complete.
-            [ not $ model ^. #waitingStatus % #syncingLoanHistories
-            , not $ model ^. #waitingStatus % #syncingOptionsContracts
-            ]
       ]
   where
     AftermarketBuyerModel{..} = aftermarketModel ^. #buyerModel
@@ -236,6 +219,10 @@ allSalesWidget AppModel{aftermarketModel=AftermarketModel{..},scene=_,..} =
             | otherwise = "Other NFT(s)"
           prices = map toNativeAsset $ salePrice ^. #unPrices
           inspectEvt = AftermarketEvent $ AftermarketBuyerEvent $ InspectAftermarketBuyerSale u
+          lookupEvt = AftermarketEvent 
+                    $ AftermarketBuyerEvent
+                    $ InspectSellerInformation
+                    $ u ^. #marketAddress
           mLoanUTxOs = 
             sequence $ for nftNames (maybe Nothing snd . flip Map.lookup cachedLoanHistories . Loans.LoanId)
           mOptionsUTxOs = 
@@ -359,6 +346,24 @@ allSalesWidget AppModel{aftermarketModel=AftermarketModel{..},scene=_,..} =
                           , radius 5
                           ]
                         `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ 
+                    tooltip_ "Lookup Seller Information" [tooltipDelay 0] $
+                      box_ [alignMiddle , onClick lookupEvt] $
+                        label idCardIcon
+                          `styleBasic` 
+                            [ bgColor black
+                            , textMiddle
+                            , textFont "Remix"
+                            , textSize 8
+                            , textColor customBlue
+                            , paddingT 1
+                            , paddingB 1
+                            , paddingL 3
+                            , paddingR 3
+                            , radius 5
+                            ]
+                          `styleHover` [bgColor customGray1, cursorIcon CursorHand]
                 , filler
                 , label (show numNfts <> " " <> keyTypeLabel)
                     `styleBasic` [textSize 10, textColor white]
@@ -429,6 +434,10 @@ allSalesWidget AppModel{aftermarketModel=AftermarketModel{..},scene=_,..} =
             | otherwise = "Other NFT(s)"
           prices = map toNativeAsset $ startingPrice ^. #unPrices
           inspectEvt = AftermarketEvent $ AftermarketBuyerEvent $ InspectAftermarketBuyerSale u
+          lookupEvt = AftermarketEvent 
+                    $ AftermarketBuyerEvent
+                    $ InspectSellerInformation
+                    $ u ^. #marketAddress
           mPaymentWallet = maybeHead $ knownWallets ^. #paymentWallets
           mLoanUTxOs = 
             sequence $ for nftNames (maybe Nothing snd . flip Map.lookup cachedLoanHistories . Loans.LoanId)
@@ -506,6 +515,24 @@ allSalesWidget AppModel{aftermarketModel=AftermarketModel{..},scene=_,..} =
                           , radius 5
                           ]
                         `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ 
+                    tooltip_ "Lookup Seller Information" [tooltipDelay 0] $
+                      box_ [alignMiddle , onClick lookupEvt] $
+                        label idCardIcon
+                          `styleBasic` 
+                            [ bgColor black
+                            , textMiddle
+                            , textFont "Remix"
+                            , textSize 8
+                            , textColor customBlue
+                            , paddingT 1
+                            , paddingB 1
+                            , paddingL 3
+                            , paddingR 3
+                            , radius 5
+                            ]
+                          `styleHover` [bgColor customGray1, cursorIcon CursorHand]
                 , filler
                 , label (show numNfts <> " " <> keyTypeLabel)
                     `styleBasic` [textSize 10, textColor white]
