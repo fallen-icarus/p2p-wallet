@@ -78,6 +78,18 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
     [ Model $ model & #aftermarketModel % #buyerModel % #inspectedSale .~ Nothing ]
 
   -----------------------------------------------
+  -- Inspect Seller
+  -----------------------------------------------
+  InspectSellerInformation sellerAddr -> 
+    [ Model $ model & #aftermarketModel % #buyerModel % #inspectedSeller ?~ sellerAddr
+    , Event $ case Map.lookup sellerAddr (aftermarketModel ^. #cachedSellerInfo) of
+        Nothing -> AftermarketEvent $ LookupSellerInfo $ StartProcess $ Just sellerAddr
+        Just _ -> AppInit
+    ]
+  CloseInspectedSellerInformation -> 
+    [ Model $ model & #aftermarketModel % #buyerModel % #inspectedSeller .~ Nothing ]
+
+  -----------------------------------------------
   -- Inspecting Buyer Loan
   -----------------------------------------------
   InspectBuyerLoanHistory loanId -> 

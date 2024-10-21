@@ -158,6 +158,24 @@ handleAftermarketEvent model@AppModel{..} evt = case evt of
           & #aftermarketModel % #cachedSales .~ newCache
       ]
 
+  -----------------------------------------------
+  -- Lookup Seller Info
+  -----------------------------------------------
+  LookupSellerInfo modal -> case modal of
+    StartProcess mSellerAddr ->
+      [ Model $ model & #waitingStatus % #syncingSellerInfo .~ True
+      , Task $ runActionOrAlert (AftermarketEvent . LookupSellerInfo . ProcessResults) $ do
+          sellerAddr <- fromJustOrAppError "mSellerAddr is Nothing" mSellerAddr
+
+          syncSellerInformation (config ^. #network) sellerAddr $ 
+            aftermarketModel ^. #cachedSellerInfo
+      ]
+    ProcessResults newCache ->
+      [ Model $ model 
+          & #waitingStatus % #syncingSellerInfo .~ False
+          & #aftermarketModel % #cachedSellerInfo .~ newCache
+      ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------

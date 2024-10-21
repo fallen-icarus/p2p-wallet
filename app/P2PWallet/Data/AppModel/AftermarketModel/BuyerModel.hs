@@ -100,6 +100,11 @@ data AftermarketBuyerEvent
   | PurchaseOptionsKeySpot (AddEvent (AftermarketUTxO,[OptionsUTxO]) OptionsKeySpotPurchase)
   -- | Claim an accepted bid for cardano-options options keys.
   | ClaimAcceptedOptionsKeyBid (AddEvent (AftermarketUTxO,[OptionsUTxO]) OptionsKeyAcceptedBidClaim)
+  -- | Inspect seller information. This shows the current sales by this seller and any bids made to
+  -- this seller.
+  | InspectSellerInformation PaymentAddress
+  -- | Close the inspected seller information.
+  | CloseInspectedSellerInformation
 
 -------------------------------------------------
 -- Transaction Filter Model
@@ -179,6 +184,8 @@ data AftermarketBuyerModel = AftermarketBuyerModel
   , newOptionsKeySpotPurchase :: Maybe NewOptionsKeySpotPurchase
   -- | The new options key accepted bid claim.
   , newOptionsKeyAcceptedBidClaim :: Maybe NewOptionsKeyAcceptedBidClaim
+  -- | Inspected seller.
+  , inspectedSeller :: Maybe PaymentAddress
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''AftermarketBuyerModel
@@ -210,4 +217,5 @@ instance Default AftermarketBuyerModel where
     , txFilterScene = FilterScene
     , newOptionsKeySpotPurchase = Nothing
     , newOptionsKeyAcceptedBidClaim = Nothing
+    , inspectedSeller = Nothing
     }
