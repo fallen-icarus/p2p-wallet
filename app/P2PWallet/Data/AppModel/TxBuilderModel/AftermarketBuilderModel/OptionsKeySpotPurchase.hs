@@ -94,5 +94,5 @@ updateOptionsKeySpotPurchaseDeposits i calculatedDeposits = do
 -- | Generate the deposit message.
 createOptionsKeySpotPurchaseDepositMsg :: OptionsKeySpotPurchase -> Text
 createOptionsKeySpotPurchaseDepositMsg OptionsKeySpotPurchase{spotPurchase} =
-  unlines $ intersperse "" $ filter (/= "") $
+  unlines $ intersperse "" $ filter (/= "")
     [ createSpotPurchaseDepositMsg spotPurchase ]

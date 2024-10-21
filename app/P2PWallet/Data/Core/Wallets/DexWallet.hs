@@ -181,6 +181,7 @@ swapUTxOAsset2 SwapUTxO{swapDatum} = case swapDatum of
 swapIsFullyConverted :: SwapUTxO -> Bool
 swapIsFullyConverted u = flip any offerSample $ \x@NativeAsset{policyId} ->
     if policyId == "" 
+    -- The minimum is set to 5 ADA so that swappers can at least take 2 ADA from any swap they see.
     then quantityOf x u < 5_000_000 
     else quantityOf x u == 0
   where

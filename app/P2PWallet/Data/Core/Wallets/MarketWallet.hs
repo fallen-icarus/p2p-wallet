@@ -295,11 +295,11 @@ aftermarketUTxOBuyerDeposit AftermarketUTxO{marketDatum} =
 
 -- | Whether the UTxO is a seller UTxOs.
 isSellerUTxO :: AftermarketUTxO -> Bool
-isSellerUTxO AftermarketUTxO{marketDatum} = fromMaybe False $ isSellerDatum <$> marketDatum
+isSellerUTxO AftermarketUTxO{marketDatum} = maybe False isSellerDatum marketDatum
 
 -- | Whether the UTxO is a bidder UTxOs.
 isBidderUTxO :: AftermarketUTxO -> Bool
-isBidderUTxO AftermarketUTxO{marketDatum} = fromMaybe False $ isBidDatum <$> marketDatum
+isBidderUTxO AftermarketUTxO{marketDatum} = maybe False isBidDatum marketDatum
 
 -------------------------------------------------
 -- Aftermarket Wallet

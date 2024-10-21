@@ -266,10 +266,9 @@ handleSellerEvent model@AppModel{..} evt = case evt of
 
           -- Verify that the new utxo is not already being spent.
           flip whenJust (const $ throwIO $ AppError "This bid UTxO is already being spent.") $
-            find (== (verifiedAcceptance ^. #bidUTxO % #utxoRef)) (concat
-              [ map (view $ _2 % #bidUTxO % #utxoRef) $
-                  txBuilderModel ^. #aftermarketBuilderModel % #claimBidAcceptances
-              ])
+            find (== (verifiedAcceptance ^. #bidUTxO % #utxoRef)) $
+              map (view $ _2 % #bidUTxO % #utxoRef) $
+                txBuilderModel ^. #aftermarketBuilderModel % #claimBidAcceptances
 
           -- There should only be one output in the `TxBody` for this action. The calculation must
           -- be done twice because the datum must be updated with the minUTxOValue as well.
@@ -416,9 +415,7 @@ processNewSpotBidAcceptance u@SpotBidAcceptance{bidUTxO} model@TxBuilderModel{af
 
   -- Verify that the new utxo is not already being spent.
   maybeToLeft () $ "This spot bid UTxO is already being spent." <$
-    find (== bidUTxO ^. #utxoRef) (concat
-      [ map (view $ _2 % #bidUTxO % #utxoRef) spotBidAcceptances
-      ])
+    find (== bidUTxO ^. #utxoRef) (map (view $ _2 % #bidUTxO % #utxoRef) spotBidAcceptances)
 
   -- Add the new close to the end of the list of sale closes.
   return $ balanceTx $ model 
@@ -438,9 +435,7 @@ processNewBidUnlock u@BidUnlock{bidUTxO} model@TxBuilderModel{aftermarketBuilder
 
   -- Verify that the new utxo is not already being spent.
   maybeToLeft () $ "This bid UTxO is already being spent." <$
-    find (== bidUTxO ^. #utxoRef) (concat
-      [ map (view $ _2 % #bidUTxO % #utxoRef) bidUnlocks
-      ])
+    find (== bidUTxO ^. #utxoRef) (map (view $ _2 % #bidUTxO % #utxoRef) bidUnlocks)
 
   -- Get the input's new index.
   let newIdx = length bidUnlocks

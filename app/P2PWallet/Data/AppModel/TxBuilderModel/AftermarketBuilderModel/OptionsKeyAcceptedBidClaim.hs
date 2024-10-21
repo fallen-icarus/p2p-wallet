@@ -94,5 +94,5 @@ updateOptionsKeyAcceptedBidClaimDeposits i calculatedDeposits = do
 -- | Generate the deposit message.
 createOptionsKeyAcceptedBidClaimDepositMsg :: OptionsKeyAcceptedBidClaim -> Text
 createOptionsKeyAcceptedBidClaimDepositMsg OptionsKeyAcceptedBidClaim{bidClaim} =
-  unlines $ intersperse "" $ filter (/= "") $
+  unlines $ intersperse "" $ filter (/= "")
     [ createAcceptedBidClaimDepositMsg bidClaim ]
