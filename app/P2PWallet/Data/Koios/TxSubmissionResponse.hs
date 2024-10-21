@@ -10,7 +10,8 @@ import Data.Aeson
 
 import P2PWallet.Prelude
 
--- | A type representing the new transaction hash for a successfully submitted transaction.
+-- | A type representing the new transaction hash for a successfully submitted transaction. The hash
+-- is prefixed with a success message.
 newtype NewTxHash = NewTxHash { unNewTxHash :: Text }
 
 instance FromJSON NewTxHash where

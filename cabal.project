@@ -47,4 +47,23 @@ source-repository-package
 source-repository-package
     type: git
     location: https://github.com/fallen-icarus/cardano-swaps
-    tag: main
+    -- v2.1.0.0rc
+    tag: 2bb88c506a8fe640a7d851409dd509a844545a6c
+
+source-repository-package
+    type: git
+    location: https://github.com/fallen-icarus/cardano-loans
+    -- v2.0.0.0rc
+    tag: f44266b8ae567fa4803421a626519d44ed48955a
+
+source-repository-package
+    type: git
+    location: https://github.com/fallen-icarus/cardano-options
+    -- v1.0.0.0rc
+    tag: b69127fd6db0bc48d49aa1f7ab278fc4095b68a8
+
+source-repository-package
+    type: git
+    location: https://github.com/fallen-icarus/cardano-aftermarket
+    -- v2.0.0.0rc
+    tag: ba6ee294584debbf9f2f00175fd73fb293cf2972
