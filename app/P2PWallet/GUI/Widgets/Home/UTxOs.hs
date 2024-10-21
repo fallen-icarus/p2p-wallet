@@ -370,17 +370,13 @@ utxoFilterWidget AppModel{homeModel=HomeModel{..}} = do
             `styleBasic` [ bgColor customGray1 , textColor white ]
             `styleHover` [ bgColor customBlue ]
           choiceButton caption field targetLens =
-            centerWidgetV $ optionButton_ caption field targetLens
+            optionButton_ caption field targetLens
               [optionButtonOffStyle offStyle]
               `styleBasic` 
                 [ bgColor customBlue
+                , border 0 transparent
                 , textColor white
-                , radius 10
-                , border 1 black
-                , paddingT 2
-                , paddingB 2
-                , paddingL 7
-                , paddingR 7
+                , radius 5
                 , textSize 12
                 ]
       vstack
@@ -388,9 +384,11 @@ utxoFilterWidget AppModel{homeModel=HomeModel{..}} = do
         , vstack
             [ cushionWidgetH $ hstack_ [childSpacing]
                 [ label "Reference Script:"
-                , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #hasReferenceScript)
-                , choiceButton "No" (Just False) (toLensVL $ rootLens % #hasReferenceScript)
-                , choiceButton "Either" Nothing (toLensVL $ rootLens % #hasReferenceScript)
+                , hgrid_ [childSpacing_ 3]
+                    [ choiceButton "Yes" (Just True) (toLensVL $ rootLens % #hasReferenceScript)
+                    , choiceButton "No" (Just False) (toLensVL $ rootLens % #hasReferenceScript)
+                    , choiceButton "Either" Nothing (toLensVL $ rootLens % #hasReferenceScript)
+                    ]
                 , mainButton helpIcon (Alert "Does the UTxO have a reference script?")
                     `styleBasic`
                       [ border 0 transparent
@@ -403,11 +401,14 @@ utxoFilterWidget AppModel{homeModel=HomeModel{..}} = do
                       ]
                     `styleHover` [bgColor customGray2, cursorIcon CursorHand]
                 ] `styleBasic` [height 30]
+            , spacer
             , cushionWidgetH $ hstack_ [childSpacing]
                 [ label "Datum:"
-                , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #hasDatum)
-                , choiceButton "No" (Just False) (toLensVL $ rootLens % #hasDatum)
-                , choiceButton "Either" Nothing (toLensVL $ rootLens % #hasDatum)
+                , hgrid_ [childSpacing_ 3]
+                    [ choiceButton "Yes" (Just True) (toLensVL $ rootLens % #hasDatum)
+                    , choiceButton "No" (Just False) (toLensVL $ rootLens % #hasDatum)
+                    , choiceButton "Either" Nothing (toLensVL $ rootLens % #hasDatum)
+                    ]
                 , mainButton helpIcon (Alert "Does the UTxO have a datum?")
                     `styleBasic`
                       [ border 0 transparent
@@ -420,11 +421,14 @@ utxoFilterWidget AppModel{homeModel=HomeModel{..}} = do
                       ]
                     `styleHover` [bgColor customGray2, cursorIcon CursorHand]
                 ] `styleBasic` [height 30]
+            , spacer
             , cushionWidgetH $ hstack_ [childSpacing]
                 [ label "Native Assets:"
-                , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #hasNativeAssets)
-                , choiceButton "No" (Just False) (toLensVL $ rootLens % #hasNativeAssets)
-                , choiceButton "Either" Nothing (toLensVL $ rootLens % #hasNativeAssets)
+                , hgrid_ [childSpacing_ 3]
+                    [ choiceButton "Yes" (Just True) (toLensVL $ rootLens % #hasNativeAssets)
+                    , choiceButton "No" (Just False) (toLensVL $ rootLens % #hasNativeAssets)
+                    , choiceButton "Either" Nothing (toLensVL $ rootLens % #hasNativeAssets)
+                    ]
                 , mainButton helpIcon (Alert "Does the UTxO have native assets?")
                     `styleBasic`
                       [ border 0 transparent

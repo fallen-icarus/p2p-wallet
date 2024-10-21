@@ -653,18 +653,14 @@ activeLoansFilterWidget AppModel{lendingModel=LendingModel{..}} = do
             `styleBasic` [ bgColor customGray1 , textColor white ]
             `styleHover` [ bgColor customBlue ]
           choiceButton caption field targetLens =
-            centerWidgetV $ optionButton_ caption field targetLens
+            optionButton_ caption field targetLens
               [optionButtonOffStyle offStyle]
               `styleBasic` 
                 [ bgColor customBlue
+                , border 0 transparent
                 , textColor white
-                , radius 10
-                , border 1 black
-                , paddingT 2
-                , paddingB 2
-                , paddingL 7
-                , paddingR 7
-                , textSize 12
+                , radius 5
+                , textSize 10
                 ]
       centerWidget $ vstack
         [ spacer
@@ -755,10 +751,12 @@ activeLoansFilterWidget AppModel{lendingModel=LendingModel{..}} = do
             , spacer_ [width 3]
             , label "Loan is Expired:"
                 `styleBasic` [textSize 10]
-            , spacer_ [width 2]
-            , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #loanExpired)
-            , choiceButton "No" (Just False) (toLensVL $ rootLens % #loanExpired)
-            , choiceButton "Either" Nothing (toLensVL $ rootLens % #loanExpired)
+            , spacer
+            , hgrid_ [childSpacing_ 3]
+                [ choiceButton "Yes" (Just True) (toLensVL $ rootLens % #loanExpired)
+                , choiceButton "No" (Just False) (toLensVL $ rootLens % #loanExpired)
+                , choiceButton "Either" Nothing (toLensVL $ rootLens % #loanExpired)
+                ]
             , filler
             , box_ [alignMiddle, onClick $ Alert "Whether the lender's claim period has expired."] $
                 label helpIcon
@@ -775,10 +773,12 @@ activeLoansFilterWidget AppModel{lendingModel=LendingModel{..}} = do
             , spacer_ [width 3]
             , label "Claim is Expired:"
                 `styleBasic` [textSize 10]
-            , spacer_ [width 2]
-            , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #claimExpired)
-            , choiceButton "No" (Just False) (toLensVL $ rootLens % #claimExpired)
-            , choiceButton "Either" Nothing (toLensVL $ rootLens % #claimExpired)
+            , spacer
+            , hgrid_ [childSpacing_ 3]
+                [ choiceButton "Yes" (Just True) (toLensVL $ rootLens % #claimExpired)
+                , choiceButton "No" (Just False) (toLensVL $ rootLens % #claimExpired)
+                , choiceButton "Either" Nothing (toLensVL $ rootLens % #claimExpired)
+                ]
             ]
         , spacer
         , separatorLine `styleBasic` [fgColor darkGray]

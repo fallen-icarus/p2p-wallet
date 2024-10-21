@@ -44,7 +44,7 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
             hstack 
               [ label ("Positions (" <> fractionShown <> ")")
                   `styleBasic` [textFont "Italics", textSize 14]
-              , spacer_ [width 5]
+              , spacer_ [width 3]
               , tooltip_ "Sort/Filter/Search" [tooltipDelay 0] $
                   toggleButton_ menuSearchIcon
                     (toLensVL $ #dexModel % #showPositionsFilter)
@@ -62,6 +62,17 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
                       , textFont "Remix"
                       ]
                     `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              , spacer_ [width 50]
+              , let rootLens = #dexModel % #positionsFilterModel in
+                hstack
+                  [ label "Status:" `styleBasic` [textSize 14]
+                  , spacer
+                  , hgrid_ [childSpacing_ 2]
+                      [ choiceButton "Converted" (Just True) (toLensVL $ rootLens % #mustBeFullyConverted)
+                      , choiceButton "Open" (Just False) (toLensVL $ rootLens % #mustBeFullyConverted)
+                      , choiceButton "Either" Nothing (toLensVL $ rootLens % #mustBeFullyConverted)
+                      ]
+                  ]
               , filler
               ]
             -- These are the UTxOs that match those filter/search settings.
@@ -73,6 +84,21 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
       , updateSwapWidget model `nodeVisible` isJust newSwapUpdate
       ]
   where
+    choiceOffStyle = def 
+      `styleBasic` [ bgColor customGray1 , textColor white ]
+      `styleHover` [ bgColor customBlue ]
+
+    choiceButton caption field targetLens =
+      optionButton_ caption field targetLens
+        [optionButtonOffStyle choiceOffStyle]
+        `styleBasic` 
+          [ bgColor customBlue
+          , border 0 transparent
+          , textColor white
+          , radius 0
+          , textSize 8
+          ]
+
     toggleOffStyle :: Style
     toggleOffStyle = 
       def `styleBasic` [ bgColor transparent , textColor customBlue ]
@@ -169,6 +195,13 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
                         , textSize 10
                         , textColor customBlue
                         ]
+                , widgetIf (swapIsFullyConverted u) $ 
+                    hstack
+                      [ filler
+                      , label "Fully Converted"
+                          `styleBasic` [textSize 10, textColor customRed, textFont "Italics"]
+                      , filler
+                      ]
                 , filler
                 , label (showAssetBalance True reverseTickerMap offerAsset)
                     `styleBasic` [textSize 10, textColor customBlue]
@@ -293,6 +326,13 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
                         , textSize 10
                         , textColor customBlue
                         ]
+                , widgetIf (swapIsFullyConverted u) $ 
+                    hstack
+                      [ filler
+                      , label "Fully Converted"
+                          `styleBasic` [textSize 10, textColor customRed, textFont "Italics"]
+                      , filler
+                      ]
                 , filler
                 , label (showAssetBalance True reverseTickerMap asset1)
                     `styleBasic` [textSize 10, textColor customBlue]
@@ -438,17 +478,13 @@ positionsFilterWidget AppModel{dexModel=DexModel{..}} = do
             `styleBasic` [ bgColor customGray1 , textColor white ]
             `styleHover` [ bgColor customBlue ]
           choiceButton caption field targetLens =
-            centerWidgetV $ optionButton_ caption field targetLens
+            optionButton_ caption field targetLens
               [optionButtonOffStyle offStyle]
               `styleBasic` 
                 [ bgColor customBlue
+                , border 0 transparent
                 , textColor white
-                , radius 10
-                , border 1 black
-                , paddingT 2
-                , paddingB 2
-                , paddingL 7
-                , paddingR 7
+                , radius 5
                 , textSize 12
                 ]
       vstack
@@ -498,9 +534,11 @@ positionsFilterWidget AppModel{dexModel=DexModel{..}} = do
         , spacer
         , centerWidgetH $ hstack_ [childSpacing]
             [ label "Fully Converted:" `styleBasic` [textSize 12]
-            , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #mustBeFullyConverted)
-            , choiceButton "No" (Just False) (toLensVL $ rootLens % #mustBeFullyConverted)
-            , choiceButton "Either" Nothing (toLensVL $ rootLens % #mustBeFullyConverted)
+            , hgrid_ [childSpacing_ 3]
+                [ choiceButton "Yes" (Just True) (toLensVL $ rootLens % #mustBeFullyConverted)
+                , choiceButton "No" (Just False) (toLensVL $ rootLens % #mustBeFullyConverted)
+                , choiceButton "Either" Nothing (toLensVL $ rootLens % #mustBeFullyConverted)
+                ]
             , mainButton helpIcon (Alert fullyConvertedSwapMsg)
                 `styleBasic`
                   [ border 0 transparent

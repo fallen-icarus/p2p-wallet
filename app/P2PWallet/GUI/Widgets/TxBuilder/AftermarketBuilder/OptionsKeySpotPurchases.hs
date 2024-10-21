@@ -107,7 +107,7 @@ editOptionsKeySpotPurchase model = do
     , spacer_ [width 20]
     , vscroll_ [wheelRate 50] $
         vstack_ [childSpacing] $ 
-          map (executeOptionsWidget model maybeLens') $ zip [0..] contracts
+          zipWith (curry $ executeOptionsWidget model maybeLens') [0..] contracts
     , spacer
     , hstack 
         [ filler

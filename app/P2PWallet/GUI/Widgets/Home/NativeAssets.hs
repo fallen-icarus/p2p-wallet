@@ -291,17 +291,13 @@ assetFilterWidget _ = do
         `styleBasic` [ bgColor customGray1 , textColor white ]
         `styleHover` [ bgColor customBlue ]
       choiceButton caption field targetLens =
-        centerWidgetV $ optionButton_ caption field targetLens
+        optionButton_ caption field targetLens
           [optionButtonOffStyle offStyle]
           `styleBasic` 
             [ bgColor customBlue
+            , border 0 transparent
             , textColor white
-            , radius 10
-            , border 1 black
-            , paddingT 2
-            , paddingB 2
-            , paddingL 7
-            , paddingR 7
+            , radius 5
             , textSize 12
             ]
   vstack
@@ -311,9 +307,11 @@ assetFilterWidget _ = do
         , spacer
         , centerWidgetH $ hstack_ [childSpacing]
             [ label "Key NFT:"
-            , choiceButton "Loan" (Just LoanKey) (toLensVL $ rootLens % #keyNftType)
-            , choiceButton "Options" (Just OptionsKey) (toLensVL $ rootLens % #keyNftType)
-            , choiceButton "Any" Nothing (toLensVL $ rootLens % #keyNftType)
+            , hgrid_ [childSpacing_ 3]
+                [ choiceButton "Loan" (Just LoanKey) (toLensVL $ rootLens % #keyNftType)
+                , choiceButton "Options" (Just OptionsKey) (toLensVL $ rootLens % #keyNftType)
+                , choiceButton "Any" Nothing (toLensVL $ rootLens % #keyNftType)
+                ]
             , mainButton helpIcon (Alert "Is the asset a Key NFT and if so, what kind?")
                 `styleBasic`
                   [ border 0 transparent

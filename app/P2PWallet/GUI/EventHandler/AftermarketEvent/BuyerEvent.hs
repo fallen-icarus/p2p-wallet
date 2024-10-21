@@ -170,10 +170,9 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
 
           -- Verify that the new utxo is not already being spent.
           flip whenJust (const $ throwIO $ AppError "This Spot UTxO is already being purchased.") $
-            find (== (newPurchase ^. #spotPurchase % #saleUTxO % #utxoRef)) (concat
-              [ map (view $ _2 % #spotPurchase % #saleUTxO % #utxoRef) $
-                  txBuilderModel ^. #aftermarketBuilderModel % #loanKeySpotPurchases
-              ])
+            find (== (newPurchase ^. #spotPurchase % #saleUTxO % #utxoRef)) $
+              map (view $ _2 % #spotPurchase % #saleUTxO % #utxoRef) $
+                txBuilderModel ^. #aftermarketBuilderModel % #loanKeySpotPurchases
 
           verifiedPurchase <- fromRightOrAppError $ 
             verifyNewLoanKeySpotPurchase (config ^. #currentTime) newPurchase
@@ -480,10 +479,9 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
 
           -- Verify that the new utxo is not already being spent.
           flip whenJust (const $ throwIO $ AppError "This Bid UTxO is already being claimed.") $
-            find (== (newClaim ^. #bidClaim % #bidUTxO % #utxoRef)) (concat
-              [ map (view $ _2 % #bidClaim % #bidUTxO % #utxoRef) $
-                  txBuilderModel ^. #aftermarketBuilderModel % #loanKeyBidClaims
-              ])
+            find (== (newClaim ^. #bidClaim % #bidUTxO % #utxoRef)) $
+              map (view $ _2 % #bidClaim % #bidUTxO % #utxoRef) $
+                txBuilderModel ^. #aftermarketBuilderModel % #loanKeyBidClaims
 
           verifiedClaim <- fromRightOrAppError $ 
             verifyNewLoanKeyAcceptedBidClaim (config ^. #currentTime) newClaim
@@ -597,10 +595,9 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
 
           -- Verify that the new utxo is not already being spent.
           flip whenJust (const $ throwIO $ AppError "This Spot UTxO is already being purchased.") $
-            find (== (newPurchase ^. #spotPurchase % #saleUTxO % #utxoRef)) (concat
-              [ map (view $ _2 % #spotPurchase % #saleUTxO % #utxoRef) $
-                  txBuilderModel ^. #aftermarketBuilderModel % #optionsKeySpotPurchases
-              ])
+            find (== (newPurchase ^. #spotPurchase % #saleUTxO % #utxoRef)) $
+              map (view $ _2 % #spotPurchase % #saleUTxO % #utxoRef) $
+                txBuilderModel ^. #aftermarketBuilderModel % #optionsKeySpotPurchases
 
           verifiedPurchase <- fromRightOrAppError $ 
             verifyNewOptionsKeySpotPurchase network alias (config ^. #currentTime) newPurchase
@@ -663,10 +660,9 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
 
           -- Verify that the new utxo is not already being spent.
           flip whenJust (const $ throwIO $ AppError "This Bid UTxO is already being claim.") $
-            find (== (newClaim ^. #bidClaim % #bidUTxO % #utxoRef)) (concat
-              [ map (view $ _2 % #bidClaim % #bidUTxO % #utxoRef) $
-                  txBuilderModel ^. #aftermarketBuilderModel % #optionsKeyBidClaims
-              ])
+            find (== (newClaim ^. #bidClaim % #bidUTxO % #utxoRef)) $
+              map (view $ _2 % #bidClaim % #bidUTxO % #utxoRef) $
+                txBuilderModel ^. #aftermarketBuilderModel % #optionsKeyBidClaims
 
           verifiedClaim <- fromRightOrAppError $ 
             verifyNewOptionsKeyAcceptedBidClaim (config ^. #currentTime) alias network newClaim

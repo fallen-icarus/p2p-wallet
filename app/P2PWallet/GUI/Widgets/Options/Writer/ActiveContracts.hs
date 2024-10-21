@@ -356,17 +356,13 @@ activeFilterWidget AppModel{optionsModel=OptionsModel{..}} = do
             `styleBasic` [ bgColor customGray1 , textColor white ]
             `styleHover` [ bgColor customBlue ]
           choiceButton caption field targetLens =
-            box_ [alignMiddle] $ optionButton_ caption field targetLens
+            optionButton_ caption field targetLens
               [optionButtonOffStyle offStyle]
               `styleBasic` 
                 [ bgColor customBlue
+                , border 0 transparent
                 , textColor white
-                , radius 10
-                , border 1 black
-                , paddingT 2
-                , paddingB 2
-                , paddingL 7
-                , paddingR 7
+                , radius 5
                 , textSize 10
                 ]
       cushionWidgetH $ vstack
@@ -399,10 +395,12 @@ activeFilterWidget AppModel{optionsModel=OptionsModel{..}} = do
             , filler
             , label "Expired Contract:"
                 `styleBasic` [textSize 10]
-            , spacer_ [width 2]
-            , choiceButton "Yes" (Just True) (toLensVL $ rootLens % #shouldBeExpired)
-            , choiceButton "No" (Just False) (toLensVL $ rootLens % #shouldBeExpired)
-            , choiceButton "Either" Nothing (toLensVL $ rootLens % #shouldBeExpired)
+            , spacer
+            , hgrid_ [childSpacing_ 3]
+                [ choiceButton "Yes" (Just True) (toLensVL $ rootLens % #shouldBeExpired)
+                , choiceButton "No" (Just False) (toLensVL $ rootLens % #shouldBeExpired)
+                , choiceButton "Either" Nothing (toLensVL $ rootLens % #shouldBeExpired)
+                ]
             ]
         , spacer
         , hstack
