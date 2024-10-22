@@ -12,6 +12,7 @@ import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.StakeReward
 import P2PWallet.Data.Core.TxBody
 import P2PWallet.Data.Core.Wallets.StakeWallet
+import P2PWallet.Data.Koios.DRep
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
@@ -45,6 +46,7 @@ delegationWidget model@AppModel{..} = do
       , widgetIf isDeleting $ confirmDeleteWidget model
       , widgetIf (model ^. #delegationModel % #showPoolPicker) $ poolPickerWidget model -- picker
       , widgetIf (model ^. #delegationModel % #showPoolFilter) poolFilterWidget -- filter
+      , widgetIf (isJust $ model ^. #delegationModel % #newDrepDelegation) $ getDRepWidget model
       ]
   where
     hasStakeWallets :: Bool
@@ -81,7 +83,7 @@ delegationWidget model@AppModel{..} = do
 -- The main widget that should only be shown if there are currently tracked stake wallets
 -- AND no overlays need to be shown.
 mainWidget :: AppModel -> AppNode
-mainWidget AppModel{..} =
+mainWidget model@AppModel{..} =
     vstack
       [ spacer
       , centerWidgetH headerWidget
@@ -96,9 +98,7 @@ mainWidget AppModel{..} =
                   , rewardsBalanceWidget registrationStatus wallet
                   ]
               , spacer
-              , widgetMaybe (wallet ^. #delegatedPool) poolInfoWidget
-              , widgetIf (isNothing $ wallet ^. #delegatedPool) $ 
-                  notDelegatedWidget registrationStatus
+              , delegationInfoWidget model
               ] `styleBasic` [padding 10]
           , vstack
               [ vstack 
@@ -236,9 +236,73 @@ mainWidget AppModel{..} =
             `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         ]
 
-notDelegatedWidget :: RegistrationStatus -> AppNode
-notDelegatedWidget registrationStatus = do
-  flip styleBasic [height 300, bgColor customGray2, padding 10, radius 10] $ box $ 
+delegationInfoWidget :: AppModel -> AppNode
+delegationInfoWidget model@AppModel{delegationModel=DelegationModel{..}} = do
+    vstack
+      [ hgrid_ [childSpacing_ 5]
+          [ header "Stake Delegation" StakeDelegationScene
+          , header "DRep Delegation" GovernanceDelegationScene
+          ]
+      , spacer_ [width 10]
+      , stakeDelegationWidget model
+          `nodeVisible` (scene == StakeDelegationScene)
+      , voteDelegationWidget model
+          `nodeVisible` (scene == GovernanceDelegationScene)
+      ] `styleBasic` [bgColor customGray2, padding 10, radius 10, height 300]
+  where
+    header txt newScene =
+      flip styleHover [bgColor customGray3, cursorIcon CursorHand, radius 5] $
+        box_ [onClick $ DelegationEvent $ ChangeDelegationScene newScene] $
+          vstack
+            [ label txt
+                `styleBasic` 
+                  [ textSize 12
+                  , configIf (scene == newScene) $ textColor customBlue
+                  ]
+            , spacer_ [width 5]
+            , separatorLine
+                `styleBasic`
+                  [ configIf (scene == newScene) $ fgColor customBlue
+                  , paddingL 10
+                  , paddingR 10
+                  ]
+            ] `styleBasic` [padding 3, radius 3]
+
+voteDelegationWidget :: AppModel -> AppNode
+voteDelegationWidget AppModel{delegationModel=DelegationModel{..}} = do
+  vstack
+    [ widgetMaybe (selectedWallet ^. #delegatedDRep) drepInfoWidget
+    , widgetIf (isNothing $ selectedWallet ^. #delegatedDRep) $ 
+        voteNotDelegatedWidget (selectedWallet ^. #registrationStatus)
+    ]
+
+stakeDelegationWidget :: AppModel -> AppNode
+stakeDelegationWidget AppModel{delegationModel=DelegationModel{..}} = do
+  vstack
+    [ widgetMaybe (selectedWallet ^. #delegatedPool) poolInfoWidget
+    , widgetIf (isNothing $ selectedWallet ^. #delegatedPool) $ 
+        stakeNotDelegatedWidget (selectedWallet ^. #registrationStatus)
+    ]
+
+voteNotDelegatedWidget :: RegistrationStatus -> AppNode
+voteNotDelegatedWidget registrationStatus = do
+  centerWidget $ vstack
+    [ centerWidgetH $ label "Delegate to a DRep!"
+        `styleBasic` [ textFont "Italics" ]
+    , widgetIf (registrationStatus == NotRegistered) $
+        vstack
+          [ spacer_ [width 3]
+          , centerWidgetH $ label (show $ tupled ["Don't forget to also register!"])
+              `styleBasic` [ textColor customRed, textSize 12 ]
+          ]
+    , spacer
+    , centerWidgetH $ mainButton "Delegate" $ 
+        DelegationEvent $ AddDrepDelegation $ StartAdding $ Just ()
+    ]
+
+stakeNotDelegatedWidget :: RegistrationStatus -> AppNode
+stakeNotDelegatedWidget registrationStatus = do
+  box $ 
     centerWidget $ vstack
       [ centerWidgetH $ label "Delegate to start earning rewards!"
           `styleBasic` [ textFont "Italics" ]
@@ -469,9 +533,9 @@ poolInfoWidget Pool{..} = do
           , changeDelegationButton
           ]
       , spacer_ [width 5]
-      , copyableLabelSelfWith 9 lightGray fitPoolId $ display poolId
+      , box_ [alignLeft] $ copyableLabelSelfWith 9 lightGray fitId $ display poolId
       , spacer_ [width 3]
-      , copyableLabelSelf 9 lightGray homepage
+      , box_ [alignLeft] $ copyableLabelSelf 9 lightGray homepage
       , spacer
       , widgetMaybe retiringEpoch $ \epoch ->
           vstack
@@ -492,17 +556,54 @@ poolInfoWidget Pool{..} = do
       , subField "Active Pledge" activePledgeMsg $ display $ fromMaybe 0 livePledge
       , spacer
       , subField "Cost" fixedCostMsg $ display $ fromMaybe 0 fixedCost
-      ] `styleBasic`
-          [ bgColor customGray2
-          , padding 10
-          , radius 10
-          , height 300
-          ]
+      ] 
   where
     changeDelegationButton :: AppNode
     changeDelegationButton = do
       tooltip_ "Change Delegation" [tooltipDelay 0] $ 
         box_ [onClick $ DelegationEvent OpenPoolPicker] $ 
+          label "Change"
+            `styleBasic`
+              [ textSize 10
+              , bgColor customBlue
+              , padding 3
+              , textMiddle
+              , radius 10
+              , textColor lightGray
+              ]
+            `styleHover`
+              [ bgColor customGray1 
+              , cursorIcon CursorHand
+              ]
+
+drepInfoWidget :: DRep -> AppNode
+drepInfoWidget DRep{..} =
+    vstack
+      [ hstack
+          [ vstack
+              [ box_ [alignLeft] $ copyableLabelSelfWith 9 lightGray fitId $ display drepId
+              , spacer_ [width 3]
+              , flip (maybe $ label "No Website" `styleBasic` [textSize 9, textColor lightGray]) url $ 
+                  \u -> box_ [alignLeft] $ copyableLabelSelf 9 lightGray u
+              ]
+          , filler
+          , box_ [alignTop] changeDelegationButton
+          ]
+      , spacer
+      , widgetMaybe expiresEpoch $ \epoch ->
+          vstack
+            [ label ("WARNING: This DRep is expiring on epoch " <> show epoch)
+                `styleBasic`
+                    [textFont "Italics", textSize 12, textColor customRed]
+            , spacer
+            ]
+      , subField "Total Voting Power" votingPowerMsg $ display amount
+      ] 
+  where
+    changeDelegationButton :: AppNode
+    changeDelegationButton = do
+      tooltip_ "Change Delegation" [tooltipDelay 0] $ 
+        box_ [onClick $ DelegationEvent $ AddDrepDelegation $ StartAdding $ Just ()] $ 
           label "Change"
             `styleBasic`
               [ textSize 10
@@ -538,7 +639,6 @@ editStakeWalletWidget _ = do
         ]
     ] `styleBasic` [bgColor customGray3, padding 20]
 
-
 confirmDeleteWidget :: AppModel -> AppNode
 confirmDeleteWidget model = do
   centerWidget $ vstack_ [childSpacing]
@@ -555,6 +655,75 @@ confirmDeleteWidget model = do
         , mainButton "Confirm" $ DelegationEvent $ DeleteStakeWallet ConfirmDeletion
         ]
     ] `styleBasic` [bgColor customGray3, padding 20]
+
+getDRepWidget :: AppModel -> AppNode
+getDRepWidget model = do
+  let rootLens = #delegationModel % #newDrepDelegation
+      offStyle = def 
+        `styleBasic` [ bgColor customGray1 , textColor white ]
+        `styleHover` [ bgColor customBlue ]
+      choiceButton caption field targetLens =
+        optionButton_ caption field targetLens
+          [optionButtonOffStyle offStyle]
+          `styleBasic` 
+            [ bgColor customBlue
+            , border 0 transparent
+            , textColor white
+            , radius 5
+            , textSize 12
+            ]
+  vstack
+    [ centerWidget $ vstack
+        [ centerWidgetH $ 
+            label "Vote Delegation"
+              `styleBasic` [textColor customBlue, textFont "Italics"]
+        , spacer
+        , centerWidgetH $ hstack_ [childSpacing]
+            [ label "Delegate To:"
+            , hgrid_ [childSpacing_ 3]
+                [ choiceButton "DRep" (Just $ DRepDelegation "" False) (toLensVL rootLens)
+                , choiceButton "Always Abstain" (Just $ AlwaysAbstainDelegation) (toLensVL rootLens)
+                , choiceButton "Always No" (Just $ AlwaysNoDelegation) (toLensVL rootLens)
+                ]
+            ]
+        , spacer
+        , centerWidgetH $ hstack
+            [ label "DRep ID:"
+                `styleBasic` [textSize 12]
+            , spacer
+            , textField (toLensVL $ #delegationModel % #newDrepId) 
+                `styleBasic` [textSize 8, width 300, bgColor customGray1, sndColor darkGray]
+                `styleFocus` [border 1 customBlue]
+            , spacer_ [width 2]
+            , box_ [onClick $ Alert drepIdMsg] $
+                label helpIcon
+                  `styleBasic`
+                    [ border 0 transparent
+                    , radius 20
+                    , padding 5
+                    , bgColor transparent
+                    , textColor customBlue
+                    , textMiddle
+                    , textFont "Remix"
+                    , textSize 10
+                    ]
+                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+            ] `nodeVisible` (model ^. rootLens == Just (DRepDelegation "" False))
+        , spacer
+        , hstack 
+            [ filler
+            , button "Cancel" $ DelegationEvent $ AddDrepDelegation CancelAdding
+            , spacer
+            , mainButton "Confirm" $ DelegationEvent $ AddDrepDelegation ConfirmAdding
+            ]
+        ] `styleBasic` [bgColor customGray3, padding 5, paddingL 20, paddingR 20, radius 10]
+    ] `styleBasic` 
+        [ bgColor $ black & #a .~ 0.4
+        , paddingT 50
+        , paddingB 50
+        , paddingL 30
+        , paddingR 30
+        ]
 
 -------------------------------------------------
 -- Helper Widgets
@@ -601,7 +770,7 @@ subField caption helpMsg field =
     [ hstack
         [ label caption
             `styleBasic`
-              [ textSize 10
+              [ textSize 8
               , textColor lightGray
               ]
         , subTipButton helpMsg
@@ -609,12 +778,12 @@ subField caption helpMsg field =
     , spacer_ [width 3]
     , label field
         `styleBasic`
-          [ textSize 12
+          [ textSize 10
           ]
     ] `styleBasic`
         [ bgColor customGray4
-        , padding 10
-        , radius 10
+        , padding 5
+        , radius 5
         ]
 
 -- | A label button that will copy itself.
@@ -663,8 +832,8 @@ copyableTruncatedPoolId fontSize mainColor (PoolID text) =
       ]
     `styleHover` [textColor customBlue, cursorIcon CursorHand]
 
-fitPoolId :: Text -> Text
-fitPoolId poolId = Text.take 20 poolId <> "..." <> Text.drop 40 poolId
+fitId :: Text -> Text
+fitId tId = Text.take 20 tId <> "..." <> Text.drop 40 tId
 
 fitAddress :: Text -> Text
 fitAddress address

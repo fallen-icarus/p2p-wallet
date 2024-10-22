@@ -67,7 +67,7 @@ calculateMinUTxOValue network mParameters newOutputAction = do
 -- | The actual command used to calculate the required minUTxO.
 calculateCmd :: TmpDirectory -> ParamsFile -> TxBodyOutput -> String
 calculateCmd tmpDir paramsFile output = toString $ unwords
-  [ "(cardano-cli transaction calculate-min-required-utxo"
+  [ "(cardano-cli conway transaction calculate-min-required-utxo"
   , "--protocol-params-file " <> toText paramsFile
   , toBuildCmdField tmpDir output <> ") | cut -d' ' -f2"
   ]

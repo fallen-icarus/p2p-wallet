@@ -105,6 +105,7 @@ pairStakeWallet network Profile{alias=_,network=_,..} stakeWalletId NewStakeWall
       , utxoBalance = 0
       , availableRewards = 0
       , delegatedPool = Nothing
+      , delegatedDRep = Nothing
       , rewardHistory = [] 
       , linkedAddresses = []
       }
@@ -204,6 +205,7 @@ watchStakeWallet network Profile{profileId} stakeWalletId NewStakeWallet{..} kno
       , utxoBalance = 0
       , availableRewards = 0
       , delegatedPool = Nothing
+      , delegatedDRep = Nothing
       , rewardHistory = [] 
       , linkedAddresses = []
       }

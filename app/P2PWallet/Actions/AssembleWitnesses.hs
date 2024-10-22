@@ -28,7 +28,7 @@ assembleWitnesses witnessFiles = do
 assembleWitnessesCmd :: TransformedTxFile -> [KeyWitnessFile] -> SignedTxFile -> String
 assembleWitnessesCmd transformedTxFile witnessFiles signedFile =
   String.unwords 
-    [ "cardano-cli transaction assemble"
+    [ "cardano-cli conway transaction assemble"
     , "--tx-body-file " <> toString transformedTxFile
     , String.unwords $ map (printf "--witness-file %s" . toString) witnessFiles
     , "--out-file " <> toString signedFile

@@ -162,6 +162,7 @@ executable p2p-wallet
       P2PWallet.Data.Core.Internal.Assets
       P2PWallet.Data.Core.Internal.Bech32Address
       P2PWallet.Data.Core.Internal.Config
+      P2PWallet.Data.Core.Internal.DRepID
       P2PWallet.Data.Core.Internal.Files
       P2PWallet.Data.Core.Internal.HardwareDevice
       P2PWallet.Data.Core.Internal.KeyDerivation
@@ -197,6 +198,7 @@ executable p2p-wallet
       P2PWallet.Data.Koios.AddressUTxO
       P2PWallet.Data.Koios.AssetTransaction
       P2PWallet.Data.Koios.BudgetEstimations
+      P2PWallet.Data.Koios.DRep
       P2PWallet.Data.Koios.LinkedPaymentAddresses
       P2PWallet.Data.Koios.MintTransaction
       P2PWallet.Data.Koios.Pool

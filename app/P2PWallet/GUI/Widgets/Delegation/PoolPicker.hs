@@ -118,7 +118,7 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
                     | otherwise = (circleCheckboxFillIcon, customBlue)
                   actualPledge = display $ fromMaybe 0 livePledge
                   newDelegationEvent = DelegationEvent $ 
-                    AddSelectedUserCertificate (Just fullNameAndTicker, Delegation poolId)
+                    AddSelectedUserCertificate (Just fullNameAndTicker, StakeDelegation poolId)
               hgrid_ [childSpacing]
                 [ vstack 
                     [ tooltip_ name [tooltipDelay 0] $ label nameAndTicker

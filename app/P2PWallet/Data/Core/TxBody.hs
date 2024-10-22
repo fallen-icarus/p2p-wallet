@@ -253,6 +253,21 @@ instance ToBuildCmdField TxBodyOutput where
 -------------------------------------------------
 -- Certificates
 -------------------------------------------------
+-- | The type of vote delegation.
+data VoteDelegation
+  -- | The bech32 encoded DRep and whether it is a script.
+  = DRepDelegation DRepID Bool
+  | AlwaysAbstainDelegation
+  | AlwaysNoDelegation
+  deriving (Show,Eq,Ord)
+
+makePrisms ''VoteDelegation
+
+instance Display VoteDelegation where
+  display (DRepDelegation drepId _) = "Vote delegation to " <> display drepId
+  display AlwaysAbstainDelegation = "Vote delegation to always-abstain"
+  display AlwaysNoDelegation = "Vote delegation to always-no"
+
 -- | Types of certificate. When registering and delegating in the same transaction,
 -- the registration certificate MUST be first.
 data CertificateAction
@@ -260,8 +275,10 @@ data CertificateAction
   = Registration
   -- | Deregister a staking credential and recover the 2 ADA deposit.
   | Deregistration
-  -- | Delegate the staking credential.
-  | Delegation PoolID
+  -- | Delegate the staking credential to a pool.
+  | StakeDelegation PoolID
+  -- | Delegate the staking credential to a drep.
+  | VoteDelegation VoteDelegation
   deriving (Show,Eq,Ord)
 
 makePrisms ''CertificateAction
@@ -269,7 +286,8 @@ makePrisms ''CertificateAction
 instance Display CertificateAction where
   display Registration = "Stake Registration"
   display Deregistration = "Stake Deregistration"
-  display (Delegation (PoolID poolId)) = "Delegation to " <> toText poolId
+  display (StakeDelegation (PoolID poolId)) = "Stake delegation to " <> toText poolId
+  display (VoteDelegation voteDelegation) = display voteDelegation
 
 -- | The type representing user supplied information for a certificate.
 data TxBodyCertificate = TxBodyCertificate

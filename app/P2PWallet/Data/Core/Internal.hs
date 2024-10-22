@@ -10,6 +10,7 @@ module P2PWallet.Data.Core.Internal
   , module P2PWallet.Data.Core.Internal.Assets
   , module P2PWallet.Data.Core.Internal.Bech32Address
   , module P2PWallet.Data.Core.Internal.Config
+  , module P2PWallet.Data.Core.Internal.DRepID
   , module P2PWallet.Data.Core.Internal.KeyDerivation
   , module P2PWallet.Data.Core.Internal.Files
   , module P2PWallet.Data.Core.Internal.HardwareDevice
@@ -27,6 +28,7 @@ import P2PWallet.Data.Core.Internal.AppError
 import P2PWallet.Data.Core.Internal.Assets
 import P2PWallet.Data.Core.Internal.Bech32Address
 import P2PWallet.Data.Core.Internal.Config
+import P2PWallet.Data.Core.Internal.DRepID
 import P2PWallet.Data.Core.Internal.KeyDerivation
 import P2PWallet.Data.Core.Internal.Files
 import P2PWallet.Data.Core.Internal.HardwareDevice

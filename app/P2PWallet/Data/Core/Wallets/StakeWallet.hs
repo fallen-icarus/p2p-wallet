@@ -9,6 +9,7 @@ module P2PWallet.Data.Core.Wallets.StakeWallet where
 import Database.SQLite.Simple (ToRow,FromRow)
 
 import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Koios.DRep
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Core.StakeReward
 import P2PWallet.Database
@@ -31,6 +32,7 @@ data StakeWallet = StakeWallet
   , utxoBalance :: Lovelace
   , availableRewards :: Lovelace
   , delegatedPool :: Maybe Pool
+  , delegatedDRep :: Maybe DRep
   , rewardHistory :: [StakeReward]
   , linkedAddresses :: [PaymentAddress]
   } deriving (Generic,ToRow,FromRow,Show,Eq)
@@ -50,6 +52,7 @@ instance Default StakeWallet where
     , utxoBalance = 0
     , availableRewards = 0
     , delegatedPool = Nothing
+    , delegatedDRep = Nothing
     , rewardHistory = []
     , linkedAddresses = []
     }
@@ -73,6 +76,7 @@ instance Creatable StakeWallet where
         , "utxo_balance INTEGER NOT NULL"
         , "available_rewards INTEGER NOT NULL"
         , "delegated_pool BLOB"
+        , "delegated_drep BLOB"
         , "reward_history BLOB"
         , "linked_addresses BLOB"
         , "UNIQUE(network,profile_id,stake_wallet_id,alias)"
@@ -96,15 +100,18 @@ instance Insertable StakeWallet where
         , "utxo_balance"
         , "available_rewards"
         , "delegated_pool"
+        , "delegated_drep"
         , "reward_history"
         , "linked_addresses"
         ]
     , ")"
-    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);"
+    , "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
     ]
 
 instance Notify StakeWallet where
-  notify oldState@StakeWallet{delegatedPool=oldPool} newState@StakeWallet{delegatedPool=newPool}
+  notify 
+    oldState@StakeWallet{delegatedPool=oldPool,delegatedDRep=oldDRep}
+    newState@StakeWallet{delegatedPool=newPool,delegatedDRep=newDRep}
     | null msg = Nothing
     | otherwise = Just $ Notification
         { notificationType = StakeNotification
@@ -119,17 +126,29 @@ instance Notify StakeWallet where
   
       isRegistered :: Bool
       isRegistered = oldState ^. #registrationStatus == NotRegistered 
-                    && newState ^. #registrationStatus == Registered
+                  && newState ^. #registrationStatus == Registered
 
-      delegationChanged :: Bool
-      delegationChanged = isJust oldPool && isJust newPool 
-                        && oldPool ^? _Just % #poolId /= newPool ^? _Just % #poolId
+      stakeDelegationChanged :: Bool
+      stakeDelegationChanged = isJust oldPool 
+                            && isJust newPool 
+                            && oldPool ^? _Just % #poolId /= newPool ^? _Just % #poolId
 
-      firstDelegation :: Bool
-      firstDelegation = isNothing oldPool && isJust newPool
+      drepDelegationChanged :: Bool
+      drepDelegationChanged = isJust oldDRep 
+                           && isJust newDRep 
+                           && oldDRep ^? _Just % #drepId /= newDRep ^? _Just % #drepId
+
+      firstStakeDelegation :: Bool
+      firstStakeDelegation = isNothing oldPool && isJust newPool
+
+      firstDrepDelegation :: Bool
+      firstDrepDelegation = isNothing oldDRep && isJust newDRep
 
       newPoolId :: PoolID
       newPoolId = fromMaybe "" $ newPool ^? _Just % #poolId
+
+      newDRepId :: DRepID
+      newDRepId = fromMaybe "" $ newDRep ^? _Just % #drepId
 
       rewardsDiff = newState ^. #availableRewards - oldState ^. #availableRewards
 
@@ -143,22 +162,24 @@ instance Notify StakeWallet where
         | otherwise = ""
 
       registeredMsg
-        | isRegistered && firstDelegation = 
-            "Stake credential registered and delegated to " <> display newPoolId <> "."
-        | isRegistered =
-            "Stake credential registered."
+        | isRegistered = "Stake credential registered."
         | otherwise = ""
 
-      delegationMsg
-        | registeredMsg /= "" = "" -- It will cover delegation as well.
-        | firstDelegation = "Delegated to " <> display newPoolId <> "."
-        | delegationChanged = "Delegation changed to " <> display newPoolId <> "."
+      stakeDelegationMsg
+        | firstStakeDelegation = "Stake delegated to " <> display newPoolId <> "."
+        | stakeDelegationChanged = "Stake delegation changed to " <> display newPoolId <> "."
+        | otherwise = ""
+
+      drepDelegationMsg
+        | firstDrepDelegation = "Vote delegated to " <> display newDRepId <> "."
+        | drepDelegationChanged = "Vote delegation changed to " <> display newDRepId <> "."
         | otherwise = ""
 
       msg = filter (/= "")
         [ deregisteredMsg
         , registeredMsg
-        , delegationMsg
+        , stakeDelegationMsg
+        , drepDelegationMsg
         , rewardMsg
         ]
 

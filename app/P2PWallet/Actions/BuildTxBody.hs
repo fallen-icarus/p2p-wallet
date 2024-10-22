@@ -217,8 +217,8 @@ buildTxBody network tx = do
 -- the action to keep the certificate files distinct. Later certificate actions override previous
 -- actions! This function will log the command used to create the certificate.
 buildCertificate :: TmpDirectory -> BuilderLogFile -> TxBodyCertificate -> IO CertificateFile
-buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificateAction} = do
-  let certFile suffix = toString tmpDir </> (toString stakeAddress <> "_" <> suffix) <.> "cert"
+buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeCredential,stakeAddress,certificateAction} = do
+  let certFile suffix = toString tmpDir </> (toString (display stakeCredential) <> "_" <> suffix) <.> "cert"
   case certificateAction of
     Registration -> do
       -- Suffix the file name with the action.
@@ -226,8 +226,7 @@ buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificat
 
       -- Create the certificate file.
       runBuildCmd_ builderLogFile $ unwords
-        [ "cardano-cli stake-address registration-certificate"
-        , "--conway-era"
+        [ "cardano-cli conway stake-address registration-certificate"
         , "--key-reg-deposit-amt 2000000" -- 2 ADA
         , "--stake-address " <> toText stakeAddress
         , "--out-file " <> toText fullFileName
@@ -242,8 +241,7 @@ buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificat
 
       -- Create the certificate file.
       runBuildCmd_ builderLogFile $ unwords
-        [ "cardano-cli stake-address deregistration-certificate"
-        , "--conway-era"
+        [ "cardano-cli conway stake-address deregistration-certificate"
         , "--key-reg-deposit-amt 2000000" -- 2 ADA
         , "--stake-address " <> toText stakeAddress
         , "--out-file " <> toText fullFileName
@@ -251,16 +249,43 @@ buildCertificate tmpDir builderLogFile TxBodyCertificate{stakeAddress,certificat
 
       -- Return the suffixed file name.
       return $ CertificateFile fullFileName
-    Delegation (PoolID poolID) -> do
+    StakeDelegation (PoolID poolID) -> do
       -- Suffix the file name with the action.
-      let fullFileName = certFile "delegation"
+      let fullFileName = certFile "stake_delegation"
       
       -- Create the certificate file.
       runBuildCmd_ builderLogFile $ unwords
-        [ "cardano-cli stake-address delegation-certificate"
-        , "--conway-era"
+        [ "cardano-cli conway stake-address stake-delegation-certificate"
         , "--stake-address " <> toText stakeAddress
         , "--stake-pool-id " <> poolID
+        , "--out-file " <> toText fullFileName
+        ]
+
+      -- Return the suffixed file name.
+      return $ CertificateFile fullFileName
+    VoteDelegation deleg -> do
+      -- Suffix the file name with the action.
+      let fullFileName = certFile "vote_delegation"
+          drepFlag = case deleg of
+            AlwaysAbstainDelegation -> "--always-abstain"
+            AlwaysNoDelegation -> "--always-no-confidence"
+            DRepDelegation drepId isScript ->
+              if isScript then 
+                unwords
+                 [ "--drep-script-hash"
+                 , fromRight "could not decode bech32 drep id" $ drepIdToHex drepId
+                 ]
+              else 
+                unwords
+                  [ "--drep-key-hash"
+                  , display drepId -- This removes the CIP-129 prefix if present.
+                  ]
+      
+      -- Create the certificate file.
+      runBuildCmd_ builderLogFile $ unwords
+        [ "cardano-cli conway stake-address vote-delegation-certificate"
+        , "--stake-address " <> toText stakeAddress
+        , drepFlag
         , "--out-file " <> toText fullFileName
         ]
 
@@ -299,7 +324,7 @@ estimateTxFee tmpDir builderLogFile paramsFile txBodyFile certificateFiles tx@Tx
 
     calcFeeCmd :: Text
     calcFeeCmd = unwords
-      [ "(cardano-cli transaction calculate-min-fee"
+      [ "(cardano-cli conway transaction calculate-min-fee"
       , "--tx-body-file " <> toText txBodyFile
       , toNetworkFlag network
       , "--protocol-params-file " <> toText paramsFile

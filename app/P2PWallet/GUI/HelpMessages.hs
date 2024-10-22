@@ -205,6 +205,7 @@ homeTxSearchMsg = unlines
   , "4. Reference script hashes"
   , "5. Datum hashes"
   , "6. UTxO output reference"
+  , "7. DRep ID"
   , ""
   , "You can even use a combination of criteria by separating them with commas."
   , ""
@@ -1416,3 +1417,14 @@ bidFilterSortMsg = unlines
   , "3. Based on the number of NFTs being sold in the batch"
   , "4. Based on the expiration of the bid."
   ]
+
+votingPowerMsg :: Text
+votingPowerMsg = unlines
+  [ unwords
+      [ "The total amount of ada delegated to this DRep."
+      ]
+  ]
+
+drepIdMsg :: Text
+drepIdMsg = unwords
+  [ "The bech32 encoded DRep ID." ]

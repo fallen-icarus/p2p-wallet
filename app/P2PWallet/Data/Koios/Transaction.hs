@@ -19,6 +19,7 @@ import Data.Aeson.Types (Parser, parseMaybe)
 import P2PWallet.Prelude
 import P2PWallet.Data.Core.Internal.Assets
 import P2PWallet.Data.Core.Internal.Bech32Address
+import P2PWallet.Data.Core.Internal.DRepID
 import P2PWallet.Data.Core.Internal.PoolID
 import P2PWallet.Plutus
 
@@ -70,10 +71,11 @@ data CertificateType
   | ParamProposalCertificate
   | ReserveMirCertificate
   | TreasuryMirCertificate
+  | VoteDelegationCertificate
   deriving (Show,Eq)
 
 instance Display CertificateType where
-  display DelegationCertificate = "Delegation"
+  display DelegationCertificate = "Stake Delegation"
   display StakeRegistrationCertificate = "Stake Registration"
   display StakeDeregistrationCertificate = "Stake Deregistration"
   display PoolUpdateCertificate = "Pool Update"
@@ -81,6 +83,7 @@ instance Display CertificateType where
   display ParamProposalCertificate = "Parameter Proposal"
   display ReserveMirCertificate = "Reserve MIR"
   display TreasuryMirCertificate = "Treasury MIR"
+  display VoteDelegationCertificate = "Vote Delegation"
 
 parseCertificateType :: Text -> Maybe CertificateType
 parseCertificateType "pool_delegation" = Just DelegationCertificate
@@ -91,6 +94,7 @@ parseCertificateType "pool_retire" = Just PoolRetireCertificate
 parseCertificateType "reserve_MIR" = Just ReserveMirCertificate
 parseCertificateType "treasury_MIR" = Just TreasuryMirCertificate
 parseCertificateType "param_proposal" = Just ParamProposalCertificate
+parseCertificateType "vote_delegation" = Just VoteDelegationCertificate
 parseCertificateType _ = Nothing
 
 showCertificateType :: CertificateType -> Text
@@ -102,11 +106,13 @@ showCertificateType PoolRetireCertificate = "pool_retire"
 showCertificateType ParamProposalCertificate = "param_proposal"
 showCertificateType ReserveMirCertificate = "reserve_MIR"
 showCertificateType TreasuryMirCertificate = "treasury_MIR"
+showCertificateType VoteDelegationCertificate = "vote_delegation"
 
 data CertificateInfo
-  = DelegationInfo { poolId :: PoolID , stakeAddress :: StakeAddress }
+  = StakeDelegationInfo { poolId :: PoolID , stakeAddress :: StakeAddress }
   -- Both Registration and Deregistration have the same info.
   | StakeRegistrationInfo { stakeAddress :: StakeAddress }
+  | VoteDelegationInfo { drepId :: DRepID , stakeAddress :: StakeAddress }
   | OtherInfo Value
   deriving (Show,Eq)
 
@@ -115,14 +121,21 @@ makePrisms ''CertificateInfo
 instance FromJSON CertificateInfo where
   parseJSON value = 
       pure $ fromMaybe (OtherInfo value) $ asum
-        [ parseMaybe delegationInfoParser value 
+        [ parseMaybe stakeDelegationInfoParser value 
+        , parseMaybe voteDelegationInfoParser value 
         , parseMaybe stakeRegistrationInfoParser value
         ]
     where
-      delegationInfoParser :: Value -> Parser CertificateInfo
-      delegationInfoParser = withObject "DelegationInfo" $ \o ->
-        DelegationInfo
+      stakeDelegationInfoParser :: Value -> Parser CertificateInfo
+      stakeDelegationInfoParser = withObject "StakeDelegationInfo" $ \o ->
+        StakeDelegationInfo
           <$> o .: "pool_id_bech32"
+          <*> o .: "stake_address"
+
+      voteDelegationInfoParser :: Value -> Parser CertificateInfo
+      voteDelegationInfoParser = withObject "VoteDelegationInfo" $ \o ->
+        VoteDelegationInfo
+          <$> o .: "drep_id"
           <*> o .: "stake_address"
 
       stakeRegistrationInfoParser :: Value -> Parser CertificateInfo
@@ -131,8 +144,13 @@ instance FromJSON CertificateInfo where
           <$> o .: "stake_address"
 
 instance ToJSON CertificateInfo where
-  toJSON DelegationInfo{..} =
+  toJSON StakeDelegationInfo{..} =
     object [ "pool_id_bech32" .= poolId
+           , "stake_address" .= stakeAddress
+           ]
+
+  toJSON VoteDelegationInfo{..} =
+    object [ "drep_id" .= drepId
            , "stake_address" .= stakeAddress
            ]
 

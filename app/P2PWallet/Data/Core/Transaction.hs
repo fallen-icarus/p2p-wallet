@@ -19,8 +19,9 @@ module P2PWallet.Data.Core.Transaction
   , Koios.TransactionCertificate(..)
   , Koios.CertificateType(..)
   , Koios.CertificateInfo(..)
-  , Koios._DelegationInfo
+  , Koios._StakeDelegationInfo
   , Koios._StakeRegistrationInfo
+  , Koios._VoteDelegationInfo
   , Koios._OtherInfo
 
     -- * Withdrawals
