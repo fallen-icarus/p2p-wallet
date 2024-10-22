@@ -16,11 +16,12 @@ userCertificatesList :: [(Int,UserCertificate)] -> [AppNode]
 userCertificatesList = map certificateRow
   where
     certificateRow :: (Int,UserCertificate) -> AppNode
-    certificateRow (idx,UserCertificate{..}) = do
+    certificateRow (idx,UserCertificate{stakeAddress,certificateAction,poolName,walletAlias}) = do
       let mainLabelCaption = fromString $ case certificateAction of
             Registration -> printf "Register %s" walletAlias
             Deregistration -> printf "Deregister %s" walletAlias
-            Delegation _ -> printf "Delegate %s" walletAlias
+            StakeDelegation _ -> printf "Delegate Stake for %s" walletAlias
+            VoteDelegation _ -> printf "Delegate Voting Power for %s" walletAlias
       hstack
         [ vstack
             [ hstack
@@ -30,13 +31,20 @@ userCertificatesList = map certificateRow
                 , widgetMaybe poolName $ \name ->
                     label name
                       `styleBasic` [textSize 10, textColor white]
+                , widgetMaybe (certificateAction ^? _VoteDelegation) $ \deleg ->
+                    case deleg of
+                      DRepDelegation _ _ -> label "DRep" `styleBasic` [textSize 10]
+                      AlwaysAbstainDelegation -> label "Always Abstain" `styleBasic` [textSize 10]
+                      AlwaysNoDelegation -> label "Always No" `styleBasic` [textSize 10]
                 ]
             , spacer_ [width 2]
             , hstack
                 [ copyableLabelSelf (toText stakeAddress) lightGray 8
                 , filler
-                , widgetMaybe (certificateAction ^? _Delegation) $ \poolId ->
+                , widgetMaybe (certificateAction ^? _StakeDelegation) $ \poolId ->
                     copyableLabelSelfWith 8 trimBech32 poolId lightGray
+                , widgetMaybe (certificateAction ^? _VoteDelegation % _DRepDelegation) $ \(drepId,_) ->
+                    copyableLabelSelfWith 8 trimBech32 (display drepId) lightGray
                 ]
             ] `styleBasic` 
                 [ padding 10

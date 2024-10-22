@@ -74,4 +74,5 @@ buildUI _ model@AppModel{..} = do
     , waitingOverlay "Syncing Current Sales..." 
         `nodeVisible` waitingStatus ^. #syncingAftermarketSales
     , waitingOverlay "Syncing Seller Info..." `nodeVisible` waitingStatus ^. #syncingSellerInfo
+    , waitingOverlay "Syncing DRep Info..." `nodeVisible` waitingStatus ^. #syncingDRepInfo
     ] `styleBasic` [bgColor customGray4]

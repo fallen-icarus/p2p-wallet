@@ -18,12 +18,24 @@ import P2PWallet.Data.Koios.Pool
 import P2PWallet.Prelude
 
 -------------------------------------------------
+-- Delegation Sub-Scene
+-------------------------------------------------
+data DelegationScene
+  -- | The scene for viewing which stake pool is being delegated to.
+  = StakeDelegationScene
+  -- | The scene for viewing which drep is being delegated to.
+  | GovernanceDelegationScene
+  deriving (Show,Eq)
+
+-------------------------------------------------
 -- Delegation Page Events
 -------------------------------------------------
 -- | The possible UI events on the Home page.
 data DelegationEvent
+  -- | Change the delegation subscene.
+  = ChangeDelegationScene DelegationScene
   -- | Pair a new `StakeWallet`. It can only be done from the `HomeAbout` subscene.
-  = PairStakeWallet (AddEvent StakeWallet StakeWallet)
+  | PairStakeWallet (AddEvent StakeWallet StakeWallet)
   -- | Watch a new `StakeWallet`. It can only be done from the `HomeAbout` subscene.
   | WatchStakeWallet (AddEvent StakeWallet StakeWallet)
   -- | Change a payment wallet name.
@@ -45,6 +57,8 @@ data DelegationEvent
   | AddSelectedUserCertificate (Maybe Text,CertificateAction)
   -- | Add the selected user withdrawal to the tx builder. 
   | AddSelectedUserWithdrawal StakeWallet
+  -- | Get the information for a new drep delegation.
+  | AddDrepDelegation (AddEvent () VoteDelegation)
 
 -------------------------------------------------
 -- Pool Filter Model
@@ -96,6 +110,8 @@ instance Default PoolFilterModel where
 data DelegationModel = DelegationModel
   -- | The currently focused `StakeWallet` from the list of tracked `StakeWallet`s.
   { selectedWallet :: StakeWallet
+  -- | The current delegation scene.
+  , scene :: DelegationScene
   -- | Whether to show the more popup.
   , showMorePopup :: Bool
   -- | Whether the add new wallet widget should be open.
@@ -116,6 +132,10 @@ data DelegationModel = DelegationModel
   , showPoolFilter :: Bool
   -- | The text field where new aliases are entered.
   , newAliasField :: Text
+  -- | The new drep delegation.
+  , newDrepDelegation :: Maybe VoteDelegation
+  -- | The new drep id. This is only used when `VoteDelegation` is `DRepDelegation`.
+  , newDrepId :: Text
   } deriving (Eq,Show)
 
 makeFieldLabelsNoPrefix ''DelegationModel
@@ -123,6 +143,7 @@ makeFieldLabelsNoPrefix ''DelegationModel
 instance Default DelegationModel where
   def = DelegationModel 
     { selectedWallet = def 
+    , scene = StakeDelegationScene
     , showMorePopup = False
     , addingWallet = False
     , editingWallet = False
@@ -133,4 +154,6 @@ instance Default DelegationModel where
     , poolFilterModel = def
     , showPoolFilter = False
     , newAliasField = ""
+    , newDrepDelegation = Nothing
+    , newDrepId = ""
     }

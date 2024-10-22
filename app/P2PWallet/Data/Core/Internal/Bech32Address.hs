@@ -178,7 +178,7 @@ plutusToBech32 network (PV1.Address pCred msCred) = case msCred of
             Address.keyHashFromBytes 
               (Address.Delegation, unBuiltinByteString $ PV1.getPubKeyHash pkh)
       PV1.StakingHash (PV1.ScriptCredential vh) -> 
-        fmap Address.DelegationFromScript $ 
+        fmap Address.DelegationFromScriptHash $ 
           maybeToRight "Could not get stake scriptHash from bytes" $ 
             Address.scriptHashFromBytes $ unBuiltinByteString $ PV1.getScriptHash vh
       _ -> Left "Pointer addresses are not supported."
@@ -190,7 +190,7 @@ plutusToBech32 network (PV1.Address pCred msCred) = case msCred of
           maybeToRight "Could not get payment keyHash from bytes" $ 
             Address.keyHashFromBytes (Address.Payment, unBuiltinByteString $ PV1.getPubKeyHash pkh)
       PV1.ScriptCredential vh ->
-        fmap Address.PaymentFromScript $ 
+        fmap Address.PaymentFromScriptHash $ 
           maybeToRight "Could not get payment scriptHash from bytes" $ 
             Address.scriptHashFromBytes $ unBuiltinByteString $ PV1.getScriptHash vh
 

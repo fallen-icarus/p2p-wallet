@@ -40,7 +40,7 @@ constraints:
 source-repository-package
     type: git
     location: https://github.com/input-output-hk/cardano-addresses
-    tag: b7273a5d3c21f1a003595ebf1e1f79c28cd72513
+    tag: dc0bfdcccf0ff2c3ea1d5db7855d4414a0cd888b
     subdir:
       core
 

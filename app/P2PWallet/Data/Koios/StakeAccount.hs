@@ -24,6 +24,7 @@ data StakeAccount = StakeAccount
   , utxoBalance :: Lovelace
   , availableRewards :: Lovelace
   , delegatedPool :: Maybe PoolID
+  , delegatedDrep :: Maybe DRepID
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''StakeAccount
@@ -37,3 +38,4 @@ instance FromJSON StakeAccount where
         <*> o .: "utxo"
         <*> o .: "rewards_available"
         <*> o .: "delegated_pool"
+        <*> o .: "delegated_drep"

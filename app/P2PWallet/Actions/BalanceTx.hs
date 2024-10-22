@@ -36,7 +36,7 @@ balanceTx tx@TxBuilderModel{..} =
       case cert ^. #certificateAction of
         Registration -> acc + 2_000_000 -- 2 ADA must be paid.
         Deregistration -> acc - 2_000_000 -- 2 ADA must be returned.
-        Delegation _ -> acc
+        _ -> acc
 
     -- The amount of ADA and native assets from the input sources.
     inputValue :: (Lovelace,[NativeAsset])

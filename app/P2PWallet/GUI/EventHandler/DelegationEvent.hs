@@ -9,15 +9,23 @@ import P2PWallet.Actions.AddWallet
 import P2PWallet.Actions.BalanceTx
 import P2PWallet.Actions.Database
 import P2PWallet.Actions.LookupPools
+import P2PWallet.Actions.Query.Koios (runQueryDRepInformation)
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Core.TxBody
 import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.Koios.DRep
 import P2PWallet.Prelude
 
 handleDelegationEvent :: AppModel -> DelegationEvent -> [AppEventResponse AppModel AppEvent]
 handleDelegationEvent model@AppModel{..} evt = case evt of
+  -----------------------------------------------
+  -- Changing Scenes
+  -----------------------------------------------
+  ChangeDelegationScene newScene -> 
+    [ Model $ model & #delegationModel % #scene .~ newScene ]
+
   -----------------------------------------------
   -- Open the More Popup
   -----------------------------------------------
@@ -285,6 +293,42 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
         , Task $ return $ Alert "Successfully added to builder!"
         ]
 
+  -----------------------------------------------
+  -- Add new drep delegation
+  -----------------------------------------------
+  AddDrepDelegation modal -> case modal of
+    StartAdding _ -> 
+      [ Model $ model 
+          & #delegationModel % #newDrepDelegation ?~ AlwaysNoDelegation
+          & #delegationModel % #newDrepId .~ ""
+      ]
+    CancelAdding -> 
+      [ Model $ model 
+          & #delegationModel % #newDrepDelegation .~ Nothing
+          & #delegationModel % #newDrepId .~ ""
+      ]
+    ConfirmAdding -> case delegationModel ^? #newDrepDelegation % _Just of
+      Nothing -> [Event $ Alert "newDrepDelegation is Nothing"]
+      Just (DRepDelegation _ _) ->
+        [ Model $ model & #waitingStatus % #syncingDRepInfo .~ True
+        , Task $ runActionOrAlert (DelegationEvent . AddDrepDelegation . AddResult) $ do
+            let network = config ^. #network
+                targetDrepId = DRepID $ delegationModel ^. #newDrepId
+
+            -- Verify the DRepID is a real DRep.
+            DRep{isScript} <- runQueryDRepInformation network targetDrepId >>= fromRightOrAppError
+
+            -- Replace the dummy value in `DRepDelegation` and return it. 
+            return $ DRepDelegation targetDrepId isScript
+        ]
+      Just voteDeleg -> [Event $ DelegationEvent $ AddDrepDelegation $ AddResult voteDeleg]
+    AddResult voteDeleg -> 
+      [ Model $ model 
+          & #waitingStatus % #syncingDRepInfo .~ False
+          & #delegationModel % #newDrepDelegation .~ Nothing
+      , Event $ DelegationEvent $ AddSelectedUserCertificate (Nothing, VoteDelegation voteDeleg)
+      ]
+
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
@@ -308,9 +352,9 @@ processNewUserCertificate u@UserCertificate{..} model@TxBuilderModel{userCertifi
           ]
 
     return $ balanceTx $ model 
-        -- Add the new certificate to the list, sort the list so that stake address actions are
-        -- grouped together, and then immediately re-index the list.
-        & #userCertificates .~ reIndex (sortOn snd $ (0,u) : filteredCertificates)
+      -- Add the new certificate to the list, sort the list so that stake address actions are
+      -- grouped together, and then immediately re-index the list.
+      & #userCertificates .~ reIndex (sortOn snd $ (0,u) : filteredCertificates)
   where
     -- Previous delegation certificates for this stake address must be replaced by the new one.
     -- If a deregistration cert was entered first, it should be overridden by a delegation cert,
@@ -323,11 +367,19 @@ processNewUserCertificate u@UserCertificate{..} model@TxBuilderModel{userCertifi
       Deregistration -> flip filter userCertificates $ \(_,userCert) -> 
         -- All previous certificates for this stake address should be overridden.
         userCert ^. #stakeAddress /= stakeAddress
-      Delegation _ -> flip filter userCertificates $ \(_,userCert) -> 
+      StakeDelegation _ -> flip filter userCertificates $ \(_,userCert) -> 
         -- All previous deregistration certificates and delegation certificates for this stake 
         -- address should be overridden.
         not $ and
           [ userCert ^. #stakeAddress == stakeAddress
-          , isJust (userCert ^? #certificateAction % _Delegation) ||
+          , isJust (userCert ^? #certificateAction % _StakeDelegation) ||
+              isJust (userCert ^? #certificateAction % _Deregistration)
+          ]
+      VoteDelegation _ -> flip filter userCertificates $ \(_,userCert) -> 
+        -- All previous deregistration certificates and vote certificates for this stake 
+        -- address should be overridden.
+        not $ and
+          [ userCert ^. #stakeAddress == stakeAddress
+          , isJust (userCert ^? #certificateAction % _VoteDelegation) ||
               isJust (userCert ^? #certificateAction % _Deregistration)
           ]

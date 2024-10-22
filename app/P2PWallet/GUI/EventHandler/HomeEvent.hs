@@ -152,6 +152,7 @@ handleHomeEvent model@AppModel{..} evt = case evt of
                       , utxoBalance = 0
                       , availableRewards = 0
                       , delegatedPool = Nothing
+                      , delegatedDRep = Nothing
                       , rewardHistory = [] 
                       , linkedAddresses = []
                       }

@@ -136,6 +136,16 @@ instance ToJSON Pools where
   toJSON (Pools pools) = object [ "_pool_bech32_ids" .= pools ]
 
 -------------------------------------------------
+-- DReps
+-------------------------------------------------
+-- | A newtype for submitting a list of `DRepID`s. This is also the return type for an intermediate
+-- query.
+newtype DReps = DReps [DRepID] deriving (Show)
+
+instance ToJSON DReps where
+  toJSON (DReps dreps) = object [ "_drep_ids" .= dreps ]
+
+-------------------------------------------------
 -- Assets
 -------------------------------------------------
 -- | A list of assets that a UTxO must contain.

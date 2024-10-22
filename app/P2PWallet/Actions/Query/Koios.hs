@@ -29,6 +29,7 @@ module P2PWallet.Actions.Query.Koios
   , runQueryMarketWallet
   , runQueryAftermarketSales
   , runQuerySellerInformation
+  , runQueryDRepInformation
   ) where
 
 import Servant.Client (client , ClientM , runClientM , Scheme(Https) , BaseUrl(..) , mkClientEnv)
@@ -60,6 +61,7 @@ import P2PWallet.Data.Core.BorrowerInformation
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Koios.AddressUTxO
 import P2PWallet.Data.Koios.AssetTransaction
+import P2PWallet.Data.Koios.DRep
 import P2PWallet.Data.Koios.LinkedPaymentAddresses
 import P2PWallet.Data.Koios.MintTransaction
 import P2PWallet.Data.Koios.Pool
@@ -247,17 +249,21 @@ runQueryStakeWalletInfo wallet@StakeWallet{network,stakeAddress} = do
     (res1,(res2,res3)) <- 
       concurrently fetchAccountStatus $ concurrently fetchRewards fetchLinkedAddresses
     case (,,) <$> res1 <*> res2 <*> res3 of
-      Right ([StakeAccount{stakeAddress=_,..}],rewards,linkedAddresses) ->
+      Right ([StakeAccount{stakeAddress=_,..}],rewards,linkedAddresses) -> do
         -- This query relies on the response from the `fetchAccountStatus` query.
-        fetchDelegatedPoolInfo delegatedPool >>= \case
+        (poolRes,drepRes) <- 
+          concurrently (fetchDelegatedPoolInfo delegatedPool) (fetchDelegatedDrepInfo delegatedDrep)
+
+        case (,) <$> poolRes <*> drepRes of
           Left err -> return $ Left $ show err
-          Right pools -> do
+          Right (pools,dreps) -> do
             return $ Right $
               wallet & #registrationStatus .~ registrationStatus
                      & #totalDelegation .~ totalDelegation
                      & #utxoBalance .~ utxoBalance
                      & #availableRewards .~ availableRewards
                      & #delegatedPool .~ maybeHead pools
+                     & #delegatedDRep .~ maybeHead dreps
                      & #rewardHistory .~ reverse (map P2P.toStakeReward rewards)
                      & #linkedAddresses .~ linkedAddresses
       Right ([],_,_) -> 
@@ -290,6 +296,14 @@ runQueryStakeWalletInfo wallet@StakeWallet{network,stakeAddress} = do
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
           query = queryPoolInfo Nothing Nothing $ Pools $ catMaybes [mDelegatedPool]
       first show <$> handleTimeoutError (runClientM query env)
+    
+    -- Try to query the information for the drep this stake address is delegated to.
+    fetchDelegatedDrepInfo :: Maybe DRepID -> IO (Either Text [DRep])
+    fetchDelegatedDrepInfo Nothing = return $ Right []
+    fetchDelegatedDrepInfo (Just drepId) = do
+      manager <- newManager customTlsSettings
+      let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+      first show <$> handleTimeoutError (runClientM (queryDrepInfo drepId) env)
     
     -- Try to query the stake address' rewards.
     fetchLinkedAddresses :: IO (Either Text [PaymentAddress])
@@ -955,6 +969,16 @@ runQuerySellerInformation network sellerAddr =
     queryUTxOsWithRedundancies :: IO (Either Text [AddressUTxO])
     queryUTxOsWithRedundancies = queryWithRedundancies fetchMarketUTxOs
 
+runQueryDRepInformation :: Network -> DRepID -> IO (Either Text DRep)
+runQueryDRepInformation network drepId = do
+  manager <- newManager customTlsSettings
+  let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
+  res <- bimap show maybeHead <$> handleTimeoutError (runClientM (queryDrepInfo drepId) env)
+  case res of
+    Right Nothing -> return $ Left "DRep not found."
+    Right (Just drep) -> return $ Right drep
+    Left err -> return $ Left err
+    
 -------------------------------------------------
 -- Low-Level API
 -------------------------------------------------
@@ -1125,6 +1149,11 @@ type KoiosApi
      :> ReqBody '[JSON] AssetList
      :> Post '[JSON] [AddressUTxO]
 
+  :<|>  "drep_info"
+     :> QueryParam' '[Required] "select" SelectParam
+     :> ReqBody '[JSON] DReps
+     :> Post '[JSON] [DRep]
+
 submitApi
   :<|> evaluateApi 
   :<|> paramsApi
@@ -1144,6 +1173,7 @@ submitApi
   :<|> loanOfferUTxOsApi
   :<|> loanActiveUTxOsApi
   :<|> optionsActiveUTxOsApi
+  :<|> drepInfoApi
   = client (Proxy :: Proxy KoiosApi)
 
 -- Query all UTxOs for a list of payment addresses.
@@ -1242,6 +1272,7 @@ queryStakeAccounts addrs = stakeAccountApi select $ StakeAddresses addrs
         [ "stake_address"
         , "status"
         , "delegated_pool"
+        , "delegated_drep"
         , "total_balance"
         , "utxo"
         , "rewards_available"
@@ -1984,3 +2015,20 @@ queryOwnBids bidderCred = queryApi 0 []
       , "block_time"
       , "block_height"
       ]
+
+queryDrepInfo :: DRepID -> ClientM [DRep]
+queryDrepInfo drepId = drepInfoApi select $ DReps [drepId]
+  where
+    select :: SelectParam
+    select =
+      fromString $ intercalate ","
+        [ "drep_id"
+        , "has_script"
+        , "registered"
+        , "deposit"
+        , "active"
+        , "expires_epoch_no"
+        , "amount"
+        , "meta_url"
+        ]
+

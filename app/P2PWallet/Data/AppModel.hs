@@ -112,6 +112,8 @@ data WaitingStatus = WaitingStatus
   , syncingAftermarketSales :: Bool
   -- | The app is syncing the seller information.
   , syncingSellerInfo :: Bool
+  -- | The app is syncing the drep's information.
+  , syncingDRepInfo :: Bool
   -- | The app is building the transaction.
   , building :: Bool
   -- | The app is loading the profile.
@@ -141,6 +143,7 @@ instance Default WaitingStatus where
     , syncingActiveOptionsContracts = False
     , syncingAftermarketSales = False
     , syncingSellerInfo = False
+    , syncingDRepInfo = False
     , building = False
     , loadingProfile = False
     , submitting = False

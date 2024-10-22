@@ -602,16 +602,21 @@ certificateField inspectedTransaction =
     certificateRow :: TransactionCertificate -> AppNode
     certificateRow TransactionCertificate{..} =
       vstack
-        [ hstack
-            [ label (display certificateType)
-                `styleBasic` [textSize 8, textColor white]
-            ]
-        , spacer_ [width 2]
-        , widgetMaybe (info ^? _DelegationInfo) $ \(poolId,stakeAddress) ->
+        [ centerWidgetH $ 
+            label (display certificateType)
+              `styleBasic` [textSize 8, textColor white, textFont "Italics"]
+        , spacer_ [width 4]
+        , widgetMaybe (info ^? _StakeDelegationInfo) $ \(poolId,stakeAddress) ->
             vstack
               [ copyableLabelFor 8 "Stake Address:" (display stakeAddress)
               , spacer_ [width 2]
               , copyableLabelFor 8 "Pool ID:" (display poolId)
+              ]
+        , widgetMaybe (info ^? _VoteDelegationInfo) $ \(drepId,stakeAddress) ->
+            vstack
+              [ copyableLabelFor 8 "Stake Address:" (display stakeAddress)
+              , spacer_ [width 2]
+              , copyableLabelFor 8 "DRep ID:" (display drepId)
               ]
         , widgetMaybe (info ^? _StakeRegistrationInfo) $ \stakeAddress ->
             copyableLabelFor 8 "Stake Address:" (display stakeAddress)
@@ -945,7 +950,7 @@ txFilterWidget model = do
             , spacer
             , textField_ 
                   (toLensVL $ #homeModel % #txFilterModel % #search) 
-                  [placeholder "many of: address, native asset, script hash, datum hash"] 
+                  [placeholder "many of: address, native asset, script hash, datum hash, DRep ID"] 
                 `styleBasic` [textSize 12, bgColor customGray1, sndColor darkGray]
                 `styleFocus` [border 1 customBlue]
             , mainButton helpIcon (Alert homeTxSearchMsg)
@@ -1154,13 +1159,20 @@ matchesUTxO wallet reverseTickerMap searchTarget TransactionUTxO{..} = or
 
 matchesCertificate :: Text -> TransactionCertificate -> Bool
 matchesCertificate searchTarget TransactionCertificate{info} = or
-    [ matchesDelegation
+    [ matchesStakeDelegation
+    , matchesVoteDelegation
     , matchesRegistration
     ]
   where
-    matchesDelegation :: Bool
-    matchesDelegation = flip (maybe False) (info ^? _DelegationInfo) $ \(poolId,stakeAddress) -> or
+    matchesStakeDelegation :: Bool
+    matchesStakeDelegation = flip (maybe False) (info ^? _StakeDelegationInfo) $ \(poolId,stakeAddress) -> or
       [ searchTarget `Text.isPrefixOf` display poolId
+      , searchTarget `Text.isPrefixOf` display stakeAddress
+      ]
+
+    matchesVoteDelegation :: Bool
+    matchesVoteDelegation = flip (maybe False) (info ^? _VoteDelegationInfo) $ \(drepId,stakeAddress) -> or
+      [ searchTarget `Text.isPrefixOf` display drepId
       , searchTarget `Text.isPrefixOf` display stakeAddress
       ]
 
