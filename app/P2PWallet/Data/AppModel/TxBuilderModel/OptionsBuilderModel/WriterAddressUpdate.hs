@@ -23,7 +23,7 @@ data WriterAddressUpdate = WriterAddressUpdate
   -- | The path to the required hw key for witnessing.
   , stakeKeyDerivation :: Maybe DerivationInfo
   -- | The new payment address to use when the contract is executed.
-  , newPaymentAddress :: PaymentAddress
+  , newPaymentWallet :: PaymentWallet
   -- | The extra deposit required for the new contract UTxO.
   , extraDeposit :: Lovelace
   -- | Wallet this UTxO is from.
@@ -52,7 +52,7 @@ instance AssetBalancesForChange (a,WriterAddressUpdate) where
 data NewWriterAddressUpdate = NewWriterAddressUpdate
   { optionsUTxO :: OptionsUTxO
   -- | The new payment address.
-  , newPaymentAddress :: Text
+  , newPaymentWallet :: PaymentWallet
   -- | The stake credential for this writer.
   , writerCredential :: Credential
   -- | The path to the required hw key for witnessing.
@@ -69,7 +69,7 @@ makeFieldLabelsNoPrefix ''NewWriterAddressUpdate
 instance Default NewWriterAddressUpdate where
   def = NewWriterAddressUpdate
     { optionsUTxO = def
-    , newPaymentAddress = ""
+    , newPaymentWallet = def
     , writerCredential = PubKeyCredential ""
     , stakeKeyDerivation = Nothing
     , network = def
@@ -82,20 +82,22 @@ createNewWriterAddressUpdate
   -> Text 
   -> Credential 
   -> Maybe DerivationInfo 
+  -> PaymentWallet -- ^ The new payment wallet to use.
   -> OptionsUTxO 
   -> NewWriterAddressUpdate
-createNewWriterAddressUpdate network alias stakeCredential mKeyInfo optionsUTxO =
+createNewWriterAddressUpdate network alias stakeCredential mKeyInfo newPaymentWallet optionsUTxO =
   NewWriterAddressUpdate
     { optionsUTxO = optionsUTxO
     , network = network
     , writerCredential = stakeCredential
     , stakeKeyDerivation = mKeyInfo
     , walletAlias = alias
-    , newPaymentAddress = either (const "") (display . fst) 
-                        $ plutusToBech32 network 
-                        $ view #paymentAddress
-                        $ fromMaybe def
-                        $ optionsUTxOActiveDatum optionsUTxO
+    , newPaymentWallet = newPaymentWallet
+    -- , newPaymentAddress = either (const "") (display . fst) 
+    --                     $ plutusToBech32 network 
+    --                     $ view #paymentAddress
+    --                     $ fromMaybe def
+    --                     $ optionsUTxOActiveDatum optionsUTxO
     }
 
 -------------------------------------------------
@@ -104,7 +106,7 @@ createNewWriterAddressUpdate network alias stakeCredential mKeyInfo optionsUTxO 
 -- | Verify the user info for the address update.
 verifyNewWriterAddressUpdate :: POSIXTime -> NewWriterAddressUpdate -> Either Text WriterAddressUpdate
 verifyNewWriterAddressUpdate currentTime NewWriterAddressUpdate{..} = do
-  verifiedAddress <- parsePaymentAddress network newPaymentAddress
+  verifiedAddress <- parsePaymentAddress network $ display $ newPaymentWallet ^. #paymentAddress
 
   addrAsPlutus <- paymentAddressToPlutusAddress verifiedAddress
 
@@ -117,7 +119,7 @@ verifyNewWriterAddressUpdate currentTime NewWriterAddressUpdate{..} = do
   return $ WriterAddressUpdate
     { optionsUTxO = optionsUTxO
     , network = network
-    , newPaymentAddress = verifiedAddress
+    , newPaymentWallet = newPaymentWallet
     , extraDeposit = 0 -- this will be set later.
     , writerCredential = writerCredential
     , stakeKeyDerivation = stakeKeyDerivation
@@ -129,7 +131,7 @@ toNewWriterAddressUpdate :: WriterAddressUpdate -> NewWriterAddressUpdate
 toNewWriterAddressUpdate WriterAddressUpdate{..} = NewWriterAddressUpdate
   { optionsUTxO = optionsUTxO
   , network = network
-  , newPaymentAddress = display newPaymentAddress
+  , newPaymentWallet = newPaymentWallet
   , writerCredential = writerCredential
   , stakeKeyDerivation = stakeKeyDerivation
   , walletAlias = walletAlias

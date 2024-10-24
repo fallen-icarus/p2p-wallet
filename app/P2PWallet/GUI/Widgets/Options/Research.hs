@@ -40,7 +40,7 @@ getActiveContractAssetsWidget model = do
         `styleBasic` [textSize 16, textFont "Italics", textColor customBlue]
     , spacer_ [width 20]
     , centerWidgetH $ hstack
-        [ box_ [alignMiddle, onClick $ Alert offerAssetMsg] $
+        [ box_ [alignMiddle, onClick $ Alert writerOfferAssetMsg] $
             label helpIcon
               `styleBasic`
                 [ border 0 transparent
@@ -65,7 +65,7 @@ getActiveContractAssetsWidget model = do
             `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
             `styleFocus` [border 1 customBlue]
         , spacer_ [width 3]
-        , box_ [alignMiddle, onClick $ Alert askAssetMsg] $
+        , box_ [alignMiddle, onClick $ Alert writerAskAssetMsg] $
             label helpIcon
               `styleBasic`
                 [ border 0 transparent

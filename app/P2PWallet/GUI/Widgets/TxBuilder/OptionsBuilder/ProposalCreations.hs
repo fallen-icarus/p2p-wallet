@@ -92,8 +92,19 @@ proposalCreationsList reverseTickerMap timeZone = map utxoRow
       hstack
         [ vstack
             [ hstack
-                [ label ("Create Options Proposal for " <> alias)
+                [ label "Create Options Proposal"
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ alias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
                 , label (showAssetBalance True reverseTickerMap offerAsset)
                     `styleBasic` [textSize 10, textColor white]
@@ -119,7 +130,7 @@ proposalCreationsList reverseTickerMap timeZone = map utxoRow
                 , border 1 black
                 ]
         , spacer_ [width 3]
-        , hstack
+        , box_ [alignMiddle] $ hstack
             [ vstack
                 [ spacer_ [width 15]
                 , box_ [alignCenter,alignTop] $ tooltip_ "Edit Action" [tooltipDelay 0] $

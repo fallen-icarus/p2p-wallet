@@ -42,9 +42,6 @@ inspectIcon = remixSearchLine
 cornerDownRightArrowIcon :: Text
 cornerDownRightArrowIcon = toGlyph 0XF309
 
-fingerprintIcon :: Text
-fingerprintIcon = remixFingerprintLine
-
 refreshIcon :: Text
 refreshIcon = remixRefreshLine
 
@@ -190,7 +187,7 @@ targetAddressIcon :: Text
 targetAddressIcon = toGlyph 0XF48E
 
 keyNftIcon :: Text
-keyNftIcon = toGlyph 0XEFD2
+keyNftIcon = remixFingerprintLine
 
 rolloverLoanIcon :: Text
 rolloverLoanIcon = remixDraftLine

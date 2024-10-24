@@ -56,8 +56,10 @@ proposalUpdatesList reverseTickerMap timeZone = map utxoRow
       hstack
         [ vstack
             [ hstack
-                [ label ("Update Options Proposal for " <> alias)
+                [ label "Update Options Proposal"
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
                 , spacer_ [width 5]
                 , let prettyRef = display (oldProposal ^. #utxoRef) in
                   flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
@@ -76,6 +78,15 @@ proposalUpdatesList reverseTickerMap timeZone = map utxoRow
                           , radius 5
                           ]
                         `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ alias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
                 , label (showAssetBalance True reverseTickerMap offerAsset)
                     `styleBasic` [textSize 10, textColor white]

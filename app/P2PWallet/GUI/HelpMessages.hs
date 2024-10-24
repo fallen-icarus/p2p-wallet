@@ -1452,3 +1452,72 @@ votingPowerMsg = unlines
 drepIdMsg :: Text
 drepIdMsg = unwords
   [ "The bech32 encoded DRep ID." ]
+
+buyerOfferAssetMsg :: Text
+buyerOfferAssetMsg = unlines
+  [ "Which asset do you currently have and wish to convert? This is the asset asked for by the options contract."
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , unwords
+      [ "Fingerprints are not supported because there is no way for the p2p-wallet to know"
+      , "which asset the fingerprint corresponds to unless it knows the asset in advance."
+      , "Due to the composability of these DeFi protocols, users may not always have the offer asset"
+      , "in question."
+      ]
+  ]
+
+buyerAskAssetMsg :: Text
+buyerAskAssetMsg = unlines
+  [ "Which asset do you wish to receive? This is the asset that will be offered by the options contract."
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , unwords
+      [ "Fingerprints are not supported because there is no way for the p2p-wallet to know"
+      , "which asset the fingerprint corresponds to unless it knows the asset in advance."
+      , "This may not be realistic in most scenarios since users don't typically have the"
+      , "asset they wish to receive."
+      ]
+  ]
+
+writerOfferAssetMsg :: Text
+writerOfferAssetMsg = unlines
+  [ "Which asset do you currently have and wish to convert? The options contract will offer this asset."
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , unwords
+      [ "Fingerprints are not supported because there is no way for the p2p-wallet to know"
+      , "which asset the fingerprint corresponds to unless it knows the asset in advance."
+      , "Due to the composability of these DeFi protocols, users may not always have the offer asset"
+      , "in question."
+      ]
+  ]
+
+writerAskAssetMsg :: Text
+writerAskAssetMsg = unlines
+  [ "Which asset do you wish to receive? The options contract will ask for this asset."
+  , ""
+  , "The asset name must be in one of the following formats:"
+  , "1. 'policy_id.asset_name'"
+  , "2. 'ticker' - if in Ticker Registry"
+  , "3. 'ADA' - if the asset is ada."
+  , ""
+  , unwords
+      [ "Fingerprints are not supported because there is no way for the p2p-wallet to know"
+      , "which asset the fingerprint corresponds to unless it knows the asset in advance."
+      , "This may not be realistic in most scenarios since users don't typically have the"
+      , "asset they wish to receive."
+      ]
+  ]
+
