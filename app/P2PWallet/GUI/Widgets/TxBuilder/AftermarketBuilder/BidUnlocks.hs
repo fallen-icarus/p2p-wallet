@@ -21,24 +21,51 @@ bidUnlocksList = map utxoRow
     utxoRow (idx,BidUnlock{..}) = do
       let (policyId,names) = fromMaybe ("",[]) 
                            $ bidUTxO ^. #marketDatum >>= aftermarketDatumNfts
-          keyType
-            | policyId == Loans.activeBeaconCurrencySymbol = "Loan Keys"
-            | policyId == Options.activeBeaconCurrencySymbol = "Options Keys"
-            | otherwise = "Other NFTs"
           numberSold = length names
+          keyType
+            | policyId == Loans.activeBeaconCurrencySymbol =
+                show numberSold <> " Loan Key(s)"
+            | policyId == Options.activeBeaconCurrencySymbol =
+                show numberSold <> " Options Key(s)"
+            | otherwise =
+                show numberSold <> " Other NFT(s)"
       hstack
         [ vstack
             [ hstack
-                [ label ("Unlock Unclaimed Aftermarket Bid for " <> sellerWallet ^. #alias)
+                [ label "Unlock Unclaimed Aftermarket Bid"
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , let prettyRef = display $ bidUTxO ^. #utxoRef in
+                  flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText prettyRef] $
+                      label targetUTxOIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ (sellerWallet ^. #alias) [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
                 , label keyType
                     `styleBasic` [textSize 10, textColor white]
-                ]
-            , spacer_ [width 2]
-            , hstack
-                [ label (show numberSold <> " NFT(s)")
-                    `styleBasic` [textSize 8, textColor lightGray]
                 ]
             ] `styleBasic` 
                 [ padding 10

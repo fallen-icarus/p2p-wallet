@@ -617,10 +617,10 @@ handleHomeEvent model@AppModel{..} evt = case evt of
       StartAdding mNfts ->
         let nfts = fromMaybe [] mNfts
             currentPaymentWallet = homeModel ^. #selectedWallet
-            firstMarketWallet@MarketWallet{alias,network} = 
+            firstMarketWallet@MarketWallet{network} = 
               fromMaybe def $ maybeHead $ knownWallets ^. #marketWallets
             newSale = 
-              createNewSaleCreation network firstMarketWallet currentPaymentWallet alias nfts
+              createNewSaleCreation network firstMarketWallet currentPaymentWallet nfts
          in [ Model $ model
                 & #homeModel % #viewingQueue .~ False
                 & #homeModel % #newSaleCreation ?~ newSale

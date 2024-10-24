@@ -32,8 +32,6 @@ data SaleCreation = SaleCreation
   -- | Which network the asks are for. This is used internally to figure out which reference
   -- scripts to use.
   , network :: Network
-  -- | The alias for the seller credential.
-  , alias :: Text
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''SaleCreation
@@ -63,8 +61,6 @@ data NewSaleCreation = NewSaleCreation
   -- | Which network the asks are for. This is used internally to figure out which reference
   -- scripts to use.
   , network :: Network
-  -- | The alias for the seller credential.
-  , alias :: Text
   -- | Show the NFTs list to enable removing NFTs.
   , showNfts :: Bool
   } deriving (Show,Eq)
@@ -79,7 +75,6 @@ instance Default NewSaleCreation where
     , nfts = []
     , salePrice = ""
     , network = def
-    , alias = ""
     , showNfts = False
     }
 
@@ -88,14 +83,12 @@ createNewSaleCreation
   :: Network 
   -> MarketWallet 
   -> PaymentWallet -- ^ The wallet where the payment must go upon purchase.
-  -> Text 
   -> [NativeAsset] -- ^ The NFTs for sale.
   -> NewSaleCreation
-createNewSaleCreation network marketWallet paymentWallet alias nfts =
+createNewSaleCreation network marketWallet paymentWallet nfts =
   def & #network .~ network
       & #paymentWallet .~ paymentWallet
       & #marketWallet .~ marketWallet
-      & #alias .~ alias
       & #nfts .~ nfts
 
 -------------------------------------------------
@@ -114,7 +107,6 @@ verifyNewSaleCreation tickerMap NewSaleCreation{..} = do
     return $ SaleCreation
       { network = network
       , isAuction = isAuction
-      , alias = alias
       , paymentWallet = paymentWallet
       , marketWallet = marketWallet
       , nfts = nfts
@@ -144,7 +136,6 @@ toNewSaleCreation :: ReverseTickerMap -> SaleCreation -> NewSaleCreation
 toNewSaleCreation reverseTickerMap SaleCreation{..} = NewSaleCreation
   { network = network
   , isAuction = isAuction
-  , alias = alias
   , paymentWallet = paymentWallet
   , marketWallet = marketWallet
   , nfts = nfts
