@@ -164,6 +164,11 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
             (lovelaceAsNativeAsset & #quantity .~ unLovelace utxoLovelace) : utxoNativeAssets
           lockedCollateral = 
             filter ((/= Loans.activeBeaconCurrencySymbol) . view #policyId) allAssets
+          payToAddress = either (const "error") fst $ plutusToBech32 (config ^. #network) lenderAddress
+          addressTip = unwords $ filter (/= "")
+            [ "Payments to:"
+            , display payToAddress
+            ]
           loanHistoryEvt = LendingEvent $ BorrowEvent $ InspectActiveLoanHistory loanId
           (buttonEvt,buttonTip,buttonIcon,buttonEnabled)
             | currentTime >= nextPaymentDueDate && currentTime < expiration =
@@ -228,6 +233,23 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
                           , textColor customRed
                           ]
                 , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ addressTip [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText $ display payToAddress] $
+                      label targetAddressIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
                 , flip styleBasic [textSize 10] $ 
                     tooltip_ ("Loan ID: " <> display loanId <> " (history)") [tooltipDelay 0] $
                       box_ [alignMiddle , onClick loanHistoryEvt] $
@@ -276,7 +298,7 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
                 ]
             , spacer_ [width 2]
             , hstack
-                [ widgetIf collateralIsSwappable $ hstack
+                [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                     [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                         label swappableCollateralIcon
                           `styleBasic` 
@@ -284,11 +306,12 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
                             , textFont "Remix"
                             , textSize 10
                             , textColor customBlue
+                            , paddingT 1
                             ]
                     , spacer_ [width 2]
                     ]
-                , label "Locked Collateral:"
-                    `styleBasic` [textSize 8, textColor lightGray]
+                , box_ [alignTop] $ label "Locked Collateral:"
+                    `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
                 , spacer_ [width 3]
                 , vstack_ [childSpacing_ 3] $ for (groupInto 3 lockedCollateral) $ 
                     \col -> hstack_ [childSpacing_ 3] $ map lockedCollateralWidget col
@@ -368,7 +391,7 @@ makePaymentWidget AppModel{..} = do
                   `styleBasic` [textSize 10, width 150, bgColor customGray1, sndColor darkGray]
                   `styleFocus` [border 1 customBlue]
               , spacer_ [width 3]
-              , helpButton offerLoanAmountMsg
+              , helpButton paymentAmountMsg
               , spacer_ [width 7]
               , box_ [alignMiddle, onClick $ LendingEvent $ BorrowEvent SetNewLoanPaymentToFullPayment] $
                   tooltip_ "Pay remaining balance" [tooltipDelay 0] $
@@ -387,7 +410,7 @@ makePaymentWidget AppModel{..} = do
               \col -> hstack_ [childSpacing_ 3] $ [spacer] <> map (collateralAssetWidget loanBalance) col
           , spacer
           , hstack
-              [ label "Collateral Assets (separated with newlines)"
+              [ label "Remaining Collateral Assets (separated with newlines):"
                   `styleBasic` [textSize 12]
               , spacer_ [width 3]
               , helpButton paymentCollateralAmountsMsg
@@ -797,7 +820,7 @@ activeLoansFilterWidget AppModel{lendingModel=LendingModel{..}} = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             , spacer_ [width 3]
-            , label "Collateral Assets (separated with newlines)"
+            , label "Collateral Assets (separated with newlines):"
                 `styleBasic` [textSize 10]
             ]
         , spacer

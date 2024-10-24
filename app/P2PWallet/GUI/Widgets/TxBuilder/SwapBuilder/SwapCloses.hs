@@ -13,6 +13,7 @@ import P2PWallet.Data.DeFi.CardanoSwaps.OneWaySwaps qualified as OneWay
 import P2PWallet.Data.DeFi.CardanoSwaps.TwoWaySwaps qualified as TwoWay
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 swapClosesList :: ReverseTickerMap -> [(Int,SwapClose)] -> [AppNode]
@@ -41,19 +42,78 @@ swapClosesList reverseTickerMap = map utxoRow
             , fingerprint = mkAssetFingerprint askId askName
             , quantity = 0
             }
+          offerAssetName = showAssetNameOnly reverseTickerMap offerAsset
+          askAssetName = showAssetNameOnly reverseTickerMap askAsset
+          buyPrice = showPriceFormatted reverseTickerMap askAsset offerAsset 
+                    $ toGHC swapPrice
+          sellPrice = showPriceFormatted reverseTickerMap offerAsset askAsset 
+                   $ 1 / toGHC swapPrice
+          buyPriceCaption = unwords
+            [ "Buy"
+            , askAssetName
+            , "@"
+            , sellPrice
+            , offerAssetName
+            , "/"
+            , askAssetName
+            ]
+          sellPriceCaption = unwords
+            [ "Sell"
+            , offerAssetName
+            , "@"
+            , buyPrice
+            , askAssetName
+            , "/"
+            , offerAssetName
+            ]
           positionSize = showAssetBalance True reverseTickerMap offerAsset
       hstack
         [ vstack
             [ hstack
-                [ label ("Close Limit Order For " <> walletAlias)
+                [ label "Close Limit Order"
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , let prettyRef = display utxoRef in
+                  flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText prettyRef] $
+                      label targetUTxOIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ walletAlias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
                 , label positionSize
                     `styleBasic` [textSize 10, textColor white]
                 ]
             , spacer_ [width 2]
             , hstack
-                [ label (display utxoRef)
+                [ label sellPriceCaption
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , spacer_ [width 5]
+                , label "=="
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , spacer_ [width 5]
+                , label buyPriceCaption
                     `styleBasic` [textSize 8, textColor lightGray]
                 , filler
                 , label ("Converted: " <> showAssetBalance True reverseTickerMap askAsset)
@@ -85,11 +145,54 @@ swapClosesList reverseTickerMap = map utxoRow
     liquiditySwapRow (idx,s@SwapClose{utxoRef,walletAlias}) TwoWay.SwapDatum{..} = do
       let asset1 = updateQuantity s $ mkNativeAsset asset1Id asset1Name
           asset2 = updateQuantity s $ mkNativeAsset asset2Id asset2Name
+          asset1AssetName = showAssetNameOnly reverseTickerMap asset1
+          asset2AssetName = showAssetNameOnly reverseTickerMap asset2
+          sellAsset1Price = 
+            showPriceFormatted reverseTickerMap asset1 asset2 $ toGHC asset2Price
+          sellAsset2Price = 
+            showPriceFormatted reverseTickerMap asset2 asset1 $ toGHC asset1Price
+          buyAsset1Price = 
+            showPriceFormatted reverseTickerMap asset2 asset1 $ 1 / toGHC asset2Price
+          buyAsset2Price = 
+            showPriceFormatted reverseTickerMap asset1 asset2 $ 1 / toGHC asset1Price
+          buyPriceCaption w x y z = 
+            fromString $ printf "Buy %s @ %s %s / %s" w x y z
+          sellPriceCaption w x y z = 
+            fromString $ printf "Sell %s @ %s %s / %s" w x y z
       hstack
         [ vstack
             [ hstack
-                [ label ("Close Liquidity Swap For " <> walletAlias)
+                [ label "Close Liquidity Swap"
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , let prettyRef = display utxoRef in
+                  flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText prettyRef] $
+                      label targetUTxOIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ walletAlias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
                 , label (showAssetBalance True reverseTickerMap asset1)
                     `styleBasic` [textSize 10, textColor white]
@@ -101,8 +204,25 @@ swapClosesList reverseTickerMap = map utxoRow
                     `styleBasic` [textSize 10, textColor white]
                 ]
             , spacer_ [width 2]
-            , label (display utxoRef)
-                `styleBasic` [textSize 8, textColor lightGray]
+            , hstack
+                [ label 
+                    (sellPriceCaption asset1AssetName sellAsset2Price asset2AssetName asset1AssetName)
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , filler
+                , label 
+                    (sellPriceCaption asset2AssetName sellAsset1Price asset1AssetName asset2AssetName)
+                    `styleBasic` [textSize 8, textColor lightGray]
+                ]
+            , spacer_ [width 2]
+            , hstack
+                [ label 
+                    (buyPriceCaption asset1AssetName buyAsset1Price asset2AssetName asset1AssetName)
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , filler
+                , label 
+                    (buyPriceCaption asset2AssetName buyAsset2Price asset1AssetName asset2AssetName)
+                    `styleBasic` [textSize 8, textColor lightGray]
+                ]
             ] `styleBasic` 
                 [ padding 10
                 , bgColor customGray2

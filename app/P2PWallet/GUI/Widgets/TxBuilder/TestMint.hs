@@ -137,7 +137,7 @@ addTestMintWidget AppModel{txBuilderModel=TxBuilderModel{newTestMint=NewTestMint
               ]
     , spacer
     , hstack
-        [ label "Token Quantities (separated with newlines)"
+        [ label "Token Quantities (separated with newlines):"
             `styleBasic` [textSize 14]
         , mainButton helpIcon (Alert testTokenMintQuantitiesMsg)
             `styleBasic`

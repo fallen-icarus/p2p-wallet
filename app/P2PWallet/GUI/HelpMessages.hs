@@ -14,20 +14,19 @@ accountIdInfoMsg = unlines
   , "1852'/1815'/0'/2/1"
   , ""
   , unwords
-      [ "All keys used for a given profile MUST be from the same account."
-      , "This requirement is because hardware wallets only allow signing transactions"
-      , "when all of its required keys are from the same account. It is technically possible"
-      , "to sign with keys from other account indices, but each account index must individually"
-      , "witness the transaction. In practice, this means the user must review the transaction"
-      , "once for each account index required. This would make for a bad user experience, and"
-      , "also makes the signing logic more annoying to write... Since users can create as many"
+      [ "All hardware wallet keys used for a given profile MUST be from the same account, and"
+      , "use the same derivation method. This requirement is because hardware wallets make it"
+      , "difficult to sign transactions using hardware wallet keys from different accounts and"
+      , "derivation methods. In essence, you would need to review the transaction once for every"
+      , "account/derivation used. This is extremely annoying from a user experience perspective,"
+      , "and it would make the p2p-wallet logic more complicated. Since users can create as many"
       , "payment keys and stake keys as they wish for each account index, there is no real reason"
-      , "to enable supporting multiple account indices for each profile."
+      , "to enable supporting multiple account indices and derivation methods for each profile."
       ]
   , ""
   , unwords
-      [ "The p2p-wallet will use this account index when pairing any hardware wallet keys with"
-      , "this profile."
+      [ "The p2p-wallet will use this account index and derivation method when pairing any hardware"
+      , "wallet keys with this profile."
       ]
   , ""
   , unwords
@@ -251,8 +250,8 @@ totalDelegatedMsg = unlines
 pledgeMsg :: Text
 pledgeMsg = unlines
   [ unwords
-      [ "The amount of ADA the stake pool owners have committed as pledge. If this is not met,"
-      , "the stake pool will be penalized."
+      [ "The amount of ADA the stake pool owners have promised to commit as pledge. If this is not"
+      , "met, the stake pool will be penalized."
       ]
   ]
 
@@ -452,8 +451,16 @@ swapArbitrageFeeMsg = unlines
   , ""
   , unwords
       [ "Alternatively, you can pay an arbitrager to take on this role for you: you specify a"
-      , "limit order price and the arbitrager will keep trying to satisfy your swap until it goes"
-      , "through."
+      , "limit order price and an arbitrage fee, and the arbitrager will keep trying to satisfy"
+      , "your swap until it goes through. The arbitrage fee can only be claimed if your swap is"
+      , "successfully executed."
+      ]
+  , ""
+  , unwords
+      [ "As an example, imagine you see a swap that _sells_ ADA for DJED at 0.355 DJED/ADA. To have"
+      , "an arbitrager fulfill this swap for you, create a limit order that _buys_ ADA with DJED at"
+      , "a price of 0.355 DJED/ADA. Then, set an 'Arbitrage Fee' > 0%. The limit price you specify"
+      , "should always be the price of the swap you want to trade with!"
       ]
   , ""
   , unwords
@@ -668,6 +675,13 @@ askCollateralMsg = unlines
   , "Fingerprints are not supported."
   , ""
   , "The Ask UTxO must be stored with at least one unit of each asset you list here."
+  , ""
+  , unwords
+      [ "It is highly advisable to always include ada as collateral! Since all Cardano UTxOs require"
+      , "a minimum amount of ada, this minUTxOValue of ada will only count towards your collateral if"
+      , "ada is specified as collateral. Otherwise, you will effectively have to cover the"
+      , "the minUTxOValue in addition to the collateral."
+      ]
   ]
 
 askLoanAmountMsg :: Text
@@ -912,6 +926,11 @@ collateralAmountsMsg :: Text
 collateralAmountsMsg = unlines
   [ "How much of each collateral will you use?"
   , ""
+  , unwords
+      [ "You must provide enough collateral so that the total relative value matches the loan"
+      , "amount."
+      ]
+  , ""
   , "The asset quantities must be in one of the following formats:"
   , "1. '# policy_id.asset_name'"
   , "2. '# ticker' - if in Ticker Registry"
@@ -926,6 +945,11 @@ collateralAmountsMsg = unlines
       , "not matter if there are still other assets left as collateral; the collateral UTxO must"
       , "always contain ada."
       ]
+  ]
+
+collateralRatesMsg :: Text
+collateralRatesMsg = unlines
+  [ "The relative values the lender has assigned to each collateral asset."
   ]
 
 paymentCollateralAmountsMsg :: Text
@@ -974,7 +998,7 @@ paymentAmountMsg = unlines
 creditScoreMsg :: Text
 creditScoreMsg = unlines
   [ "The credit score is calculated by:"
-  , "number of loans successfully repaid / number of loans"
+  , "number of loans successfully repaid / total number of finished loans"
   , ""
   , unwords
       [ "Current active loans are not included in this calculation, and an undefined"
@@ -1421,7 +1445,7 @@ bidFilterSortMsg = unlines
 votingPowerMsg :: Text
 votingPowerMsg = unlines
   [ unwords
-      [ "The total amount of ada delegated to this DRep."
+      [ "The total amount of ada (not just from you) delegated to this DRep."
       ]
   ]
 

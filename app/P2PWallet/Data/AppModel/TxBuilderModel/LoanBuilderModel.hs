@@ -1110,7 +1110,8 @@ addAddressUpdateToBody txBody (_,LenderAddressUpdate{..}) =
       Testnet -> testnetSlotConfig
 
     newPlutusAddress = fromRight (Address (PubKeyCredential "") Nothing) 
-                     $ paymentAddressToPlutusAddress newPaymentAddress
+                     $ paymentAddressToPlutusAddress 
+                     $ newPaymentWallet ^. #paymentAddress
 
     postUpdateDatum = 
       Loans.createPostAddressUpdateActiveDatum newPlutusAddress activeDatum
@@ -1138,7 +1139,7 @@ addAddressUpdateToBody txBody (_,LenderAddressUpdate{..}) =
 
     newKeyOutput :: TxBodyOutput
     newKeyOutput = TxBodyOutput
-      { paymentAddress = newPaymentAddress
+      { paymentAddress = newPaymentWallet ^. #paymentAddress
       , lovelace = keyDeposit
       , nativeAssets = 
           [ mkNativeAsset Loans.activeBeaconCurrencySymbol (loanId ^. #unLoanId)

@@ -33,8 +33,8 @@ instance AssetBalancesForChange (a,SwapUpdate) where
     ]
 
 -- | Create a populated `NewSwapCreation` based on the current swap terms.
-swapUTxOToNewSwapCreation :: Network -> ReverseTickerMap -> SwapUTxO -> NewSwapCreation
-swapUTxOToNewSwapCreation network reverseTickerMap u@SwapUTxO{..} = NewSwapCreation
+swapUTxOToNewSwapCreation :: Network -> Text -> ReverseTickerMap -> SwapUTxO -> NewSwapCreation
+swapUTxOToNewSwapCreation network alias reverseTickerMap u@SwapUTxO{..} = NewSwapCreation
     { paymentAddress = swapAddress
     , swapType = swapType
     , arbitrageFee = "0.0"
@@ -47,6 +47,7 @@ swapUTxOToNewSwapCreation network reverseTickerMap u@SwapUTxO{..} = NewSwapCreat
           Just $ showAssetQuantityOnly reverseTickerMap $ targetQuantity askAsset
     , count = 1
     , network = network
+    , walletAlias = alias
     , askPerOfferPrice = 
         showPriceFormatted reverseTickerMap offerAsset askAsset $
           maybe 0 (1/) $ swapUTxOPrice (OfferAsset offerAsset) (AskAsset askAsset) u

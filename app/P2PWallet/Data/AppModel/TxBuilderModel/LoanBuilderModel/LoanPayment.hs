@@ -54,7 +54,7 @@ instance AssetBalancesForChange (a,LoanPayment) where
           -- Ada could be specified as collateral.
           , sum $ map (Lovelace . negate . view #quantity) $
               filter ((== "") . view #policyId) $ 
-                concatMap (view $ _2 % #collateralBalances) xs
+                concatMap (collateralAssets . snd) xs
           -- Some extra ada could still be required for the collateral deposit.
           , sum $ map (negate . view (_2 % #collateralDeposit)) xs
           -- Ada could be the payment asset.
@@ -68,7 +68,7 @@ instance AssetBalancesForChange (a,LoanPayment) where
       , filterOutBeacons $ sumNativeAssets $ mconcat
           [ concatMap (view $ _2 % #activeUTxO % #nativeAssets) xs
           , filter ((/= "") . view #policyId) $ map (over #quantity negate) $
-              concatMap (view $ _2 % #collateralBalances) xs
+              concatMap (collateralAssets . snd) xs
           , filter ((/= "") . view #policyId) $
               for xs (over #quantity negate . view (_2 % #paymentAmount))
           ]
@@ -77,6 +77,11 @@ instance AssetBalancesForChange (a,LoanPayment) where
       filterOutBeacons :: [NativeAsset] -> [NativeAsset]
       filterOutBeacons = filter $ \NativeAsset{policyId} -> 
         policyId /= Loans.activeBeaconCurrencySymbol
+
+      collateralAssets :: LoanPayment -> [NativeAsset]
+      collateralAssets LoanPayment{isFullPayment,collateralBalances}
+        | isFullPayment = [] -- Ignore the collateral 
+        | otherwise = collateralBalances
 
 -------------------------------------------------
 -- New Loan Payment
@@ -185,9 +190,7 @@ verifyNewLoanPayment reverseTickerMap tickerMap currentTime NewLoanPayment{..} =
 
     -- Check that the assets are valid. Returns the first error, if any.
     verifiedCollateral <-
-      if isFullPayment 
-      then return [] -- This can mess with the balancing if the field is not actually empty.
-      else mapM (parseNativeAssets tickerMap mempty) $ lines collateralBalances
+      mapM (parseNativeAssets tickerMap mempty) $ lines collateralBalances
 
     let LoanUTxO{lovelace,nativeAssets} = activeUTxO
         startingCollateralValue = relativeCollateral $

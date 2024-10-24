@@ -9,6 +9,7 @@ import Prettyprinter (tupled)
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal.HardwareDevice
 import P2PWallet.Data.Core.Internal.KeyDerivation
+import P2PWallet.Data.Core.Internal.Network
 import P2PWallet.Data.Core.Profile
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
@@ -62,6 +63,12 @@ profilesWidget model@AppModel{..} = do
         [ filler
         , centerWidgetH $ label "Select a profile:" 
             `styleBasic` [textFont "Medium", textSize 30]
+        , widgetIf (config ^. #network == Mainnet) $ vstack
+            [ spacer
+            , centerWidgetH $ 
+                label "The p2p-defi protocols are currently disabled for mainnet."
+                  `styleBasic` [textFont "Italics", textColor customRed]
+            ]
         , spacer_ [width 100]
         , hstack
             [ spacer_ [width 50]

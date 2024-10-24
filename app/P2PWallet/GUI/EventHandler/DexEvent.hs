@@ -159,12 +159,13 @@ handleDexEvent model@AppModel{..} evt = case evt of
           return (offerAsset, askAsset)
       ]
     AddResult tradingPair ->
+      let DexWallet{alias,network} = dexModel ^. #selectedWallet in
       [ Model $ model 
           & #dexModel % #choosingTradingPair .~ False
           & #dexModel % #newTradingPair .~ ("","")
           & #dexModel % #selectedTradingPair ?~ tradingPair
           -- Configure the new swap creation info to use the new assets.
-          & #dexModel % #newSwapCreation .~ createNewSwapCreation (config ^. #network) tradingPair
+          & #dexModel % #newSwapCreation .~ createNewSwapCreation network alias tradingPair
       , Task $ do
           -- Only sync the order book for the new trading pair if it has not been synced yet.
           -- Users can manually resync if necessary.
@@ -302,9 +303,10 @@ handleDexEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   AddSelectedSwapUpdate modal -> case modal of
     StartAdding mTarget ->
-      let newSwapUpdate = 
+      let DexWallet{network,alias} = dexModel ^. #selectedWallet
+          newSwapUpdate = 
             (,) <$> mTarget
-                <*> (swapUTxOToNewSwapCreation (config ^. #network) reverseTickerMap <$> mTarget)
+                <*> (swapUTxOToNewSwapCreation network alias reverseTickerMap <$> mTarget)
       in  [ Model $ model
               & #dexModel % #newSwapUpdate .~ newSwapUpdate
           ]

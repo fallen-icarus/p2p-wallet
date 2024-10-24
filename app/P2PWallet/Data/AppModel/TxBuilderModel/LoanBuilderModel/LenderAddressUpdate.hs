@@ -18,7 +18,8 @@ import P2PWallet.Prelude
 -- | Information for updating a loan payment address.
 data LenderAddressUpdate = LenderAddressUpdate
   { loanUTxO :: LoanUTxO
-  , newPaymentAddress :: PaymentAddress
+  -- | The wallet where future loan payments should go.
+  , newPaymentWallet :: PaymentWallet
   -- | The extra deposit required for the new collateral UTxO.
   , extraDeposit :: Lovelace
   -- | The deposit that must go with the key NFT.
@@ -28,6 +29,8 @@ data LenderAddressUpdate = LenderAddressUpdate
   , network :: Network
   -- | The current time.
   , currentTime :: PlutusTime
+  -- | The alias for the current holder.
+  , alias :: Text
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''LenderAddressUpdate
@@ -55,10 +58,11 @@ instance AssetBalancesForChange (a,LenderAddressUpdate) where
 -- | Information for updating a loan payment address.
 data NewLenderAddressUpdate = NewLenderAddressUpdate
   { loanUTxO :: LoanUTxO
-  , newPaymentAddress :: Text
-  -- | Which network the swaps are for. This is used internally to figure out which reference
-  -- scripts to use.
+  , newPaymentWallet :: PaymentWallet
+  -- | This is used internally to figure out which reference scripts to use.
   , network :: Network
+  -- | The alias for the current holder.
+  , alias :: Text
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''NewLenderAddressUpdate
@@ -66,21 +70,24 @@ makeFieldLabelsNoPrefix ''NewLenderAddressUpdate
 instance Default NewLenderAddressUpdate where
   def = NewLenderAddressUpdate
     { loanUTxO = def
-    , newPaymentAddress = ""
+    , newPaymentWallet = def
     , network = def
+    , alias = ""
     }
 
 -- | Create a fresh `NewLenderAddressUpdate`.
 createNewLenderAddressUpdate
   :: Network
-  -> PaymentAddress -- ^ The current holder's payment address.
+  -> PaymentWallet -- ^ The current holder's payment wallet.
+  -> Text -- ^ The alias for the current holder.
   -> LoanUTxO
   -> NewLenderAddressUpdate
-createNewLenderAddressUpdate network currentAddress loanUTxO =
+createNewLenderAddressUpdate network currentWallet alias loanUTxO =
     NewLenderAddressUpdate
       { loanUTxO = loanUTxO
       , network = network
-      , newPaymentAddress = display currentAddress
+      , newPaymentWallet = currentWallet
+      , alias = alias
       }
 
 -------------------------------------------------
@@ -89,7 +96,7 @@ createNewLenderAddressUpdate network currentAddress loanUTxO =
 -- | Verify the user info for the address update.
 verifyNewLenderAddressUpdate :: POSIXTime -> NewLenderAddressUpdate -> Either Text LenderAddressUpdate
 verifyNewLenderAddressUpdate currentTime NewLenderAddressUpdate{..} = do
-  verifiedAddress <- parsePaymentAddress network newPaymentAddress
+  verifiedAddress <- parsePaymentAddress network $ display $ newPaymentWallet ^. #paymentAddress
 
   addrAsPlutus <- paymentAddressToPlutusAddress verifiedAddress
 
@@ -102,17 +109,19 @@ verifyNewLenderAddressUpdate currentTime NewLenderAddressUpdate{..} = do
   return $ LenderAddressUpdate
     { loanUTxO = loanUTxO
     , network = network
-    , newPaymentAddress = verifiedAddress
+    , newPaymentWallet = newPaymentWallet
     , extraDeposit = 0 -- this will be set later.
     , keyDeposit = 0 -- this will be set later.
     , currentTime = toPlutusTime currentTime
+    , alias = alias
     }
 
 toNewLenderAddressUpdate :: LenderAddressUpdate -> NewLenderAddressUpdate
 toNewLenderAddressUpdate LenderAddressUpdate{..} = NewLenderAddressUpdate
   { loanUTxO = loanUTxO
   , network = network
-  , newPaymentAddress = display newPaymentAddress
+  , newPaymentWallet = newPaymentWallet
+  , alias = alias
   }
 
 -------------------------------------------------

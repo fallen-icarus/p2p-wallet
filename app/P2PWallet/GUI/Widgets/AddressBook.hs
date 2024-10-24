@@ -264,7 +264,7 @@ addNewUserOutputWidget recipient = do
         ]
     , spacer
     , hstack
-        [ label "Native Assets (separated with newlines)"
+        [ label "Native Assets (separated with newlines):"
         , mainButton helpIcon (Alert nativeAssetAreaEntryMsg)
             `styleBasic`
               [ border 0 transparent

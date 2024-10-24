@@ -410,10 +410,10 @@ loanInputs AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ label "Offered Collateral:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            [ box_ [alignTop] $ label "Offered Collateral:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+            , vstack_ [childSpacing_ 3] $ for (groupInto 4 offeredCollateral) $ 
                 \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
             ]
         ] `styleBasic` 
@@ -575,7 +575,7 @@ loanInputs AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ widgetIf collateralIsSwappable $ hstack
+            [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                 [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                     label swappableCollateralIcon
                       `styleBasic` 
@@ -583,11 +583,12 @@ loanInputs AppModel{..} = do
                         , textFont "Remix"
                         , textSize 10
                         , textColor customBlue
+                        , paddingT 1
                         ]
                 , spacer_ [width 2]
                 ]
-            , label "Collateralization:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            , box_ [alignTop] $ label "Collateralization:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map (collateralizationWidget loanAmount) col
@@ -678,6 +679,11 @@ loanInputs AppModel{..} = do
               , displayPercentage (toRational percent) <> "%"
               ]
           swapCollateralMsg = "Collateral can be swapped out for other approved collateral"
+          payToAddress = either (const "error") fst $ plutusToBech32 (config ^. #network) lenderAddress
+          addressTip = unwords $ filter (/= "")
+            [ "Payments to:"
+            , display payToAddress
+            ]
           allAssets = 
             (lovelaceAsNativeAsset & #quantity .~ unLovelace lovelace) : nativeAssets
           lockedCollateral = 
@@ -714,6 +720,23 @@ loanInputs AppModel{..} = do
                       , textSize 10
                       , textColor customRed
                       ]
+            , spacer_ [width 5]
+            , flip styleBasic [textSize 10] $ tooltip_ addressTip [tooltipDelay 0] $
+                box_ [alignMiddle, onClick $ CopyText $ display payToAddress] $
+                  label targetAddressIcon
+                    `styleBasic` 
+                      [ bgColor black
+                      , textMiddle
+                      , textFont "Remix"
+                      , textSize 8
+                      , textColor customBlue
+                      , paddingT 1
+                      , paddingB 1
+                      , paddingL 3
+                      , paddingR 3
+                      , radius 5
+                      ]
+                    `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             , spacer_ [width 5]
             , flip styleBasic [textSize 10] $ 
                 tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
@@ -759,7 +782,7 @@ loanInputs AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ widgetIf collateralIsSwappable $ hstack
+            [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                 [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                     label swappableCollateralIcon
                       `styleBasic` 
@@ -767,11 +790,12 @@ loanInputs AppModel{..} = do
                         , textFont "Remix"
                         , textSize 10
                         , textColor customBlue
+                        , paddingT 1
                         ]
                 , spacer_ [width 2]
                 ]
-            , label "Locked Collateral:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            , box_ [alignTop] $ label "Locked Collateral:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 lockedCollateral) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map lockedCollateralWidget col
@@ -884,10 +908,10 @@ loanOutputs AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ label "Offered Collateral:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            [ box_ [alignTop] $ label "Offered Collateral:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+            , vstack_ [childSpacing_ 3] $ for (groupInto 4 offeredCollateral) $ 
                 \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
             ]
         ] `styleBasic` 
@@ -1046,7 +1070,7 @@ loanOutputs AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ widgetIf collateralIsSwappable $ hstack
+            [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                 [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                     label swappableCollateralIcon
                       `styleBasic` 
@@ -1054,11 +1078,12 @@ loanOutputs AppModel{..} = do
                         , textFont "Remix"
                         , textSize 10
                         , textColor customBlue
+                        , paddingT 1
                         ]
                 , spacer_ [width 2]
                 ]
-            , label "Collateralization:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            , box_ [alignTop] $ label "Collateralization:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map (collateralizationWidget loanAmount) col
@@ -1147,6 +1172,11 @@ loanOutputs AppModel{..} = do
               , displayPercentage (toRational percent) <> "%"
               ]
           swapCollateralMsg = "Collateral can be swapped out for other approved collateral"
+          payToAddress = either (const "error") fst $ plutusToBech32 (config ^. #network) lenderAddress
+          addressTip = unwords $ filter (/= "")
+            [ "Payments to:"
+            , display payToAddress
+            ]
           allAssets = 
             (lovelaceAsNativeAsset & #quantity .~ unLovelace lovelace) : nativeAssets
           lockedCollateral = 
@@ -1183,6 +1213,23 @@ loanOutputs AppModel{..} = do
                       , textSize 10
                       , textColor customRed
                       ]
+            , spacer_ [width 5]
+            , flip styleBasic [textSize 10] $ tooltip_ addressTip [tooltipDelay 0] $
+                box_ [alignMiddle, onClick $ CopyText $ display payToAddress] $
+                  label targetAddressIcon
+                    `styleBasic` 
+                      [ bgColor black
+                      , textMiddle
+                      , textFont "Remix"
+                      , textSize 8
+                      , textColor customBlue
+                      , paddingT 1
+                      , paddingB 1
+                      , paddingL 3
+                      , paddingR 3
+                      , radius 5
+                      ]
+                    `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             , spacer_ [width 5]
             , flip styleBasic [textSize 10] $ 
                 tooltip_ ("Loan ID: " <> display loanId) [tooltipDelay 0] $
@@ -1225,7 +1272,7 @@ loanOutputs AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ widgetIf collateralIsSwappable $ hstack
+            [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                 [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                     label swappableCollateralIcon
                       `styleBasic` 
@@ -1233,11 +1280,12 @@ loanOutputs AppModel{..} = do
                         , textFont "Remix"
                         , textSize 10
                         , textColor customBlue
+                        , paddingT 1
                         ]
                 , spacer_ [width 2]
                 ]
-            , label "Locked Collateral:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            , box_ [alignTop] $ label "Locked Collateral:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 lockedCollateral) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map lockedCollateralWidget col

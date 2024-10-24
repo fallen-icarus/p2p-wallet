@@ -195,6 +195,9 @@ keyNftIcon = toGlyph 0XEFD2
 rolloverLoanIcon :: Text
 rolloverLoanIcon = remixDraftLine
 
+makeOfferIcon :: Text
+makeOfferIcon = remixDraftLine
+
 paymentIcon :: Text
 paymentIcon = remixSecurePaymentLine
 
@@ -218,3 +221,6 @@ nftBasketIcon = remixShoppingBasketLine
 
 counterOfferIcon :: Text
 counterOfferIcon = remixArrowGoBackLine
+
+userIcon :: Text
+userIcon = remixUserLine

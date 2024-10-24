@@ -292,7 +292,15 @@ instance Insertable DexWallet where
 instance Notify DexWallet where
   notify oldState newState
     | oldState ^. #lovelace == newState ^. #lovelace && 
-      oldState ^. #nativeAssets == newState ^. #nativeAssets = Nothing
+      oldState ^. #nativeAssets == newState ^. #nativeAssets =
+        if any swapIsFullyConverted $ oldState ^. #utxos then
+          Just $ Notification
+            { notificationType = DexNotification
+            , alias = oldState ^. #alias
+            , message = "Some swaps have been fully converted!"
+            , markedAsRead = False
+            }
+        else Nothing
     | otherwise = Just $ Notification
         { notificationType = DexNotification
         , alias = oldState ^. #alias
