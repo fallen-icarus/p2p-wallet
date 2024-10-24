@@ -1,5 +1,3 @@
-{-# LANGUAGE DuplicateRecordFields #-}
-
 module P2PWallet.GUI.EventHandler.DelegationEvent
   ( 
     handleDelegationEvent
@@ -8,212 +6,380 @@ module P2PWallet.GUI.EventHandler.DelegationEvent
 import Monomer
 
 import P2PWallet.Actions.AddWallet
-import P2PWallet.Actions.BackupFiles
+import P2PWallet.Actions.BalanceTx
+import P2PWallet.Actions.Database
+import P2PWallet.Actions.LookupPools
+import P2PWallet.Actions.Query.Koios (runQueryDRepInformation)
 import P2PWallet.Actions.Utils
-import P2PWallet.Data.App
-import P2PWallet.Data.Lens
+import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.TxBody
+import P2PWallet.Data.Core.Wallets
+import P2PWallet.Data.Koios.DRep
 import P2PWallet.Prelude
 
-handleDelegationEvent
-  :: AppModel
-  -> DelegationEvent
-  -> [AppEventResponse AppModel AppEvent]
-handleDelegationEvent model evt = case evt of
+handleDelegationEvent :: AppModel -> DelegationEvent -> [AppEventResponse AppModel AppEvent]
+handleDelegationEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   -- Changing Scenes
   -----------------------------------------------
   ChangeDelegationScene newScene -> 
-    -- If the new scene is `DelegatedPools` and there are currently no known registered pools,
-    -- sync the pools after changing the scene. This sync should only happen automatically
-    -- the first time.
-    [ Model $ model & delegationModel . scene .~ newScene 
-    , Task $ do
-        if [] == (model ^. delegationModel . registeredPools) && newScene == DelegationPools
-          then return $ SyncRegisteredPools StartSync
-          else return AppInit
+    [ Model $ model & #delegationModel % #scene .~ newScene ]
+
+  -----------------------------------------------
+  -- Open the More Popup
+  -----------------------------------------------
+  ShowDelegationMorePopup -> 
+    [ Model $ model & #delegationModel % #showMorePopup .~ True ]
+
+  -----------------------------------------------
+  -- Change the pool sort method
+  -----------------------------------------------
+  ChangePoolPickerSortMethod method -> 
+    [ Model $ model & #delegationModel % #poolFilterModel % #sortMethod .~ method ]
+
+  -----------------------------------------------
+  -- Open the Pool Picker Widget
+  -----------------------------------------------
+  OpenPoolPicker ->
+    [ Model $ model & #delegationModel % #showPoolPicker .~ True
+    , Task $ 
+        -- Only sync if no pools are cached yet.
+        if null $ model ^. #delegationModel % #registeredPools
+        then return $ DelegationEvent $ SyncRegisteredPools $ StartProcess Nothing
+        else return AppInit
     ]
-
-  -----------------------------------------------
-  -- Delegation Details
-  -----------------------------------------------
-  ShowDelegationDetails specific -> 
-    -- Display the information for the selected item.
-    [ Model $ model & delegationModel . details .~ Just specific ]
-
-  CloseDelegationDetails -> 
-    -- Close the information for the selected item.
-    [ Model $ model & delegationModel . details .~ Nothing ]
 
   -----------------------------------------------
   -- Pairing Wallets
   -----------------------------------------------
   PairStakeWallet modal -> case modal of
-    -- A paired stake wallet is an address using a hardware wallet stake key.
-    StartAdding -> 
+    StartAdding _ -> 
       -- Set `pairing` to `True` to display the widget for getting the new stake wallet info.
-      -- Also reset the `newPaymentWallet` field so that the last information is cleared.
-      [ Model $ model & delegationModel . pairing .~ True -- Show widget.
-                      & delegationModel . newStakeWallet .~ def -- Clear information.
+      -- Also reset the `newStakeWallet` field so that the last information is cleared.
+      [ Model $ model 
+          & #delegationModel % #addingWallet .~ True -- Show widget.
+          & #delegationModel % #newStakeWallet .~ def -- Clear information.
       ]
     CancelAdding -> 
       -- Close the widget for getting the new stake wallet info.
-      [ Model $ model & delegationModel . pairing .~ False ]
+      [ Model $ model 
+          & #delegationModel % #addingWallet .~ False
+          & #delegationModel % #newStakeWallet .~ def -- Clear information.
+      ]
     ConfirmAdding -> 
       -- Set `waitingOnDevice` to `True` so that users know to check their hardware wallet.
       -- Get the information from the hardware wallet and generate the addresses.
-      [ Model $ model & waitingOnDevice .~ True
-      , Task $
-          let network' = model ^. config . network
-              profile' = fromMaybe def $ model ^. selectedProfile
-              newWallet = model ^. delegationModel . newStakeWallet
-          in runActionOrAlert 
-               (DelegationEvent . PairStakeWallet . AddResult)
-               (pairStakeWallet network' (profile' ^. accountIndex) newWallet)
+      [ Model $ model & #waitingStatus % #waitingOnDevice .~ True
+      , Task $ runActionOrAlert (DelegationEvent . PairStakeWallet . AddResult) $ do
+          let network = config ^. #network
+              profile = fromMaybe def selectedProfile
+              newWallet = delegationModel ^. #newStakeWallet
+
+          -- Get the new stake id for the new entry into the stake_wallet table.
+          stakeWalletId <- getNextStakeWalletId databaseFile >>= fromRightOrAppError
+          
+          -- Validate the new stake wallet info, and export the required key.
+          verifiedStakeWallet <- 
+            pairStakeWallet network profile stakeWalletId newWallet $ knownWallets ^. #stakeWallets
+
+          -- Add the new stake wallet to the database.
+          insertStakeWallet databaseFile verifiedStakeWallet >>= fromRightOrAppError
+
+          return verifiedStakeWallet
       ]
-    AddResult w -> 
-      -- Disable `pairing` and `waitingOnDevice`. Update the list of known wallets and change
-      -- the scene to display the new wallet on the summary page. Also backup and sync
-      -- the new list of wallets so that the pairing is saved for the next application start.
-      case processStakeWallet w (model ^. wallets) of
-        Left err -> [ Task $ return $ Alert err ]
-        Right updatedWallets ->
-          let network' = model ^. config . network
-              profile' = fromMaybe def $ model ^. selectedProfile
-          in [ Model $ 
-                 model & delegationModel . pairing .~ False 
-                       & waitingOnDevice .~ False
-                       & delegationModel . selectedWallet .~ w
-                       & scene .~ DelegationScene
-                       & wallets .~ updatedWallets
-             , Task $ do
-                 backupWallets network' profile' updatedWallets
-                 return $ SyncWallets StartSync
-             ]
+    AddResult verifiedStakeWallet -> 
+       [ Model $ model 
+          & #knownWallets % #stakeWallets %~ flip snoc verifiedStakeWallet
+          & #waitingStatus % #waitingOnDevice .~ False
+          & #delegationModel % #addingWallet .~ False
+          & #delegationModel % #selectedWallet .~ verifiedStakeWallet
+          & #scene .~ DelegationScene
+       , Task $ return $ SyncWallets $ StartProcess Nothing
+       ]
 
   -----------------------------------------------
   -- Watching Wallets
   -----------------------------------------------
   WatchStakeWallet modal -> case modal of
-    -- A watched stake wallet can be any kind of stake wallet. However, it cannot be used
-    -- to sign since only signing with hardware wallets is supported.
-    StartAdding -> 
-      -- Set `watching` to `True` to display the widget for getting the new stake wallet info.
+    StartAdding _ -> 
+      -- Set `addingWallet` to `True` to display the widget for getting the new wallet info.
       -- Also reset the `newStakeWallet` field so that the last information is cleared.
-      [ Model $ model & delegationModel . watching .~ True -- Show widget.
-                      & delegationModel . newStakeWallet .~ def -- Clear information.
+      [ Model $ model 
+          & #delegationModel % #addingWallet .~ True -- Show widget.
+          & #delegationModel % #newStakeWallet .~ def -- Clear information.
       ]
     CancelAdding -> 
-      -- Close the widget for getting the new stake wallet info.
-      [ Model $ model & delegationModel . watching .~ False ]
+      -- Close the widget for getting the new wallet info.
+      [ Model $ model 
+          & #delegationModel % #addingWallet .~ False
+          & #delegationModel % #newStakeWallet .~ def -- Clear information.
+      ]
     ConfirmAdding -> 
-      -- Validate the information and generate the stake address, if any.
-      [ Task $
-          let network' = model ^. config . network
-              newWallet = model ^. delegationModel . newStakeWallet
-          in runActionOrAlert 
-               (DelegationEvent . WatchStakeWallet . AddResult)
-               (watchStakeWallet network' newWallet)
+      -- Validate the information.
+      [ Task $ runActionOrAlert (DelegationEvent . WatchStakeWallet . AddResult) $ do
+          let network = config ^. #network
+              profile = fromMaybe def selectedProfile
+              newWallet = delegationModel ^. #newStakeWallet
+
+          -- Get the new stake id for the new entry into the stake_wallet table.
+          stakeWalletId <- getNextStakeWalletId databaseFile >>= fromRightOrAppError
+          
+          -- Validate the new wallet info.
+          verifiedStakeWallet <- 
+            watchStakeWallet network profile stakeWalletId newWallet $ knownWallets ^. #stakeWallets
+
+          -- Add the new wallet to the database.
+          insertStakeWallet databaseFile verifiedStakeWallet >>= fromRightOrAppError
+
+          return verifiedStakeWallet
       ]
-    AddResult w -> 
-      -- Disable `watching`. Update the list of known wallets and change
-      -- the scene to display the new wallet on the delegation page. Also backup and sync
-      -- the new list of wallets so that the new wallet is saved for the next application start.
-      case processStakeWallet w (model ^. wallets) of
+    AddResult verifiedStakeWallet -> 
+       [ Model $ model 
+          & #knownWallets % #stakeWallets %~ flip snoc verifiedStakeWallet
+          & #delegationModel % #addingWallet .~ False
+          & #delegationModel % #selectedWallet .~ verifiedStakeWallet
+          & #scene .~ DelegationScene
+       , Task $ return $ SyncWallets $ StartProcess Nothing
+       ]
+
+  -----------------------------------------------
+  -- Change Stake Wallet Name
+  -----------------------------------------------
+  ChangeStakeWalletName modal -> case modal of
+    -- Show the edit widget and set the extraTextField to the current alias.
+    StartAdding _ -> 
+      [ Model $ model 
+          & #delegationModel % #editingWallet .~ True
+          & #delegationModel % #showMorePopup .~ False
+          & #delegationModel % #newAliasField .~ (delegationModel ^. #selectedWallet % #alias)
+      ]
+    CancelAdding -> 
+      -- Close the widget for getting the new info and reset the text field.
+      [ Model $ model 
+          & #delegationModel % #editingWallet .~ False 
+          & #delegationModel % #newAliasField .~ ""
+      ]
+    ConfirmAdding ->
+      -- The state is deliberately not updated in case there is an error with any of these steps.
+      -- The state will be updated after everything has successfully executed.
+      [ Task $ runActionOrAlert (DelegationEvent . ChangeStakeWalletName . AddResult) $ do
+          let currentWallet@StakeWallet{stakeWalletId} = delegationModel ^. #selectedWallet
+              newAlias = model ^. #delegationModel % #newAliasField
+              newWallet = currentWallet & #alias .~ newAlias
+              -- Filter out the selected wallet from the list of known wallets.
+              otherWallets = filter (\p -> stakeWalletId /= p ^. #stakeWalletId) $
+                knownWallets ^. #stakeWallets
+
+          when (newAlias == "") $ throwIO $ AppError "New name is empty."
+
+          when (any ((== newAlias) . view #alias) otherWallets) $ 
+            throwIO $ AppError "This name is already being used by another stake wallet."
+
+          -- Overwrite the current stake wallet name.
+          insertStakeWallet databaseFile newWallet >>= fromRightOrAppError
+
+          -- Overwrite the current aliases for all DeFi wallets using this stake credential.
+          changeDeFiWalletAliases databaseFile stakeWalletId newAlias >>= fromRightOrAppError
+
+          return newWallet
+      ] 
+    AddResult newWallet@StakeWallet{alias,stakeWalletId} ->
+      [ Model $ model 
+          & #knownWallets %~ updateStakeIdAliases stakeWalletId alias
+          & #delegationModel % #editingWallet .~ False
+          -- update all selected wallets so the new aliases take effect.
+          & configureSelectedDeFiWallets
+          -- override the selected wallet set by `configureSelectedDeFiWallets` for
+          -- the `delegationModel`.
+          & #delegationModel % #selectedWallet .~ newWallet
+          & #delegationModel % #newAliasField .~ ""
+      ]
+
+  -----------------------------------------------
+  -- Delete Stake Wallet
+  -----------------------------------------------
+  DeleteStakeWallet modal -> case modal of
+    -- Show the confirmation widget.
+    GetDeleteConfirmation _ -> 
+      [ Model $ model 
+          & #delegationModel % #deletingWallet .~ True
+          & #delegationModel % #showMorePopup .~ False
+      ]
+    CancelDeletion -> 
+      -- Close the widget for confirming deletion.
+      [ Model $ model & #delegationModel % #deletingWallet .~ False ]
+    ConfirmDeletion ->
+      -- Delete the wallet from the database.
+      [ Task $ runActionOrAlert (const $ DelegationEvent $ DeleteStakeWallet PostDeletionAction) $ do
+          -- Get the stake id for the stake wallet to delete.
+          let currentId = delegationModel ^. #selectedWallet % #stakeWalletId
+
+          -- Delete the stake wallet.
+          deleteStakeWallet databaseFile currentId >>= fromRightOrAppError
+      ]
+    PostDeletionAction ->
+      -- Delete the wallet from the cache.
+      let currentId = delegationModel ^. #selectedWallet % #stakeWalletId
+      in [ Model $ model 
+            & #delegationModel % #deletingWallet .~ False
+            & #knownWallets %~ deleteStakeIdWallets currentId
+            & configureSelectedDeFiWallets
+         ]
+
+  -----------------------------------------------
+  -- Reset Filters
+  -----------------------------------------------
+  ResetPoolFilters -> 
+    [ Model $ model 
+        & #delegationModel % #poolFilterModel .~ def
+        & #forceRedraw %~ not -- this is needed to force redrawing upon resets 
+    ]
+
+  -----------------------------------------------
+  -- Syncing Registered Pools
+  -----------------------------------------------
+  SyncRegisteredPools modal -> case modal of
+    StartProcess _ -> 
+      -- Set `syncing` to True to let users know syncing is happening.
+      [ Model $ model & #waitingStatus % #syncingPools .~ True 
+      , Task $ do
+          runActionOrAlert (DelegationEvent . SyncRegisteredPools . ProcessResults) $ 
+            lookupRegisteredPools (config ^. #network)
+      ]
+    ProcessResults resp -> 
+      -- Disable `syncing` and update the list of pools. 
+      [ Model $ model 
+          & #waitingStatus % #syncingPools .~ False
+          & #delegationModel % #registeredPools .~ resp
+      ]
+
+  -----------------------------------------------
+  -- Add User Certificate to Builder
+  -----------------------------------------------
+  AddSelectedUserCertificate (mNameAndTicker,certificateAction) ->
+    let StakeWallet{alias,stakeAddress,stakeKeyDerivation} = delegationModel ^. #selectedWallet 
+        userCertificate = UserCertificate
+          { stakeAddress = stakeAddress
+          , stakeKeyDerivation = stakeKeyDerivation
+          , certificateAction = certificateAction
+          , walletAlias = alias
+          , poolName = mNameAndTicker
+          }
+    in case processNewUserCertificate userCertificate txBuilderModel of
         Left err -> [ Task $ return $ Alert err ]
-        Right updatedWallets ->
-          let network' = model ^. config . network
-              profile' = fromMaybe def $ model ^. selectedProfile
-          in [ Model $ 
-                 model & delegationModel . watching .~ False 
-                       & delegationModel . selectedWallet .~ w
-                       & scene .~ DelegationScene
-                       & wallets .~ updatedWallets
-             , Task $ do
-                 backupWallets network' profile' updatedWallets
-                 return $ SyncWallets StartSync
-             ]
+        Right newTxModel ->
+          [ Model $ model & #txBuilderModel .~ newTxModel
+          , Task $ return $ Alert "Successfully added to builder!"
+          ]
 
   -----------------------------------------------
-  -- Filtering Registered Pools
+  -- Add User Withdrawal to Builder
   -----------------------------------------------
-  FilterRegisteredPools modal -> case modal of
-    StartFiltering -> 
-      -- Enable `filteringRegisteredPools` to show the pool filter widget. If the currently
-      -- set filters is [], then show a default implementation of the filter language. Otherwise, 
-      -- show the current filters.
-      let vf@(VerifiedPoolFilters setFilters') = model ^. delegationModel . setPoolFilters
-          newFilters' = if setFilters' == [] then def else fromVerifiedPoolFilters vf
-      in
-        [ Model $ model & delegationModel . filteringRegisteredPools .~ True 
-                        & delegationModel . newPoolFilters .~ newFilters'
+  AddSelectedUserWithdrawal StakeWallet{alias,stakeAddress,stakeKeyDerivation,availableRewards} ->
+    let userWithdrawal = UserWithdrawal
+          { stakeAddress = stakeAddress
+          , stakeKeyDerivation = stakeKeyDerivation
+          , lovelace = availableRewards
+          , walletAlias = alias
+          }
+        filteredWithdrawals = flip filter (txBuilderModel ^. #userWithdrawals) $ \(_,wtdr) ->
+            wtdr ^. #stakeAddress /= stakeAddress
+    in  [ Model $ model 
+            & #txBuilderModel % #userWithdrawals .~ 
+                -- Add the new withdrawal, sort them by stake address, and immediately reindex.
+                reIndex (sortOn snd $ (0,userWithdrawal) : filteredWithdrawals)
+            & #txBuilderModel %~ balanceTx
+        , Task $ return $ Alert "Successfully added to builder!"
         ]
-    CancelFiltering -> 
-      -- Disable `filteringRegisteredPools` to close the pool filter widget. 
-      [ Model $ model & delegationModel . filteringRegisteredPools .~ False ]
-    ResetFiltering -> 
-      -- Disable `filteringRegisteredPools` and reset the `setPoolFilters`.
-      [ Model $ model & delegationModel . filteringRegisteredPools .~ False
-                      & delegationModel . setPoolFilters .~ def
-      ]
-    VerifyFilters ->
-      -- Before confirming the filters, check if they are valid. Throw an appropriate error
-      -- message if they are not.
-      [ Task $
-          either
-            (return . Alert)
-            (return . DelegationEvent . FilterRegisteredPools . ConfirmFilters)
-            (toVerifiedPoolFilters $ model ^. delegationModel . newPoolFilters)
-      ]
-    ConfirmFilters verifiedFilters -> 
-      -- Disable `filteringRegisteredPools` and assign the `newFilters` to the `setFilters`.
-      [ Model $ model & delegationModel . filteringRegisteredPools .~ False
-                      & delegationModel . setPoolFilters .~ verifiedFilters
-      ]
 
   -----------------------------------------------
-  -- Quick Actions
+  -- Add new drep delegation
   -----------------------------------------------
-  -- Called from the details widget.
-  QuickDelegate poolId' ->
-    -- Add a delegation certificate to the TxBuilderModel for the specified pool and the
-    -- currently selected stake wallet. This will also close the details page and move
-    -- the user to the transaction summary page.
-    let newCert = UserCertificate
-          { _internalWallet = Just $ model ^. delegationModel . selectedWallet
-          , _stakeAddress = ""
-          , _certificateAction = Delegation poolId'
-          }
-    in [ Model $ model & delegationModel . details .~ Nothing
-                       & txBuilderModel . newCertificate .~ (0,newCert)
-                       & scene .~ TxBuilderScene
-       , Task $ return $ TxBuilderEvent InsertNewCertificate
-       ]
+  AddDrepDelegation modal -> case modal of
+    StartAdding _ -> 
+      [ Model $ model 
+          & #delegationModel % #newDrepDelegation ?~ AlwaysNoDelegation
+          & #delegationModel % #newDrepId .~ ""
+      ]
+    CancelAdding -> 
+      [ Model $ model 
+          & #delegationModel % #newDrepDelegation .~ Nothing
+          & #delegationModel % #newDrepId .~ ""
+      ]
+    ConfirmAdding -> case delegationModel ^? #newDrepDelegation % _Just of
+      Nothing -> [Event $ Alert "newDrepDelegation is Nothing"]
+      Just (DRepDelegation _ _) ->
+        [ Model $ model & #waitingStatus % #syncingDRepInfo .~ True
+        , Task $ runActionOrAlert (DelegationEvent . AddDrepDelegation . AddResult) $ do
+            let network = config ^. #network
+                targetDrepId = DRepID $ delegationModel ^. #newDrepId
 
-  -- Called from the summary widget.
-  QuickWithdraw ->
-    -- Add the currently selected wallet to the newWithdrawal in the txBuilderModel and
-    -- take the user to the widget for getting the withdrawal amount.
-    let newWtdr = UserWithdrawal
-          { _internalWallet = Just $ model ^. delegationModel . selectedWallet
-          , _stakeAddress = ""
-          , _lovelaces = 0
-          }
-    in [ Model $ model & txBuilderModel . newWithdrawal .~ (0,newWtdr)
-                       & scene .~ TxBuilderScene
-                       & txBuilderModel . scene .~ BuilderAddNewWithdrawal
-       ]
+            -- Verify the DRepID is a real DRep.
+            DRep{isScript} <- runQueryDRepInformation network targetDrepId >>= fromRightOrAppError
 
-  -- Called from the summary widget.
-  QuickRegister ->
-    -- Add a registration certificate to the TxBuilderModel for the currently selected stake 
-    -- wallet. This will also move the user to the transaction summary page.
-    let newCert = UserCertificate
-          { _internalWallet = Just $ model ^. delegationModel . selectedWallet
-          , _stakeAddress = ""
-          , _certificateAction = Registration
-          }
-    in [ Model $ model & delegationModel . details .~ Nothing
-                       & txBuilderModel . newCertificate .~ (0,newCert)
-                       & scene .~ TxBuilderScene
-       , Task $ return $ TxBuilderEvent InsertNewCertificate
-       ]
+            -- Replace the dummy value in `DRepDelegation` and return it. 
+            return $ DRepDelegation targetDrepId isScript
+        ]
+      Just voteDeleg -> [Event $ DelegationEvent $ AddDrepDelegation $ AddResult voteDeleg]
+    AddResult voteDeleg -> 
+      [ Model $ model 
+          & #waitingStatus % #syncingDRepInfo .~ False
+          & #delegationModel % #newDrepDelegation .~ Nothing
+      , Event $ DelegationEvent $ AddSelectedUserCertificate (Nothing, VoteDelegation voteDeleg)
+      ]
+
+-------------------------------------------------
+-- Helper Functions
+-------------------------------------------------
+-- | Validate the new user certificate and add it to the builder. Balance the transaction after.
+processNewUserCertificate :: UserCertificate -> TxBuilderModel -> Either Text TxBuilderModel
+processNewUserCertificate u@UserCertificate{..} model@TxBuilderModel{userCertificates} = do
+    -- Make sure this is not a duplicate registration.
+    when (certificateAction == Registration) $
+      flip when (Left "This stake address is already being registered.") $
+        flip any userCertificates $ \(_,userCert) -> and
+          [ isJust (userCert ^? #certificateAction % _Registration)
+          , userCert ^. #stakeAddress == stakeAddress
+          ]
+      
+    -- Make sure this is not a duplicate deregistration.
+    when (certificateAction == Deregistration) $
+      flip when (Left "This stake address is already being deregistered.") $
+        flip any userCertificates $ \(_,userCert) -> and
+          [ isJust (userCert ^? #certificateAction % _Deregistration)
+          , userCert ^. #stakeAddress == stakeAddress
+          ]
+
+    return $ balanceTx $ model 
+      -- Add the new certificate to the list, sort the list so that stake address actions are
+      -- grouped together, and then immediately re-index the list.
+      & #userCertificates .~ reIndex (sortOn snd $ (0,u) : filteredCertificates)
+  where
+    -- Previous delegation certificates for this stake address must be replaced by the new one.
+    -- If a deregistration cert was entered first, it should be overridden by a delegation cert,
+    -- and vice versa.
+    filteredCertificates :: [(Int,UserCertificate)]
+    filteredCertificates = case certificateAction of
+      Registration -> 
+        -- Don't filter the certificates. Duplicate registrations would have been caught already.
+        userCertificates
+      Deregistration -> flip filter userCertificates $ \(_,userCert) -> 
+        -- All previous certificates for this stake address should be overridden.
+        userCert ^. #stakeAddress /= stakeAddress
+      StakeDelegation _ -> flip filter userCertificates $ \(_,userCert) -> 
+        -- All previous deregistration certificates and delegation certificates for this stake 
+        -- address should be overridden.
+        not $ and
+          [ userCert ^. #stakeAddress == stakeAddress
+          , isJust (userCert ^? #certificateAction % _StakeDelegation) ||
+              isJust (userCert ^? #certificateAction % _Deregistration)
+          ]
+      VoteDelegation _ -> flip filter userCertificates $ \(_,userCert) -> 
+        -- All previous deregistration certificates and vote certificates for this stake 
+        -- address should be overridden.
+        not $ and
+          [ userCert ^. #stakeAddress == stakeAddress
+          , isJust (userCert ^? #certificateAction % _VoteDelegation) ||
+              isJust (userCert ^? #certificateAction % _Deregistration)
+          ]

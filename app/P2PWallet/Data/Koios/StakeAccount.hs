@@ -1,6 +1,8 @@
-{-# LANGUAGE NoFieldSelectors #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-
 
@@ -12,20 +14,20 @@ module P2PWallet.Data.Koios.StakeAccount where
 
 import Data.Aeson
 
-import P2PWallet.Data.Core.Asset
-import P2PWallet.Data.Core.Bech32Address
-import P2PWallet.Data.Core.PoolID
-import P2PWallet.Data.Core.RegistrationStatus
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Prelude
 
 data StakeAccount = StakeAccount
-  { _stakeAddress :: StakeAddress
-  , _registrationStatus :: RegistrationStatus
-  , _totalDelegation :: Lovelace
-  , _utxoBalance :: Lovelace
-  , _availableRewards :: Lovelace
-  , _delegatedPool :: Maybe PoolID
+  { stakeAddress :: StakeAddress
+  , registrationStatus :: RegistrationStatus
+  , totalDelegation :: Lovelace
+  , utxoBalance :: Lovelace
+  , availableRewards :: Lovelace
+  , delegatedPool :: Maybe PoolID
+  , delegatedDrep :: Maybe DRepID
   } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''StakeAccount
 
 instance FromJSON StakeAccount where
   parseJSON = withObject "StakeAccount" $ \o ->
@@ -36,3 +38,4 @@ instance FromJSON StakeAccount where
         <*> o .: "utxo"
         <*> o .: "rewards_available"
         <*> o .: "delegated_pool"
+        <*> o .: "delegated_drep"

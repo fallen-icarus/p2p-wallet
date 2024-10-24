@@ -4,57 +4,75 @@ module P2PWallet.GUI.UIBuilder
   ) where
 
 import Monomer
-import Monomer.Lens qualified as L
 
-import P2PWallet.Data.App
-import P2PWallet.Data.Lens
-import P2PWallet.GUI.Widgets.Delegation
+import P2PWallet.Data.AppModel
+import P2PWallet.GUI.Colors
+import P2PWallet.GUI.MonomerOptics()
+import P2PWallet.GUI.Widgets.AddressBook
+import P2PWallet.GUI.Widgets.Aftermarket
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.GUI.Widgets.Delegation
+import P2PWallet.GUI.Widgets.Dex
 import P2PWallet.GUI.Widgets.Home
+import P2PWallet.GUI.Widgets.Lending
 import P2PWallet.GUI.Widgets.MainMenu
+import P2PWallet.GUI.Widgets.Networks
+import P2PWallet.GUI.Widgets.Notifications
+import P2PWallet.GUI.Widgets.Options
 import P2PWallet.GUI.Widgets.Profiles
+import P2PWallet.GUI.Widgets.Settings
+import P2PWallet.GUI.Widgets.TickerRegistry
 import P2PWallet.GUI.Widgets.TxBuilder
 import P2PWallet.Prelude
 
 buildUI :: AppWenv -> AppModel -> AppNode
-buildUI wenv model = do
-  let waitingOnDeviceOverlay =
-        box (label "Waiting on Device..." `styleBasic` [textSize 20, textColor black])
-          `styleBasic` [bgColor $ darkGray & L.a .~ 0.9]
-      syncingWalletsOverlay = 
-        box (label "Syncing Wallets..." `styleBasic` [textSize 20, textColor black])
-          `styleBasic` [bgColor (darkGray & L.a .~ 0.8)] where
-      syncingPoolsOverlay = 
-        box (label "Syncing Pools..." `styleBasic` [textSize 20, textColor black])
-          `styleBasic` [bgColor (darkGray & L.a .~ 0.8)] where
-      buildingOverlay =
-        box (label "Building Transaction..." `styleBasic` [textSize 20, textColor black])
-          `styleBasic` [bgColor $ darkGray & L.a .~ 0.9]
-      submittingOverlay =
-        box (label "Submitting Transaction..." `styleBasic` [textSize 20, textColor black])
-          `styleBasic` [bgColor $ darkGray & L.a .~ 0.9]
-      alertOverlay = customAlertMsg (fromMaybe "" $ model ^. alertMessage) CloseAlertMessage
-
-      profile' = fromMaybe def $ model ^. selectedProfile
-      sectionBgColor = wenv ^. L.theme . L.sectionColor
+buildUI _ model@AppModel{..} = do
+  let alertOverlay = customAlertMsg (fromMaybe "" alertMessage) CloseAlertMessage
+      waitingOverlay caption =
+        box (label caption `styleBasic` [textSize 20, textColor black])
+          `styleBasic` [bgColor $ darkGray & #a .~ 0.8]
 
   zstack 
-    [ profilesWidget wenv model `nodeVisible` isNothing (model ^. selectedProfile)
+    [ networksWidget model `nodeVisible` (NetworksScene == scene)
+    , profilesWidget model `nodeVisible` (ProfilesScene == scene)
     , hstack
-        [
-          mainMenuWidget wenv
+        [ mainMenuWidget model
         , vstack
-            [ flip styleBasic [bgColor sectionBgColor] $ centerWidgetH $ 
-                flip styleBasic [padding 10, textSize 20] $ label (profile' ^. alias) 
-            , delegationWidget wenv model `nodeVisible` (DelegationScene == model ^. scene)
-            , homeWidget wenv model `nodeVisible` (HomeScene == model ^. scene)
-            , txBuilderWidget wenv model `nodeVisible` (TxBuilderScene == model ^. scene)
+            [ settingsWidget model `nodeVisible` (SettingsScene == scene)
+            , homeWidget model `nodeVisible` (HomeScene == scene)
+            , delegationWidget model `nodeVisible` (DelegationScene == scene)
+            , txBuilderWidget model `nodeVisible` (TxBuilderScene == scene)
+            , addressBookWidget model `nodeVisible` (AddressBookScene == scene)
+            , tickerRegistryWidget model `nodeVisible` (TickerRegistryScene == scene)
+            , dexWidget model `nodeVisible` (DexScene == scene)
+            , lendingWidget model `nodeVisible` (LendingScene == scene)
+            , optionsWidget model `nodeVisible` (OptionsScene == scene)
+            , aftermarketWidget model `nodeVisible` (AftermarketScene == scene)
+            , notificationsWidget model `nodeVisible` (NotificationsScene == scene)
             ]
-        ] `nodeVisible` isJust (model ^. selectedProfile)
-    , alertOverlay `nodeVisible` isJust (model ^. alertMessage)
-    , waitingOnDeviceOverlay `nodeVisible` (model ^. waitingOnDevice)
-    , syncingWalletsOverlay `nodeVisible` (model ^. syncingWallets)
-    , syncingPoolsOverlay `nodeVisible` (model ^. syncingPools)
-    , submittingOverlay `nodeVisible` (model ^. submitting)
-    , buildingOverlay `nodeVisible` (model ^. building)
-    ]
+        ] `nodeVisible` isJust selectedProfile
+    , alertOverlay `nodeVisible` isJust alertMessage
+    , waitingOverlay "Waiting on Device..." `nodeVisible` waitingStatus ^. #waitingOnDevice
+    , waitingOverlay "Syncing Wallets..." `nodeVisible` waitingStatus ^. #syncingWallets
+    , waitingOverlay "Loading Profile..." `nodeVisible` waitingStatus ^. #loadingProfile
+    , waitingOverlay "Syncing Pools..." `nodeVisible` waitingStatus ^. #syncingPools
+    , waitingOverlay "Building..." `nodeVisible` waitingStatus ^. #building
+    , waitingOverlay "Submitting Transaction..." `nodeVisible` waitingStatus ^. #submitting
+    , waitingOverlay "Adding to Builder..." `nodeVisible` waitingStatus ^. #addingToBuilder
+    , waitingOverlay "Syncing Order Book..." `nodeVisible` waitingStatus ^. #syncingOrderBook
+    , waitingOverlay "Syncing Loan Requests..." `nodeVisible` waitingStatus ^. #syncingLoanAsks
+    , waitingOverlay "Syncing Loan Offers..." `nodeVisible` waitingStatus ^. #syncingLoanOffers
+    , waitingOverlay "Syncing Active Loans..." `nodeVisible` waitingStatus ^. #syncingActiveLoans
+    , waitingOverlay "Syncing Loan Histories..." `nodeVisible` waitingStatus ^. #syncingLoanHistories
+    , waitingOverlay "Syncing Borrower Info..." `nodeVisible` waitingStatus ^. #syncingBorrowerInfo
+    , waitingOverlay "Syncing Proposed Options Contracts..." 
+        `nodeVisible` waitingStatus ^. #syncingOptionsProposals
+    , waitingOverlay "Syncing the Options Contract(s)..." 
+        `nodeVisible` waitingStatus ^. #syncingOptionsContracts
+    , waitingOverlay "Syncing Active Options Contracts..." 
+        `nodeVisible` waitingStatus ^. #syncingActiveOptionsContracts
+    , waitingOverlay "Syncing Current Sales..." 
+        `nodeVisible` waitingStatus ^. #syncingAftermarketSales
+    , waitingOverlay "Syncing Seller Info..." `nodeVisible` waitingStatus ^. #syncingSellerInfo
+    , waitingOverlay "Syncing DRep Info..." `nodeVisible` waitingStatus ^. #syncingDRepInfo
+    ] `styleBasic` [bgColor customGray4]

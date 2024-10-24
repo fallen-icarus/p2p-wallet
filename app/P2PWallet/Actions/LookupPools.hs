@@ -1,8 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
-{-# LANGUAGE TypeOperators #-}
-
 module P2PWallet.Actions.LookupPools
   (
     lookupRegisteredPools
@@ -10,10 +5,10 @@ module P2PWallet.Actions.LookupPools
 
 import P2PWallet.Actions.Query.Koios
 import P2PWallet.Actions.Utils
-import P2PWallet.Data.Core.Network
+import P2PWallet.Data.Core.Internal.Network
 import P2PWallet.Data.Koios.Pool
 import P2PWallet.Prelude
 
 lookupRegisteredPools :: Network -> IO [Pool]
-lookupRegisteredPools network' = do
-  runQueryAllRegisteredPools network' >>= fromRightOrAppError
+lookupRegisteredPools network = do
+  runQueryAllRegisteredPools network >>= fromRightOrAppError

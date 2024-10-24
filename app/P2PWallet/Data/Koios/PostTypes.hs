@@ -1,15 +1,16 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 
+{-
+
+This module contains the types for POST information for the Koios apis.
+
+-}
 module P2PWallet.Data.Koios.PostTypes where
 
 import Data.Aeson
-import Data.Vector (Vector)
 
-import P2PWallet.Data.Core.Bech32Address
-import P2PWallet.Data.Core.PoolID
-import P2PWallet.Data.Core.TxCBOR
-import P2PWallet.Data.Plutus
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -54,14 +55,48 @@ instance ToJSON PaymentAddresses where
            ]
 
 -- | A newtype for submitting a list of payment addresses with the "_extended" flag.
-newtype ExtendedPaymentAddresses = ExtendedPaymentAddresses [PaymentAddress] 
+newtype PaymentAddressesExtended = PaymentAddressesExtended [PaymentAddress] 
   deriving (Show)
 
-instance ToJSON ExtendedPaymentAddresses where
-  toJSON (ExtendedPaymentAddresses as) = 
+instance ToJSON PaymentAddressesExtended where
+  toJSON (PaymentAddressesExtended as) = 
     object [ "_addresses" .= map unPaymentAddress as 
            , "_extended" .= True
            ]
+
+-- | A newtype for submitting a list of payment addresses with the "_after_block_height" flag.
+data PaymentAddressesAfterBlock = PaymentAddressesAfterBlock [PaymentAddress] Integer
+  deriving (Show)
+
+instance ToJSON PaymentAddressesAfterBlock where
+  toJSON (PaymentAddressesAfterBlock as lastBlock) = 
+    object [ "_addresses" .= map unPaymentAddress as 
+           , "_after_block_height" .= lastBlock
+           ]
+
+-------------------------------------------------
+-- Transactions
+-------------------------------------------------
+-- | A newtype for submitting a list of transaction hashes. This is also the return type for
+-- an intermediate query.
+newtype TxHashes = TxHashes [Text] deriving (Show)
+
+instance ToJSON TxHashes where
+  toJSON (TxHashes txs) = 
+    object [ "_tx_hashes" .= txs 
+           , "_inputs" .= True -- always return inputs.
+           , "_metadata" .= False -- never return metadata.
+           , "_assets" .= True -- always return assets.
+           , "_withdrawals" .= True -- always return withdrawals.
+           , "_certs" .= True -- always return certificates.
+           , "_scripts" .= True -- always return scripts.
+           , "_bytecode" .= False -- never return the script bytecode.
+           , "_governance" .= False -- don't return for now.
+           ]
+
+instance FromJSON TxHashes where
+  parseJSON = 
+    withArray "TxHashes" $ fmap (TxHashes . toList) . mapM (withObject "TxHash" (.: "tx_hash"))
 
 -------------------------------------------------
 -- Stake Addresses
@@ -75,29 +110,15 @@ instance ToJSON StakeAddresses where
     object [ "_stake_addresses" .= map unStakeAddress as 
            ]
 
--------------------------------------------------
--- Transactions
--------------------------------------------------
--- | A newtype for submitting a list of transaction hashes. This is also the return type for
--- an intermediate query.
-newtype TxHashes = TxHashes (Vector Text) deriving (Show)
-
-instance ToJSON TxHashes where
-  toJSON (TxHashes txs) = object [ "_tx_hashes" .= txs ]
-
-instance FromJSON TxHashes where
-  parseJSON = 
-    withArray "TxHashes" $ fmap TxHashes . mapM (withObject "TxHash" (.: "tx_hash"))
-
--------------------------------------------------
--- Unknown UTxOs
--------------------------------------------------
--- | A newtype for submitting a list of unknown UTxOs to lookup.
-newtype UnknownUTxOs = UnknownUTxOs [TxOutRef]
+-- | A newtype for submitting a list of stake addresses to get the active linked payment addresses.
+newtype StakeAddressesNonEmpty = StakeAddressesNonEmpty [StakeAddress] 
   deriving (Show)
 
-instance ToJSON UnknownUTxOs where
-  toJSON (UnknownUTxOs refs) = object [ "_utxo_refs" .= map (showTxOutRef @Text) refs ]
+instance ToJSON StakeAddressesNonEmpty where
+  toJSON (StakeAddressesNonEmpty as) = 
+    object [ "_stake_addresses" .= map unStakeAddress as 
+           , "_empty" .= False
+           ]
 
 -------------------------------------------------
 -- Pools
@@ -114,5 +135,25 @@ instance FromJSON Pools where
 instance ToJSON Pools where
   toJSON (Pools pools) = object [ "_pool_bech32_ids" .= pools ]
 
-instance Semigroup Pools where
-  (Pools !p1) <> (Pools !p2) = Pools $ p1 <> p2
+-------------------------------------------------
+-- DReps
+-------------------------------------------------
+-- | A newtype for submitting a list of `DRepID`s. This is also the return type for an intermediate
+-- query.
+newtype DReps = DReps [DRepID] deriving (Show)
+
+instance ToJSON DReps where
+  toJSON (DReps dreps) = object [ "_drep_ids" .= dreps ]
+
+-------------------------------------------------
+-- Assets
+-------------------------------------------------
+-- | A list of assets that a UTxO must contain.
+newtype AssetList = AssetList [(CurrencySymbol,TokenName)]
+
+instance ToJSON AssetList where
+  toJSON (AssetList xs) = 
+    object [ "_asset_list" .= 
+             map (\(currSym,tokName) -> [display currSym, display tokName]) xs
+           , "_extended" .= True
+           ]
