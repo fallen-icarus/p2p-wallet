@@ -33,7 +33,7 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
           ]
       ]
   where
-    Config{currentTime} = config
+    Config{currentTime,timeZone} = config
 
     toggleOffStyle :: Style
     toggleOffStyle = 
@@ -150,10 +150,22 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
             , showLocalDate (config ^. #timeZone) blockTime
             , showLocalTime (config ^. #timeZone) blockTime
             ]
-          prettyExpirationTime exprTime = unwords
-            [ "Expires:"
-            , showLocalDate (config ^. #timeZone) exprTime
-            , showLocalTime (config ^. #timeZone) exprTime
+          prettyExpirationTime = maybe "Offer does not expire." $ \exprTime ->
+            unwords
+              [ "Offer Expires:"
+              , showLocalDate timeZone $ fromPlutusTime exprTime
+              , showLocalTime timeZone $ fromPlutusTime exprTime
+              ]
+          prettyClaimPeriod = unwords
+            [ "Claim Period:"
+            , show $ calcDaysInPosixPeriod $ fromPlutusTime claimPeriod
+            , "Day(s)"
+            ]
+          prettyOfferTime = prettyExpirationTime offerExpiration <> "\n" <> prettyClaimPeriod
+          payToAddress = either (const "error") fst $ plutusToBech32 network lenderAddress
+          addressTip = unwords $ filter (/= "")
+            [ "Payments to:"
+            , display payToAddress
             ]
           swapCollateralMsg = "Collateral can be swapped out for other approved collateral"
           acceptEvt = LendingEvent $ BorrowEvent $ AcceptLoanOffer $ ChooseOfferToAccept u
@@ -189,18 +201,33 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
                         , textSize 10
                         , textColor customBlue
                         ]
-                , widgetMaybe offerExpiration $ \exprTime -> hstack
-                    [ spacer_ [width 5]
-                    , flip styleBasic [textSize 10] $ 
-                        tooltip_ (prettyExpirationTime $ fromPlutusTime exprTime) [tooltipDelay 0] $
-                          label expirationIcon
-                            `styleBasic` 
-                              [ textMiddle
-                              , textFont "Remix"
-                              , textSize 10
-                              , textColor customRed
-                              ]
-                    ]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ 
+                    tooltip_ prettyOfferTime [tooltipDelay 0] $
+                      label expirationIcon
+                        `styleBasic` 
+                          [ textMiddle
+                          , textFont "Remix"
+                          , textSize 10
+                          , textColor customRed
+                          ]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ addressTip [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText $ display payToAddress] $
+                      label targetAddressIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
                 , filler
                 , label "Duration:"
                     `styleBasic` [textSize 10, textColor white]
@@ -228,7 +255,7 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
                 ]
             , spacer_ [width 2]
             , hstack
-                [ widgetIf collateralIsSwappable $ hstack
+                [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                     [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                         label swappableCollateralIcon
                           `styleBasic` 
@@ -236,11 +263,12 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
                             , textFont "Remix"
                             , textSize 10
                             , textColor customBlue
+                            , paddingT 1
                             ]
                     , spacer_ [width 2]
                     ]
-                , label "Collateralization:"
-                    `styleBasic` [textSize 8, textColor lightGray]
+                , box_ [alignTop] $ label "Collateralization:"
+                    `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
                 , spacer_ [width 3]
                 , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
                     \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
@@ -346,10 +374,10 @@ chooseAskWidget AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ label "Offered Collateral:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            [ box_ [alignTop] $ label "Offered Collateral:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+            , vstack_ [childSpacing_ 3] $ for (groupInto 4 offeredCollateral) $ 
                 \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
             ]
         ] `styleBasic` 
@@ -381,25 +409,47 @@ specifyCollateralWidget AppModel{..} = do
           , label ("Loan Amount: " <> showAssetBalance True reverseTickerMap loanAmount)
               `styleBasic` [textSize 12]
           , spacer
-          , label "Collateral Rates:"
-              `styleBasic` [textSize 12]
+          , hstack
+              [ box_ [alignMiddle, onClick $ Alert collateralRatesMsg] $
+                  label helpIcon
+                    `styleBasic`
+                      [ border 0 transparent
+                      , radius 20
+                      , bgColor transparent
+                      , textColor customBlue
+                      , textMiddle
+                      , textFont "Remix"
+                      , textSize 10
+                      , padding 2
+                      ]
+                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              , spacer_ [width 3]
+              , label "Collateral Rates:"
+                  `styleBasic` [textSize 12]
+              ]
           , spacer_ [width 3]
           , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
-              \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
+              \col -> hstack_ [childSpacing_ 3] $ [spacer] <> map (collateralAssetWidget loanAmount) col
+          , spacer
           , hstack
-              [ label "Collateral Assets (separated with newlines)"
+              [ box_ [alignMiddle, onClick $ Alert collateralAmountsMsg] $
+                  label helpIcon
+                    `styleBasic`
+                      [ border 0 transparent
+                      , radius 20
+                      , bgColor transparent
+                      , textColor customBlue
+                      , textMiddle
+                      , textFont "Remix"
+                      , textSize 10
+                      , padding 2
+                      ]
+                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+              , spacer_ [width 3]
+              , label "Collateral Assets (separated with newlines):"
                   `styleBasic` [textSize 12]
-              , mainButton helpIcon (Alert collateralAmountsMsg)
-                  `styleBasic`
-                    [ border 0 transparent
-                    , radius 20
-                    , bgColor transparent
-                    , textColor customBlue
-                    , textMiddle
-                    , textFont "Remix"
-                    ]
-                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
               ]
+          , spacer_ [width 3]
           , textArea (toLensVL $ maybeLens' % #collateralAmounts)
               `styleBasic` [height 180, textSize 10, bgColor customGray1]
               `styleFocus` [border 1 customBlue]
@@ -611,7 +661,7 @@ offersFilterWidget AppModel{lendingModel=LendingModel{..}} = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             , spacer_ [width 3]
-            , label "Collateral Assets (separated with newlines)"
+            , label "Collateral Assets (separated with newlines):"
                 `styleBasic` [textSize 10]
             ]
         , spacer

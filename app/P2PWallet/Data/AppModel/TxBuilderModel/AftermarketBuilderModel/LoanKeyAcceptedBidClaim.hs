@@ -10,6 +10,7 @@ import P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.AcceptedBi
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.ExpiredClaim
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LenderAddressUpdate
 import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -19,8 +20,8 @@ import P2PWallet.Prelude
 data LoanKeyAcceptedBidClaim = LoanKeyAcceptedBidClaim
   -- | The accepted bid being claim.
   { bidClaim :: AcceptedBidClaim
-  -- | The new payment address for the loans.
-  , newPaymentAddress :: Text
+  -- | The new payment wallet for the loan payments.
+  , newPaymentWallet :: PaymentWallet
   -- | The address updates for the active loan UTxOs.
   , lenderAddressUpdates :: [LenderAddressUpdate]
   -- | The collateral claims for the expired loan UTxOs.
@@ -43,7 +44,7 @@ instance AssetBalancesForChange (a,LoanKeyAcceptedBidClaim) where
 -------------------------------------------------
 data NewLoanKeyAcceptedBidClaim = NewLoanKeyAcceptedBidClaim
   { bidClaim :: AcceptedBidClaim
-  , newPaymentAddress :: Text
+  , newPaymentWallet :: PaymentWallet
   , lenderAddressUpdates :: [NewLenderAddressUpdate]
   , expiredClaims :: [ExpiredClaim]
   } deriving (Show,Eq)
@@ -53,7 +54,7 @@ makeFieldLabelsNoPrefix ''NewLoanKeyAcceptedBidClaim
 instance Default NewLoanKeyAcceptedBidClaim where
   def = NewLoanKeyAcceptedBidClaim
     { bidClaim = def
-    , newPaymentAddress = ""
+    , newPaymentWallet = def
     , lenderAddressUpdates = []
     , expiredClaims = []
     }
@@ -69,12 +70,12 @@ verifyNewLoanKeyAcceptedBidClaim
 verifyNewLoanKeyAcceptedBidClaim currentTime NewLoanKeyAcceptedBidClaim{..} = do
   verifiedLenderAddressUpdates <- 
     mapM 
-      (verifyNewLenderAddressUpdate currentTime . set #newPaymentAddress newPaymentAddress) 
+      (verifyNewLenderAddressUpdate currentTime . set #newPaymentWallet newPaymentWallet) 
       lenderAddressUpdates
 
   return $ LoanKeyAcceptedBidClaim
     { bidClaim = bidClaim
-    , newPaymentAddress = newPaymentAddress
+    , newPaymentWallet = newPaymentWallet
     , lenderAddressUpdates = verifiedLenderAddressUpdates
     , expiredClaims = expiredClaims
     }
@@ -82,7 +83,7 @@ verifyNewLoanKeyAcceptedBidClaim currentTime NewLoanKeyAcceptedBidClaim{..} = do
 toNewLoanKeyAcceptedBidClaim :: LoanKeyAcceptedBidClaim -> NewLoanKeyAcceptedBidClaim
 toNewLoanKeyAcceptedBidClaim LoanKeyAcceptedBidClaim{..} = NewLoanKeyAcceptedBidClaim
   { bidClaim = bidClaim
-  , newPaymentAddress = newPaymentAddress
+  , newPaymentWallet = newPaymentWallet
   , lenderAddressUpdates = map toNewLenderAddressUpdate lenderAddressUpdates
   , expiredClaims = expiredClaims
   }

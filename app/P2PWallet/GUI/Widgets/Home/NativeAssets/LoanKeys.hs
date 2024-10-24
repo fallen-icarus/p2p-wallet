@@ -19,7 +19,7 @@ import P2PWallet.Plutus
 import P2PWallet.Prelude
 
 inspectLoanWidget :: AppModel -> AppNode
-inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
+inspectLoanWidget model@AppModel{lendingModel=LendingModel{..},scene=_,..} = do
     zstack
       [ vstack
           [ vstack
@@ -119,8 +119,8 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
               , padding 30
               , radius 10
               ]
-      , updatePaymentAddressWidget `nodeVisible`
-          isJust (homeModel ^. #newLenderAddressUpdate)
+      , updatePaymentAddressWidget model
+          `nodeVisible` isJust (homeModel ^. #newLenderAddressUpdate)
       ]
   where
     targetId :: Loans.LoanId
@@ -431,7 +431,7 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ widgetIf collateralIsSwappable $ hstack
+            [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                 [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                     label swappableCollateralIcon
                       `styleBasic` 
@@ -439,11 +439,12 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
                         , textFont "Remix"
                         , textSize 10
                         , textColor customBlue
+                        , paddingT 1
                         ]
                 , spacer_ [width 2]
                 ]
-            , label "Locked Collateral:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            , box_ [alignTop] $ label "Locked Collateral:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 lockedCollateral) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map lockedCollateralWidget col
@@ -455,19 +456,34 @@ inspectLoanWidget AppModel{lendingModel=LendingModel{..},scene=_,..} = do
               , border 1 black
               ]
 
-updatePaymentAddressWidget :: AppNode
-updatePaymentAddressWidget = do
+updatePaymentAddressWidget :: AppModel -> AppNode
+updatePaymentAddressWidget AppModel{knownWallets} = do
   let maybeLens' = maybeLens def (#homeModel % #newLenderAddressUpdate)
+      innerDormantStyle = 
+        def `styleBasic` [textSize 10, bgColor customGray3, border 1 black]
+            `styleHover` [textSize 10, bgColor customGray2, border 1 black]
+      innerFocusedStyle = 
+        def `styleFocus` [textSize 10, bgColor customGray3, border 1 customBlue]
+            `styleFocusHover` [textSize 10, bgColor customGray2, border 1 customBlue]
   vstack
     [ centerWidget $ vstack
         [ centerWidgetH $ label "Where would you like future loan payments to go?"
         , spacer_ [width 20]
-        , hstack
+        , centerWidgetH $ hstack
             [ label "Address:"
             , spacer
-            , textField (toLensVL $ maybeLens' % #newPaymentAddress)
-                `styleBasic` [textSize 10, bgColor customGray1, sndColor darkGray]
-                `styleFocus` [border 1 customBlue]
+            , textDropdown_ 
+                  (toLensVL $ maybeLens' % #newPaymentWallet) 
+                  (knownWallets ^. #paymentWallets) 
+                  (view #alias) -- The dropdown displays the wallet's alias in the menu.
+                  [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+                `styleBasic` 
+                  [ bgColor customGray2
+                  , width 150
+                  , border 1 black
+                  , textSize 10
+                  ]
+                `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             ]
         , spacer
         , hstack 

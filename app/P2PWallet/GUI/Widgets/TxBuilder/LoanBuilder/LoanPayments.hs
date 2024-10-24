@@ -31,10 +31,39 @@ loanPaymentsList reverseTickerMap = map utxoRow
       hstack
         [ vstack
             [ hstack
-                [ label ("Make " <> paymentType <> " Payment of " <> prettyPayment)
+                [ label ("Make " <> paymentType <> " Loan Payment")
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , let prettyRef = display $ activeUTxO ^. #utxoRef in
+                  flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText prettyRef] $
+                      label targetUTxOIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ alias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
-                , label ("For Borrower " <> alias)
+                , label ("Payment Amount: " <> prettyPayment)
                     `styleBasic` [textSize 10, textColor white]
                 ]
             , spacer_ [width 2]
@@ -126,7 +155,7 @@ editLoanPaymentWidget AppModel{..} = do
               `styleBasic` [textSize 10, width 150, bgColor customGray1, sndColor darkGray]
               `styleFocus` [border 1 customBlue]
           , spacer_ [width 3]
-          , helpButton offerLoanAmountMsg
+          , helpButton paymentAmountMsg
           , spacer_ [width 7]
           , box_ [alignMiddle, onClick $ loanBuilderEvent SetEditLoanPaymentToFullPayment] $
               tooltip_ "Pay remaining balance" [tooltipDelay 0] $
@@ -145,7 +174,7 @@ editLoanPaymentWidget AppModel{..} = do
           \col -> hstack_ [childSpacing_ 3] $ [spacer] <> map (collateralAssetWidget loanBalance) col
       , spacer
       , hstack
-          [ label "Collateral Assets (separated with newlines)"
+          [ label "Collateral Assets (separated with newlines):"
               `styleBasic` [textSize 12]
           , spacer_ [width 3]
           , helpButton paymentCollateralAmountsMsg

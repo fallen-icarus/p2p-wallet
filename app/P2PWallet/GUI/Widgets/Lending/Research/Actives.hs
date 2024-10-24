@@ -122,7 +122,7 @@ getActiveLoanConfiguration model = do
                 ]
               `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         , spacer_ [width 3]
-        , label "Collateral Assets (separated with newlines)"
+        , label "Collateral Assets (separated with newlines):"
             `styleBasic` [textSize 10]
         ]
     , spacer
@@ -337,7 +337,7 @@ allActivesWidget AppModel{lendingModel=LendingModel{..},reverseTickerMap} =
             ]
         , spacer_ [width 2]
         , hstack
-            [ widgetIf collateralIsSwappable $ hstack
+            [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                 [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                     label swappableCollateralIcon
                       `styleBasic` 
@@ -345,11 +345,12 @@ allActivesWidget AppModel{lendingModel=LendingModel{..},reverseTickerMap} =
                         , textFont "Remix"
                         , textSize 10
                         , textColor customBlue
+                        , paddingT 1
                         ]
                 , spacer_ [width 2]
                 ]
-            , label "Collateralization:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            , box_ [alignTop] $ label "Collateralization:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
@@ -522,7 +523,7 @@ activesFilterWidget AppModel{lendingModel=LendingModel{..}} = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             , spacer_ [width 3]
-            , label "Collateral Assets (separated with newlines)"
+            , label "Collateral Assets (separated with newlines):"
                 `styleBasic` [textSize 10]
             ]
         , spacer

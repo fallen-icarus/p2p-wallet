@@ -126,7 +126,7 @@ getLoanAskConfiguration model = do
                 ]
               `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         , spacer_ [width 3]
-        , label "Collateral Assets (separated with newlines)"
+        , label "Collateral Assets (separated with newlines):"
             `styleBasic` [textSize 10]
         ]
     , spacer
@@ -279,10 +279,10 @@ allAsksWidget AppModel{lendingModel=LendingModel{lendModel},reverseTickerMap} = 
                 ]
             , spacer_ [width 2]
             , hstack
-                [ label "Offered Collateral:"
-                    `styleBasic` [textSize 8, textColor lightGray]
+                [ box_ [alignTop] $ label "Offered Collateral:"
+                    `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
                 , spacer_ [width 3]
-                , vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+                , vstack_ [childSpacing_ 3] $ for (groupInto 4 offeredCollateral) $ 
                     \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
                 ]
             ] `styleBasic` 
@@ -294,7 +294,7 @@ allAsksWidget AppModel{lendingModel=LendingModel{lendModel},reverseTickerMap} = 
         , spacer_ [width 3]
         , flip styleBasic [padding 3] $ box_ [alignCenter,alignMiddle] $ vstack
             [ tooltip_ "Make Offer" [tooltipDelay 0] $
-                button remixDraftLine addOfferEvt
+                button makeOfferIcon addOfferEvt
                   `styleBasic` 
                     [ textSize 10
                     , textColor customBlue
@@ -472,7 +472,7 @@ requestsFilterWidget AppModel{lendingModel=LendingModel{..}} = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             , spacer_ [width 3]
-            , label "Collateral Assets (separated with newlines)"
+            , label "Collateral Assets (separated with newlines):"
                 `styleBasic` [textSize 10]
             ]
         , spacer
@@ -769,7 +769,7 @@ createNewOfferWidget AppModel{lendingModel, knownWallets, reverseTickerMap, tick
         , hstack
             [ helpButton offerCollateralMsg
             , spacer_ [width 3]
-            , label "Collateral Values (separated with newlines)"
+            , label "Collateral Values (separated with newlines):"
                 `styleBasic` [textSize 10]
             ]
         , spacer
@@ -1072,7 +1072,7 @@ creditHistoryField target historyEvt AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ widgetIf collateralIsSwappable $ hstack
+            [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                 [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                     label swappableCollateralIcon
                       `styleBasic` 
@@ -1080,11 +1080,12 @@ creditHistoryField target historyEvt AppModel{..} = do
                         , textFont "Remix"
                         , textSize 10
                         , textColor customBlue
+                        , paddingT 1
                         ]
                 , spacer_ [width 2]
                 ]
-            , label "Collateralization:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            , box_ [alignTop] $ label "Collateralization:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
@@ -1193,10 +1194,10 @@ openAsksField target AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ label "Offered Collateral:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            [ box_ [alignTop] $ label "Offered Collateral:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+            , vstack_ [childSpacing_ 3] $ for (groupInto 4 offeredCollateral) $ 
                 \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
             ]
         ] `styleBasic` 
@@ -1395,7 +1396,7 @@ currentOffersField target AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ widgetIf collateralIsSwappable $ hstack
+            [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                 [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                     label swappableCollateralIcon
                       `styleBasic` 
@@ -1403,11 +1404,12 @@ currentOffersField target AppModel{..} = do
                         , textFont "Remix"
                         , textSize 10
                         , textColor customBlue
+                        , paddingT 1
                         ]
                 , spacer_ [width 2]
                 ]
-            , label "Collateralization:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            , box_ [alignTop] $ label "Collateralization:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
@@ -1612,7 +1614,7 @@ activeLoansField target historyEvt AppModel{..} = do
             ]
         , spacer_ [width 2]
         , hstack
-            [ widgetIf collateralIsSwappable $ hstack
+            [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                 [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                     label swappableCollateralIcon
                       `styleBasic` 
@@ -1620,11 +1622,12 @@ activeLoansField target historyEvt AppModel{..} = do
                         , textFont "Remix"
                         , textSize 10
                         , textColor customBlue
+                        , paddingT 1
                         ]
                 , spacer_ [width 2]
                 ]
-            , label "Locked Collateral:"
-                `styleBasic` [textSize 8, textColor lightGray]
+            , box_ [alignTop] $ label "Locked Collateral:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 lockedCollateral) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map lockedCollateralWidget col

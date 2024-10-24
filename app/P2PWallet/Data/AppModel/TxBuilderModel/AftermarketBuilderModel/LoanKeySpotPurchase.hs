@@ -10,6 +10,7 @@ import P2PWallet.Data.AppModel.TxBuilderModel.AftermarketBuilderModel.SpotPurcha
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.ExpiredClaim
 import P2PWallet.Data.AppModel.TxBuilderModel.LoanBuilderModel.LenderAddressUpdate
 import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.Core.Wallets
 import P2PWallet.Prelude
 
 -------------------------------------------------
@@ -20,7 +21,7 @@ data LoanKeySpotPurchase = LoanKeySpotPurchase
   -- | The sale being purchased.
   { spotPurchase :: SpotPurchase
   -- | The new payment address for the active loans.
-  , newPaymentAddress :: Text
+  , newPaymentWallet :: PaymentWallet
   -- | The address updates for the active loan UTxOs.
   , lenderAddressUpdates :: [LenderAddressUpdate]
   -- | The collateral claims for the expired loan UTxOs.
@@ -43,7 +44,7 @@ instance AssetBalancesForChange (a,LoanKeySpotPurchase) where
 -------------------------------------------------
 data NewLoanKeySpotPurchase = NewLoanKeySpotPurchase
   { spotPurchase :: SpotPurchase
-  , newPaymentAddress :: Text
+  , newPaymentWallet :: PaymentWallet
   , lenderAddressUpdates :: [NewLenderAddressUpdate]
   , expiredClaims :: [ExpiredClaim]
   } deriving (Show,Eq)
@@ -53,7 +54,7 @@ makeFieldLabelsNoPrefix ''NewLoanKeySpotPurchase
 instance Default NewLoanKeySpotPurchase where
   def = NewLoanKeySpotPurchase
     { spotPurchase = def
-    , newPaymentAddress = ""
+    , newPaymentWallet = def
     , lenderAddressUpdates = []
     , expiredClaims = []
     }
@@ -66,12 +67,12 @@ verifyNewLoanKeySpotPurchase :: POSIXTime -> NewLoanKeySpotPurchase -> Either Te
 verifyNewLoanKeySpotPurchase currentTime NewLoanKeySpotPurchase{..} = do
   verifiedLenderAddressUpdates <- 
     mapM 
-      (verifyNewLenderAddressUpdate currentTime . set #newPaymentAddress newPaymentAddress) 
+      (verifyNewLenderAddressUpdate currentTime . set #newPaymentWallet newPaymentWallet) 
       lenderAddressUpdates
 
   return $ LoanKeySpotPurchase
     { spotPurchase = spotPurchase
-    , newPaymentAddress = newPaymentAddress
+    , newPaymentWallet = newPaymentWallet
     , lenderAddressUpdates = verifiedLenderAddressUpdates
     , expiredClaims = expiredClaims
     }
@@ -79,7 +80,7 @@ verifyNewLoanKeySpotPurchase currentTime NewLoanKeySpotPurchase{..} = do
 toNewLoanKeySpotPurchase :: LoanKeySpotPurchase -> NewLoanKeySpotPurchase
 toNewLoanKeySpotPurchase LoanKeySpotPurchase{..} = NewLoanKeySpotPurchase
   { spotPurchase = spotPurchase
-  , newPaymentAddress = newPaymentAddress
+  , newPaymentWallet = newPaymentWallet
   , lenderAddressUpdates = map toNewLenderAddressUpdate lenderAddressUpdates
   , expiredClaims = expiredClaims
   }

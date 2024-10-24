@@ -248,7 +248,7 @@ editSpotBidWidget model@AppModel{..} = do
         ]
     , spacer
     , hstack
-        [ label "Bid Price (assets separated with newlines)"
+        [ label "Bid Price (assets separated with newlines):"
             `styleBasic` [textSize 10]
         , spacer_ [width 3]
         , helpButton bidPriceMsg
@@ -371,7 +371,7 @@ editClaimBidWidget model@AppModel{..} = do
         ]
     , spacer
     , hstack
-        [ label "Bid Price (assets separated with newlines)"
+        [ label "Bid Price (assets separated with newlines):"
             `styleBasic` [textSize 10]
         , spacer_ [width 3]
         , helpButton bidPriceMsg

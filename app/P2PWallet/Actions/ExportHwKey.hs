@@ -38,8 +38,8 @@ exportHwPubKeyHash keyInfo@(_, key) = do
 
   where
     hashPubKeyFileCmd = case key of
-      PaymentKeyPath _ _ -> "cardano-cli address key-hash --payment-verification-key-file %s"
-      StakeKeyPath _ _ -> "cardano-cli stake-address key-hash --stake-verification-key-file %s"
+      PaymentKeyPath _ _ -> "cardano-cli conway address key-hash --payment-verification-key-file %s"
+      StakeKeyPath _ _ -> "cardano-cli conway stake-address key-hash --stake-verification-key-file %s"
 
 exportPubKeyCmd :: (Maybe DerivationType, DerivationPath) -> PubKeyFile -> HwSigningFile -> String
 exportPubKeyCmd (mDerType, key) pubKeyFile hwsKeyFile =

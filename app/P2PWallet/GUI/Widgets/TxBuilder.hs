@@ -146,7 +146,7 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (loanBuilderModel ^. #targetOfferAcceptance)
       , editLoanPaymentWidget model
           `nodeVisible` isJust (loanBuilderModel ^. #targetLoanPayment)
-      , editLenderAddressUpdateWidget
+      , editLenderAddressUpdateWidget model
           `nodeVisible` isJust (loanBuilderModel ^. #targetAddressUpdate)
       , editProposalCreationWidget model
           `nodeVisible` isJust (optionsBuilderModel ^. #targetProposalCreation)
@@ -158,7 +158,7 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetSaleCreation)
       , editSaleUpdateWidget model
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetSaleUpdate)
-      , editLoanKeySpotPurchase
+      , editLoanKeySpotPurchase model
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetLoanKeySpotPurchase)
       , editBidCreationWidget model
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetBidCreation)
@@ -166,7 +166,7 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetBidUpdate)
       , editClaimBidAcceptance model
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetClaimBidAcceptance)
-      , editLoanKeyBidClaim
+      , editLoanKeyBidClaim model
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetLoanKeyBidClaim)
       , editOptionsKeySpotPurchase model
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetOptionsKeySpotPurchase)
@@ -320,9 +320,10 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap,config} 
         , askCreationsList reverseTickerMap $ loanBuilderModel ^. #askCreations
         , askClosesList reverseTickerMap $ loanBuilderModel ^. #askCloses
         , askUpdatesList reverseTickerMap $ loanBuilderModel ^. #askUpdates
-        , offerCreationsList reverseTickerMap $ loanBuilderModel ^. #offerCreations
-        , offerClosesList reverseTickerMap $ loanBuilderModel ^. #offerCloses
-        , offerUpdatesList reverseTickerMap $ loanBuilderModel ^. #offerUpdates
+        , offerCreationsList reverseTickerMap (config ^. #timeZone) $ 
+            loanBuilderModel ^. #offerCreations
+        , offerClosesList reverseTickerMap (config ^. #timeZone) $ loanBuilderModel ^. #offerCloses
+        , offerUpdatesList reverseTickerMap (config ^. #timeZone) $ loanBuilderModel ^. #offerUpdates
         , offerAcceptancesList reverseTickerMap $ loanBuilderModel ^. #offerAcceptances
         , loanPaymentsList reverseTickerMap $ loanBuilderModel ^. #loanPayments
         , interestApplicationsList $ loanBuilderModel ^. #interestApplications
@@ -416,7 +417,7 @@ addExternalUserOutputWidget = do
         ]
     , spacer
     , hstack
-        [ label "Native Assets (separated with newlines)"
+        [ label "Native Assets (separated with newlines):"
         , mainButton helpIcon (Alert nativeAssetAreaEntryMsg)
             `styleBasic`
               [ border 0 transparent

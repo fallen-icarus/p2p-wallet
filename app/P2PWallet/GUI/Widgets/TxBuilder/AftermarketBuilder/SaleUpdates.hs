@@ -256,7 +256,7 @@ spotEditWidget model@AppModel{..} = do
         ]
     , spacer
     , hstack
-        [ label "Sale Price (assets separated with newlines)"
+        [ label "Sale Price (assets separated with newlines):"
             `styleBasic` [textSize 10]
         , spacer_ [width 3]
         , helpButton salePriceMsg
@@ -354,7 +354,7 @@ auctionEditWidget model@AppModel{..} = do
         ]
     , spacer
     , hstack
-        [ label "Starting Price (assets separated with newlines)"
+        [ label "Starting Price (assets separated with newlines):"
             `styleBasic` [textSize 10]
         , spacer_ [width 3]
         , helpButton startingPriceMsg

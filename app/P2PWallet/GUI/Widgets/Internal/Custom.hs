@@ -92,4 +92,5 @@ customAlertMsg msg closeEvt = do
         , textSize 12
         , bgColor transparent
         , border 0 transparent
+        , textColor lightGray
         ]

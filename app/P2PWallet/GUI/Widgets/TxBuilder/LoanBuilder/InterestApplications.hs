@@ -19,8 +19,37 @@ interestApplicationsList = map utxoRow
       hstack
         [ vstack
             [ hstack
-                [ label ("Apply Interest/Penalties For " <> alias)
+                [ label "Apply Interest/Penalties"
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , let prettyRef = display utxoRef in
+                  flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText prettyRef] $
+                      label targetUTxOIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ alias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
                 , label (show requiredApplicationCount <> " time(s)")
                     `styleBasic` [textSize 10, textColor white]

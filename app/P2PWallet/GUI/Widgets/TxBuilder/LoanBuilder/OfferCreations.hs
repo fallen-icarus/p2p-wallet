@@ -4,40 +4,203 @@ module P2PWallet.GUI.Widgets.TxBuilder.LoanBuilder.OfferCreations
   , editOfferCreationWidget
   ) where
 
-import Monomer as M
+import Monomer as M hiding (duration)
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal
+import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.MonomerOptics()
 import P2PWallet.GUI.Widgets.Internal.Custom
+import P2PWallet.Plutus
 import P2PWallet.Prelude
 
-offerCreationsList :: ReverseTickerMap -> [(Int,OfferCreation)] -> [AppNode]
-offerCreationsList reverseTickerMap = map utxoRow
+offerCreationsList :: ReverseTickerMap -> TimeZone -> [(Int,OfferCreation)] -> [AppNode]
+offerCreationsList reverseTickerMap timeZone = map utxoRow
   where
+    genLenderTerms :: OfferCreation -> Loans.LenderTerms
+    genLenderTerms OfferCreation{..} = Loans.LenderTerms
+      { lenderCredential = lenderCredential
+      , lenderAddress = paymentWallet ^. #paymentAddress
+      , loanTerm = toPlutusTime $ convertDaysToPosixPeriod loanTerm
+      , loanAmount = loanAmount
+      , interest = interest
+      , compoundingInterest = compoundingInterest
+      , epochDuration = toPlutusTime . convertDaysToPosixPeriod <$> epochDuration
+      , minPayment = minPayment
+      , penalty = penalty
+      , claimPeriod = toPlutusTime $ convertDaysToPosixPeriod claimPeriod
+      , offerExpiration = (+ currentTime) . toPlutusTime . convertDaysToPosixPeriod <$> offerExpiration
+      , collateralization = sortOn fst collateralization
+      , offerDeposit = unLovelace deposit
+      , collateralIsSwappable = collateralIsSwappable
+      }
+
+    collateralAssetWidget :: NativeAsset -> (NativeAsset,Rational) -> AppNode
+    collateralAssetWidget loanAsset (collateralAsset, price) = do
+      let formattedPrice = showPriceFormatted reverseTickerMap collateralAsset loanAsset price
+          prettyPrice = mconcat
+            [ formattedPrice
+            , " "
+            , showAssetNameOnly reverseTickerMap collateralAsset
+            , " / "
+            , showAssetNameOnly reverseTickerMap loanAsset
+            ]
+      hstack
+        [ spacer_ [width 2]
+        , label prettyPrice
+            `styleBasic` [textSize 8, textColor lightGray]
+        , spacer_ [width 2]
+        ] `styleBasic` 
+            [ bgColor customGray4
+            , padding 2
+            , paddingT 1
+            , paddingT 1
+            , radius 3
+            , border 1 customGray1
+            ]
+
     utxoRow :: (Int,OfferCreation) -> AppNode
-    utxoRow s@(idx,OfferCreation{..}) = do
-      let prettyLoanAmount = showAssetBalance True reverseTickerMap loanAmount
-          numberOfCollateral = length collateralization
+    utxoRow s@(idx,oc@OfferCreation{alias,paymentWallet}) = do
+      let Loans.OfferDatum{..} = Loans.createOfferDatum $ genLenderTerms oc
+          loanAmount = toNativeAsset loanAsset & #quantity .~ loanPrincipal
+          prettyLoanAmount = showAssetBalance True reverseTickerMap loanAmount
+          duration = calcDaysInPosixPeriod $ fromPlutusTime loanTerm
+          collateralPrices = map (over _1 toNativeAsset . over _2 toRational) 
+                           $ collateralization ^. #unCollateralization
+          prettyInterest 
+            | loanInterest == 0 = "Interest-Free"
+            | otherwise = unwords
+                [ if compoundingInterest then "Compounding" else "Non-Compounding"
+                , "Interest:"
+                , displayPercentage (toRational loanInterest) <> "%"
+                ]
+          prettyEpochDuration = flip (maybe "No Loan Epochs") epochDuration $ \freq ->
+            unwords
+              [ "Loan Epoch:"
+              , show (calcDaysInPosixPeriod $ fromPlutusTime freq)
+              , "Day(s)"
+              ]
+          prettyMinPayment = unwords
+            [ "Minimum Payment:"
+            , showAssetBalance True reverseTickerMap $ loanAmount & #quantity .~ minPayment
+            ]
+          prettyPenalty = case penalty of
+            Loans.NoPenalty -> "No Penalty"
+            Loans.FixedFee fee -> unwords
+              [ "Fee Penalty:"
+              , showAssetBalance True reverseTickerMap $ loanAmount & #quantity .~ fee
+              ]
+            Loans.PercentFee percent -> unwords
+              [ "Percent Penalty:"
+              , displayPercentage (toRational percent) <> "%"
+              ]
+          prettyExpirationTime = maybe "Offer does not expire." $ \exprTime ->
+            unwords
+              [ "Offer Expires:"
+              , showLocalDate timeZone $ fromPlutusTime exprTime
+              , showLocalTime timeZone $ fromPlutusTime exprTime
+              ]
+          prettyClaimPeriod = unwords
+            [ "Claim Period:"
+            , show $ oc ^. #claimPeriod
+            , "Day(s)"
+            ]
+          prettyOfferTime = prettyExpirationTime offerExpiration <> "\n" <> prettyClaimPeriod
+          swapCollateralMsg = "Collateral can be swapped out for other approved collateral"
+          payToAddress = paymentWallet ^. #paymentAddress
+          addressTip = unwords
+            [ "Payments to"
+            , paymentWallet ^. #alias <> ":"
+            , display payToAddress
+            ]
       hstack
         [ vstack
             [ hstack
-                [ label ("Offer for " <> prettyLoanAmount <> " Loan")
+                [ label "Create Loan Offer"
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ alias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ 
+                    tooltip_ prettyOfferTime [tooltipDelay 0] $
+                      label expirationIcon
+                        `styleBasic` 
+                          [ textMiddle
+                          , textFont "Remix"
+                          , textSize 10
+                          , textColor customRed
+                          ]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ addressTip [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText $ display payToAddress] $
+                      label targetAddressIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
                 , filler
-                , label ("Duration: " <> show loanTerm <> " Days")
+                , label (prettyLoanAmount <> " for " <> show duration <> " Day(s)")
                     `styleBasic` [textSize 10, textColor white]
+                ]
+            , spacer_ [width 3]
+            , hstack
+                [ label prettyInterest
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , filler
+                , label prettyEpochDuration
+                    `styleBasic` [textSize 8, textColor lightGray]
+                ]
+            , widgetIf (isJust epochDuration) $ vstack
+                [ spacer_ [width 3]
+                , hstack
+                    [ label prettyMinPayment
+                        `styleBasic` [textSize 8, textColor lightGray]
+                    , filler
+                    , label prettyPenalty
+                        `styleBasic` [textSize 8, textColor lightGray]
+                    ]
                 ]
             , spacer_ [width 2]
             , hstack
-                [ label ("Lender: " <> alias <> " (" <> display lenderCredential <> ")")
-                    `styleBasic` [textSize 8, textColor lightGray]
-                , filler
-                , label (show numberOfCollateral <> " Collateral Asset(s)")
-                    `styleBasic` [textSize 8, textColor lightGray]
+                [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
+                    [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
+                        label swappableCollateralIcon
+                          `styleBasic` 
+                            [ textMiddle
+                            , textFont "Remix"
+                            , textSize 10
+                            , textColor customBlue
+                            , paddingT 1
+                            ]
+                    , spacer_ [width 2]
+                    ]
+                , box_ [alignTop] $ label "Collateralization:"
+                    `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+                , spacer_ [width 3]
+                , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
+                    \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
                 ]
             ] `styleBasic` 
                 [ padding 10
@@ -299,7 +462,7 @@ editOfferCreationWidget AppModel{txBuilderModel, knownWallets, reverseTickerMap,
     , hstack
         [ helpButton offerCollateralMsg
         , spacer_ [width 3]
-        , label "Collateral Values (separated with newlines)"
+        , label "Collateral Values (separated with newlines):"
             `styleBasic` [textSize 10]
         ]
     , spacer

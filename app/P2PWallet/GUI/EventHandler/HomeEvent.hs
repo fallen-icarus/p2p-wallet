@@ -462,9 +462,9 @@ handleHomeEvent model@AppModel{..} evt = case evt of
   -----------------------------------------------
   UpdateLenderPaymentAddress modal -> case modal of
     StartAdding mLoanUTxO -> 
-      let PaymentWallet{network,paymentAddress} = homeModel ^. #selectedWallet
+      let wallet@PaymentWallet{alias,network} = homeModel ^. #selectedWallet
           newInput = 
-            createNewLenderAddressUpdate network paymentAddress $ fromMaybe def mLoanUTxO
+            createNewLenderAddressUpdate network wallet alias $ fromMaybe def mLoanUTxO
        in [ Model $ model 
               & #homeModel % #newLenderAddressUpdate ?~ newInput
           ]

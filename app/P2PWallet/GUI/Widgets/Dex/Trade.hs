@@ -394,8 +394,8 @@ createLimitOrderWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
       -- the order book is in units of.
       pricePlaceholder = offerAssetName <> " / " <> askAssetName
       quantityPlaceholder
-        | tradingPairInverted = "# " <> askAssetName
-        | otherwise = "# " <> offerAssetName
+        | tradingPairInverted = askAssetName
+        | otherwise = offerAssetName
       buyOffStyle = def 
         `styleBasic` [ bgColor customGray4 , textColor lightGray ]
         `styleHover` [ textColor customBlue ]
@@ -538,7 +538,6 @@ createLiquiditySwapWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
       offerAssetName = showAssetNameOnly reverseTickerMap $ unOfferAsset offerAsset
       askAssetName = showAssetNameOnly reverseTickerMap $ unAskAsset askAsset
       pricePlaceholder = offerAssetName <> " / " <> askAssetName
-      quantityPlaceholder x = "# " <> x
       buyPriceLabel = "Buy " <> askAssetName <> " Price:"
       sellPriceLabel = "Sell " <> askAssetName <> " Price:"
       depositLabel = fromString . printf "%s Deposit:"
@@ -583,7 +582,7 @@ createLiquiditySwapWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
                 `styleBasic` [textSize 10]
             , spacer
             , textField_ (toLensVL $ #dexModel % #newSwapCreation % #offerQuantity) 
-                  [placeholder $ quantityPlaceholder offerAssetName] 
+                  [placeholder offerAssetName] 
                 `styleBasic` [textSize 10, width 100, bgColor customGray1, sndColor darkGray]
                 `styleFocus` [border 1 customBlue]
             ]
@@ -606,7 +605,7 @@ createLiquiditySwapWidget AppModel{dexModel=DexModel{..},reverseTickerMap} = do
                 `styleBasic` [textSize 10]
             , spacer
             , textField_ (toLensVL askQuantityLens)
-                  [placeholder $ quantityPlaceholder askAssetName] 
+                  [placeholder askAssetName] 
                 `styleBasic` [textSize 10, width 100, bgColor customGray1, sndColor darkGray]
                 `styleFocus` [border 1 customBlue]
             ]
@@ -788,7 +787,7 @@ getSwapQuantityWidget AppModel{dexModel=DexModel{..},reverseTickerMap}= do
             ]
         , spacer
         , hstack
-            [ label "Approximate Cost:"
+            [ label "Cost:"
                 `styleBasic` [textSize 10]
             , spacer
             , label (showAssetBalance True reverseTickerMap askAssetCost)

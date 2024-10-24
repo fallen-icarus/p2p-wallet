@@ -210,9 +210,10 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
             , hstack
                 [ label sellPriceCaption
                     `styleBasic` [textSize 8, textColor lightGray]
-                , spacer_ [width 10]
-                , separatorLine
-                , spacer_ [width 10]
+                , spacer_ [width 5]
+                , label "=="
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , spacer_ [width 5]
                 , label buyPriceCaption
                     `styleBasic` [textSize 8, textColor lightGray]
                 , filler

@@ -21,14 +21,43 @@ expiredClaimsList = map utxoRow
       let Loans.ActiveDatum{..} = fromMaybe def $ loanUTxOActiveDatum loanUTxO
           titleMsg
             | isJust borrowerCredential = 
-                "Claim Lost Collateral For " <> walletAlias
+                "Claim Lost Loan Collateral"
             | otherwise = 
-                "Claim Defaulted Collateral For " <> walletAlias
+                "Claim Defaulted Loan Collateral"
       hstack
         [ vstack
             [ hstack
                 [ label titleMsg
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , let prettyRef = display $ loanUTxO ^. #utxoRef in
+                  flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText prettyRef] $
+                      label targetUTxOIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ walletAlias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
                 ]
             , spacer_ [width 2]

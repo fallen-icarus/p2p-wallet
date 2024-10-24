@@ -8,6 +8,7 @@ import Monomer as M
 
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.HelpMessages
 import P2PWallet.GUI.Icons
@@ -18,26 +19,49 @@ import P2PWallet.Prelude
 askCreationsList :: ReverseTickerMap -> [(Int,AskCreation)] -> [AppNode]
 askCreationsList reverseTickerMap = map utxoRow
   where
+    collateralAssetWidget :: NativeAsset -> AppNode
+    collateralAssetWidget asset = do
+      hstack
+        [ spacer_ [width 2]
+        , copyableLabelSelf (showAssetNameOnly reverseTickerMap asset) lightGray 8
+        , spacer_ [width 2]
+        ] `styleBasic` 
+            [ bgColor customGray4
+            , padding 2
+            , radius 3
+            , border 1 customGray1
+            ]
+
     utxoRow :: (Int,AskCreation) -> AppNode
     utxoRow s@(idx,AskCreation{..}) = do
       let askAmount = showAssetBalance True reverseTickerMap loanAmount
-          numberOfCollateral = length collateral
       hstack
         [ vstack
             [ hstack
-                [ label ("Ask for " <> askAmount <> " Loan")
+                [ label "Create Loan Ask"
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ alias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
-                , label ("Duration: " <> show loanTerm <> " Days")
+                , label (askAmount <> " for " <> show loanTerm <> " Day(s)")
                     `styleBasic` [textSize 10, textColor white]
                 ]
             , spacer_ [width 2]
             , hstack
-                [ label ("Borrower ID: " <> alias <> " (" <> display borrowerCredential <> ")")
-                    `styleBasic` [textSize 8, textColor lightGray]
-                , filler
-                , label (show numberOfCollateral <> " Collateral Asset(s)")
-                    `styleBasic` [textSize 8, textColor lightGray]
+                [ box_ [alignTop] $ label "Offered Collateral:"
+                    `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+                , spacer_ [width 3]
+                , vstack_ [childSpacing_ 3] $ for (groupInto 4 collateral) $ 
+                    \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
                 ]
             ] `styleBasic` 
                 [ padding 10
@@ -190,7 +214,7 @@ editAskCreationWidget _ = do
                 ]
               `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         , spacer_ [width 3]
-        , label "Collateral Assets (separated with newlines)"
+        , label "Collateral Assets (separated with newlines):"
             `styleBasic` [textSize 10]
         ]
     , spacer
@@ -211,3 +235,21 @@ editAskCreationWidget _ = do
         , padding 20
         , radius 20
         ]
+
+-------------------------------------------------
+-- Helper Widgets
+-------------------------------------------------
+-- | A label button that will copy itself.
+copyableLabelSelf :: Text -> Color -> Double -> WidgetNode s AppEvent
+copyableLabelSelf caption color fontSize = 
+  tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
+    `styleBasic`
+      [ padding 0
+      , radius 5
+      , textMiddle
+      , textSize fontSize
+      , border 0 transparent
+      , textColor color
+      , bgColor transparent
+      ]
+    `styleHover` [textColor customBlue, cursorIcon CursorHand]

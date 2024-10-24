@@ -32,7 +32,7 @@ ownBidsWidget model@AppModel{scene=_,..} =
           , not $ model ^. #waitingStatus % #syncingOptionsContracts
           ]
       , bidsFilterWidget model `nodeVisible` (buyerModel ^. #showBidFilter)
-      , loanBidClaimAddressUpdateWidget
+      , loanBidClaimAddressUpdateWidget model
           `nodeVisible` and
             [ isJust $ buyerModel ^. #newLoanKeyBidClaim
             , buyerModel ^. #showBidClaimLenderAddressWidget
@@ -814,7 +814,7 @@ updateSpotBidWidget model@AppModel{..} = do
         ]
     , spacer
     , hstack
-        [ label "Bid Price (assets separated with newlines)"
+        [ label "Bid Price (assets separated with newlines):"
             `styleBasic` [textSize 10]
         , spacer_ [width 3]
         , helpButton bidPriceMsg
@@ -937,7 +937,7 @@ updateClaimBidWidget model@AppModel{..} = do
         ]
     , spacer
     , hstack
-        [ label "Bid Price (assets separated with newlines)"
+        [ label "Bid Price (assets separated with newlines):"
             `styleBasic` [textSize 10]
         , spacer_ [width 3]
         , helpButton bidPriceMsg
@@ -958,19 +958,34 @@ updateClaimBidWidget model@AppModel{..} = do
           ]
     ] `styleBasic` [padding 20]
 
-loanBidClaimAddressUpdateWidget :: AppNode
-loanBidClaimAddressUpdateWidget = do
+loanBidClaimAddressUpdateWidget :: AppModel -> AppNode
+loanBidClaimAddressUpdateWidget AppModel{knownWallets} = do
   let maybeLens' = maybeLens def (#aftermarketModel % #buyerModel % #newLoanKeyBidClaim)
+      innerDormantStyle = 
+        def `styleBasic` [textSize 10, bgColor customGray3, border 1 black]
+            `styleHover` [textSize 10, bgColor customGray2, border 1 black]
+      innerFocusedStyle = 
+        def `styleFocus` [textSize 10, bgColor customGray3, border 1 customBlue]
+            `styleFocusHover` [textSize 10, bgColor customGray2, border 1 customBlue]
   vstack
     [ centerWidget $ vstack
         [ centerWidgetH $ label "Where would you like future loan payments to go for these loans?"
         , spacer_ [width 20]
-        , hstack
+        , centerWidgetH $ hstack
             [ label "Address:"
             , spacer
-            , textField (toLensVL $ maybeLens' % #newPaymentAddress)
-                `styleBasic` [textSize 10, bgColor customGray1, sndColor darkGray]
-                `styleFocus` [border 1 customBlue]
+            , textDropdown_ 
+                  (toLensVL $ maybeLens' % #newPaymentWallet) 
+                  (knownWallets ^. #paymentWallets) 
+                  (view #alias) -- The dropdown displays the wallet's alias in the menu.
+                  [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+                `styleBasic` 
+                  [ bgColor customGray2
+                  , width 150
+                  , border 1 black
+                  , textSize 10
+                  ]
+                `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             ]
         , spacer
         , hstack 

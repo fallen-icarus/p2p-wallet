@@ -40,6 +40,8 @@ swapExecutionsList reverseTickerMap = map utxoRow
                 [ label "Execute Swap"
                     `styleBasic` [textSize 10, textColor customBlue]
                 , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
                 , let prettyRef = display utxoRef in
                   flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
                     box_ [alignMiddle, onClick $ CopyText prettyRef] $

@@ -21,11 +21,62 @@ lenderAddressUpdatesList = map utxoRow
     utxoRow :: (Int, LenderAddressUpdate) -> AppNode
     utxoRow s@(idx,LenderAddressUpdate{..}) = do
       let Loans.ActiveDatum{..} = fromMaybe def $ loanUTxOActiveDatum loanUTxO
+          addressTip = unwords
+            [ "Payments to"
+            , newPaymentWallet ^. #alias <> ":"
+            , display $ newPaymentWallet ^. #paymentAddress
+            ]
       hstack
         [ vstack
             [ hstack
                 [ label "Update Loan Payment Address"
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , let prettyRef = display $ loanUTxO ^. #utxoRef in
+                  flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText prettyRef] $
+                      label targetUTxOIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ alias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ addressTip [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText $ display $ newPaymentWallet ^. #paymentAddress] $
+                      label targetAddressIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
                 , filler
                 ]
             , spacer_ [width 2]
@@ -75,18 +126,33 @@ lenderAddressUpdatesList = map utxoRow
             ]
         ]
 
-editLenderAddressUpdateWidget :: AppNode
-editLenderAddressUpdateWidget = do
+editLenderAddressUpdateWidget :: AppModel -> AppNode
+editLenderAddressUpdateWidget AppModel{knownWallets} = do
   let maybeLens' = maybeLens (def,def) $ #txBuilderModel % #loanBuilderModel % #targetAddressUpdate
+      innerDormantStyle = 
+        def `styleBasic` [textSize 10, bgColor customGray3, border 1 black]
+            `styleHover` [textSize 10, bgColor customGray2, border 1 black]
+      innerFocusedStyle = 
+        def `styleFocus` [textSize 10, bgColor customGray3, border 1 customBlue]
+            `styleFocusHover` [textSize 10, bgColor customGray2, border 1 customBlue]
   centerWidget $ vstack
     [ centerWidgetH $ label "Where would you like future loan payments to go?"
     , spacer_ [width 20]
-    , hstack
+    , centerWidgetH $ hstack
         [ label "Address:"
         , spacer
-        , textField (toLensVL $ maybeLens' % _2 % #newPaymentAddress)
-            `styleBasic` [textSize 10, bgColor customGray1, sndColor darkGray]
-            `styleFocus` [border 1 customBlue]
+        , textDropdown_ 
+              (toLensVL $ maybeLens' % _2 % #newPaymentWallet) 
+              (knownWallets ^. #paymentWallets) 
+              (view #alias) -- The dropdown displays the wallet's alias in the menu.
+              [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+            `styleBasic` 
+              [ bgColor customGray2
+              , width 150
+              , border 1 black
+              , textSize 10
+              ]
+            `styleHover` [bgColor customGray1, cursorIcon CursorHand]
         ]
     , spacer
     , hstack 

@@ -97,18 +97,33 @@ loanKeySpotPurchasesList reverseTickerMap = map utxoRow
             ]
         ]
 
-editLoanKeySpotPurchase :: AppNode
-editLoanKeySpotPurchase = do
+editLoanKeySpotPurchase :: AppModel -> AppNode
+editLoanKeySpotPurchase AppModel{knownWallets} = do
   let maybeLens' = maybeLens (0,def) (#txBuilderModel % #aftermarketBuilderModel % #targetLoanKeySpotPurchase)
+      innerDormantStyle = 
+        def `styleBasic` [textSize 10, bgColor customGray3, border 1 black]
+            `styleHover` [textSize 10, bgColor customGray2, border 1 black]
+      innerFocusedStyle = 
+        def `styleFocus` [textSize 10, bgColor customGray3, border 1 customBlue]
+            `styleFocusHover` [textSize 10, bgColor customGray2, border 1 customBlue]
   centerWidget $ vstack
     [ centerWidgetH $ label "Where would you like future loan payments to go for these loans?"
     , spacer_ [width 20]
-    , hstack
+    , centerWidgetH $ hstack
         [ label "Address:"
         , spacer
-        , textField (toLensVL $ maybeLens' % _2 % #newPaymentAddress)
-            `styleBasic` [textSize 10, bgColor customGray1, sndColor darkGray]
-            `styleFocus` [border 1 customBlue]
+        , textDropdown_ 
+              (toLensVL $ maybeLens' % _2 % #newPaymentWallet) 
+              (knownWallets ^. #paymentWallets) 
+              (view #alias) -- The dropdown displays the wallet's alias in the menu.
+              [itemBasicStyle innerDormantStyle, itemSelectedStyle innerFocusedStyle]
+            `styleBasic` 
+              [ bgColor customGray2
+              , width 150
+              , border 1 black
+              , textSize 10
+              ]
+            `styleHover` [bgColor customGray1, cursorIcon CursorHand]
         ]
     , spacer
     , hstack 

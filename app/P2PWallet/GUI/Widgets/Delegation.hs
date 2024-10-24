@@ -597,7 +597,7 @@ drepInfoWidget DRep{..} =
                     [textFont "Italics", textSize 12, textColor customRed]
             , spacer
             ]
-      , subField "Total Voting Power" votingPowerMsg $ display amount
+      , subField "Total DRep Voting Power" votingPowerMsg $ display amount
       ] 
   where
     changeDelegationButton :: AppNode

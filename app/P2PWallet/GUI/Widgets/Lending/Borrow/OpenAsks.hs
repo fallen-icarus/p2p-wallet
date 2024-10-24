@@ -97,10 +97,10 @@ openAsksWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,con
                 ]
             , spacer_ [width 2]
             , hstack
-                [ label "Offered Collateral:"
-                    `styleBasic` [textSize 8, textColor lightGray]
+                [ box_ [alignTop] $ label "Offered Collateral:"
+                    `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
                 , spacer_ [width 3]
-                , vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+                , vstack_ [childSpacing_ 3] $ for (groupInto 4 offeredCollateral) $ 
                     \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
                 ]
             ] `styleBasic` 
@@ -272,7 +272,7 @@ createNewAskWidget _ = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             , spacer_ [width 3]
-            , label "Collateral Assets (separated with newlines)"
+            , label "Collateral Assets (separated with newlines):"
                 `styleBasic` [textSize 10]
             ]
         , spacer
@@ -371,7 +371,7 @@ updateAskWidget _ = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             , spacer_ [width 3]
-            , label "Collateral Assets (separated with newlines)"
+            , label "Collateral Assets (separated with newlines):"
                 `styleBasic` [textSize 10]
             ]
         , spacer
@@ -562,7 +562,7 @@ asksFilterWidget AppModel{lendingModel=LendingModel{..}} = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             , spacer_ [width 3]
-            , label "Collateral Assets (separated with newlines)"
+            , label "Collateral Assets (separated with newlines):"
                 `styleBasic` [textSize 10]
             ]
         , spacer

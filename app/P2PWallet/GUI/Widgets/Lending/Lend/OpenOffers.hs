@@ -144,11 +144,18 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
             , showLocalDate timeZone blockTime
             , showLocalTime timeZone blockTime
             ]
-          prettyExpirationTime exprTime = unwords
-            [ "Expires:"
-            , showLocalDate timeZone exprTime
-            , showLocalTime timeZone exprTime
+          prettyExpirationTime = maybe "Offer does not expire." $ \exprTime ->
+            unwords
+              [ "Offer Expires:"
+              , showLocalDate timeZone $ fromPlutusTime exprTime
+              , showLocalTime timeZone $ fromPlutusTime exprTime
+              ]
+          prettyClaimPeriod = unwords
+            [ "Claim Period:"
+            , show $ calcDaysInPosixPeriod $ fromPlutusTime claimPeriod
+            , "Day(s)"
             ]
+          prettyOfferTime = prettyExpirationTime offerExpiration <> "\n" <> prettyClaimPeriod
           swapCollateralMsg = "Collateral can be swapped out for other approved collateral"
           payToAddress = either (const "error") fst $ plutusToBech32 network lenderAddress
           mTargetWallet = find ((==payToAddress) . view #paymentAddress) 
@@ -193,18 +200,16 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
                         , textSize 10
                         , textColor customBlue
                         ]
-                , widgetMaybe offerExpiration $ \exprTime -> hstack
-                    [ spacer_ [width 5]
-                    , flip styleBasic [textSize 10] $ 
-                        tooltip_ (prettyExpirationTime $ fromPlutusTime exprTime) [tooltipDelay 0] $
-                          label expirationIcon
-                            `styleBasic` 
-                              [ textMiddle
-                              , textFont "Remix"
-                              , textSize 10
-                              , textColor customRed
-                              ]
-                    ]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ 
+                    tooltip_ prettyOfferTime [tooltipDelay 0] $
+                      label expirationIcon
+                        `styleBasic` 
+                          [ textMiddle
+                          , textFont "Remix"
+                          , textSize 10
+                          , textColor customRed
+                          ]
                 , spacer_ [width 5]
                 , flip styleBasic [textSize 10] $ tooltip_ addressTip [tooltipDelay 0] $
                     box_ [alignMiddle, onClick $ CopyText $ display payToAddress] $
@@ -240,6 +245,13 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
                             , radius 5
                             ]
                           `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , widgetIf (maybe False (<= toPlutusTime currentTime) offerExpiration) $
+                    hstack
+                      [ filler
+                      , label "Expired"
+                          `styleBasic` [textSize 12, textColor customRed, textFont "Italics"]
+                      , filler
+                      ]
                 , filler
                 , label "Duration:"
                     `styleBasic` [textSize 10, textColor white]
@@ -267,7 +279,7 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
                 ]
             , spacer_ [width 2]
             , hstack
-                [ widgetIf collateralIsSwappable $ hstack
+                [ widgetIf collateralIsSwappable $ box_ [alignTop] $ hstack
                     [ flip styleBasic [textSize 10] $ tooltip_ swapCollateralMsg [tooltipDelay 0] $
                         label swappableCollateralIcon
                           `styleBasic` 
@@ -275,11 +287,12 @@ openOffersWidget model@AppModel{knownWallets,lendingModel=LendingModel{..},rever
                             , textFont "Remix"
                             , textSize 10
                             , textColor customBlue
+                            , paddingT 1
                             ]
                     , spacer_ [width 2]
                     ]
-                , label "Collateralization:"
-                    `styleBasic` [textSize 8, textColor lightGray]
+                , box_ [alignTop] $ label "Collateralization:"
+                    `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
                 , spacer_ [width 3]
                 , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
                     \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
@@ -511,7 +524,7 @@ offersFilterWidget AppModel{lendingModel=LendingModel{..}} = do
                     ]
                   `styleHover` [bgColor customGray2, cursorIcon CursorHand]
             , spacer_ [width 3]
-            , label "Collateral Assets (separated with newlines)"
+            , label "Collateral Assets (separated with newlines):"
                 `styleBasic` [textSize 10]
             ]
         , spacer
@@ -808,7 +821,7 @@ updateOfferWidget AppModel{lendingModel, knownWallets, reverseTickerMap, tickerM
         , hstack
             [ helpButton offerCollateralMsg
             , spacer_ [width 3]
-            , label "Collateral Values (separated with newlines)"
+            , label "Collateral Values (separated with newlines):"
                 `styleBasic` [textSize 10]
             ]
         , spacer

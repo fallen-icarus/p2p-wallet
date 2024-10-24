@@ -128,9 +128,8 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
   PurchaseLoanKeySpot modal -> case modal of
     StartAdding mTargets ->
       let (aftermarketUTxO,loanUTxOs) = fromMaybe (def,[]) mTargets
-          PaymentWallet{network,paymentAddress} = fromMaybe def 
-                                                $ maybeHead 
-                                                $ knownWallets ^. #paymentWallets
+          wallet@PaymentWallet{network} = 
+            fromMaybe def $ maybeHead $ knownWallets ^. #paymentWallets
           MarketWallet{alias} = aftermarketModel ^. #selectedWallet
           Config{currentTime} = config
           activeLoanUTxOs = 
@@ -138,12 +137,12 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
           expiredLoanUTxOs = 
             filter (maybe False (<= toPlutusTime currentTime) . loanUTxOExpiration) loanUTxOs
           newAddressUpdates = 
-            map (createNewLenderAddressUpdate network paymentAddress) activeLoanUTxOs
+            map (createNewLenderAddressUpdate network wallet alias) activeLoanUTxOs
           newClaims = 
             map (loanUTxOToExpiredClaim network alias Nothing Nothing currentTime) expiredLoanUTxOs
           newPurchase = NewLoanKeySpotPurchase
             { spotPurchase = aftermarketUTxOToSpotPurchase network aftermarketUTxO
-            , newPaymentAddress = display paymentAddress
+            , newPaymentWallet = wallet
             , lenderAddressUpdates = newAddressUpdates
             , expiredClaims = newClaims
             }
@@ -437,9 +436,8 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
   ClaimAcceptedLoanKeyBid modal -> case modal of
     StartAdding mTargets ->
       let (aftermarketUTxO,loanUTxOs) = fromMaybe (def,[]) mTargets
-          PaymentWallet{network,paymentAddress} = fromMaybe def 
-                                                $ maybeHead 
-                                                $ knownWallets ^. #paymentWallets
+          wallet@PaymentWallet{network} = 
+            fromMaybe def $ maybeHead $ knownWallets ^. #paymentWallets
           marketWallet@MarketWallet{alias} = aftermarketModel ^. #selectedWallet
           Config{currentTime} = config
           activeLoanUTxOs = 
@@ -447,12 +445,12 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
           expiredLoanUTxOs = 
             filter (maybe False (<= toPlutusTime currentTime) . loanUTxOExpiration) loanUTxOs
           newAddressUpdates = 
-            map (createNewLenderAddressUpdate network paymentAddress) activeLoanUTxOs
+            map (createNewLenderAddressUpdate network wallet alias) activeLoanUTxOs
           newClaims = 
             map (loanUTxOToExpiredClaim network alias Nothing Nothing currentTime) expiredLoanUTxOs
           newBidClaim = NewLoanKeyAcceptedBidClaim
             { bidClaim = aftermarketUTxOToAcceptedBidClaim network marketWallet aftermarketUTxO
-            , newPaymentAddress = display paymentAddress
+            , newPaymentWallet = wallet
             , lenderAddressUpdates = newAddressUpdates
             , expiredClaims = newClaims
             }

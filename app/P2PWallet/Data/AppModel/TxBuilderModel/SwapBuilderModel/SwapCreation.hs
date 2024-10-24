@@ -43,6 +43,8 @@ data SwapCreation = SwapCreation
   -- | Which network the swaps are for. This is used internally to figure out which reference
   -- scripts to use.
   , network :: Network
+  -- | The dex wallet alias this creation is for.
+  , walletAlias :: Text
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''SwapCreation
@@ -109,6 +111,8 @@ data NewSwapCreation = NewSwapCreation
   -- | Which network the swaps are for. This is used internally to figure out which reference
   -- scripts to use.
   , network :: Network
+  -- | The dex wallet alias this creation is for.
+  , walletAlias :: Text
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''NewSwapCreation
@@ -127,22 +131,25 @@ instance Default NewSwapCreation where
     , arbitrageFee = "0.0"
     , count = 1
     , network = def
+    , walletAlias = ""
     }
 
 -- | Create a fresh `NewSwapCreation` for the trading pair.
-createNewSwapCreation :: Network -> (OfferAsset,AskAsset) -> NewSwapCreation
-createNewSwapCreation network (offerAsset,askAsset) =
+createNewSwapCreation :: Network -> Text -> (OfferAsset,AskAsset) -> NewSwapCreation
+createNewSwapCreation network alias (offerAsset,askAsset) =
   def & #offerAsset .~ offerAsset
       & #askAsset .~ askAsset
       & #network .~ network
+      & #walletAlias .~ alias
 
 -- | Clear the new swap creation while leaving the trading pair info.
 clearNewSwapCreation :: NewSwapCreation -> NewSwapCreation
-clearNewSwapCreation NewSwapCreation{offerAsset,askAsset,network,tradingPairInverted} =
+clearNewSwapCreation NewSwapCreation{walletAlias,offerAsset,askAsset,network,tradingPairInverted} =
   -- Just keep the fields that must stay the same.
   def & #offerAsset .~ offerAsset
       & #askAsset .~ askAsset
       & #network .~ network
+      & #walletAlias .~ walletAlias
       & #tradingPairInverted .~ tradingPairInverted
 
 -------------------------------------------------
@@ -240,6 +247,7 @@ verifyNewSwapCreation swapAddress reverseTickerMap NewSwapCreation{..} = do
     , swapType = swapType
     -- This will be used to re-invert things for editing.
     , tradingPairInverted = tradingPairInverted
+    , walletAlias = walletAlias
     }
 
 -- | Convert a `SwapCreation` back to a `NewSwapCreation` for editing. This needs to invert
@@ -304,4 +312,5 @@ toNewSwapCreation reverseTickerMap SwapCreation{..} = NewSwapCreation
   , count = count
   , network = network
   , tradingPairInverted = tradingPairInverted
+  , walletAlias = walletAlias
   }
