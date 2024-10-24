@@ -35,13 +35,15 @@ buyerWidget model@AppModel{optionsModel=OptionsModel{..}} =
   where
     OptionsBuyerModel{selectedContractAssets, choosingContractAssets} = buyerModel
 
+-- | The resulting trading pair will be inverted since it is from the perspective of the buyer
+-- instead of the writer.
 getContractAssetsWidget :: AppModel -> AppNode
 getContractAssetsWidget model = do
   centerWidget $ vstack
     [ centerWidgetH $ label "Which trading pair would you like to lookup?"
     , spacer_ [width 20]
     , centerWidgetH $ hstack
-        [ box_ [alignMiddle, onClick $ Alert offerAssetMsg] $
+        [ box_ [alignMiddle, onClick $ Alert buyerOfferAssetMsg] $
             label helpIcon
               `styleBasic`
                 [ border 0 transparent
@@ -53,7 +55,7 @@ getContractAssetsWidget model = do
                 ]
               `styleHover` [bgColor customGray2, cursorIcon CursorHand]
         , spacer_ [width 3]
-        , textField_ (toLensVL $ #optionsModel % #buyerModel % #newContractAssets % _1)
+        , textField_ (toLensVL $ #optionsModel % #buyerModel % #newContractAssets % _2)
               [placeholder "Offer Asset"]
             `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
             `styleFocus` [border 1 customBlue]
@@ -61,12 +63,12 @@ getContractAssetsWidget model = do
         , label remixArrowRightLine 
             `styleBasic` [textMiddle, textFont "Remix", textColor customBlue, radius 5]
         , spacer
-        , textField_ (toLensVL $ #optionsModel % #buyerModel % #newContractAssets % _2)
+        , textField_ (toLensVL $ #optionsModel % #buyerModel % #newContractAssets % _1)
               [placeholder "Ask Asset"]
             `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
             `styleFocus` [border 1 customBlue]
         , spacer_ [width 3]
-        , box_ [alignMiddle, onClick $ Alert askAssetMsg] $
+        , box_ [alignMiddle, onClick $ Alert buyerAskAssetMsg] $
             label helpIcon
               `styleBasic`
                 [ border 0 transparent

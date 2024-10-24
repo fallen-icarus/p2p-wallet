@@ -586,7 +586,7 @@ addAddressUpdateToBody txBody (_,WriterAddressUpdate{..}) =
       Testnet -> testnetSlotConfig
 
     newPlutusAddress = fromRight (Address (PubKeyCredential "") Nothing) 
-                     $ paymentAddressToPlutusAddress newPaymentAddress
+                     $ paymentAddressToPlutusAddress $ newPaymentWallet ^. #paymentAddress
 
     postUpdateDatum = 
       Options.createPostAddressUpdateActiveDatum 

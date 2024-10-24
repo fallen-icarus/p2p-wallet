@@ -284,15 +284,31 @@ handleWriterEvent model@AppModel{..} evt = case evt of
   -- Change Writer Payment Address
   -----------------------------------------------
   UpdateWriterPaymentAddress modal -> case modal of
-    StartAdding mOptionsUTxO -> 
-      let OptionsWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
-            optionsModel ^. #selectedWallet
-          newInput = 
-            createNewWriterAddressUpdate network alias stakeCredential stakeKeyDerivation $ 
-              fromMaybe def mOptionsUTxO
-       in [ Model $ model 
-              & #optionsModel % #writerModel % #newWriterAddressUpdate ?~ newInput
-          ]
+    StartAdding mOptionsUTxO -> case knownWallets ^. #paymentWallets of
+      [] -> [ Event $ 
+                Alert "You must add a payment wallet under the 'Home' page to update the address."
+            ]
+      ws@(x:_) ->
+        let OptionsWallet{network,alias,stakeCredential,stakeKeyDerivation} = 
+              optionsModel ^. #selectedWallet
+            optionsUTxO = fromMaybe def mOptionsUTxO
+            currentAddress = either (const "") fst
+                           $ plutusToBech32 network 
+                           $ view #paymentAddress
+                           $ fromMaybe def
+                           $ optionsUTxOActiveDatum optionsUTxO
+            wallet = fromMaybe x $ find ((==currentAddress) . view #paymentAddress) ws
+            newInput = 
+              createNewWriterAddressUpdate 
+                network 
+                alias 
+                stakeCredential 
+                stakeKeyDerivation 
+                wallet
+                optionsUTxO
+         in [ Model $ model 
+                & #optionsModel % #writerModel % #newWriterAddressUpdate ?~ newInput
+            ]
     CancelAdding -> 
       [ Model $ model 
           & #optionsModel % #writerModel % #newWriterAddressUpdate .~ Nothing 

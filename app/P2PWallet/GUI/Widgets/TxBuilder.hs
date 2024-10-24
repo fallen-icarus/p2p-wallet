@@ -152,7 +152,7 @@ txBuilderWidget model@AppModel{..} = do
           `nodeVisible` isJust (optionsBuilderModel ^. #targetProposalCreation)
       , editProposalUpdateWidget model
           `nodeVisible` isJust (optionsBuilderModel ^. #targetProposalUpdate)
-      , editWriterAddressUpdateWidget
+      , editWriterAddressUpdateWidget model
           `nodeVisible` isJust (optionsBuilderModel ^. #targetAddressUpdate)
       , editSaleCreationWidget model
           `nodeVisible` isJust (aftermarketBuilderModel ^. #targetSaleCreation)
