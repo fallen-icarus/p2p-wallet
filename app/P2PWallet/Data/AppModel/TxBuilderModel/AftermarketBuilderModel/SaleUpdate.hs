@@ -51,7 +51,6 @@ aftermarketUTxOToNewSaleCreation reverseTickerMap marketWallet paymentWallet u =
                   $ intersperse "\n" 
                   $ map (showAssetBalance True reverseTickerMap) prices
       , network = marketWallet ^. #network
-      , alias = marketWallet ^. #alias
       , showNfts = False
       }
   where

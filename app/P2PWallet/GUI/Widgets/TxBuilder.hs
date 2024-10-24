@@ -346,13 +346,13 @@ actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap,config} 
         , optionsContractExecutionsList reverseTickerMap (config ^. #timeZone) $ 
             optionsBuilderModel ^. #contractExecutions
         -- Aftermarket
-        , saleCreationsList $ aftermarketBuilderModel ^. #saleCreations
-        , saleClosesList $ aftermarketBuilderModel ^. #saleCloses
-        , saleUpdatesList $ aftermarketBuilderModel ^. #saleUpdates
+        , saleCreationsList reverseTickerMap $ aftermarketBuilderModel ^. #saleCreations
+        , saleClosesList reverseTickerMap $ aftermarketBuilderModel ^. #saleCloses
+        , saleUpdatesList reverseTickerMap $ aftermarketBuilderModel ^. #saleUpdates
         , loanKeySpotPurchasesList reverseTickerMap $ aftermarketBuilderModel ^. #loanKeySpotPurchases
-        , bidCreationsList $ aftermarketBuilderModel ^. #bidCreations
-        , bidClosesList $ aftermarketBuilderModel ^. #bidCloses
-        , bidUpdatesList $ aftermarketBuilderModel ^. #bidUpdates
+        , bidCreationsList reverseTickerMap $ aftermarketBuilderModel ^. #bidCreations
+        , bidClosesList reverseTickerMap $ aftermarketBuilderModel ^. #bidCloses
+        , bidUpdatesList reverseTickerMap $ aftermarketBuilderModel ^. #bidUpdates
         , claimBidAcceptancesList reverseTickerMap $ aftermarketBuilderModel ^. #claimBidAcceptances
         , loanKeyBidClaimsList reverseTickerMap $ aftermarketBuilderModel ^. #loanKeyBidClaims
         , optionsKeySpotPurchasesList reverseTickerMap $ aftermarketBuilderModel ^. #optionsKeySpotPurchases

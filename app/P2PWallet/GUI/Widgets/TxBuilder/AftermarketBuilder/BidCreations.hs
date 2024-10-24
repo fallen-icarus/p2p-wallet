@@ -7,6 +7,8 @@ module P2PWallet.GUI.Widgets.TxBuilder.AftermarketBuilder.BidCreations
 import Monomer as M
 
 import P2PWallet.Data.AppModel
+import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.DeFi.CardanoLoans qualified as Loans
 import P2PWallet.Data.DeFi.CardanoOptions qualified as Options
 import P2PWallet.GUI.Colors
@@ -17,36 +19,66 @@ import P2PWallet.GUI.Widgets.Aftermarket.Common
 import P2PWallet.GUI.Widgets.Internal.Custom
 import P2PWallet.Prelude
 
-bidCreationsList :: [(Int,BidCreation)] -> [AppNode]
-bidCreationsList = map utxoRow
+bidCreationsList :: ReverseTickerMap -> [(Int,BidCreation)] -> [AppNode]
+bidCreationsList reverseTickerMap = map utxoRow
   where
+    priceWidget :: NativeAsset -> AppNode
+    priceWidget priceAsset = do
+      hstack
+        [ spacer_ [width 2]
+        , label (showAssetBalance True reverseTickerMap priceAsset)
+            `styleBasic` [textSize 8, textColor lightGray]
+        , spacer_ [width 2]
+        ] `styleBasic` 
+            [ bgColor customGray4
+            , padding 2
+            , paddingT 1
+            , paddingT 1
+            , radius 3
+            , border 1 customGray1
+            ]
+
     utxoRow :: (Int,BidCreation) -> AppNode
     utxoRow s@(idx,BidCreation{..}) = do
       let policyId = maybe "" (view #policyId) $ maybeHead nfts
-          keyType
-            | policyId == Loans.activeBeaconCurrencySymbol = "Loan Keys"
-            | policyId == Options.activeBeaconCurrencySymbol = "Options Keys"
-            | otherwise = "Other NFTs"
           numberSold = length nfts
+          keyType
+            | policyId == Loans.activeBeaconCurrencySymbol =
+                show numberSold <> " Loan Key(s)"
+            | policyId == Options.activeBeaconCurrencySymbol =
+                show numberSold <> " Options Key(s)"
+            | otherwise =
+                show numberSold <> " Other NFT(s)"
           bidType
-            | isSpotBid = "Spot Bid"
-            | otherwise = "Claim Bid"
+            | isSpotBid = "Spot"
+            | otherwise = "Claim"
       hstack
         [ vstack
             [ hstack
-                [ label ("Create Aftermarket Bid for " <> alias)
+                [ label ("Create Aftermarket " <> bidType <> " Bid")
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ alias [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
                 , label keyType
                     `styleBasic` [textSize 10, textColor white]
                 ]
             , spacer_ [width 2]
             , hstack
-                [ label ("Type: " <> bidType)
-                    `styleBasic` [textSize 8, textColor lightGray]
-                , filler
-                , label (show numberSold <> " NFT(s)")
-                    `styleBasic` [textSize 8, textColor lightGray]
+                [ box_ [alignTop] $ label "Bid:"
+                    `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+                , spacer_ [width 2]
+                , vstack_ [childSpacing_ 3] $ for (groupInto 4 bid) $ 
+                    \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
                 ]
             ] `styleBasic` 
                 [ padding 10

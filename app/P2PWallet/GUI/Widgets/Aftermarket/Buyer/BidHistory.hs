@@ -529,11 +529,13 @@ bidInputs AppModel{..} = do
                 `styleBasic` [textSize 10, textColor white]
             ]
         , spacer_ [width 2]
-        , label "Bid Price:"
-            `styleBasic` [textSize 8, textColor lightGray]
-        , spacer_ [width 2]
-        , vstack_ [childSpacing_ 3] $ for (groupInto 3 prices) $ 
-            \p -> hstack_ [childSpacing_ 3] $ spacer : map priceWidget p
+        , hstack
+            [ box_ [alignTop] $ label "Bid:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+            , spacer_ [width 2]
+            , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
+                \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+            ]
         ] `styleBasic` 
             [ padding 10
             , bgColor customGray2
@@ -603,11 +605,13 @@ bidInputs AppModel{..} = do
                 `styleBasic` [textSize 10, textColor white]
             ]
         , spacer_ [width 2]
-        , label "Bid Price:"
-            `styleBasic` [textSize 8, textColor lightGray]
-        , spacer_ [width 2]
-        , vstack_ [childSpacing_ 3] $ for (groupInto 3 prices) $ 
-            \p -> hstack_ [childSpacing_ 3] $ spacer : map priceWidget p
+        , hstack
+            [ box_ [alignTop] $ label "Bid:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+            , spacer_ [width 2]
+            , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
+                \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+            ]
         ] `styleBasic` 
             [ padding 10
             , bgColor customGray2
@@ -692,11 +696,13 @@ bidInputs AppModel{..} = do
                 `styleBasic` [textSize 10, textColor white]
             ]
         , spacer_ [width 2]
-        , label "Bid Price:"
-            `styleBasic` [textSize 8, textColor lightGray]
-        , spacer_ [width 2]
-        , vstack_ [childSpacing_ 3] $ for (groupInto 3 prices) $ 
-            \p -> hstack_ [childSpacing_ 3] $ spacer : map priceWidget p
+        , hstack
+            [ box_ [alignTop] $ label "Bid:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+            , spacer_ [width 2]
+            , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
+                \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+            ]
         ] `styleBasic` 
             [ padding 10
             , bgColor customGray2
@@ -831,11 +837,13 @@ bidOutputs AppModel{..} = do
                 `styleBasic` [textSize 10, textColor white]
             ]
         , spacer_ [width 2]
-        , label "Bid Price:"
-            `styleBasic` [textSize 8, textColor lightGray]
-        , spacer_ [width 2]
-        , vstack_ [childSpacing_ 3] $ for (groupInto 3 prices) $ 
-            \p -> hstack_ [childSpacing_ 3] $ spacer : map priceWidget p
+        , hstack
+            [ box_ [alignTop] $ label "Bid:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+            , spacer_ [width 2]
+            , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
+                \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+            ]
         ] `styleBasic` 
             [ padding 10
             , bgColor customGray2
@@ -902,11 +910,13 @@ bidOutputs AppModel{..} = do
                 `styleBasic` [textSize 10, textColor white]
             ]
         , spacer_ [width 2]
-        , label "Bid Price:"
-            `styleBasic` [textSize 8, textColor lightGray]
-        , spacer_ [width 2]
-        , vstack_ [childSpacing_ 3] $ for (groupInto 3 prices) $ 
-            \p -> hstack_ [childSpacing_ 3] $ spacer : map priceWidget p
+        , hstack
+            [ box_ [alignTop] $ label "Bid:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+            , spacer_ [width 2]
+            , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
+                \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+            ]
         ] `styleBasic` 
             [ padding 10
             , bgColor customGray2
@@ -988,11 +998,13 @@ bidOutputs AppModel{..} = do
                 `styleBasic` [textSize 10, textColor white]
             ]
         , spacer_ [width 2]
-        , label "Bid Price:"
-            `styleBasic` [textSize 8, textColor lightGray]
-        , spacer_ [width 2]
-        , vstack_ [childSpacing_ 3] $ for (groupInto 3 prices) $ 
-            \p -> hstack_ [childSpacing_ 3] $ spacer : map priceWidget p
+        , hstack
+            [ box_ [alignTop] $ label "Bid:"
+                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+            , spacer_ [width 2]
+            , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
+                \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+            ]
         ] `styleBasic` 
             [ padding 10
             , bgColor customGray2

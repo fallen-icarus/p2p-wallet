@@ -54,16 +54,47 @@ claimBidAcceptancesList reverseTickerMap = map utxoRow
             [ hstack
                 [ label "Accept Claim Bid"
                     `styleBasic` [textSize 10, textColor customBlue]
+                , spacer_ [width 5]
+                , separatorLine `styleBasic` [fgColor darkGray, paddingT 1, paddingB 1]
+                , spacer_ [width 5]
+                , let prettyRef = display $ bidUTxO ^. #utxoRef in
+                  flip styleBasic [textSize 10] $ tooltip_ prettyRef [tooltipDelay 0] $
+                    box_ [alignMiddle, onClick $ CopyText prettyRef] $
+                      label targetUTxOIcon
+                        `styleBasic` 
+                          [ bgColor black
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 8
+                          , textColor customBlue
+                          , paddingT 1
+                          , paddingB 1
+                          , paddingL 3
+                          , paddingR 3
+                          , radius 5
+                          ]
+                        `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                , spacer_ [width 5]
+                , flip styleBasic [textSize 10] $ tooltip_ (marketWallet ^. #alias) [tooltipDelay 0] $
+                    label userIcon
+                      `styleBasic` 
+                        [ textMiddle
+                        , textFont "Remix"
+                        , textSize 8
+                        , textColor customBlue
+                        ]
                 , filler
                 , label (show numberSold <> " " <> keyType)
                     `styleBasic` [textSize 10, textColor white]
                 ]
             , spacer_ [width 2]
-            , label "Bid Price:"
-                `styleBasic` [textSize 8, textColor lightGray]
-            , spacer_ [width 2]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 3 prices) $ 
-                \p -> hstack_ [childSpacing_ 3] $ spacer : map priceWidget p
+            , hstack
+                [ box_ [alignTop] $ label "Bid:"
+                    `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+                , spacer_ [width 2]
+                , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
+                    \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+                ]
             ] `styleBasic` 
                 [ padding 10
                 , bgColor customGray2
@@ -126,7 +157,7 @@ editClaimBidAcceptance AppModel{..} = do
   centerWidget $ vstack
     [ centerWidgetH $ label "Where would you like the bid payment to go?"
     , spacer_ [width 20]
-    , hstack
+    , centerWidgetH $ hstack
         [ label "Payment Address:"
             `styleBasic` [textSize 10]
         , spacer
