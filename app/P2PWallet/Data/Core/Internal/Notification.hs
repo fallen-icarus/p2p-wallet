@@ -59,5 +59,6 @@ instance Default Notification where
 -------------------------------------------------
 class Notify a where
   -- | Generate the notification for a specific state change. If there is no state change,
-  -- `notify` should return `Nothing` so it can be filtered out.
-  notify :: (oldState ~ a, newState ~ a) => oldState -> newState -> Maybe Notification
+  -- `notify` should return `Nothing` so it can be filtered out. The `POSIXTime` is the current
+  -- time so that expirations can be checked.
+  notify :: (oldState ~ a, newState ~ a) => POSIXTime -> oldState -> newState -> Maybe Notification

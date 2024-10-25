@@ -12,6 +12,7 @@ import P2PWallet.Actions.SyncWallets
 import P2PWallet.Actions.Utils
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.AssetMaps
+import P2PWallet.Data.Core.Internal.Config
 import P2PWallet.Data.Core.Wallets
 import P2PWallet.GUI.EventHandler.AddressBookEvent
 import P2PWallet.GUI.EventHandler.AftermarketEvent
@@ -167,11 +168,12 @@ handleEvent _ _ model@AppModel{..} evt = case evt of
   -----------------------------------------------
   SyncWallets modal -> case modal of
     StartProcess _ -> 
+      let Config{network,currentTime} = config in
       -- Set `syncing` to True to let users know syncing is happening.
       [ Model $ model & #waitingStatus % #syncingWallets .~ True 
       , Task $ do
           runActionOrAlert (SyncWallets . ProcessResults) $ 
-            syncWallets databaseFile (config ^. #network) knownWallets
+            syncWallets databaseFile network currentTime knownWallets
       ]
     ProcessResults (resp@Wallets{..}, networkParams, newNotifications) ->
       -- Disable `syncing` and update the list of wallets. Also update the information for

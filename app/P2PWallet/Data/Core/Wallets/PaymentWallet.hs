@@ -178,7 +178,7 @@ instance Insertable PaymentWallet where
     ]
 
 instance Notify PaymentWallet where
-  notify oldState newState
+  notify _ oldState newState
     | null msg = Nothing
     | otherwise = Just $ Notification
         { notificationType = PaymentNotification
