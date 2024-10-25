@@ -7,3 +7,6 @@
 - ignore: {name: Use &&} 
 - ignore: {name: Use ||}
 - ignore: {name: Use ++}
+
+# Lambda case is less clear than `case x of`. For newbies to haskell, I think the latter is better.
+- ignore: {name: Use lambda-case}

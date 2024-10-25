@@ -39,7 +39,6 @@ drepIdToHex (DRepID drepId) = do
     _ -> return $ show $ PubKeyHash $ BuiltinByteString res
 
 hexToDrepId :: Text -> Either Text DRepID
-hexToDrepId h = fmap DRepID
-              $ maybeToRight ("Couldn't parse hexidecimal: '" <> h <> "'") 
-              $ fmap (T.decodeLatin1 . E.encode (E.EBech32 Cardano.drep) . unBuiltinByteString)
-              $ parseHex h
+hexToDrepId h = 
+  fmap DRepID $ maybeToRight ("Couldn't parse hexidecimal: '" <> h <> "'") $ 
+    T.decodeLatin1 . E.encode (E.EBech32 Cardano.drep) . unBuiltinByteString <$> parseHex h

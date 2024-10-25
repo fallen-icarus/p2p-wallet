@@ -682,8 +682,8 @@ getDRepWidget model = do
             [ label "Delegate To:"
             , hgrid_ [childSpacing_ 3]
                 [ choiceButton "DRep" (Just $ DRepDelegation "" False) (toLensVL rootLens)
-                , choiceButton "Always Abstain" (Just $ AlwaysAbstainDelegation) (toLensVL rootLens)
-                , choiceButton "Always No" (Just $ AlwaysNoDelegation) (toLensVL rootLens)
+                , choiceButton "Always Abstain" (Just AlwaysAbstainDelegation) (toLensVL rootLens)
+                , choiceButton "Always No" (Just AlwaysNoDelegation) (toLensVL rootLens)
                 ]
             ]
         , spacer
