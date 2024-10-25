@@ -201,6 +201,29 @@ loanUTxOExpiration LoanUTxO{loanDatum} = case loanDatum of
   Just (ActiveDatum Loans.ActiveDatum{loanExpiration}) -> Just loanExpiration
   _ -> Nothing
 
+offerHasExpired :: POSIXTime -> LoanUTxO -> Bool
+offerHasExpired currentTime LoanUTxO{loanDatum} = case loanDatum of
+  Just (OfferDatum Loans.OfferDatum{offerExpiration}) -> 
+    maybe False (<= toPlutusTime currentTime) offerExpiration
+  _ -> False
+
+loanHasExpired :: POSIXTime -> LoanUTxO -> Bool
+loanHasExpired currentTime LoanUTxO{loanDatum} = case loanDatum of
+  Just (ActiveDatum Loans.ActiveDatum{loanExpiration}) -> 
+    loanExpiration <= toPlutusTime currentTime
+  _ -> False
+
+loanRequiresRollover :: POSIXTime -> LoanUTxO -> Bool
+loanRequiresRollover currentTime LoanUTxO{loanDatum} = case loanDatum of
+  Just (ActiveDatum Loans.ActiveDatum{..}) -> 
+    case (+lastEpochBoundary) <$> epochDuration of
+      Nothing -> False
+      Just nextEpochBoundary -> 
+        if nextEpochBoundary < loanExpiration
+        then nextEpochBoundary <= toPlutusTime currentTime
+        else False 
+  _ -> False
+
 -------------------------------------------------
 -- Loan Event
 -------------------------------------------------
@@ -467,7 +490,7 @@ instance Insertable LoanWallet where
     ]
 
 instance Notify LoanWallet where
-  notify oldState newState
+  notify currentTime oldState newState
     | msg /= [] =
         Just $ Notification
           { notificationType = LoanNotification
@@ -512,11 +535,34 @@ instance Notify LoanWallet where
       activesMsg :: Text
       activesMsg
         | activeOnly (oldState ^. #utxos) /= activeOnly (newState ^. #utxos) = 
-            "Active loan statuses have changed."
-        | otherwise = ""
+            unwords $ intersperse "\n" $ filter (/="")
+              [ "Active loan statuses have changed."
+              , if any (loanHasExpired currentTime) $ newState ^. #utxos
+                then "Some loans have expired."
+                else ""
+              , if any (loanRequiresRollover currentTime) $ newState ^. #utxos
+                then "Some loans required interest/penalty applications."
+                else ""
+              ]
+        | otherwise = unwords $ intersperse "\n" $ filter (/="")
+            [ if any (loanHasExpired currentTime) $ newState ^. #utxos
+              then "Some loans have expired."
+              else ""
+            , if any (loanRequiresRollover currentTime) $ newState ^. #utxos
+              then "Some loans required interest/penalty applications."
+              else ""
+            ]
 
       lenderOffersMsg :: Text
       lenderOffersMsg
         | oldState ^. #offerUTxOs /= newState ^. #offerUTxOs = 
-            "Offers to borrowers have changed."
-        | otherwise = ""
+            unwords $ intersperse "\n" $ filter (/="")
+              [ "Offers to borrowers have changed."
+              , if any (offerHasExpired currentTime) $ newState ^. #offerUTxOs
+                then "Some offers are expired."
+                else ""
+              ]
+        | otherwise =
+           if any (offerHasExpired currentTime) $ newState ^. #offerUTxOs
+           then "Some offers are expired."
+           else ""

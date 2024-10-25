@@ -301,6 +301,18 @@ isSellerUTxO AftermarketUTxO{marketDatum} = maybe False isSellerDatum marketDatu
 isBidderUTxO :: AftermarketUTxO -> Bool
 isBidderUTxO AftermarketUTxO{marketDatum} = maybe False isBidDatum marketDatum
 
+claimBidHasExpired :: POSIXTime -> AftermarketUTxO -> Bool
+claimBidHasExpired currentTime AftermarketUTxO{marketDatum} = case marketDatum of
+  Just (ClaimBidDatum Aftermarket.ClaimBidDatum{bidExpiration}) ->
+    maybe False (<= toPlutusTime currentTime) bidExpiration
+  _ -> False
+
+claimPeriodHasExpired :: POSIXTime -> AftermarketUTxO -> Bool
+claimPeriodHasExpired currentTime AftermarketUTxO{marketDatum} = case marketDatum of
+  Just (AcceptedBidDatum Aftermarket.AcceptedBidDatum{claimExpiration}) ->
+    claimExpiration <= toPlutusTime currentTime
+  _ -> False
+
 -------------------------------------------------
 -- Aftermarket Wallet
 -------------------------------------------------
@@ -418,7 +430,7 @@ instance Insertable MarketWallet where
     ]
 
 instance Notify MarketWallet where
-  notify oldState newState
+  notify currentTime oldState newState
     | msg /= [] =
         Just $ Notification
           { notificationType = AftermarketNotification
@@ -488,16 +500,32 @@ instance Notify MarketWallet where
         | spotBidOnly (oldState ^. #bidUTxOs) /= spotBidOnly (newState ^. #bidUTxOs) = 
             "Bids to to sellers have changed."
         | claimBidOnly (oldState ^. #bidUTxOs) /= claimBidOnly (newState ^. #bidUTxOs) = 
-            "Bids to to sellers have changed."
-        | otherwise = ""
+            unwords $ intersperse "\n" $ filter (/="")
+              [ "Bids to to sellers have changed."
+              , if any (claimBidHasExpired currentTime) $ newState ^. #utxos
+                then "Some Claim Bids have expired."
+                else ""
+              ]
+        | otherwise =
+            if any (claimBidHasExpired currentTime) $ newState ^. #utxos
+            then "Some Claim Bids have expired."
+            else ""
 
       sellerAcceptedBidMsg :: Text
       sellerAcceptedBidMsg
         | acceptedBidOnly (oldState ^. #utxos) /= acceptedBidOnly (newState ^. #utxos) = 
-            "AcceptedBid statuses have changed."
-        | otherwise = ""
+            unwords $ intersperse "\n" $ filter (/="")
+              [ "Accepted Bid statuses have changed."
+              , if any (claimPeriodHasExpired currentTime) $ newState ^. #utxos
+                then "Some Accepted Bid NFTs are reclaimable!"
+                else ""
+              ]
+        | otherwise =
+            if any (claimPeriodHasExpired currentTime) $ newState ^. #utxos
+            then "Some Accepted Bid NFTs are reclaimable!"
+            else ""
 
       buyerAcceptedBidMsg :: Text
       buyerAcceptedBidMsg
-        | acceptedBidOnly (newState ^. #bidUTxOs) /= [] = "AcceptedBids available to claim."
+        | acceptedBidOnly (newState ^. #bidUTxOs) /= [] = "Accepted Bids available to claim."
         | otherwise = ""

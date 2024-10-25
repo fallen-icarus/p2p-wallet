@@ -110,6 +110,7 @@ instance Insertable StakeWallet where
 
 instance Notify StakeWallet where
   notify 
+    _
     oldState@StakeWallet{delegatedPool=oldPool,delegatedDRep=oldDRep}
     newState@StakeWallet{delegatedPool=newPool,delegatedDRep=newDRep}
     | null msg = Nothing

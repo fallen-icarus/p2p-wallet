@@ -17,8 +17,8 @@ import P2PWallet.Prelude
 -- | This function gets the latest wallet states, and then backs up the states into the database.
 -- It will also get the current network parameters so they are available for transaction
 -- building.
-syncWallets :: FilePath -> Network -> Wallets -> IO (Wallets,(ByteString,Decimal),[Notification])
-syncWallets databaseFile network ws@Wallets{..} = do
+syncWallets :: FilePath -> Network -> POSIXTime -> Wallets -> IO (Wallets,(ByteString,Decimal),[Notification])
+syncWallets databaseFile network currentTime ws@Wallets{..} = do
     -- The information is fetched concurrently.
     (updatedPaymentWallets,(updatedStakeWallets,networkParameters)) <- 
       concurrently fetchPaymentWallets $ concurrently fetchStakeWallets fetchParameters
@@ -62,12 +62,12 @@ syncWallets databaseFile network ws@Wallets{..} = do
       insertAftermarketWallet databaseFile marketWallet >>= fromRightOrAppError
 
     let newNotifications = catMaybes $ mconcat
-          [ zipWith notify paymentWallets updatedPaymentWallets
-          , zipWith notify stakeWallets updatedStakeWallets
-          , zipWith notify dexWallets updatedDexWallets
-          , zipWith notify loanWallets updatedLoanWallets
-          , zipWith notify optionsWallets updatedOptionsWallets
-          , zipWith notify marketWallets updatedMarketWallets
+          [ zipWith (notify currentTime) paymentWallets updatedPaymentWallets
+          , zipWith (notify currentTime) stakeWallets updatedStakeWallets
+          , zipWith (notify currentTime) dexWallets updatedDexWallets
+          , zipWith (notify currentTime) loanWallets updatedLoanWallets
+          , zipWith (notify currentTime) optionsWallets updatedOptionsWallets
+          , zipWith (notify currentTime) marketWallets updatedMarketWallets
           ]
 
     -- Return the updated wallets and network parameters.

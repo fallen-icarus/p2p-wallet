@@ -138,6 +138,12 @@ optionsUTxOOfferAmount OptionsUTxO{optionsDatum} = case optionsDatum of
     Just $ toNativeAsset offerAsset & #quantity .~ offerQuantity
   _ -> Nothing
 
+contractHasExpired :: POSIXTime -> OptionsUTxO -> Bool
+contractHasExpired currentTime OptionsUTxO{optionsDatum} = case optionsDatum of
+  Just (OptionsActiveDatum Options.ActiveDatum{expiration}) -> 
+    expiration <= toPlutusTime currentTime
+  _ -> False
+
 -------------------------------------------------
 -- Options Wallet
 -------------------------------------------------
@@ -238,7 +244,7 @@ instance Insertable OptionsWallet where
     ]
 
 instance Notify OptionsWallet where
-  notify oldState newState
+  notify currentTime oldState newState
     | msg /= [] =
         Just $ Notification
           { notificationType = OptionsNotification
@@ -273,6 +279,14 @@ instance Notify OptionsWallet where
       activesMsg :: Text
       activesMsg
         | activesOnly (oldState ^. #utxos) /= activesOnly (newState ^. #utxos) = 
-            "Active options contract statuses have changed."
-        | otherwise = ""
+            unwords $ intersperse "\n" $ filter (/="")
+              [ "Active options contract statuses have changed."
+              , if any (contractHasExpired currentTime) $ newState ^. #utxos
+                then "Some contracts have expired"
+                else ""
+              ]
+        | otherwise =
+            if any (contractHasExpired currentTime) $ newState ^. #utxos
+            then "Some contracts have expired"
+            else ""
 

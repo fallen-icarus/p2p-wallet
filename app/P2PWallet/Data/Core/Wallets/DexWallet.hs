@@ -290,7 +290,7 @@ instance Insertable DexWallet where
     ]
 
 instance Notify DexWallet where
-  notify oldState newState
+  notify _ oldState newState
     | oldState ^. #lovelace == newState ^. #lovelace && 
       oldState ^. #nativeAssets == newState ^. #nativeAssets =
         if any swapIsFullyConverted $ oldState ^. #utxos then
@@ -309,7 +309,7 @@ instance Notify DexWallet where
         }
     where
       msg :: Text
-      msg = unlines $ filter (/= "")
+      msg = unwords $ intersperse "\n" $ filter (/= "")
         [ "Swap statuses have changed."
         , if any swapIsFullyConverted $ newState ^. #utxos
           then "Some swaps have been fully converted!"
