@@ -219,9 +219,7 @@ loanRequiresRollover currentTime LoanUTxO{loanDatum} = case loanDatum of
     case (+lastEpochBoundary) <$> epochDuration of
       Nothing -> False
       Just nextEpochBoundary -> 
-        if nextEpochBoundary < loanExpiration
-        then nextEpochBoundary <= toPlutusTime currentTime
-        else False 
+        nextEpochBoundary < loanExpiration && nextEpochBoundary <= toPlutusTime currentTime
   _ -> False
 
 -------------------------------------------------
