@@ -76,6 +76,7 @@ import P2PWallet.Prelude
 -------------------------------------------------
 initializeDatabase :: FilePath -> IO (Either Text ())
 initializeDatabase dbFile = do
+  -- The parent directories must already exist!
   handle @SomeException (return . Left . ("Could not initialize database: " <>) . show) $ do
     -- Create the tables in the database if they don't already exist.
     create @Profile dbFile

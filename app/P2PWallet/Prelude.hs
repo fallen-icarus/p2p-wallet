@@ -37,6 +37,7 @@ module P2PWallet.Prelude
     -- * File Paths and Directories
   , getTemporaryDirectory
   , expandFilePath
+  , getDatabasePath
 
     -- * Miscelleneous Functions
   , showValue
@@ -82,6 +83,7 @@ import Relude hiding (uncons)
 import Relude.Unsafe qualified as Unsafe
 import System.Directory qualified as Dir
 import System.Environment qualified as Env
+import System.FilePath ((</>), (<.>))
 import System.FilePath qualified as Path
 import Data.Text qualified as T
 import Data.Time qualified as Time
@@ -180,6 +182,14 @@ getTemporaryDirectory = do
   tmpDir <- (<> "/p2p-wallet") <$> Dir.getTemporaryDirectory
   Dir.createDirectoryIfMissing True tmpDir -- Create the subfolder if it doesn't exist yet.
   return tmpDir
+
+-- | A custom version of `Dir.getXdgDirectory` so that the database is stored in a parent
+-- directory.
+getDatabasePath :: IO FilePath
+getDatabasePath = do
+  dataDir <- Dir.getXdgDirectory Dir.XdgData "p2p-wallet"
+  Dir.createDirectoryIfMissing True dataDir -- Create the subfolder if it doesn't exist yet.
+  return $ dataDir </> "p2p-wallet" <.> "db"
 
 -------------------------------------------------
 -- Time

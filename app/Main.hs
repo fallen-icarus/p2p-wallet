@@ -7,9 +7,6 @@ import Monomer.Lens qualified as L
 import Data.FileEmbed (embedFile)
 import Data.Time.Clock.POSIX qualified as Time
 
-import System.FilePath ((</>), (<.>))
-import System.Directory qualified as Dir
-
 import P2PWallet.Actions.Database
 import P2PWallet.Data.AppModel
 import P2PWallet.Data.Core.Internal.AppError
@@ -21,8 +18,7 @@ import P2PWallet.Prelude
 main :: IO ()
 main = do
     -- The db file is located in the user's $XDG_DATA_HOME directory.
-    let dbName = "p2p-wallet" </> "p2p-wallet" <.> "db"
-    dbFilePath <- Dir.getXdgDirectory Dir.XdgData dbName
+    dbFilePath <- getDatabasePath
 
     whenLeftM_ (initializeDatabase dbFilePath) (throwIO . AppError)
 
