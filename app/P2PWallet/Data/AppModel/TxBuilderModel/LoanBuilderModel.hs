@@ -306,7 +306,7 @@ addAskCreationToBody txBody (_,AskCreation{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case borrowerCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, borrowerKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (alias, pkHash, borrowerKeyDerivation)
 
     toNativeAssetQuantity :: NativeAsset -> Maybe NativeAsset
     toNativeAssetQuantity asset@NativeAsset{policyId}
@@ -382,7 +382,7 @@ addAskCloseToBody txBody (_,AskClose{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case borrowerCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (walletAlias, pkHash, stakeKeyDerivation)
 
     newInput :: TxBodyInput
     newInput = TxBodyInput
@@ -430,7 +430,7 @@ addOfferCreationToBody txBody (_,OfferCreation{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case lenderCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, lenderKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (alias, pkHash, lenderKeyDerivation)
 
     lovelace = case loanAmount ^. #policyId of
       "" -> deposit + Lovelace (loanAmount ^. #quantity)
@@ -515,7 +515,7 @@ addOfferCloseToBody txBody (_,OfferClose{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case lenderCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (walletAlias, pkHash, stakeKeyDerivation)
 
     newInput :: TxBodyInput
     newInput = TxBodyInput
@@ -631,7 +631,7 @@ addOfferAcceptanceToBody txBody (_,OfferAcceptance{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case borrowerCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (alias, pkHash, stakeKeyDerivation)
 
     lovelaceQuantity :: NativeAsset -> Lovelace
     lovelaceQuantity NativeAsset{policyId,quantity}
@@ -816,7 +816,7 @@ addLoanPaymentToBody txBody (_,LoanPayment{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case borrowerCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (alias, pkHash, stakeKeyDerivation)
 
     lovelaceQuantity :: NativeAsset -> Lovelace
     lovelaceQuantity NativeAsset{policyId,quantity}
@@ -952,7 +952,7 @@ addInterestApplicationToBody txBody (_,InterestApplication{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case borrowerCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (alias, pkHash, stakeKeyDerivation)
 
     postApplicationDatum = 
       Loans.createPostInterestActiveDatum requiredApplicationCount activeDatum
@@ -1035,7 +1035,8 @@ addExpiredClaimToBody txBody (_,ExpiredClaim{..}) =
     requiredWitness = case borrowerCredential of
       Nothing -> Nothing
       Just (ScriptCredential _) -> Nothing
-      Just (PubKeyCredential pkHash) -> Just $ KeyWitness (pkHash, borrowerStakeKeyDerivation)
+      Just (PubKeyCredential pkHash) -> 
+        Just $ KeyWitness (walletAlias, pkHash, borrowerStakeKeyDerivation)
 
     newInput :: TxBodyInput
     newInput = TxBodyInput

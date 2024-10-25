@@ -50,8 +50,10 @@ import P2PWallet.Prelude
 data TxBuilderEvent
   -- | Reset all fields in the transaction builder.
   = ResetBuilder
-  -- | Open the add popup widget
-  | ShowTxAddPopup
+  -- | Open the tools popup widget
+  | ShowTxToolsPopup
+  -- | Open the keys popup widget
+  | ShowTxKeysPopup
   -- | Open the change popup widget
   | ShowTxChangePopup
   -- | Open the collateral popup widget
@@ -194,8 +196,10 @@ data TxBuilderModel = TxBuilderModel
   , requiresCollateral :: Bool
   -- | The chosen collateral input.
   , collateralInput :: Maybe CollateralInput
-  -- | Whether to show the add popup widget.
-  , showAddPopup :: Bool
+  -- | Whether to show the tools popup widget.
+  , showToolsPopup :: Bool
+  -- | Whether to show the keys popup widget.
+  , showKeysPopup :: Bool
   -- | Whether to show the change popup widget.
   , showChangePopup :: Bool
   -- | Whether to show the collateral popup widget.
@@ -236,7 +240,8 @@ instance Default TxBuilderModel where
     , targetPath = ""
     , requiresCollateral = False
     , collateralInput = Nothing
-    , showAddPopup = False
+    , showToolsPopup = False
+    , showKeysPopup = False
     , showChangePopup = False
     , showCollateralPopup = False
     , parameters = Nothing

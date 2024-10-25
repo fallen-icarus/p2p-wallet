@@ -42,7 +42,7 @@ instance AssetBalancesForChange (a,UserInput) where
     )
 
 instance AddToTxBody UserInput where
-  addToTxBody txBody UserInput{utxoRef,paymentAddress,paymentKeyDerivation} = 
+  addToTxBody txBody UserInput{utxoRef,paymentAddress,paymentKeyDerivation,walletAlias} = 
       txBody 
         -- Add the input while preserving ordering.
         & #inputs %~ flip snoc newInput
@@ -64,7 +64,7 @@ instance AddToTxBody UserInput where
       requiredWitness :: Maybe KeyWitness
       requiredWitness = case toPubKeyHash plutusAddress of
           Nothing -> Nothing
-          Just pkHash -> Just $ KeyWitness (pkHash, paymentKeyDerivation)
+          Just pkHash -> Just $ KeyWitness (walletAlias,pkHash, paymentKeyDerivation)
 
 personalUTxOToUserInput 
   :: Text 

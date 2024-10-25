@@ -221,3 +221,6 @@ counterOfferIcon = remixArrowGoBackLine
 
 userIcon :: Text
 userIcon = remixUserLine
+
+reqKeysIcon :: Text
+reqKeysIcon = remixKey2Fill

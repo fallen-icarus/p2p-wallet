@@ -32,7 +32,7 @@ data UserCertificate = UserCertificate
 makeFieldLabelsNoPrefix ''UserCertificate
 
 instance AddToTxBody UserCertificate where
-  addToTxBody txBody UserCertificate{stakeAddress,certificateAction,stakeKeyDerivation} = 
+  addToTxBody txBody UserCertificate{walletAlias,stakeAddress,certificateAction,stakeKeyDerivation} = 
       txBody 
         -- Add the new certificate. They will be sorted by the `Semigroup` instance of `TxBody`.
         & #certificates %~ (newCertificate:)
@@ -55,4 +55,4 @@ instance AddToTxBody UserCertificate where
       requiredWitness :: Maybe KeyWitness
       requiredWitness = case stakeCredential of
           ScriptCredential _ -> Nothing
-          PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+          PubKeyCredential pkHash -> Just $ KeyWitness (walletAlias, pkHash, stakeKeyDerivation)
