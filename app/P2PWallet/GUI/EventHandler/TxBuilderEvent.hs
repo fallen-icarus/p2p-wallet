@@ -51,10 +51,16 @@ handleTxBuilderEvent model@AppModel{..} evt = case evt of
   AftermarketBuilderEvent aftermarketEvent -> handleAftermarketBuilderEvent model aftermarketEvent
 
   -----------------------------------------------
-  -- Open the Add Popup
+  -- Open the Tools Popup
   -----------------------------------------------
-  ShowTxAddPopup -> 
-    [ Model $ model & #txBuilderModel % #showAddPopup .~ True ]
+  ShowTxToolsPopup -> 
+    [ Model $ model & #txBuilderModel % #showToolsPopup .~ True ]
+
+  -----------------------------------------------
+  -- Open the Keys Popup
+  -----------------------------------------------
+  ShowTxKeysPopup -> 
+    [ Model $ model & #txBuilderModel % #showKeysPopup .~ True ]
 
   -----------------------------------------------
   -- Open the Change Popup

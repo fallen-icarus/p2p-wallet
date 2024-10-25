@@ -71,7 +71,7 @@ instance AddToTxBody CollateralInput where
       requiredWitness :: Maybe KeyWitness
       requiredWitness = case toPubKeyHash plutusAddress of
           Nothing -> Nothing
-          Just pkHash -> Just $ KeyWitness (pkHash, paymentKeyDerivation)
+          Just pkHash -> Just $ KeyWitness (walletAlias, pkHash, paymentKeyDerivation)
 
 -- | Multiply the transaction fee by the collateralPercentage. Add one lovelace to
 -- account for potential rounding issues.

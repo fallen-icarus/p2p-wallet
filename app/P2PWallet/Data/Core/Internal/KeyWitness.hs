@@ -10,7 +10,9 @@ import P2PWallet.Data.Core.Internal.KeyDerivation
 import P2PWallet.Plutus
 import P2PWallet.Prelude
 
-newtype KeyWitness = KeyWitness { unKeyWitness :: (PubKeyHash, Maybe DerivationInfo) }
+-- The `Text` is the user provided alias for the credential. Payment keys use the alias for the
+-- associated `PaymentWallet`.
+newtype KeyWitness = KeyWitness { unKeyWitness :: (Text, PubKeyHash, Maybe DerivationInfo) }
   deriving (Show,Eq,Ord)
 
 makeFieldLabelsNoPrefix ''KeyWitness

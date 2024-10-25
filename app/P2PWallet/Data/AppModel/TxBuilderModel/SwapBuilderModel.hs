@@ -326,7 +326,7 @@ addSwapCloseToBody txBody (_,SwapClose{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case stakeCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (walletAlias, pkHash, stakeKeyDerivation)
 
     newMint :: TxBodyMint
     newMint = TxBodyMint

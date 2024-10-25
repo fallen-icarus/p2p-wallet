@@ -30,7 +30,7 @@ data UserWithdrawal = UserWithdrawal
 makeFieldLabelsNoPrefix ''UserWithdrawal
 
 instance AddToTxBody UserWithdrawal where
-  addToTxBody txBody UserWithdrawal{stakeAddress,lovelace,stakeKeyDerivation} =
+  addToTxBody txBody UserWithdrawal{stakeAddress,lovelace,stakeKeyDerivation,walletAlias} =
       txBody 
         -- Add the new withdrawal. They will be reordered by the node.
         & #withdrawals %~ (newWithdrawal:)
@@ -54,4 +54,4 @@ instance AddToTxBody UserWithdrawal where
       requiredWitness :: Maybe KeyWitness
       requiredWitness = case stakeCredential of
           ScriptCredential _ -> Nothing
-          PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+          PubKeyCredential pkHash -> Just $ KeyWitness (walletAlias,pkHash, stakeKeyDerivation)

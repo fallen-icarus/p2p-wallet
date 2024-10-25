@@ -338,7 +338,7 @@ addProposalCloseToBody txBody (_,ProposalClose{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case writerCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (walletAlias, pkHash, stakeKeyDerivation)
 
     newInput :: TxBodyInput
     newInput = TxBodyInput
@@ -521,7 +521,7 @@ addExpiredCloseToBody txBody (_,ExpiredOptionsClose{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case writerCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (walletAlias, pkHash, stakeKeyDerivation)
 
     newInput :: TxBodyInput
     newInput = TxBodyInput
@@ -571,7 +571,7 @@ addAddressUpdateToBody txBody (_,WriterAddressUpdate{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case writerCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> Just $ KeyWitness (walletAlias, pkHash, stakeKeyDerivation)
 
     upperBound :: Slot
     upperBound = 

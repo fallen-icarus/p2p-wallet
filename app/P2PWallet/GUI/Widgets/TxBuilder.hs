@@ -14,7 +14,7 @@ import Monomer hiding
 import Prettyprinter (pretty, tupled)
 
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core.Internal.Network
+import P2PWallet.Data.Core.Internal
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.Icons
 import P2PWallet.GUI.HelpMessages
@@ -48,7 +48,9 @@ txBuilderWidget model@AppModel{..} = do
               ]
           , filler
           , hstack
-              [ filler
+              [ widgetIf ([] /= txBuilderModel ^. #keyWitnesses) $ 
+                  box_ [alignBottom,alignLeft] $ reqKeysPopup model
+              , filler
               , box_ [alignMiddle] $ hstack
                   [ spacer_ [width 50]
                   , mainButton "Build" (TxBuilderEvent $ BuildTx $ StartProcess Nothing)
@@ -94,7 +96,7 @@ txBuilderWidget model@AppModel{..} = do
                         ]
                   ] `nodeVisible` not isEmpty
               , filler
-              , box_ [alignBottom,alignRight] addPopup
+              , box_ [alignBottom,alignRight] $ toolsPopup model
               ]
           ] `nodeVisible` and
               [ isNothing targetUserOutput
@@ -217,83 +219,6 @@ txBuilderWidget model@AppModel{..} = do
               , widgetIf (txBuilderModel ^. #userInputs /= []) $ userInputsList model
               ]
         ]
-
-    addPopup :: AppNode
-    addPopup = do
-      let anchor = 
-            tooltip_ "Tools" [tooltipDelay 0] $
-              button toolsIcon (TxBuilderEvent ShowTxAddPopup)
-                `styleBasic`
-                  [ border 0 transparent
-                  , radius 20
-                  , paddingT 2
-                  , paddingB 2
-                  , bgColor customGray3
-                  , textColor customBlue
-                  , textMiddle
-                  , textFont "Remix"
-                  ]
-                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-      vstack
-        [ customPopup_ (toLensVL $ #txBuilderModel % #showAddPopup) 
-            [popupAnchor anchor, alignTop, alignLeft, popupAlignToOuterV] $
-            vstack
-              [ button "External Output" 
-                    (TxBuilderEvent $ AddNewExternalUserOutput $ StartAdding Nothing)
-                  `styleBasic`
-                    [ border 0 transparent
-                    , textSize 12
-                    , bgColor transparent
-                    , textColor customBlue
-                    , textMiddle
-                    ]
-                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-              , button "Change Output" 
-                    (TxBuilderEvent $ AddNewChangeOutput $ StartAdding Nothing)
-                  `styleBasic`
-                    [ border 0 transparent
-                    , textSize 12
-                    , bgColor transparent
-                    , textColor customBlue
-                    , textMiddle
-                    ]
-                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-              -- Minting test tokens is only available for the testnet.
-              , widgetIf (config ^. #network == Testnet) $
-                  button "Mint Test Tokens" (TxBuilderEvent $ AddNewTestMint $ StartAdding Nothing)
-                    `styleBasic`
-                      [ border 0 transparent
-                      , textSize 12
-                      , bgColor transparent
-                      , textColor customBlue
-                      , textMiddle
-                      ]
-                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-              , separatorLine `styleBasic` [fgColor black, padding 5]
-              , button "Submit External Tx" (TxBuilderEvent $ ImportSignedTxFile $ StartAdding Nothing)
-                  `styleBasic`
-                    [ border 0 transparent
-                    , textSize 12
-                    , bgColor transparent
-                    , textColor customBlue
-                    , textMiddle
-                    ]
-                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-              , button "Reset Builder" (TxBuilderEvent ResetBuilder)
-                  `styleBasic`
-                    [ border 0 transparent
-                    , textSize 12
-                    , bgColor transparent
-                    , textColor customRed
-                    , textMiddle
-                    ]
-                  `styleHover` [bgColor customGray2, cursorIcon CursorHand]
-              ] `styleBasic`
-                  [ bgColor customGray3
-                  , border 1 black
-                  , padding 5
-                  ]
-        ] `styleBasic` [padding 0]
 
 actionsList :: AppModel -> AppNode
 actionsList AppModel{txBuilderModel=TxBuilderModel{..},reverseTickerMap,config} = do
@@ -498,3 +423,116 @@ exportDestinationWidget = do
         , mainButton "Confirm" $ TxBuilderEvent $ GetTxFileExportDirectory ConfirmAdding
         ]
     ] `styleBasic` [bgColor customGray3, padding 20]
+
+toolsPopup :: AppModel -> AppNode
+toolsPopup AppModel{..} = do
+  let anchor = 
+        tooltip_ "Tools" [tooltipDelay 0] $
+          button toolsIcon (TxBuilderEvent ShowTxToolsPopup)
+            `styleBasic`
+              [ border 0 transparent
+              , radius 20
+              , paddingT 2
+              , paddingB 2
+              , bgColor customGray3
+              , textColor customBlue
+              , textMiddle
+              , textFont "Remix"
+              ]
+            `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+  vstack
+    [ customPopup_ (toLensVL $ #txBuilderModel % #showToolsPopup) 
+        [popupAnchor anchor, alignTop, alignLeft, popupAlignToOuterV] $
+        vstack
+          [ button "External Output" 
+                (TxBuilderEvent $ AddNewExternalUserOutput $ StartAdding Nothing)
+              `styleBasic`
+                [ border 0 transparent
+                , textSize 12
+                , bgColor transparent
+                , textColor customBlue
+                , textMiddle
+                ]
+              `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          , button "Change Output" 
+                (TxBuilderEvent $ AddNewChangeOutput $ StartAdding Nothing)
+              `styleBasic`
+                [ border 0 transparent
+                , textSize 12
+                , bgColor transparent
+                , textColor customBlue
+                , textMiddle
+                ]
+              `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          -- Minting test tokens is only available for the testnet.
+          , widgetIf (config ^. #network == Testnet) $
+              button "Mint Test Tokens" (TxBuilderEvent $ AddNewTestMint $ StartAdding Nothing)
+                `styleBasic`
+                  [ border 0 transparent
+                  , textSize 12
+                  , bgColor transparent
+                  , textColor customBlue
+                  , textMiddle
+                  ]
+                `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          , separatorLine `styleBasic` [fgColor black, padding 5]
+          , button "Submit External Tx" (TxBuilderEvent $ ImportSignedTxFile $ StartAdding Nothing)
+              `styleBasic`
+                [ border 0 transparent
+                , textSize 12
+                , bgColor transparent
+                , textColor customBlue
+                , textMiddle
+                ]
+              `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          , button "Reset Builder" (TxBuilderEvent ResetBuilder)
+              `styleBasic`
+                [ border 0 transparent
+                , textSize 12
+                , bgColor transparent
+                , textColor customRed
+                , textMiddle
+                ]
+              `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          ] `styleBasic`
+              [ bgColor customGray3
+              , border 1 black
+              , padding 5
+              ]
+    ] `styleBasic` [padding 0]
+
+reqKeysPopup :: AppModel -> AppNode
+reqKeysPopup AppModel{..} = do
+  let anchor = 
+        tooltip_ "Required Signatures" [tooltipDelay 0] $
+          button reqKeysIcon (TxBuilderEvent ShowTxKeysPopup)
+            `styleBasic`
+              [ border 0 transparent
+              , radius 20
+              , paddingT 2
+              , paddingB 2
+              , bgColor customGray3
+              , textColor customBlue
+              , textMiddle
+              , textFont "Remix"
+              ]
+            `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+      (aliases, pkhs, derivs) = unzip3 $ map unKeyWitness $ txBuilderModel ^. #keyWitnesses
+      row txt = box_ [alignMiddle, alignCenter] $ label txt `styleBasic` [textSize 9]
+      header txt = [ row txt
+                   , separatorLine `styleBasic` [fgColor lightGray]
+                   ]
+  vstack
+    [ customPopup_ (toLensVL $ #txBuilderModel % #showKeysPopup) 
+        [popupAnchor anchor, alignTop, alignRight, popupAlignToOuterV] $
+        flip styleBasic [bgColor customGray3, border 1 black, padding 5] $
+          hstack_ [childSpacing_ 7]
+            [ vstack_ [childSpacing_ 3] $ header "Alias" <> map row aliases 
+            , separatorLine `styleBasic` [fgColor lightGray]
+            , vstack_ [childSpacing_ 3] $ header "Hash" <> map (row . show) pkhs 
+            , separatorLine `styleBasic` [fgColor lightGray]
+            , vstack_ [childSpacing_ 3] $ header "Derivation" <> for derivs (\der -> case der of
+                Just d -> row $ display d
+                Nothing -> row "Watched Key")
+            ]
+    ] `styleBasic` [padding 0]

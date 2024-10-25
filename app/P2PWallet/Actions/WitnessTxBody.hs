@@ -25,13 +25,13 @@ witnessTxBody network TxBuilderModel{keyWitnesses,isBuilt} = do
   let transformedTxFile = TransformedTxFile $ tmpDir </> "tx" <.> "body"
 
   -- All key witnesses must use the same derivation type.
-  let mDerType = maybeHead keyWitnesses >>= (snd . unKeyWitness >=> fst)
+  let mDerType = maybeHead keyWitnesses >>= (view _3 . unKeyWitness >=> fst)
 
   -- Export all required pubkeys. Return the file names used for the hwsKeyFile. The file names
   -- will be prefixed by the respective key hashes. Skip witnesses for unknown derivation paths
   -- since these may be for a watched wallet.
   (hwsFiles,witnessFiles) <- fmap (unzip . catMaybes) $ forM keyWitnesses $ 
-    \(KeyWitness (pkh,mPath)) -> flip (maybe (return Nothing)) mPath $ \path -> do
+    \(KeyWitness (_,pkh,mPath)) -> flip (maybe (return Nothing)) mPath $ \path -> do
         let hash = show pkh 
         hwsFile <- snd <$> exportHwKeyFiles (Just hash) path
         return $ Just (hwsFile, KeyWitnessFile $ tmpDir </> hash <.> "witness")

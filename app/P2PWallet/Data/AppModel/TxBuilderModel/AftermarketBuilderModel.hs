@@ -363,7 +363,8 @@ addSaleCloseToBody txBody (_,SaleClose{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case sellerCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> 
+        Just $ KeyWitness (walletAlias, pkHash, stakeKeyDerivation)
 
     newInput :: TxBodyInput
     newInput = TxBodyInput
@@ -541,7 +542,8 @@ addBidCreationToBody txBody (_,BidCreation{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case stakeCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> 
+        Just $ KeyWitness (marketWallet ^. #alias, pkHash, stakeKeyDerivation)
 
     bidDatum
       | isSpotBid =
@@ -637,7 +639,8 @@ addBidCloseToBody txBody (_,BidClose{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case bidderCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> 
+        Just $ KeyWitness (walletAlias, pkHash, stakeKeyDerivation)
 
     newInput :: TxBodyInput
     newInput = TxBodyInput
@@ -690,7 +693,8 @@ addClaimBidAcceptanceToBody txBody (_,ClaimBidAcceptance{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case marketWallet ^. #stakeCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, marketWallet ^. #stakeKeyDerivation)
+      PubKeyCredential pkHash -> 
+        Just $ KeyWitness (marketWallet ^. #alias, pkHash, marketWallet ^. #stakeKeyDerivation)
 
     slotConfig :: SlotConfig
     slotConfig = case network of
@@ -782,7 +786,8 @@ addAcceptedBidClaimToBody txBody (_,AcceptedBidClaim{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case stakeCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> 
+        Just $ KeyWitness (marketWallet ^. #alias, pkHash, stakeKeyDerivation)
 
     Aftermarket.AcceptedBidDatum{nftPolicyId,bid,paymentAddress,sellerDeposit} = 
       case bidUTxO ^. #marketDatum of
@@ -912,7 +917,8 @@ addSpotBidAcceptanceToBody txBody (_,SpotBidAcceptance{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case stakeCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, stakeKeyDerivation)
+      PubKeyCredential pkHash -> 
+        Just $ KeyWitness (marketWallet ^. #alias, pkHash, stakeKeyDerivation)
 
     newBidInput :: TxBodyInput
     newBidInput = TxBodyInput
@@ -1011,7 +1017,8 @@ addBidUnlockToBody txBody (_,BidUnlock{..}) =
     requiredWitness :: Maybe KeyWitness
     requiredWitness = case sellerWallet ^. #stakeCredential of
       ScriptCredential _ -> Nothing
-      PubKeyCredential pkHash -> Just $ KeyWitness (pkHash, sellerWallet ^. #stakeKeyDerivation)
+      PubKeyCredential pkHash -> 
+        Just $ KeyWitness (sellerWallet ^. #alias, pkHash, sellerWallet ^. #stakeKeyDerivation)
 
     newInput :: TxBodyInput
     newInput = TxBodyInput
