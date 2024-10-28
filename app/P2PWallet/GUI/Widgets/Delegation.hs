@@ -84,69 +84,70 @@ delegationWidget model@AppModel{..} = do
 -- AND no overlays need to be shown.
 mainWidget :: AppModel -> AppNode
 mainWidget model@AppModel{..} =
-    vstack
-      [ spacer
-      , centerWidgetH headerWidget
-      , spacer
-      , hgrid
-          [ vstack
-              [ box_ [alignMiddle] $ hstack
-                  [ registrationStatusWidget registrationStatus
-                  , spacer_ [width 5]
-                  , totalDelegatedWidget totalDelegation
-                  , spacer_ [width 5]
-                  , rewardsBalanceWidget registrationStatus wallet
-                  ]
-              , spacer
-              , delegationInfoWidget model
-              ] `styleBasic` [padding 10]
-          , vstack
-              [ vstack 
-                  [ box_ [alignMiddle] $ label "Reward History"
-                      `styleBasic` [textFont "Italics", textSize 14, paddingT 10]
-                  , separatorLine `styleBasic` [paddingL 70, paddingR 70, fgColor darkGray]
-                  , widgetIf (rewardHistory /= []) $ historyTableWidget rewardHistory
-                  , widgetIf (null rewardHistory) $ centerWidget $ 
-                      flip styleBasic [padding 10, bgColor customGray4, radius 10] $ box $ 
-                        label "This staking address has not earned any rewards yet."
-                          `styleBasic` [textSize 8]
-                  ] `styleBasic` 
-                      [ bgColor customGray2, radius 15
-                      , height 353
-                      ]
-              ] `styleBasic` [padding 10]
-          ]
-      , flip styleBasic [padding 10] $ box $ vstack
-          [ centerWidgetH $ hstack
-              [ label "Active Linked Payment Addresses"
-                  `styleBasic` [textFont "Italics", textSize 14]
-              , mainButton helpIcon (Alert activeLinkedAddressesMsg)
-                  `styleBasic`
-                    [ border 0 transparent
-                    , radius 20
-                    , bgColor transparent
-                    , textColor customBlue
-                    , textMiddle
-                    , padding 2
-                    , textSize 12
-                    , textFont "Remix"
+    vscroll_ [wheelRate 50] $
+      vstack
+        [ spacer
+        , centerWidgetH headerWidget
+        , spacer
+        , hgrid
+            [ vstack
+                [ box_ [alignMiddle] $ hstack
+                    [ registrationStatusWidget registrationStatus
+                    , spacer_ [width 5]
+                    , totalDelegatedWidget totalDelegation
+                    , spacer_ [width 5]
+                    , rewardsBalanceWidget registrationStatus wallet
                     ]
-                  `styleHover` [bgColor customGray1, cursorIcon CursorHand]
-              ]
-          , separatorLine `styleBasic` [paddingL 125, paddingR 125, fgColor darkGray]
-          , spacer
-          , widgetIf(null linkedAddresses) $ centerWidget $ 
-              flip styleBasic [padding 10, bgColor customGray4, radius 10] $ box $ 
-                label "There are no active linked payment addresses."
-                  `styleBasic` [textSize 12, textColor lightGray]
-          , widgetIf(linkedAddresses /= []) $
-              vscroll_ [scrollOverlay, wheelRate 50, barWidth 3, thumbWidth 3] $ 
-                vstack_ [childSpacing_ 1] $ 
-                  for linkedAddresses $ \addr ->
-                    centerWidgetH $ copyableLabelSelfWith 12 lightGray fitAddress (toText addr)
-                      `styleBasic` [textCenter,radius 20, padding 5, bgColor customGray4]
-          ] `styleBasic` [radius 15, bgColor customGray2, padding 10]
-      ] `styleBasic` [padding 10]
+                , spacer
+                , delegationInfoWidget model
+                ] `styleBasic` [padding 10]
+            , vstack
+                [ vstack 
+                    [ box_ [alignMiddle] $ label "Reward History"
+                        `styleBasic` [textFont "Italics", textSize 14, paddingT 10]
+                    , separatorLine `styleBasic` [paddingL 70, paddingR 70, fgColor darkGray]
+                    , widgetIf (rewardHistory /= []) $ historyTableWidget rewardHistory
+                    , widgetIf (null rewardHistory) $ centerWidget $ 
+                        flip styleBasic [padding 10, bgColor customGray4, radius 10] $ box $ 
+                          label "This staking address has not earned any rewards yet."
+                            `styleBasic` [textSize 8]
+                    ] `styleBasic` 
+                        [ bgColor customGray2, radius 15
+                        , height 353
+                        ]
+                ] `styleBasic` [padding 10]
+            ]
+        , flip styleBasic [padding 10] $ box $ vstack
+            [ centerWidgetH $ hstack
+                [ label "Active Linked Payment Addresses"
+                    `styleBasic` [textFont "Italics", textSize 14]
+                , mainButton helpIcon (Alert activeLinkedAddressesMsg)
+                    `styleBasic`
+                      [ border 0 transparent
+                      , radius 20
+                      , bgColor transparent
+                      , textColor customBlue
+                      , textMiddle
+                      , padding 2
+                      , textSize 12
+                      , textFont "Remix"
+                      ]
+                    `styleHover` [bgColor customGray1, cursorIcon CursorHand]
+                ]
+            , separatorLine `styleBasic` [paddingL 125, paddingR 125, fgColor darkGray]
+            , spacer
+            , widgetIf(null linkedAddresses) $ centerWidget $ 
+                flip styleBasic [padding 10, bgColor customGray4, radius 10] $ box $ 
+                  label "There are no active linked payment addresses."
+                    `styleBasic` [textSize 12, textColor lightGray]
+            , widgetIf(linkedAddresses /= []) $
+                vscroll_ [scrollOverlay, wheelRate 50, barWidth 3, thumbWidth 3] $ 
+                  vstack_ [childSpacing_ 1] $ 
+                    for linkedAddresses $ \addr ->
+                      centerWidgetH $ copyableLabelSelfWith 12 lightGray fitAddress (toText addr)
+                        `styleBasic` [textCenter,radius 20, padding 5, bgColor customGray4]
+            ] `styleBasic` [radius 15, bgColor customGray2, padding 10]
+        ] `styleBasic` [padding 10]
   where
     wallet :: StakeWallet
     wallet@StakeWallet{..} = delegationModel ^. #selectedWallet
