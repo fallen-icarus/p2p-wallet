@@ -19,7 +19,7 @@ networksWidget _ =
             `styleBasic` [textFont "Medium", textSize 30]
         , spacer_ [width 100]
         , centerWidgetH $ flip styleBasic [border 1 black, padding 10, radius 5] $ 
-            hstack_ [childSpacing] 
+            hgrid_ [childSpacing] 
               [ networkBox Testnet
               , networkBox Mainnet 
               ]
@@ -28,10 +28,13 @@ networksWidget _ =
     networkBox :: Network -> AppNode
     networkBox network = do
       let content =
-            vstack
+            box_ [alignMiddle,alignCenter] (vstack
               [ centerWidgetH $ label (display network)
                   `styleBasic` [textFont "Regular", textSize 24]
-              ] `styleBasic` [width 200, padding 20, radius 5]
-                `styleHover` [bgColor customBlue, cursorIcon CursorHand]
+              , widgetIf (network == Testnet) $
+                  centerWidgetH  $ label "(Preproduction)"
+                    `styleBasic` [textFont "Regular", textSize 10]
+              ]) `styleBasic` [width 200, padding 20, radius 5]
+                 `styleHover` [bgColor customBlue, cursorIcon CursorHand]
       box_ [expandContent, onClick $ SetNetwork network] content 
         `styleBasic` [bgColor customGray1, radius 5]

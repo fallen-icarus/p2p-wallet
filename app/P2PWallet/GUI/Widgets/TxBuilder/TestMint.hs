@@ -110,10 +110,11 @@ addTestMintWidget AppModel{txBuilderModel=TxBuilderModel{newTestMint=NewTestMint
             `styleBasic` [bgColor customGray1, width 200, textSize 10, sndColor darkGray]
             `styleFocus` [border 1 customBlue]
         , spacer_ [width 10]
-        , box_ [alignMiddle, onClick $ TxBuilderEvent ConvertExampleTestMintNameToHexidecimal] $
-            label remixArrowRightLine 
-              `styleBasic` [textMiddle, textFont "Remix", textColor customBlue, radius 5]
-              `styleHover` [bgColor customGray1]
+        , tooltip_ "Convert" [tooltipDelay 0] $
+            box_ [alignMiddle, onClick $ TxBuilderEvent ConvertExampleTestMintNameToHexidecimal] $
+              label remixArrowRightLine 
+                `styleBasic` [textMiddle, textFont "Remix", textColor customBlue, radius 5]
+                `styleHover` [bgColor customGray1, cursorIcon CursorHand]
         , spacer_ [width 10]
         , tooltip_ "Copy" [tooltipDelay 0] $ box_ [alignMiddle, onClick (CopyText exampleOutput)] $
             label_ exampleOutput [ellipsis]
