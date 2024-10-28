@@ -366,7 +366,7 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
                     `styleBasic` [textSize 8]
                 ]
             , hstack
-                [ widgetIf (not $ null nativeAssets) $ vstack
+                [ widgetIf (not $ null nativeAssets) $ hstack
                     [ tooltip_ "Native Assets" [tooltipDelay 0] $ label coinsIcon
                         `styleBasic` 
                           [ textSize 8
@@ -376,7 +376,7 @@ inspectionWidget Transaction{..} AppModel{homeModel=HomeModel{..},reverseTickerM
                           ]
                     , spacer_ [width 3]
                     ]
-                , widgetIf (isJust datumHash) $ vstack
+                , widgetIf (isJust datumHash) $ hstack
                     [ tooltip_ "Datum" [tooltipDelay 0] $ label datumIcon
                         `styleBasic` 
                           [ textSize 8

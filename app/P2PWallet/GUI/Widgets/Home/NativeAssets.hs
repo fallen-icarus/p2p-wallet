@@ -271,6 +271,7 @@ nativeAssetsWidget model@AppModel{reverseTickerMap,..} =
             , spacer_ [width 3]
             , copyableLabelSub $ display policyId <> "." <> display tokenName
             , filler
+            , spacer_ [width 20]
             , label (show utxoCount <> " UTxO(s)")
                 `styleBasic`
                     [ textFont "Italics"
@@ -361,16 +362,18 @@ copyableLabelMain caption =
     `styleHover` [textColor white, cursorIcon CursorHand]
 
 -- | A label button that will copy itself.
-copyableLabelSub :: Text -> WidgetNode s AppEvent
+copyableLabelSub :: Typeable s => Text -> WidgetNode s AppEvent
 copyableLabelSub caption = 
-  tooltip_ "Copy" [tooltipDelay 0] $ button caption (CopyText caption)
-    `styleBasic`
-      [ padding 0
-      , radius 5
-      , textMiddle
-      , textSize 8
-      , border 0 transparent
-      , textColor lightGray
-      , bgColor transparent
-      ]
-    `styleHover` [textColor customBlue, cursorIcon CursorHand]
+  tooltip_ "Copy" [tooltipDelay 0] $ 
+    box_ [onClick $ CopyText caption] $
+      label_ caption [resizeFactorW 20]
+        `styleBasic`
+          [ padding 0
+          , radius 5
+          , textMiddle
+          , textSize 8
+          , border 0 transparent
+          , textColor lightGray
+          , bgColor transparent
+          ]
+        `styleHover` [textColor customBlue, cursorIcon CursorHand]

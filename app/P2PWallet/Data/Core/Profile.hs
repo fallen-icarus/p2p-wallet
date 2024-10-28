@@ -111,7 +111,7 @@ instance Default NewProfile where
     { alias = ""
     , accountIndex = 0
     , device = Ledger
-    , derivationType = Nothing
+    , derivationType = Just IcarusDerivation
     }
 
 -- | Process the user's info for the profile. Check that the profile name is not already being
