@@ -57,7 +57,10 @@ main = do
       , appFontDefMem "Italics" $(embedFile "./assets/fonts/Roboto-Italic.ttf")
       , appFontDefMem "Remix" $(embedFile "./assets/fonts/remixicon.ttf")
       , appInitEvent x
-      -- , appWindowState $ MainWindowNormal (700,700)
+      -- The scaling is weird for some monitor resolutions so the auto-scaling is disabled.
+      , appWindowState MainWindowMaximized
+      , appDisableAutoScale True
+      , appScaleFactor 2
       ]
 
     customDarkTheme :: Theme
