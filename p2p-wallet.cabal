@@ -389,6 +389,7 @@ executable p2p-wallet
       , memory
       , base16-bytestring
       , plutus-core
+      , bmp
 
     -- Directories containing source files.
     hs-source-dirs:   app

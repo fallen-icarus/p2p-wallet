@@ -286,6 +286,11 @@ cardano-hw-cli installed if you wish to use a hardware wallet. You can find the 
 tarball). For cardano-hw-cli, you must use version 1.15.0-rc1, or later. You can find all of the
 cardano-hw-cli releases [here](https://github.com/vacuumlabs/cardano-hw-cli/releases).
 
+> [!IMPORTANT] 
+> If you install cardano-hw-cli by downloading the tarball, *all* files in the tarball must be moved
+> to your $PATH (eg, the HID files must also be found in your path). Without them, cardano-hw-cli
+> will not be able to talk to your hardware wallet, even if the right udev rules are configured.
+
 #### Ledger Wallets
 
 If you are using a ledger hardware wallet on linux, you will need to add the udev rules so that you
