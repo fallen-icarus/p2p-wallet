@@ -4,23 +4,39 @@ module Main where
 
 import Monomer
 import Monomer.Lens qualified as L
+import Data.Either qualified as Either
 import Data.FileEmbed (embedFile)
 import Data.Time.Clock.POSIX qualified as Time
+import Codec.BMP (parseBMP,writeBMP)
+import System.FilePath ((</>), (<.>))
 
 import P2PWallet.Actions.Database
 import P2PWallet.Data.AppModel
-import P2PWallet.Data.Core.Internal.AppError
 import P2PWallet.GUI.Colors
 import P2PWallet.GUI.EventHandler
 import P2PWallet.GUI.UIBuilder
 import P2PWallet.Prelude
 
+-- | The icon to use for when the app is open. It must be exported to a file for monomer to be able
+-- to use it. It is compiled into the executable so that the icon file doesn't need to be installed,
+-- too.
+cardanoIcon :: ByteString
+cardanoIcon = $(embedFile "./assets/icons/cardano.bmp")
+
 main :: IO ()
 main = do
+    -- The cardano icon will be exported to the temporary directory.
+    tmpDir <- getTemporaryDirectory
+    let iconFilePath = tmpDir </> "cardano" <.> "bmp"
+
+    -- Export the cardano icon.
+    exportStatus <- case parseBMP $ toLazy cardanoIcon of
+      Right bmp -> writeBMP iconFilePath bmp >> return (Right ())
+      Left _ -> return $ Left $ "Couldn't parse cardano icon"
+    
     -- The db file is located in the user's $XDG_DATA_HOME directory.
     dbFilePath <- getDatabasePath
-
-    whenLeftM_ (initializeDatabase dbFilePath) (throwIO . AppError)
+    initializationStatus <- initializeDatabase dbFilePath
 
     -- Get the user's current time zone.
     timeZone <- getCurrentTimeZone
@@ -31,7 +47,11 @@ main = do
     -- Get the current time for the user.
     currentTime <- Time.getPOSIXTime
 
-    let thirtyDaysAgo = addDays (-30) currentDate
+    let startupErrors = Either.lefts
+          [ exportStatus
+          , initializationStatus
+          ]
+        thirtyDaysAgo = addDays (-30) currentDate
         initModel = 
           def & #databaseFile .~ dbFilePath -- Use the full filepath for to the database.
               & #config % #timeZone .~ timeZone
@@ -44,11 +64,13 @@ main = do
               & #optionsModel % #writerModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
               & #aftermarketModel % #buyerModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
               & #aftermarketModel % #sellerModel % #txFilterModel % #dateRange % _1 ?~ thirtyDaysAgo
-    startApp initModel handleEvent buildUI $ appCfg AppInit
+    startApp initModel handleEvent buildUI $ appCfg iconFilePath $ case startupErrors of
+      [] -> AppInit
+      (firstError : _) -> Alert firstError
 
   where
-    appCfg :: AppEvent -> [AppConfig s AppEvent]
-    appCfg x =
+    appCfg :: FilePath -> AppEvent -> [AppConfig s AppEvent]
+    appCfg iconFilePath x =
       [ appWindowTitle "P2P-DeFi Wallet"
       , appTheme customDarkTheme
       , appFontDefMem "Regular" $(embedFile "./assets/fonts/Roboto-Regular.ttf")
@@ -56,6 +78,7 @@ main = do
       , appFontDefMem "Bold" $(embedFile "./assets/fonts/Roboto-Bold.ttf")
       , appFontDefMem "Italics" $(embedFile "./assets/fonts/Roboto-Italic.ttf")
       , appFontDefMem "Remix" $(embedFile "./assets/fonts/remixicon.ttf")
+      , appWindowIcon $ toText iconFilePath
       , appInitEvent x
       -- The scaling is weird for some monitor resolutions so the auto-scaling is disabled.
       , appWindowState MainWindowMaximized
