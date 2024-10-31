@@ -309,7 +309,7 @@ instance Notify DexWallet where
         }
     where
       msg :: Text
-      msg = unwords $ intersperse "\n" $ filter (/= "")
+      msg = mconcat $ intersperse "\n" $ filter (/= "")
         [ "Swap statuses have changed."
         , if any swapIsFullyConverted $ newState ^. #utxos
           then "Some swaps have been fully converted!"

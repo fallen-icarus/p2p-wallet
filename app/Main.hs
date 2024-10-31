@@ -32,7 +32,7 @@ main = do
     -- Export the cardano icon.
     exportStatus <- case parseBMP $ toLazy cardanoIcon of
       Right bmp -> writeBMP iconFilePath bmp >> return (Right ())
-      Left _ -> return $ Left $ "Couldn't parse cardano icon"
+      Left _ -> return $ Left "Couldn't parse cardano icon"
     
     -- The db file is located in the user's $XDG_DATA_HOME directory.
     dbFilePath <- getDatabasePath
