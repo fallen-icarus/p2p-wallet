@@ -199,7 +199,7 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
                     hstack
                       [ filler
                       , label "Fully Converted"
-                          `styleBasic` [textSize 10, textColor customRed, textFont "Italics"]
+                          `styleBasic` [textSize 12, textColor customRed, textFont "Italics"]
                       , filler
                       ]
                 , filler
@@ -331,7 +331,7 @@ mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap,tickerMap,confi
                     hstack
                       [ filler
                       , label "Fully Converted"
-                          `styleBasic` [textSize 10, textColor customRed, textFont "Italics"]
+                          `styleBasic` [textSize 12, textColor customRed, textFont "Italics"]
                       , filler
                       ]
                 , filler

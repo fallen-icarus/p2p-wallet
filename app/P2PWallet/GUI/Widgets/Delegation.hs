@@ -96,7 +96,7 @@ mainWidget model@AppModel{..} =
                     , spacer_ [width 5]
                     , totalDelegatedWidget totalDelegation
                     , spacer_ [width 5]
-                    , rewardsBalanceWidget registrationStatus wallet
+                    , rewardsBalanceWidget wallet
                     ]
                 , spacer
                 , delegationInfoWidget model
@@ -317,15 +317,26 @@ stakeNotDelegatedWidget registrationStatus = do
       , centerWidgetH $ mainButton "Delegate" $ DelegationEvent OpenPoolPicker
       ]
 
-withdrawButton :: StakeWallet -> RegistrationStatus -> AppNode
-withdrawButton stakeWallet registrationStatus = do
+withdrawButton :: StakeWallet -> AppNode
+withdrawButton stakeWallet@StakeWallet{delegatedDRep,registrationStatus} = do
   let (tip,mainColor,highlightColor,event)
-        | registrationStatus == Registered = 
+        | registrationStatus == Registered && isJust delegatedDRep = 
             ( "Withdraw"
             , customBlue
             , customGray1
             , DelegationEvent $ AddSelectedUserWithdrawal stakeWallet)
-        | otherwise = ("Register to enable withdrawals",customRed,transparent,AppInit)
+        | registrationStatus == Registered && isNothing delegatedDRep = 
+            ( "Delegate to a DRep to enable withdrawals"
+            , customRed
+            , transparent
+            , AppInit
+            )
+        | otherwise = 
+            ( "Register and delegate to a DRep to enable withdrawals"
+            , customRed
+            , transparent
+            , AppInit
+            )
   tooltip_ tip [tooltipDelay 0] $ box_ [onClick event] $ 
     label withdrawRewardsIcon
       `styleBasic`
@@ -415,8 +426,8 @@ totalDelegatedWidget totalDelegation = do
         , radius 8
         ]
 
-rewardsBalanceWidget :: RegistrationStatus -> StakeWallet -> AppNode
-rewardsBalanceWidget registrationStatus wallet@StakeWallet{availableRewards} = do
+rewardsBalanceWidget :: StakeWallet -> AppNode
+rewardsBalanceWidget wallet@StakeWallet{availableRewards} = do
   vstack
     [ hstack
         [ label "Rewards Balance"
@@ -424,7 +435,7 @@ rewardsBalanceWidget registrationStatus wallet@StakeWallet{availableRewards} = d
               [ textSize 8
               , textColor lightGray
               ]
-        , withdrawButton wallet registrationStatus
+        , withdrawButton wallet
         ]
     , spacer_ [width 3]
     , label (display availableRewards)
