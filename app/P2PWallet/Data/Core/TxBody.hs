@@ -534,8 +534,8 @@ instance Semigroup TxBody where
         -- estimations easier.
         sort $ txBody1 ^. #certificates <> txBody2 ^. #certificates
     , withdrawals = 
-        -- Sort the withdrawals by credential. This makes getting the execution budgets easier.
-        sort $ txBody1 ^. #withdrawals <> txBody2 ^. #withdrawals
+        -- Sort the withdrawals by address. This makes getting the execution budgets easier.
+        sortOn (view #stakeAddress) $ txBody1 ^. #withdrawals <> txBody2 ^. #withdrawals
     , mints = 
         -- Sort them by policy id. This makes getting the execution budgets easier.
         -- Redeemer and witness collisions must be caught before converting to `TxBody`!

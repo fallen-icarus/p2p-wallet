@@ -15,7 +15,7 @@ import P2PWallet.Prelude
 
 notificationsWidget :: AppModel -> AppNode
 notificationsWidget AppModel{notifications} = do
-  centerWidget $ vstack
+  vstack
     [ centerWidgetH $ 
         hstack
           [ label "Notifications"
@@ -43,10 +43,10 @@ notificationsWidget AppModel{notifications} = do
                   `styleHover`
                     [ bgColor customGray3, cursorIcon CursorHand]
           ] `nodeVisible` (notifications /= [])
-    , notificationsList notifications 
+    , vscroll_ [wheelRate 50] (notificationsList notifications)
         `styleBasic` [padding 10, bgColor customGray2, radius 5]
         `nodeVisible` (notifications /= [])
-    , noNotificationsMessage `nodeVisible` null notifications
+    , vscroll_ [wheelRate 50] noNotificationsMessage `nodeVisible` null notifications
     ] `styleBasic`
         [ padding 10
         , radius 5

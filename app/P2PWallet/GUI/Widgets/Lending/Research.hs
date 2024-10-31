@@ -21,10 +21,12 @@ researchWidget model@AppModel{lendingModel} = do
           [ spacer
           , centerWidgetH researchSceneMenu
           , spacer
-          , box_ [mergeRequired reqUpdate] (researchOffersWidget model)
-              `nodeVisible` (lendingModel ^. #researchModel % #scene == ResearchLoanOffers)
-          , box_ [mergeRequired reqUpdate] (researchActivesWidget model)
-              `nodeVisible` (lendingModel ^. #researchModel % #scene == ResearchActiveLoans)
+          , vscroll_ [wheelRate 50] $ vstack
+              [ box_ [mergeRequired reqUpdate] (researchOffersWidget model)
+                  `nodeVisible` (lendingModel ^. #researchModel % #scene == ResearchLoanOffers)
+              , box_ [mergeRequired reqUpdate] (researchActivesWidget model)
+                  `nodeVisible` (lendingModel ^. #researchModel % #scene == ResearchActiveLoans)
+              ]
           ]
       -- The inspected borrower is here since only one borrower can be inspected at a time.
       -- It doesn't make sense to move to other scenes while inspecting a borrower.

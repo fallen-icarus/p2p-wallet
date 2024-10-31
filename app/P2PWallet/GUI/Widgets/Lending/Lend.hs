@@ -21,12 +21,14 @@ lendWidget model@AppModel{lendingModel} = do
           [ spacer
           , centerWidgetH lendSceneMenu
           , spacer
-          , box_ [mergeRequired reqUpdate] (openOffersWidget model)
-              `nodeVisible` (lendingModel ^. #lendModel % #scene == OpenOffers)
-          , box_ [mergeRequired reqUpdate] (viewLoanRequestsWidget model)
-              `nodeVisible` (lendingModel ^. #lendModel % #scene == ViewLoanRequests)
-          , box_ [mergeRequired reqUpdate] (transactionsWidget model)
-              `nodeVisible` (lendingModel ^. #lendModel % #scene == OfferHistory)
+          , vscroll_ [wheelRate 50] $ vstack
+              [ box_ [mergeRequired reqUpdate] (openOffersWidget model)
+                  `nodeVisible` (lendingModel ^. #lendModel % #scene == OpenOffers)
+              , box_ [mergeRequired reqUpdate] (viewLoanRequestsWidget model)
+                  `nodeVisible` (lendingModel ^. #lendModel % #scene == ViewLoanRequests)
+              , box_ [mergeRequired reqUpdate] (transactionsWidget model)
+                  `nodeVisible` (lendingModel ^. #lendModel % #scene == OfferHistory)
+              ]
           ]
       , widgetIf (isJust $ lendingModel ^. #lendModel % #inspectedOfferTransaction) $
           offerTxInspectionWidget model

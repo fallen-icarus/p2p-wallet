@@ -23,16 +23,18 @@ borrowWidget model@AppModel{lendingModel} = do
           [ spacer
           , centerWidgetH borrowSceneMenu
           , spacer
-          , box_ [mergeRequired reqUpdate] (openAsksWidget model)
-              `nodeVisible` (lendingModel ^. #borrowModel % #scene == OpenAsks)
-          , box_ [mergeRequired reqUpdate] (lenderOffersWidget model)
-              `nodeVisible` (lendingModel ^. #borrowModel % #scene == CurrentOffers)
-          , box_ [mergeRequired reqUpdate] (activeLoansWidget model)
-              `nodeVisible` (lendingModel ^. #borrowModel % #scene == ActiveLoans)
-          , box_ [mergeRequired reqUpdate] (creditHistoryWidget model)
-              `nodeVisible` (lendingModel ^. #borrowModel % #scene == CreditHistory)
-          , box_ [mergeRequired reqUpdate] (transactionsWidget model)
-              `nodeVisible` (lendingModel ^. #borrowModel % #scene == BorrowerTransactions)
+          , vscroll_ [wheelRate 50] $ vstack
+              [ box_ [mergeRequired reqUpdate] (openAsksWidget model)
+                  `nodeVisible` (lendingModel ^. #borrowModel % #scene == OpenAsks)
+              , box_ [mergeRequired reqUpdate] (lenderOffersWidget model)
+                  `nodeVisible` (lendingModel ^. #borrowModel % #scene == CurrentOffers)
+              , box_ [mergeRequired reqUpdate] (activeLoansWidget model)
+                  `nodeVisible` (lendingModel ^. #borrowModel % #scene == ActiveLoans)
+              , box_ [mergeRequired reqUpdate] (creditHistoryWidget model)
+                  `nodeVisible` (lendingModel ^. #borrowModel % #scene == CreditHistory)
+              , box_ [mergeRequired reqUpdate] (transactionsWidget model)
+                  `nodeVisible` (lendingModel ^. #borrowModel % #scene == BorrowerTransactions)
+              ]
           ]
       , widgetIf (isJust $ lendingModel ^. #borrowModel % #inspectedBorrowerTransaction) $
           borrowerTxInspectionWidget model
