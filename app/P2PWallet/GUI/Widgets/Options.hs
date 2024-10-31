@@ -64,8 +64,8 @@ mainWidget model@AppModel{scene=_,..} =
           ]
       , spacer_ [width 5]
       , writerWidget model `nodeVisible` (optionsModel ^. #scene == OptionsWriterScene)
-      , buyerWidget model `nodeVisible` (optionsModel ^. #scene == OptionsBuyerScene)
-      , researchWidget model `nodeVisible` (optionsModel ^. #scene == OptionsResearchScene)
+      , vscroll_ [wheelRate 50] (buyerWidget model) `nodeVisible` (optionsModel ^. #scene == OptionsBuyerScene)
+      , vscroll_ [wheelRate 50] (researchWidget model) `nodeVisible` (optionsModel ^. #scene == OptionsResearchScene)
       ] 
   where
     optionsMainSceneButton :: Text -> OptionsScene -> AppNode

@@ -48,7 +48,7 @@ txBuilderWidget model@AppModel{..} = do
               ]
           , filler
           , hstack
-              [ widgetIf ([] /= txBuilderModel ^. #keyWitnesses) $ 
+              [ widgetIf ([] /= txBuilderModel ^. #keyWitnesses && txBuilderModel ^. #isBuilt) $ 
                   box_ [alignBottom,alignLeft] $ reqKeysPopup model
               , filler
               , box_ [alignMiddle] $ hstack

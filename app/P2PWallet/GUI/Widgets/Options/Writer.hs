@@ -20,12 +20,14 @@ writerWidget model@AppModel{optionsModel} = do
           [ spacer
           , centerWidgetH writerSceneMenu
           , spacer
-          , box_ [mergeRequired reqUpdate] (openProposalsWidget model)
-              `nodeVisible` (optionsModel ^. #writerModel % #scene == OpenOptionsProposals)
-          , box_ [mergeRequired reqUpdate] (activeContractsWidget model)
-              `nodeVisible` (optionsModel ^. #writerModel % #scene == ActiveOptionsContracts)
-          , box_ [mergeRequired reqUpdate] (transactionsWidget model)
-              `nodeVisible` (optionsModel ^. #writerModel % #scene == OptionsTransactions)
+          , vscroll_ [wheelRate 50] $ vstack
+              [ box_ [mergeRequired reqUpdate] (openProposalsWidget model)
+                  `nodeVisible` (optionsModel ^. #writerModel % #scene == OpenOptionsProposals)
+              , box_ [mergeRequired reqUpdate] (activeContractsWidget model)
+                  `nodeVisible` (optionsModel ^. #writerModel % #scene == ActiveOptionsContracts)
+              , box_ [mergeRequired reqUpdate] (transactionsWidget model)
+                  `nodeVisible` (optionsModel ^. #writerModel % #scene == OptionsTransactions)
+              ]
           ]
       , widgetIf (isJust $ optionsModel ^. #writerModel % #inspectedTransaction) $
           inspectionWidget model
