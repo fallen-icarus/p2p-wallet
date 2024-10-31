@@ -279,14 +279,14 @@ instance Notify OptionsWallet where
       activesMsg :: Text
       activesMsg
         | activesOnly (oldState ^. #utxos) /= activesOnly (newState ^. #utxos) = 
-            unwords $ intersperse "\n" $ filter (/="")
+            mconcat $ intersperse "\n" $ filter (/="")
               [ "Active options contract statuses have changed."
               , if any (contractHasExpired currentTime) $ newState ^. #utxos
-                then "Some contracts have expired"
+                then "Some contracts have expired."
                 else ""
               ]
         | otherwise =
             if any (contractHasExpired currentTime) $ newState ^. #utxos
-            then "Some contracts have expired"
+            then "Some contracts have expired."
             else ""
 

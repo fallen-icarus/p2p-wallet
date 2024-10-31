@@ -533,7 +533,7 @@ instance Notify LoanWallet where
       activesMsg :: Text
       activesMsg
         | activeOnly (oldState ^. #utxos) /= activeOnly (newState ^. #utxos) = 
-            unwords $ intersperse "\n" $ filter (/="")
+            mconcat $ intersperse "\n" $ filter (/="")
               [ "Active loan statuses have changed."
               , if any (loanHasExpired currentTime) $ newState ^. #utxos
                 then "Some loans have expired."
@@ -542,7 +542,7 @@ instance Notify LoanWallet where
                 then "Some loans required interest/penalty applications."
                 else ""
               ]
-        | otherwise = unwords $ intersperse "\n" $ filter (/="")
+        | otherwise = mconcat $ intersperse "\n" $ filter (/="")
             [ if any (loanHasExpired currentTime) $ newState ^. #utxos
               then "Some loans have expired."
               else ""
@@ -554,7 +554,7 @@ instance Notify LoanWallet where
       lenderOffersMsg :: Text
       lenderOffersMsg
         | oldState ^. #offerUTxOs /= newState ^. #offerUTxOs = 
-            unwords $ intersperse "\n" $ filter (/="")
+            mconcat $ intersperse "\n" $ filter (/="")
               [ "Offers to borrowers have changed."
               , if any (offerHasExpired currentTime) $ newState ^. #offerUTxOs
                 then "Some offers are expired."

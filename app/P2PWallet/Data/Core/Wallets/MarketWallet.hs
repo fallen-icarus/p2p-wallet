@@ -500,7 +500,7 @@ instance Notify MarketWallet where
         | spotBidOnly (oldState ^. #bidUTxOs) /= spotBidOnly (newState ^. #bidUTxOs) = 
             "Bids to to sellers have changed."
         | claimBidOnly (oldState ^. #bidUTxOs) /= claimBidOnly (newState ^. #bidUTxOs) = 
-            unwords $ intersperse "\n" $ filter (/="")
+            mconcat $ intersperse "\n" $ filter (/="")
               [ "Bids to to sellers have changed."
               , if any (claimBidHasExpired currentTime) $ newState ^. #utxos
                 then "Some Claim Bids have expired."
@@ -514,7 +514,7 @@ instance Notify MarketWallet where
       sellerAcceptedBidMsg :: Text
       sellerAcceptedBidMsg
         | acceptedBidOnly (oldState ^. #utxos) /= acceptedBidOnly (newState ^. #utxos) = 
-            unwords $ intersperse "\n" $ filter (/="")
+            mconcat $ intersperse "\n" $ filter (/="")
               [ "Accepted Bid statuses have changed."
               , if any (claimPeriodHasExpired currentTime) $ newState ^. #utxos
                 then "Some Accepted Bid NFTs are reclaimable!"
