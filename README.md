@@ -7,10 +7,6 @@ compositions.
 > [!WARNING]
 > This is a prototype! Expect breaking changes until at least an official v1 release.
 
-> [!NOTE]
-> The [cardano-aftermarket protocol](https://github.com/fallen-icarus/cardano-aftermarket) (the
-> secondary market for loans and options) has not been integrated yet. It is a WIP.
-
 ---
 ## Table of Contents
 - [Abstract](#abstract)
