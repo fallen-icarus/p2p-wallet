@@ -262,10 +262,10 @@ The wallet depends on:
   - SDL2
   - GLEW
   - libsodium (aka "sodium")
-  - scep256k1
+  - secp256k1
   - blst
 
-The `p2p-wallet` executable will work on any computer with the above packages/executable installed.
+The `p2p-wallet` executable will work on any computer with the above packages/executables installed.
 For the sake of simplicity, this guide will be dedicated to Ubuntu/Debian (Linux), but reference
 material will be provided for installing the wallet on other operating systems.
 
@@ -278,7 +278,7 @@ sudo apt-get install autoconf automake build-essential curl g++ git jq libffi-de
 
 These packages are necessary for installing everything else.
 
-> [!WARNING]
+> [!TIP]
 > If you get an error about `libncursesw5`, you can replace it with `libncurses-dev`. Some versions
 > of Linux have deprecated the former in favor of the latter.
 
@@ -362,8 +362,7 @@ sudo curl https://data.trezor.io/udev/51-trezor.rules -o /etc/udev/rules.d/51-tr
 > Alternatively, you can set up trezor-bridge by following these
 > [instructions](https://github.com/gitmachtl/scripts/tree/master/cardano/mainnet#how-to-prepare-your-system-before-using-a-hardware-wallet).
 
-If your udev rules are set up correctly, you should be able to test your hardware wallet's
-connection with:
+If things are set up correctly, you should be able to test your hardware wallet's connection with:
 ```bash
 cardano-hw-cli device version
 ```
@@ -378,7 +377,7 @@ sudo apt-get install libsdl2-dev libglew-dev
 The documentation for installing these dependencies on other operating systems can be found
 [here](https://github.com/fjvallarino/monomer/blob/main/docs/tutorials/00-setup.md#libraries-sdl2-and-glew).
 
-### Install libsodium, scep256k1, and blst
+### Install libsodium, secp256k1, and blst
 
 These instructions are the same as when [installing
 `cardano-node`](https://developers.cardano.org/docs/get-started/cardano-node/installing-cardano-node/#installing-dependencies).
@@ -455,7 +454,7 @@ source $HOME/.bashrc
 ghcup install ghc 9.2.8 # The wallet relies on 9.2.8
 ```
 
-### Build the executable - this may take about 30 minutes
+#### Build the executable - this may take about 30 minutes
 ```bash
 cd # Return to your home directory.
 git clone https://github.com/fallen-icarus/p2p-wallet
