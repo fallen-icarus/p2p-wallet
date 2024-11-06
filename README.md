@@ -250,78 +250,197 @@ from 0.5 ADA to 1.7 ADA. It tripled despite Alice personally cutting costs by 66
 
 ## Installing
 
-The p2p-wallet is effectively just a GUI wrapper around
+The P2P-DeFi Wallet is a cross-platform GUI wrapper around
 [cardano-cli](https://github.com/IntersectMBO/cardano-cli) and
-[cardano-hw-cli](https://github.com/vacuumlabs/cardano-hw-cli). The smart contracts for the p2p-DeFi
-protocols depend on libsodium, scep256k1, and blst. Finally, the [GUI
-library](https://github.com/fjvallarino/monomer) used to build the p2p-wallet depends on SDL2 and
-GLEW.
+[cardano-hw-cli](https://github.com/vacuumlabs/cardano-hw-cli). It should work on Windows, macOS,
+and Linux. The wallet is a light-wallet that connects to [koios.rest](https://koios.rest/) so there
+is no need to have a local node installed.
 
 > [!CAUTION]
-> The GUI library is supposed to have cross-platform support for Windows, macOS and Linux. I have
-> not been able to verify the wallet on anything but Linux.
+> At the time of writing, I have not been able to verify the wallet works on anything, but Linux. If
+> you are on Windows, it is recommended that you use WSL2.
 
-> [!IMPORTANT] 
-> This is not a software wallet! I do not know how to safely handle spending passwords for hot keys,
-> so I cannot add support for that. The wallet is fully capable of signing with hardware wallets
-> directly, or exporting/importing the built transactions for signing manually.
+The wallet depends on:
+  - `cardano-cli` version 10.0.0 or later
+  - `cardano-hw-cli` version 1.15.0-rc1 or later
+  - SDL2
+  - GLEW
+  - libsodium (aka "sodium")
+  - scep256k1
+  - blst
 
-> [!WARNING] 
-> There is currently a bug in cardano-hw-cli that prevents hardware wallets from being able to sign
-> certain DeFi transactions ([bug](https://github.com/vacuumlabs/cardano-hw-cli/issues/177)).
-> cardano-swaps is not impacted by this bug! However, the other p2p-DeFi protocols are impacted. If
-> you ever come across a `ScriptIntegrity` error when trying to use your hardware wallet to sign,
-> you have encountered this bug. Unfortunately, there is no timeline for a fix. Perhaps this wallet
-> will create enough pressure to get it fixed ASAP. Luckily, when a fix is implemented, you can
-> simply swap out the version of cardano-hw-cli on you system and the p2p-wallet should be able to
-> sign these DeFi transactions without having to re-compile it.
+The `p2p-wallet` executable will work on any computer with the above packages/executable installed.
+For the sake of simplicity, this guide will be dedicated to Ubuntu/Debian (Linux), but reference
+material will be provided for installing the wallet on other operating systems.
 
-### Prerequisites
-
-#### cardano-cli and cardano-hw-cli
-
-You will need both cardano-cli installed in order to build transactions and you will need
-cardano-hw-cli installed if you wish to use a hardware wallet. You can find the latest cardano-cli
-[here](https://github.com/IntersectMBO/cardano-node/releases) (it is included with the node
-tarball). For cardano-hw-cli, you must use version 1.15.0-rc1, or later. You can find all of the
-cardano-hw-cli releases [here](https://github.com/vacuumlabs/cardano-hw-cli/releases).
-
-> [!IMPORTANT] 
-> If you install cardano-hw-cli by downloading the tarball, *all* files in the tarball must be moved
-> to your $PATH (eg, the HID files must also be found in your path). Without them, cardano-hw-cli
-> will not be able to talk to your hardware wallet, even if the right udev rules are configured.
-
-#### Ledger Wallets
-
-If you are using a ledger hardware wallet on linux, you will need to add the udev rules so that you
-don't need to use `sudo` every time to sign transactions. You can find the latest udev rules
-[here](https://github.com/LedgerHQ/udev-rules). You can either manually add the `20-hw1.rules` file
-to the `/etc/udev/rules.d/` directory, or you can execute the `add_udev_rules.sh` script using
-`sudo` and it will do it for you.
-
-#### Trezor Wallets
-
-You will need to have [trezor-suite](https://trezor.io/trezor-suite) installed and open whenever you
-wish to use your trezor hardware wallet. Alternatively, you can set up trezor-bridge by following
-these [instructions](https://github.com/gitmachtl/scripts/tree/master/cardano/mainnet#how-to-prepare-your-system-before-using-a-hardware-wallet).
-
-If you are on linux, you will also need udev rules for trezor so that you don't need to use `sudo`
-every time you sign transactions. You can find those udev rules
-[here](https://trezor.io/learn/a/udev-rules).
-
-#### SDL2 and GLEW
-
-The documentation for installing these dependencies can be found
-[here](https://github.com/fjvallarino/monomer/blob/main/docs/tutorials/00-setup.md#libraries-sdl2-and-glew).
-
-### Building From Source
-
-#### Install the necessary packages - similar to cardano-node
+### Install the necessary system dependencies
 ```bash
 sudo apt update
 sudo apt upgrade
 sudo apt-get install autoconf automake build-essential curl g++ git jq libffi-dev libgmp-dev libncursesw5 libssl-dev libsystemd-dev libtinfo-dev libtool make pkg-config wget zlib1g-dev liblzma-dev libpq-dev
 ```
+
+These packages are necessary for installing everything else.
+
+> [!WARNING]
+> If you get an error about `libncursesw5`, you can replace it with `libncurses-dev`. Some versions
+> of Linux have deprecated the former in favor of the latter.
+
+For other operating systems, refer to the [System dependencies installation
+section](https://developers.cardano.org/docs/get-started/cardano-node/installing-cardano-node/) of
+the `cardano-node` install instructions. The `p2p-wallet` executable depends on the same system
+dependencies as `cardano-node`.
+
+### Create a location for installing `cardano-cli` and `cardano-hw-cli` locally
+```bash
+# Create a directory for storing cardano-cli and cardano-hw-cli.
+mkdir -p $HOME/.local/bin
+# Add a newline to your .bashrc file.
+echo '' >> $HOME/.bashrc
+# Add the new directory to your lookup PATH so the executables can be executed from any directory.
+echo 'export PATH=$PATH:$HOME/.local/bin' >> $HOME/.bashrc
+# Reload the .bashrc file.
+source $HOME/.bashrc
+```
+
+This step is required so that the `p2p-wallet` executable can actually use the `cardano-cli` and
+`cardano-hw-cli` executables.
+
+### Install `cardano-cli`
+
+You can find the latest version of `cardano-cli` attached to the latest
+[release](https://github.com/IntersectMBO/cardano-node/releases) of `cardano-node`. It can be found
+inside the tar/zip files under the release's *Assets* section. You only need `cardano-cli`, but you
+need to move it to the local install location:
+```bash
+# Execute this from within the extracted directory.
+cp cardano-cli $HOME/.local/bin
+```
+
+If you did it right, you should be able to execute `cardano-cli --version` in the terminal from any
+directory.
+
+### Install `cardano-hw-cli`
+
+The latest version can be found [here](https://github.com/vacuumlabs/cardano-hw-cli/releases). Just
+like with `cardano-cli`, you can find the executable inside the tar/zip files under the release's
+*Assets* section. You must move **all** of the executables found inside to the local install
+location! You can easily do that with:
+```bash
+# Execute this from within the extracted directory.
+cp * $HOME/.local/bin
+```
+
+If you did it right, you should be able to execute `cardano-hw-cli version` in the terminal from any
+directory.
+
+> [!WARNING] 
+> There is currently a bug in `cardano-hw-cli` that prevents hardware wallets from being able to sign
+> certain DeFi transactions ([bug](https://github.com/vacuumlabs/cardano-hw-cli/issues/177)).
+> Cardano-Swaps (DEX) and normal wallet actions are not impacted by this bug! However, the other
+> p2p-DeFi protocols are impacted. If you ever come across a `ScriptIntegrity` error when trying to
+> use your hardware wallet to sign, you have encountered this bug. Unfortunately, there is no
+> timeline for a fix. Perhaps this wallet will create enough pressure to get it fixed ASAP. Luckily,
+> when a fix is implemented, you can simply swap out the version of `cardano-hw-cli` on your system and
+> the `p2p-wallet` should be able to sign these DeFi transactions without having to re-build the
+> wallet from source.
+
+#### UDEV rules - Linux Only
+
+If you are on Linux, you will also need to set up the required udev rules for your hardware wallet
+in order for `cardano-hw-cli` to be able to connect to your hardware wallet.
+
+For Ledger, you can execute ([source](https://github.com/LedgerHQ/udev-rules)):
+```bash
+wget -q -O - https://raw.githubusercontent.com/LedgerHQ/udev-rules/master/add_udev_rules.sh | sudo bash
+```
+
+For Trezor, you can execute ([source](https://trezor.io/learn/a/udev-rules)):
+```bash
+sudo curl https://data.trezor.io/udev/51-trezor.rules -o /etc/udev/rules.d/51-trezor.rules
+```
+
+> [!IMPORTANT]
+> If you are using Trezor, you will need to have [trezor-suite](https://trezor.io/trezor-suite)
+> installed **and open in the background** whenever you wish to use your trezor hardware wallet.
+> Alternatively, you can set up trezor-bridge by following these
+> [instructions](https://github.com/gitmachtl/scripts/tree/master/cardano/mainnet#how-to-prepare-your-system-before-using-a-hardware-wallet).
+
+If your udev rules are set up correctly, you should be able to test your hardware wallet's
+connection with:
+```bash
+cardano-hw-cli device version
+```
+
+### SDL2 and GLEW
+
+These are easily installed with:
+```bash
+sudo apt-get install libsdl2-dev libglew-dev
+```
+
+The documentation for installing these dependencies on other operating systems can be found
+[here](https://github.com/fjvallarino/monomer/blob/main/docs/tutorials/00-setup.md#libraries-sdl2-and-glew).
+
+### Install libsodium, scep256k1, and blst
+
+These instructions are the same as when [installing
+`cardano-node`](https://developers.cardano.org/docs/get-started/cardano-node/installing-cardano-node/#installing-dependencies).
+
+```bash
+git clone https://github.com/intersectmbo/libsodium
+cd libsodium
+git checkout dbb48cc
+./autogen.sh
+./configure
+make
+sudo make install
+
+cd # Return to your home directory.
+git clone https://github.com/bitcoin-core/secp256k1
+cd secp256k1
+git checkout ac83be33
+./autogen.sh
+./configure --enable-module-schnorrsig --enable-experimental
+make
+make check
+sudo make install
+sudo ldconfig
+
+cd # Return to your home directory.
+git clone https://github.com/supranational/blst
+cd blst
+git checkout v0.3.10
+./build.sh
+cat > libblst.pc << EOF # This command extends through the next EOF
+prefix=/usr/local
+exec_prefix=\${prefix}
+libdir=\${exec_prefix}/lib
+includedir=\${prefix}/include
+
+Name: libblst
+Description: Multilingual BLS12-381 signature library
+URL: https://github.com/supranational/blst
+Version: 0.3.10
+Cflags: -I\${includedir}
+Libs: -L\${libdir} -lblst
+EOF
+sudo cp libblst.pc /usr/local/lib/pkgconfig/
+sudo cp bindings/blst_aux.h bindings/blst.h bindings/blst.hpp  /usr/local/include/
+sudo cp libblst.a /usr/local/lib
+sudo chmod u=rw,go=r /usr/local/{lib/{libblst.a,pkgconfig/libblst.pc},include/{blst.{h,hpp},blst_aux.h}}
+
+echo '' >> $HOME/.bashrc # Add a newline to your .bashrc file.
+echo 'export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"' >> $HOME/.bashrc
+echo 'export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"' >> $HOME/.bashrc
+source $HOME/.bashrc
+```
+
+> [!IMPORTANT]
+> At this point, a pre-built version of `p2p-wallet` should be able to run on your computer. If you
+> wish to build the executable from source, continue with these instructions.
+
+### Building From Source
 
 #### Install GHC and cabal
 ```bash
@@ -340,54 +459,9 @@ source $HOME/.bashrc
 ghcup install ghc 9.2.8 # The wallet relies on 9.2.8
 ```
 
-#### Install libsodium, scep256k1, and blst
-```bash
-git clone https://github.com/intersectmbo/libsodium
-cd libsodium
-git checkout dbb48cc
-./autogen.sh
-./configure
-make
-sudo make install
-
-cd ../ # Leave the libsodium directory.
-git clone https://github.com/bitcoin-core/secp256k1
-cd secp256k1
-git checkout ac83be33
-./autogen.sh
-./configure --enable-module-schnorrsig --enable-experimental
-make
-make check
-sudo make install
-sudo ldconfig
-
-cd ../ # Leave the secp256k1 directory.
-git clone https://github.com/supranational/blst
-cd blst
-git checkout v0.3.10
-./build.sh
-cat > libblst.pc << EOF # This command extends until the next EOF
-prefix=/usr/local
-exec_prefix=\${prefix}
-libdir=\${exec_prefix}/lib
-includedir=\${prefix}/include
-
-Name: libblst
-Description: Multilingual BLS12-381 signature library
-URL: https://github.com/supranational/blst
-Version: 0.3.10
-Cflags: -I\${includedir}
-Libs: -L\${libdir} -lblst
-EOF
-sudo cp libblst.pc /usr/local/lib/pkgconfig/
-sudo cp bindings/blst_aux.h bindings/blst.h bindings/blst.hpp  /usr/local/include/
-sudo cp libblst.a /usr/local/lib
-sudo chmod u=rw,go=r /usr/local/{lib/{libblst.a,pkgconfig/libblst.pc},include/{blst.{h,hpp},blst_aux.h}}
-```
-
 ### Build the executable - this may take about 30 minutes
 ```bash
-cd ../ # Leave the blst directory.
+cd # Return to your home directory.
 git clone https://github.com/fallen-icarus/p2p-wallet
 cd p2p-wallet
 git checkout dev # this branch
@@ -398,10 +472,9 @@ cabal build
 
 The `p2p-wallet` executable program should now be at
 `dist-newstyle/build/x86_64-linux/ghc-9.2.8/p2p-wallet-0.1.0.0/x/p2p-wallet/build/p2p-wallet/p2p-wallet`.
-Move the program to somewhere in your `$PATH`.
+You can move it to your home directory with:
+```bash
+cp dist-newstyle/build/x86_64-linux/ghc-9.2.8/p2p-wallet-0.1.0.0/x/p2p-wallet/build/p2p-wallet/p2p-wallet $HOME
+```
 
-You can open the wallet by executing `p2p-wallet` in the terminal.
-
-> [!NOTE] 
-> I currently do not know how to package all of these dependencies up to create a single desktop
-> application.
+It can be opened by double-clicking on it. Enjoy!
