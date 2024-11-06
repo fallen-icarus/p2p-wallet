@@ -358,8 +358,9 @@ sudo curl https://data.trezor.io/udev/51-trezor.rules -o /etc/udev/rules.d/51-tr
 
 > [!IMPORTANT]
 > If you are using Trezor, you will need to have [trezor-suite](https://trezor.io/trezor-suite)
-> installed **and open in the background** whenever you wish to use your trezor hardware wallet.
-> Alternatively, you can set up trezor-bridge by following these
+> installed **and open in the background** whenever you wish to use your trezor hardware wallet. In
+> order to run trezor-suite on Linux, you will need to install libfuse2 with `sudo apt install
+> libfuse2`. Alternatively, you can set up trezor-bridge by following these
 > [instructions](https://github.com/gitmachtl/scripts/tree/master/cardano/mainnet#how-to-prepare-your-system-before-using-a-hardware-wallet).
 
 If things are set up correctly, you should be able to test your hardware wallet's connection with:
@@ -425,6 +426,7 @@ sudo cp bindings/blst_aux.h bindings/blst.h bindings/blst.hpp  /usr/local/includ
 sudo cp libblst.a /usr/local/lib
 sudo chmod u=rw,go=r /usr/local/{lib/{libblst.a,pkgconfig/libblst.pc},include/{blst.{h,hpp},blst_aux.h}}
 
+cd # Return to your home directory.
 echo '' >> $HOME/.bashrc # Add a newline to your .bashrc file.
 echo 'export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"' >> $HOME/.bashrc
 echo 'export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"' >> $HOME/.bashrc
@@ -456,7 +458,6 @@ ghcup install ghc 9.2.8 # The wallet relies on 9.2.8
 
 #### Build the executable - this may take about 30 minutes
 ```bash
-cd # Return to your home directory.
 git clone https://github.com/fallen-icarus/p2p-wallet
 cd p2p-wallet
 git checkout dev # this branch
