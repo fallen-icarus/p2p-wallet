@@ -15,6 +15,7 @@ compositions.
 - [The P2P-DeFi Wallet](#the-p2p-defi-wallet)
 - [FAQ](#faq)
 - [Installing](#installing)
+- [Known Issues](#known-issues)
 
 ## Abstract
 
@@ -253,8 +254,7 @@ and Linux. The wallet is a light-wallet that connects to [koios.rest](https://ko
 is no need to have a local node installed.
 
 > [!CAUTION]
-> At the time of writing, I have not been able to verify the wallet works on anything, but Linux. If
-> you are on Windows, it is recommended that you use WSL2.
+> If you are on Windows, it is recommended that you use WSL2.
 
 The wallet depends on:
   - `cardano-cli` version 10.0.0 or later
@@ -474,3 +474,14 @@ cp dist-newstyle/build/x86_64-linux/ghc-9.2.8/p2p-wallet-0.1.0.0/x/p2p-wallet/bu
 ```
 
 It can be opened by double-clicking on it. Enjoy!
+
+## Known Issues
+
+#### Linux
+- none
+
+#### macOS
+- Resizing the window can cause the app to crash. This issue seems to be unique to the M-series chips.
+
+#### Windows
+- none
