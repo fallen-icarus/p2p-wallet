@@ -384,6 +384,10 @@ These instructions are the same as when [installing
 `cardano-node`](https://developers.cardano.org/docs/get-started/cardano-node/installing-cardano-node/#installing-dependencies).
 
 ```bash
+# Create a subdirectory for the git repos.
+mkdir -p $HOME/git-clones
+cd $HOME/git-clones
+
 git clone https://github.com/intersectmbo/libsodium
 cd libsodium
 git checkout dbb48cc
@@ -392,7 +396,7 @@ git checkout dbb48cc
 make
 sudo make install
 
-cd # Return to your home directory.
+cd $HOME/git-clones # Return to the git-clones directory.
 git clone https://github.com/bitcoin-core/secp256k1
 cd secp256k1
 git checkout ac83be33
@@ -403,7 +407,7 @@ make check
 sudo make install
 sudo ldconfig
 
-cd # Return to your home directory.
+cd $HOME/git-clones # Return to the git-clones directory.
 git clone https://github.com/supranational/blst
 cd blst
 git checkout v0.3.10
@@ -458,6 +462,7 @@ ghcup install ghc 9.2.8 # The wallet relies on 9.2.8
 
 #### Build the executable - this may take about 30 minutes
 ```bash
+cd $HOME/git-clones # Go to the git-clones directory.
 git clone https://github.com/fallen-icarus/p2p-wallet
 cd p2p-wallet
 git checkout dev # this branch
