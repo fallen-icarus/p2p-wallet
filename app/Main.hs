@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-deprecations #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Main where
@@ -80,6 +81,9 @@ main = do
       , appFontDefMem "Remix" $(embedFile "./assets/fonts/remixicon.ttf")
       , appWindowIcon $ toText iconFilePath
       , appInitEvent x
+      -- Without this option, the app can crash on apple's M-series chips whenever the window is
+      -- resized, or the resolution is changed while the app is running.
+      , appRenderOnMainThread
       -- The scaling is weird for some monitor resolutions so the auto-scaling is disabled.
       , appWindowState MainWindowMaximized
       , appDisableAutoScale True
