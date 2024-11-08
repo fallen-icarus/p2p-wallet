@@ -15,7 +15,6 @@ compositions.
 - [The P2P-DeFi Wallet](#the-p2p-defi-wallet)
 - [FAQ](#faq)
 - [Installing](#installing)
-- [Known Issues](#known-issues)
 
 ## Abstract
 
@@ -479,14 +478,3 @@ cp dist-newstyle/build/x86_64-linux/ghc-9.2.8/p2p-wallet-0.1.0.0/x/p2p-wallet/bu
 ```
 
 It can be opened by double-clicking on it. Enjoy!
-
-## Known Issues
-
-#### Linux
-- none
-
-#### macOS
-- Resizing the window can cause the app to crash. This issue seems to be unique to the M-series chips.
-
-#### Windows
-- none
