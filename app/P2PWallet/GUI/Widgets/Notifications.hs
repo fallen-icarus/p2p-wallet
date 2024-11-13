@@ -46,7 +46,7 @@ notificationsWidget AppModel{notifications} = do
     , vscroll_ [wheelRate 50] (notificationsList notifications)
         `styleBasic` [padding 10, bgColor customGray2, radius 5]
         `nodeVisible` (notifications /= [])
-    , vscroll_ [wheelRate 50] noNotificationsMessage `nodeVisible` null notifications
+    , widgetIf (null notifications) $ centerWidget noNotificationsMessage
     ] `styleBasic`
         [ padding 10
         , radius 5
