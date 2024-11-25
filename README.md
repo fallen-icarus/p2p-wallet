@@ -5,11 +5,12 @@ trading. It includes a *transaction builder* that can be used to build arbitrari
 compositions.
 
 > [!WARNING]
-> This is a prototype! Expect breaking changes until at least an official v1 release.
+> This is a prototype! Expect breaking changes until at least an official v1.0.0 release.
 
 ---
 ## Table of Contents
 - [Abstract](#abstract)
+- [Demo and Tutorials](#demo-and-tutorials)
 - [Screenshots](#screenshots)
 - [Motivation](#motivation)
 - [The P2P-DeFi Wallet](#the-p2p-defi-wallet)
@@ -27,6 +28,18 @@ has builtin support for a full DeFi stack: DEX, lending/borrowing, options tradi
 Furthermore, since it uses the p2p-DeFi protocols, it is the first fully-decentralized and
 censorship-resistant DeFi experience. There is no multisig or central point of failure that can be
 used to stop any part of it.
+
+## Demo and Tutorials
+
+You can find the demo video on [youtube](https://youtu.be/lB1czpijpag?si=pIcOEJ28DZaqc4EX).
+
+Tutorial videos:
+- [Installation](https://youtu.be/A4MTurAdmtI?si=z9Bi1gn7pac-RC9Q)
+- [The Basics](https://youtu.be/wI6IPohiRYA?si=vo_XiSNY3gLgQVF_)
+- DEX - TODO
+- Options - TODO
+- Lending/Borrowing - TODO
+- Aftermarket - TODO
 
 ## Screenshots
 
@@ -464,17 +477,18 @@ ghcup install ghc 9.2.8 # The wallet relies on 9.2.8
 cd $HOME/git-clones # Go to the git-clones directory.
 git clone https://github.com/fallen-icarus/p2p-wallet
 cd p2p-wallet
-git checkout dev # this branch
+git checkout 0.1.0 # specify the desired version
 cabal clean
 cabal update
 cabal build
 ```
 
 The `p2p-wallet` executable program should now be at
-`dist-newstyle/build/x86_64-linux/ghc-9.2.8/p2p-wallet-0.1.0.0/x/p2p-wallet/build/p2p-wallet/p2p-wallet`.
-You can move it to your home directory with:
+`dist-newstyle/build/x86_64-linux/ghc-9.2.8/p2p-wallet-0.1.0/x/p2p-wallet/build/p2p-wallet/p2p-wallet`.
+Make sure to swap out `0.1.0` with the version number you chose! You can move it to your home
+directory with:
 ```bash
-cp dist-newstyle/build/x86_64-linux/ghc-9.2.8/p2p-wallet-0.1.0.0/x/p2p-wallet/build/p2p-wallet/p2p-wallet $HOME
+cp dist-newstyle/build/x86_64-linux/ghc-9.2.8/p2p-wallet-0.1.0/x/p2p-wallet/build/p2p-wallet/p2p-wallet $HOME
 ```
 
 It can be opened by double-clicking on it. Enjoy!
