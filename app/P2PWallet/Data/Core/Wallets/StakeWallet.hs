@@ -31,7 +31,7 @@ data StakeWallet = StakeWallet
   , totalDelegation :: Lovelace
   , utxoBalance :: Lovelace
   , availableRewards :: Lovelace
-  , delegatedPool :: Maybe Pool
+  , delegatedPool :: Maybe PoolInfo
   , delegatedDRep :: Maybe DRep
   , rewardHistory :: [StakeReward]
   , linkedAddresses :: [PaymentAddress]

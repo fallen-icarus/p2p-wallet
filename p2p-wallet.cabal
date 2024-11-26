@@ -198,6 +198,7 @@ executable p2p-wallet
       P2PWallet.Data.Koios.AddressUTxO
       P2PWallet.Data.Koios.AssetTransaction
       P2PWallet.Data.Koios.BudgetEstimations
+      P2PWallet.Data.Koios.EpochParams
       P2PWallet.Data.Koios.DRep
       P2PWallet.Data.Koios.LinkedPaymentAddresses
       P2PWallet.Data.Koios.MintTransaction
@@ -205,6 +206,7 @@ executable p2p-wallet
       P2PWallet.Data.Koios.PostTypes
       P2PWallet.Data.Koios.StakeAccount
       P2PWallet.Data.Koios.StakeReward
+      P2PWallet.Data.Koios.Tokenomics
       P2PWallet.Data.Koios.Transaction
       P2PWallet.Data.Koios.TxSubmissionResponse
       P2PWallet.Database

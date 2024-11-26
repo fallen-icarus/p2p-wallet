@@ -61,6 +61,7 @@ import P2PWallet.Data.Core.BorrowerInformation
 import P2PWallet.Data.Core.Internal
 import P2PWallet.Data.Koios.AddressUTxO
 import P2PWallet.Data.Koios.AssetTransaction
+import P2PWallet.Data.Koios.EpochParams
 import P2PWallet.Data.Koios.DRep
 import P2PWallet.Data.Koios.LinkedPaymentAddresses
 import P2PWallet.Data.Koios.MintTransaction
@@ -68,6 +69,7 @@ import P2PWallet.Data.Koios.Pool
 import P2PWallet.Data.Koios.PostTypes
 import P2PWallet.Data.Koios.StakeAccount
 import P2PWallet.Data.Koios.StakeReward
+import P2PWallet.Data.Koios.Tokenomics
 import P2PWallet.Data.Koios.Transaction
 import P2PWallet.Data.Core.Transaction qualified as P2P
 import P2PWallet.Data.Core.StakeReward qualified as P2P
@@ -89,22 +91,30 @@ toNetworkURL Mainnet = "api.koios.rest"
 toNetworkURL Testnet = "preprod.koios.rest"
 
 -- | Koios occassionally takes too long to respond. When this happens, the query should just
--- be retried.
+-- be retried. The wallet should not retry indefinitely, so the number of allowed retries is
+-- capped.
 handleTimeoutError :: IO (Either Client.ClientError a) -> IO (Either Client.ClientError a)
-handleTimeoutError query = query >>= \case
-    Left err -> if isTimeoutError err then handleTimeoutError query else return $ Left err
-    Right res -> return $ Right res
+handleTimeoutError query' = go 5 query'
   where
+    -- A helper function to cap the number of retries.
+    go :: Int -> IO (Either Client.ClientError a) -> IO (Either Client.ClientError a)
+    go n query = query >>= \case
+      Right res -> return $ Right res
+      Left err -> 
+        if n == 0
+        then return $ Left err
+        else if isTimeoutError err then go (n-1) query else return $ Left err
+
     isTimeoutError :: Client.ClientError -> Bool
     isTimeoutError err =
       "ResponseTimeout)" == Text.takeEnd 16 (show err)
 
--- | Koios instances occasionally take too long to respond. If they take longer than 5 seconds,
+-- | Koios instances occasionally take too long to respond. If they take longer than 15 seconds,
 -- odds are, they won't reply by 30 seconds either (the default timeout). These settings just change
--- the default timeout to 5 seconds.
+-- the default timeout to 15 seconds.
 customTlsSettings :: HTTP.ManagerSettings
 customTlsSettings = HTTPS.tlsManagerSettings
-  { HTTP.managerResponseTimeout = HTTP.responseTimeoutMicro 5_000_000
+  { HTTP.managerResponseTimeout = HTTP.responseTimeoutMicro 15_000_000
   }
 
 -- Since Koios instances may occassionally return incorrect UTxOs if they are not
@@ -168,7 +178,7 @@ runGetParams :: Network -> IO (Either Text (ByteString,Decimal))
 runGetParams network = do
     manager' <- newManager customTlsSettings
     let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network) 443 "api/v1")
-    handleTimeoutError (runClientM paramsApi env) >>= 
+    handleTimeoutError (runClientM cliParamsApi env) >>= 
       either (return . Left . show) (return . processResults)
   where
     processResults :: Value -> Either Text (ByteString,Decimal)
@@ -290,7 +300,7 @@ runQueryStakeWalletInfo wallet@StakeWallet{network,stakeAddress} = do
       first show <$> handleTimeoutError (runClientM (queryStakeRewards [stakeAddress]) env)
     
     -- Try to query the information for the pool this stake address is delegated to.
-    fetchDelegatedPoolInfo :: Maybe PoolID -> IO (Either Text [Pool])
+    fetchDelegatedPoolInfo :: Maybe PoolID -> IO (Either Text [PoolInfo])
     fetchDelegatedPoolInfo mDelegatedPool = do
       manager <- newManager customTlsSettings
       let env = mkClientEnv manager (BaseUrl Https (toNetworkURL network) 443 "api/v1")
@@ -314,25 +324,25 @@ runQueryStakeWalletInfo wallet@StakeWallet{network,stakeAddress} = do
     
 -- | Get all registered pools for the given network. This tries to do as much concurrently as
 -- possible.
-runQueryAllRegisteredPools :: Network -> IO (Either Text [Pool])
+runQueryAllRegisteredPools :: Network -> IO (Either Text [PoolList])
 runQueryAllRegisteredPools network = do
     manager' <- newManager customTlsSettings
     let env = mkClientEnv manager' (BaseUrl Https (toNetworkURL network) 443 "api/v1")
 
-    -- Get the list of pool ids. Group them 70 at a time so that the next query is not too large.
-    poolIds <- handleTimeoutError $ fmap (groupInto 70) <$> runClientM (queryPoolIds 0 []) env
+    -- Get the saturation limit for calculating each pools active saturation.
+    resSaturationLimit <- handleTimeoutError $ runClientM querySaturationLimit env
 
-    -- If the previous query returned an error, just return the error. Otherwise, try to get
-    -- the information for each pool.
-    info <- 
-      flip (either (return . Left)) poolIds $ 
-        fmap sequence . mapConcurrently
-          (\ids -> handleTimeoutError $ 
-            runClientM (queryPoolInfo (Just "not.is.null") (Just "not.is.null") $ Pools ids) env)
+    -- Get all registered pools.
+    resPools <- handleTimeoutError $ runClientM (queryRegisteredPools 0 []) env
 
-    case info of
-      Right rs -> return $ Right $ concat rs
+    case (,) <$> resPools <*> resSaturationLimit of
+      Right (pools, saturationLimit) -> 
+        return $ Right $ map (updateActiveSaturation saturationLimit) pools
       Left err -> return $ Left $ show err
+  where
+    updateActiveSaturation :: Ada -> PoolList -> PoolList
+    updateActiveSaturation limit pool@PoolList{activeStake} =
+      pool & #activeSaturation ?~ maybe 0 (unAda . toAda) activeStake / unAda limit
 
 -- | Get the current order-book for a specific trading pair. This queries both one-way and two-way
 -- swaps. Ask and offer queries are _not_ supported.
@@ -990,6 +1000,10 @@ newtype InlineDatumFilterParam = InlineDatumFilterParam Text
 newtype AssetListFilterParam = AssetListFilterParam Text
   deriving newtype (ToHttpApiData,IsString)
 
+-- | Limit the response.
+newtype LimitParam = LimitParam Int
+  deriving newtype (ToHttpApiData,Num)
+
 -- | Offset the response.
 newtype OffsetParam = OffsetParam Int
   deriving newtype (ToHttpApiData,Num)
@@ -1015,6 +1029,17 @@ type KoiosApi
 
   :<|>  "cli_protocol_params"
      :> Get '[JSON] Value
+
+  :<|>  "epoch_params"
+     :> QueryParam' '[Required] "select" SelectParam
+     :> QueryParam' '[Required] "order" OrderParam
+     :> QueryParam' '[Required] "limit" LimitParam
+     :> Get '[JSON] EpochParams
+
+  :<|>  "totals"
+     :> QueryParam' '[Required] "order" OrderParam
+     :> QueryParam' '[Required] "limit" LimitParam
+     :> Get '[JSON] Tokenomics
 
   :<|>  "address_utxos"
      :> QueryParam' '[Required] "select" SelectParam
@@ -1058,7 +1083,7 @@ type KoiosApi
      :> QueryParam "sigma" Text
      :> QueryParam "meta_json" Text
      :> ReqBody '[JSON] Pools
-     :> Post '[JSON] [Pool]
+     :> Post '[JSON] [PoolInfo]
 
   :<|>  "account_addresses"
      :> QueryParam' '[Required] "select" SelectParam
@@ -1069,7 +1094,9 @@ type KoiosApi
      :> QueryParam' '[Required] "select" SelectParam
      :> QueryParam' '[Required] "offset" OffsetParam
      :> QueryParam' '[Required] "pool_status" Text
-     :> Get '[JSON] Pools
+     :> QueryParam' '[Required] "ticker" Text -- Used to filter out pools without a ticker.
+     :> QueryParam' '[Required] "meta_url" Text -- Used to filter out pools without a website.
+     :> Get '[JSON] [PoolList]
 
   :<|>  "asset_utxos"
      :> QueryParam' '[Required] "select" SelectParam
@@ -1156,7 +1183,9 @@ type KoiosApi
 
 submitApi
   :<|> evaluateApi 
-  :<|> paramsApi
+  :<|> cliParamsApi
+  :<|> epochParamsApi
+  :<|> tokenomicsApi
   :<|> addressUTxOsApi 
   :<|> addressTxsApi
   :<|> fullTxInfoApi 
@@ -1285,7 +1314,7 @@ queryStakeRewards addrs =
 -- Some pools will have `Nothing` for a lot of correlated fields. The sigma filter
 -- can be used to filter out these pools. Another possible filter is whethere a pool
 -- has registered metadata.
-queryPoolInfo :: Maybe Text -> Maybe Text -> Pools -> ClientM [Pool]
+queryPoolInfo :: Maybe Text -> Maybe Text -> Pools -> ClientM [PoolInfo]
 queryPoolInfo _ _ (Pools []) = return []
 queryPoolInfo sigmaFilter metaFilter pools = poolInfoApi select sigmaFilter metaFilter pools
   where
@@ -1312,15 +1341,29 @@ queryLinkedPaymentAddresses :: [StakeAddress] -> ClientM [PaymentAddress]
 queryLinkedPaymentAddresses addrs = 
   unLinkedPaymentAddresses <$> linkedPaymentAddressesApi "addresses" (StakeAddressesNonEmpty addrs)
 
-queryPoolIds :: OffsetParam -> [PoolID] -> ClientM [PoolID]
-queryPoolIds offset !acc = do
-  (Pools poolIds) <- poolListApi "pool_id_bech32,pool_status" offset "eq.registered"
-  if length poolIds == 1000 then
-    -- Query again since there may be more.
-    queryPoolIds (offset + 1000) $ acc <> poolIds
-  else
-    -- That should be the last of the results.
-    return $ acc <> poolIds
+queryRegisteredPools :: OffsetParam -> [PoolList] -> ClientM [PoolList]
+queryRegisteredPools offset !acc = do
+    pools <- poolListApi select offset "eq.registered" "neq.null" "neq.null"
+    if length pools == 1000 then
+      -- Query again since there may be more.
+      queryRegisteredPools (offset + 1000) $ acc <> pools
+    else
+      -- That should be the last of the results.
+      return $ acc <> pools
+  where
+    select :: SelectParam
+    select =
+      fromString $ intercalate ","
+        [ "pool_id_bech32"
+        , "margin"
+        , "fixed_cost"
+        , "pledge"
+        , "ticker"
+        , "meta_url"
+        , "pool_status"
+        , "retiring_epoch"
+        , "active_stake"
+        ]
 
 queryOneWaySwaps :: Swaps.OfferAsset -> Swaps.AskAsset -> ClientM [AddressUTxO]
 queryOneWaySwaps offerAsset askAsset = queryApi 0 []
@@ -2032,3 +2075,12 @@ queryDrepInfo drepId = drepInfoApi select $ DReps [drepId]
         , "meta_url"
         ]
 
+querySaturationLimit :: ClientM Ada
+querySaturationLimit = do
+  Tokenomics{totalSupply} <- tokenomicsApi (OrderParam "epoch_no.desc") (LimitParam 1)
+  EpochParams{optimalPoolCount} <-
+    epochParamsApi 
+      (SelectParam "epoch_no,optimal_pool_count")
+      (OrderParam "epoch_no.desc")
+      (LimitParam 1)
+  return $ toAda totalSupply / (Ada optimalPoolCount)
