@@ -50,7 +50,7 @@ instance ToText Lovelace where
 -- | A type representing Ada values.
 newtype Ada = Ada { unAda :: Decimal }
   deriving (Show)
-  deriving newtype (Eq,Ord,Num,ToText)
+  deriving newtype (Eq,Ord,Num,ToText,Fractional)
 
 instance Printf.PrintfArg Ada where
   formatArg (Ada x) fmt | Printf.fmtChar (Printf.vFmt 'D' fmt) == 'D' =

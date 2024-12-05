@@ -286,6 +286,14 @@ liveSaturationMsg = unlines
       ]
   ]
 
+activeSaturationMsg :: Text
+activeSaturationMsg = unlines
+  [ unwords
+      [ "The percent saturation for this pool for the currently active epoch."
+      , "This is NOT the live saturation!"
+      ]
+  ]
+
 activeLinkedAddressesMsg :: Text
 activeLinkedAddressesMsg = unlines
   [ unwords

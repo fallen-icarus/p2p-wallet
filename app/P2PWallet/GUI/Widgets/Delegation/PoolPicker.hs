@@ -6,7 +6,6 @@ module P2PWallet.GUI.Widgets.Delegation.PoolPicker
 
 import Monomer hiding (icon)
 import Data.Text qualified as Text
-import Prettyprinter ((<+>), pretty, tupled)
 import Data.Ord qualified as Ord
 
 import P2PWallet.Data.AppModel
@@ -58,7 +57,7 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
                 `styleHover` [bgColor customGray1, cursorIcon CursorHand]
           , textField_ 
                 (toLensVL $ #delegationModel % #poolFilterModel % #search) 
-                [placeholder "ticker, name, pool id"] 
+                [placeholder "ticker, pool id"] 
               `styleBasic` [bgColor customGray1, sndColor darkGray]
               `styleFocus` [border 1 customBlue]
           ]
@@ -67,9 +66,9 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
           [ box_ [alignMiddle] $ label "Pool Description"
               `styleBasic` [textMiddle, textSize 8]
           , box_ [alignMiddle] $ vstack
-              [ sortButton ascendingSortIcon (PoolLiveSaturation SortAscending)
-              , headerField "Live Saturation" liveSaturationMsg
-              , sortButton descendingSortIcon (PoolLiveSaturation SortDescending)
+              [ sortButton ascendingSortIcon (PoolActiveSaturation SortAscending)
+              , headerField "Active Saturation" activeSaturationMsg
+              , sortButton descendingSortIcon (PoolActiveSaturation SortDescending)
               ]
           , box_ [alignMiddle] $ vstack
               [ sortButton ascendingSortIcon (PoolActivePledge SortAscending)
@@ -106,43 +105,25 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
       , spacer_ [width 1]
       , vscroll_ [scrollOverlay, wheelRate 50, barWidth 3, thumbWidth 3] $ 
           vstack_ [childSpacing_ 1] $
-            for sample $ \Pool{..} -> do
-              let PoolInfo{..} = fromMaybe def info
-                  displayName = if Text.length name <= 10 then name else Text.take 10 name <> "..."
-                  nameAndTicker = show $ 
-                    pretty ticker <+> "-" <+> pretty displayName
-                  fullNameAndTicker =
-                    show $ pretty name <+> tupled [pretty ticker]
-                  (pledgeIcon,pledgeColor)
-                    | pledge > livePledge = (closeCircleIcon, customRed)
-                    | otherwise = (circleCheckboxFillIcon, customBlue)
-                  actualPledge = display $ fromMaybe 0 livePledge
-                  newDelegationEvent = DelegationEvent $ 
-                    AddSelectedUserCertificate (Just fullNameAndTicker, StakeDelegation poolId)
+            for sample $ \PoolList{..} -> do
+              let newDelegationEvent = DelegationEvent $ 
+                    AddSelectedUserCertificate (ticker, StakeDelegation poolId)
+                  prettyActiveSaturation = 
+                    displayPercentage (maybe 0 toRational activeSaturation) <> "%"
               hgrid_ [childSpacing]
                 [ vstack 
-                    [ tooltip_ name [tooltipDelay 0] $ label nameAndTicker
-                        `styleBasic` [textLeft, textSize 8, textColor white]
+                    [ widgetMaybe ticker $ \t -> 
+                        label t
+                          `styleBasic` [textLeft, textSize 8, textColor white]
                     , copyableTruncatedPoolId 8 lightGray poolId
-                    , copyableLabelSelf 8 lightGray homepage
+                    , widgetMaybe url $ copyableLabelSelf 8 lightGray
                     ]
                 , box_ [alignMiddle] $ 
-                    label (fromString $ printf "%D%%" $ fromMaybe 0 liveSaturation)
+                    label prettyActiveSaturation
                       `styleBasic` [textMiddle, textSize 8]
-                , box_ [alignMiddle] $ box_ [alignMiddle] $ vstack
-                    [ label (display $ fromMaybe 0 pledge)
+                , box_ [alignMiddle] $
+                    label (display $ fromMaybe 0 pledge)
                         `styleBasic` [textCenter, textSize 8]
-                    , spacer_ [width 3]
-                    , tooltip_ ("Actual: " <> actualPledge) [tooltipDelay 0] $ 
-                        label pledgeIcon
-                          `styleBasic` 
-                            [ textMiddle
-                            , textCenter
-                            , textSize 8
-                            , textFont "Remix"
-                            , textColor pledgeColor
-                            ]
-                    ]
                 , box_ [alignMiddle] $ 
                     label (display $ fromMaybe 0 fixedCost)
                       `styleBasic` [textMiddle, textSize 8]
@@ -201,7 +182,7 @@ poolPickerWidget AppModel{delegationModel=DelegationModel{poolFilterModel,..}} =
           `styleHover`
             [ bgColor customGray1]
 
-    sample :: [Pool]
+    sample :: [PoolList]
     sample = take sampleSize
            . drop (currentPage * sampleSize)
            . sorter sortMethod
@@ -270,7 +251,7 @@ poolFilterWidget = do
             ] 
         , spacer
         , vstack
-            [ label "Saturation:"
+            [ label "Active Saturation:"
                 `styleBasic` [textSize 12, textColor lightGray]
             , spacer
             , hstack
@@ -279,7 +260,7 @@ poolFilterWidget = do
                     `styleBasic` [textSize 10, textColor lightGray]
                 , spacer_ [width 5]
                 , numericField_ 
-                      (toLensVL $ #delegationModel % #poolFilterModel % #liveSaturationRange % _1)
+                      (toLensVL $ #delegationModel % #poolFilterModel % #activeSaturationRange % _1)
                       [minValue 0, maxValue 100, decimals 3]
                     `styleBasic` [bgColor customGray1, width 100, textSize 10, height 30]
                     `styleFocus` [border 1 customBlue]
@@ -288,7 +269,7 @@ poolFilterWidget = do
                     `styleBasic` [textSize 10, textColor lightGray]
                 , spacer_ [width 5]
                 , numericField_ 
-                      (toLensVL $ #delegationModel % #poolFilterModel % #liveSaturationRange % _2)
+                      (toLensVL $ #delegationModel % #poolFilterModel % #activeSaturationRange % _2)
                       [minValue 0, maxValue 100, decimals 3]
                     `styleBasic` [bgColor customGray1, width 100, textSize 10, height 30]
                     `styleFocus` [border 1 customBlue]
@@ -514,32 +495,31 @@ pledgeMaximum = lens getLowerBoundText setLowerBoundText
 -------------------------------------------------
 -- Helper Functions
 -------------------------------------------------
-searchFilter :: Text -> [Pool] -> [Pool]
+searchFilter :: Text -> [PoolList] -> [PoolList]
 searchFilter searchTarget xs
   | searchTarget == "" = xs
-  | otherwise = flip filter xs $ \Pool{..} -> or
+  | otherwise = flip filter xs $ \PoolList{..} -> or
       [ display poolId == searchTarget
-      , maybe False (Text.isPrefixOf searchTarget) (info ^? _Just % #ticker)
-      , maybe False (Text.isPrefixOf searchTarget) (info ^? _Just % #name)
+      , maybe False (Text.isPrefixOf searchTarget) ticker
       ]
 
-sorter :: PoolSortMethod -> [Pool] -> [Pool]
+sorter :: PoolSortMethod -> [PoolList] -> [PoolList]
 sorter sortMethod = case sortMethod of
-  PoolLiveSaturation SortAscending -> sortOn (view #liveSaturation)
-  PoolLiveSaturation SortDescending -> sortOn (Ord.Down . view #liveSaturation)
-  PoolActivePledge SortAscending -> sortOn (view #livePledge)
-  PoolActivePledge SortDescending -> sortOn (Ord.Down . view #livePledge)
+  PoolActiveSaturation SortAscending -> sortOn (view #activeSaturation)
+  PoolActiveSaturation SortDescending -> sortOn (Ord.Down . view #activeSaturation)
+  PoolActivePledge SortAscending -> sortOn (view #pledge)
+  PoolActivePledge SortDescending -> sortOn (Ord.Down . view #pledge)
   PoolCost SortAscending -> sortOn (view #fixedCost)
   PoolCost SortDescending -> sortOn (Ord.Down . view #fixedCost)
   PoolMargin SortAscending -> sortOn (view #margin)
   PoolMargin SortDescending -> sortOn (Ord.Down . view #margin)
 
-filterer :: PoolFilterModel -> [Pool] -> [Pool]
-filterer poolFilterModel = filter $ \Pool{..} -> and
+filterer :: PoolFilterModel -> [PoolList] -> [PoolList]
+filterer poolFilterModel = filter $ \PoolList{..} -> and
   [ fmap (*100) margin >= Just (poolFilterModel ^. #marginRange % _1)
   , fmap (*100) margin <= Just (poolFilterModel ^. #marginRange % _2)
-  , liveSaturation >= Just (poolFilterModel ^. #liveSaturationRange % _1)
-  , liveSaturation <= Just (poolFilterModel ^. #liveSaturationRange % _2)
+  , activeSaturation >= Just ((/100) $ poolFilterModel ^. #activeSaturationRange % _1)
+  , activeSaturation <= Just ((/100) $ poolFilterModel ^. #activeSaturationRange % _2)
   , flip (maybe True) (poolFilterModel ^. #fixedCostRange % _1) $ \lowerBound ->
       fmap (unAda . toAda) fixedCost >= Just lowerBound
   , flip (maybe True) (poolFilterModel ^. #fixedCostRange % _2) $ \upperBound ->

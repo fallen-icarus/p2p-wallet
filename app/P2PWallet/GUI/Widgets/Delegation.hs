@@ -534,9 +534,9 @@ historyTableWidget rewardHistory = do
             ] `styleBasic` [padding 5, bgColor customGray4]
     ] `styleBasic` [ padding 10 ]
 
-poolInfoWidget :: Pool -> AppNode
-poolInfoWidget Pool{..} = do
-    let PoolInfo{..} = fromMaybe def info
+poolInfoWidget :: PoolInfo -> AppNode
+poolInfoWidget PoolInfo{..} = do
+    let PoolMetadata{..} = fromMaybe def info
         nameAndTicker = show $ pretty name <+> tupled [pretty ticker]
     vstack
       [ hstack

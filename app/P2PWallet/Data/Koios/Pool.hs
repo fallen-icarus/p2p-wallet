@@ -50,37 +50,90 @@ parsePoolStatus "retired" = Just RetiredPool
 parsePoolStatus _ = Nothing
 
 -------------------------------------------------
--- Pool Info
+-- PoolList
 -------------------------------------------------
--- | The information about the pool.
-data PoolInfo = PoolInfo
+-- | The stats for a specific pool from the pool_list endpoint. This is used for the pool picker.
+data PoolList = PoolList
+  { poolId :: PoolID
+  , margin :: Maybe Decimal
+  , fixedCost :: Maybe Lovelace
+  , pledge :: Maybe Lovelace
+  , ticker :: Maybe Text
+  , url :: Maybe Text
+  , status :: PoolStatus
+  , retiringEpoch :: Maybe Integer
+  , activeStake :: Maybe Lovelace
+  , activeSaturation :: Maybe Decimal
+  } deriving (Show,Eq)
+
+makeFieldLabelsNoPrefix ''PoolList
+
+instance ToJSON PoolList where
+  toJSON PoolList{..} =
+    object [ "pool_id_bech32" .= poolId
+           , "margin" .= margin
+           , "fixed_cost" .= fixedCost
+           , "pledge" .= pledge
+           , "ticker" .= ticker
+           , "meta_url" .= url
+           , "pool_status" .= status
+           , "retiring_epoch" .= retiringEpoch
+           , "active_stake" .= activeStake
+           , "active_saturation" .= (Nothing :: Maybe Decimal)
+           ]
+
+instance FromJSON PoolList where
+  parseJSON = withObject "PoolList" $ \o ->
+    PoolList
+      <$> o .: "pool_id_bech32"
+      <*> o .: "margin"
+      <*> o .: "fixed_cost"
+      <*> o .: "pledge"
+      <*> o .: "ticker"
+      <*> o .: "meta_url"
+      <*> o .: "pool_status"
+      <*> o .: "retiring_epoch"
+      <*> o .: "active_stake"
+      <*> pure Nothing -- This must be calculated independentally.
+
+instance ToField PoolList where
+  toField = toField . encode
+
+instance FromField PoolList where
+  fromField = fmap (decode @PoolList) . fromField @LBS.ByteString >=> maybe mzero Ok
+
+-------------------------------------------------
+-- Pool Metadata
+-------------------------------------------------
+-- | The metadata for the pool.
+data PoolMetadata = PoolMetadata
   { name :: Text
   , ticker :: Text
   , homepage :: Text
   , description :: Text
   } deriving (Show,Eq)
 
-makeFieldLabelsNoPrefix ''PoolInfo
+makeFieldLabelsNoPrefix ''PoolMetadata
 
-instance ToJSON PoolInfo where
-  toJSON PoolInfo{..} =
+instance ToJSON PoolMetadata where
+  toJSON PoolMetadata{..} =
     object [ "name" .= name
            , "ticker" .= ticker
            , "homepage" .= homepage
            , "description" .= description
            ]
 
-instance FromJSON PoolInfo where
-  parseJSON = withObject "PoolInfo" $ \o ->
-    PoolInfo
+instance FromJSON PoolMetadata where
+  parseJSON = withObject "PoolMetadata" $ \o ->
+    PoolMetadata
       <$> o .: "name"
       <*> o .: "ticker"
       <*> o .: "homepage"
       <*> o .: "description"
       
--- A default instance is usefull for `Maybe PoolInfo`.
-instance Default PoolInfo where
-  def = PoolInfo
+-- A default instance is usefull for `Maybe PoolMetadata`.
+instance Default PoolMetadata where
+  def = PoolMetadata
     { name = "none"
     , ticker = "none"
     , homepage = "none"
@@ -88,15 +141,15 @@ instance Default PoolInfo where
     }
 
 -------------------------------------------------
--- Pool
+-- PoolInfo
 -------------------------------------------------
--- | The stats for a specific pool.
-data Pool = Pool
+-- | The stats for a specific pool from the pool_info endpoint.
+data PoolInfo = PoolInfo
   { poolId :: PoolID
   , margin :: Maybe Decimal
   , fixedCost :: Maybe Lovelace
   , pledge :: Maybe Lovelace
-  , info :: Maybe PoolInfo
+  , info :: Maybe PoolMetadata
   , status :: PoolStatus
   , retiringEpoch :: Maybe Integer
   , activeStake :: Maybe Lovelace
@@ -108,10 +161,10 @@ data Pool = Pool
   , liveSaturation :: Maybe Decimal
   } deriving (Show,Eq)
 
-makeFieldLabelsNoPrefix ''Pool
+makeFieldLabelsNoPrefix ''PoolInfo
 
-instance ToJSON Pool where
-  toJSON Pool{..} =
+instance ToJSON PoolInfo where
+  toJSON PoolInfo{..} =
     object [ "pool_id_bech32" .= poolId
            , "margin" .= margin
            , "fixed_cost" .= fixedCost
@@ -128,9 +181,9 @@ instance ToJSON Pool where
            , "live_saturation" .= liveSaturation
            ]
 
-instance FromJSON Pool where
-  parseJSON = withObject "Pool" $ \o ->
-    Pool
+instance FromJSON PoolInfo where
+  parseJSON = withObject "PoolInfo" $ \o ->
+    PoolInfo
       <$> o .: "pool_id_bech32"
       <*> o .: "margin"
       <*> o .: "fixed_cost"
@@ -146,8 +199,8 @@ instance FromJSON Pool where
       <*> o .: "live_delegators"
       <*> o .: "live_saturation"
 
-instance ToField Pool where
+instance ToField PoolInfo where
   toField = toField . encode
 
-instance FromField Pool where
-  fromField = fmap (decode @Pool) . fromField @LBS.ByteString >=> maybe mzero Ok
+instance FromField PoolInfo where
+  fromField = fmap (decode @PoolInfo) . fromField @LBS.ByteString >=> maybe mzero Ok

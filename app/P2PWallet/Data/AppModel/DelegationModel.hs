@@ -51,7 +51,7 @@ data DelegationEvent
   -- | Reset Pool Filters.
   | ResetPoolFilters
   -- | Sync all registered pools.
-  | SyncRegisteredPools (ProcessEvent () [Pool])
+  | SyncRegisteredPools (ProcessEvent () [PoolList])
   -- | Add the selected user certificate to the tx builder. The `Text` is the target
   -- pool name so that the GUI can show it on the Builder scene.
   | AddSelectedUserCertificate (Maybe Text,CertificateAction)
@@ -65,7 +65,7 @@ data DelegationEvent
 -------------------------------------------------
 -- | Possible sortings.
 data PoolSortMethod
-  = PoolLiveSaturation SortDirection
+  = PoolActiveSaturation SortDirection
   | PoolActivePledge SortDirection
   | PoolCost SortDirection
   | PoolMargin SortDirection
@@ -82,8 +82,8 @@ data PoolFilterModel = PoolFilterModel
   , sortMethod :: PoolSortMethod
   -- | The required range for the margin value.
   , marginRange :: (Decimal,Decimal)
-  -- | The required range for the live saturation value.
-  , liveSaturationRange :: (Decimal,Decimal)
+  -- | The required range for the active saturation value.
+  , activeSaturationRange :: (Decimal,Decimal)
   -- | The required range for the fixed cost value.
   , fixedCostRange :: (Maybe Decimal,Maybe Decimal)
   -- | The required range for the pledge value.
@@ -95,11 +95,11 @@ makeFieldLabelsNoPrefix ''PoolFilterModel
 instance Default PoolFilterModel where
   def = PoolFilterModel
     { search = ""
-    , sampleSize = 50
+    , sampleSize = 1000
     , currentPage = 0
-    , sortMethod = PoolLiveSaturation SortDescending
+    , sortMethod = PoolActiveSaturation SortDescending
     , marginRange = (0,100)
-    , liveSaturationRange = (0,100)
+    , activeSaturationRange = (0,100)
     , fixedCostRange = (Nothing,Nothing)
     , pledgeRange = (Nothing,Nothing)
     }
@@ -125,7 +125,7 @@ data DelegationModel = DelegationModel
   -- | Whether to show the pool picker.
   , showPoolPicker :: Bool
   -- | The list of registered pools.
-  , registeredPools :: [Pool]
+  , registeredPools :: [PoolList]
   -- | The current filter settings for the stake pools.
   , poolFilterModel :: PoolFilterModel
   -- | Whether to show the pool filter widget.
