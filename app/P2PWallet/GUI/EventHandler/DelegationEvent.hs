@@ -299,7 +299,7 @@ handleDelegationEvent model@AppModel{..} evt = case evt of
   AddDrepDelegation modal -> case modal of
     StartAdding _ -> 
       [ Model $ model 
-          & #delegationModel % #newDrepDelegation ?~ AlwaysNoDelegation
+          & #delegationModel % #newDrepDelegation ?~ AlwaysAbstainDelegation
           & #delegationModel % #newDrepId .~ ""
       ]
     CancelAdding -> 
