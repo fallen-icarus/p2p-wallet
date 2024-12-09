@@ -30,7 +30,7 @@ tradeWidget model@AppModel{dexModel=DexModel{..}} = do
 mainWidget :: AppModel -> AppNode
 mainWidget model@AppModel{dexModel=DexModel{..},reverseTickerMap} = do
     zstack
-      [ hstack
+      [ vscroll_ [wheelRate 50] $ hstack
           [ orderBookWidget model
           , filler
           , entryWidget
