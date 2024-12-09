@@ -1,6 +1,6 @@
 # Revision history for p2p-wallet
 
-## Next (Unreleased) Version
+## 0.2.0
 
 ### Features
 * When delegating to a DRep, set the default option to always-abstain ([#6](https://github.com/fallen-icarus/p2p-wallet/issues/6)).

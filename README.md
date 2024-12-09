@@ -477,18 +477,19 @@ ghcup install ghc 9.2.8 # The wallet relies on 9.2.8
 cd $HOME/git-clones # Go to the git-clones directory.
 git clone https://github.com/fallen-icarus/p2p-wallet
 cd p2p-wallet
-git checkout 0.1.0 # specify the desired version
+
+# Specify the desired version
+git checkout 0.2.0 # Latest stable
+# git checkout main # Bleeding-edge
+
 cabal clean
 cabal update
 cabal build
 ```
 
-The `p2p-wallet` executable program should now be at
-`dist-newstyle/build/x86_64-linux/ghc-9.2.8/p2p-wallet-0.1.0/x/p2p-wallet/build/p2p-wallet/p2p-wallet`.
-Make sure to swap out `0.1.0` with the version number you chose! You can move it to your home
-directory with:
+You can move it to your home directory with:
 ```bash
-cp dist-newstyle/build/x86_64-linux/ghc-9.2.8/p2p-wallet-0.1.0/x/p2p-wallet/build/p2p-wallet/p2p-wallet $HOME
+cp "$(cabal list-bin exe:p2p-wallet)" $HOME #This command may take a few seconds.
 ```
 
 It can be opened by double-clicking on it. Enjoy!
