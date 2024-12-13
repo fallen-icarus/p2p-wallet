@@ -479,7 +479,7 @@ git clone https://github.com/fallen-icarus/p2p-wallet
 cd p2p-wallet
 
 # Specify the desired version
-git checkout 0.2.0 # Latest stable
+git checkout 0.2.1 # Latest stable
 # git checkout main # Bleeding-edge
 
 cabal clean

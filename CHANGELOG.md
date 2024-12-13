@@ -1,6 +1,6 @@
 # Revision history for p2p-wallet
 
-## Next (Unreleased)
+## 0.2.1
 
 ### Fixes
 * Made DEX "Trade" page scrollable in case the order book doesn't fit on the screen for lower
