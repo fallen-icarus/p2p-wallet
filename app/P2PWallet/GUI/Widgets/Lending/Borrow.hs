@@ -63,7 +63,7 @@ borrowWidget model@AppModel{lendingModel} = do
     borrowSceneMenu :: AppNode
     borrowSceneMenu = hstack 
       [ spacer
-      , borrowSceneButton "Open Ask" OpenAsks
+      , borrowSceneButton "Open Asks" OpenAsks
       , spacer
       , separatorLine `styleBasic` [paddingT 5, paddingB 5]
       , spacer
