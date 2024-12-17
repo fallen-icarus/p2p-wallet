@@ -566,7 +566,7 @@ offersFilterWidget AppModel{lendingModel=LendingModel{..}} = do
                   ]
                 `styleHover` [bgColor customGray1, cursorIcon CursorHand]
             , spacer_ [width 3]
-            , box_ [onClick $ Alert openAsksSortMsg] $
+            , box_ [onClick $ Alert openOffersSortMsg] $
                 label helpIcon
                   `styleBasic`
                     [ border 0 transparent

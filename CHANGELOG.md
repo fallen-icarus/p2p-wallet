@@ -8,6 +8,7 @@ collateral.
 
 ### Fix
 * "Open Asks" page label missing trailing 's'.
+* "Open Offers" sort help message wasn't showing the correct message.
 
 ### Dependencies
 * Switch from `cryptonite` to `crypton`. The former is deprecated.

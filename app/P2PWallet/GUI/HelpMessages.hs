@@ -1014,6 +1014,17 @@ creditScoreMsg = unlines
       ]
   ]
 
+openOffersSortMsg :: Text
+openOffersSortMsg = unlines
+  [ "Loan offers can be sorted based off one of the following methods:"
+  , "1. Lexicographically based on the UTxO's output reference"
+  , "2. Based on the offered loan amount"
+  , "3. Based on the loan's duration"
+  , "4. Chronologically based on the time the offer was created"
+  , "5. Based on the loan's interest rate"
+  , "6. Based on offer expiration"
+  ]
+
 lenderOffersSortMsg :: Text
 lenderOffersSortMsg = unlines
   [ "Loan offers can be sorted based off one of the following methods:"
