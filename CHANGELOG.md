@@ -1,5 +1,10 @@
 # Revision history for p2p-wallet
 
+## Next
+
+### Dependencies
+* Switch from `cryptonite` to `crypton`. The former is deprecated.
+
 ## 0.2.1
 
 ### Fixes

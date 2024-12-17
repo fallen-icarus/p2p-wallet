@@ -387,7 +387,7 @@ executable p2p-wallet
       , sqlite-simple
       , bech32
       , bech32-th
-      , cryptonite
+      , crypton
       , memory
       , base16-bytestring
       , plutus-core
