@@ -94,7 +94,7 @@ instance Default NewAskCreation where
     , borrowerKeyDerivation = Nothing
     , loanAmount = ""
     , loanTerm = 30
-    , collateral = ""
+    , collateral = "ADA"
     , count = 1
     , network = def
     , alias = ""
