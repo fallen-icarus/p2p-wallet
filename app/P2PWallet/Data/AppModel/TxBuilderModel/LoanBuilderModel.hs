@@ -982,7 +982,7 @@ addInterestApplicationToBody txBody (_,InterestApplication{..}) =
     interestObserverStakeWithdrawal = TxBodyWithdrawal
       { stakeAddress = Loans.interestObserverStakeAddress network
       , lovelace = 0
-      , stakeCredential = ScriptCredential Loans.paymentObserverScriptHash
+      , stakeCredential = ScriptCredential Loans.interestObserverScriptHash
       , stakingScriptInfo = Just $ StakingScriptInfo
           { scriptWitness = 
               ReferenceWitness $ Loans.getScriptRef network Loans.InterestObserverScript

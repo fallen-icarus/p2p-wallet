@@ -6,9 +6,11 @@
 * Set ADA as default collateral for all new loans. This way the minUTxOValue will count towards the
 collateral.
 
-### Fix
+### Fixes
 * "Open Asks" page label missing trailing 's'.
 * "Open Offers" sort help message wasn't showing the correct message.
+* Tx Builder would drop the staking script observer for interest/penalty applications if loan
+payments were made in the same transaction.
 
 ### Dependencies
 * Switch from `cryptonite` to `crypton`. The former is deprecated.
