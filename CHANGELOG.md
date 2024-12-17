@@ -2,6 +2,13 @@
 
 ## Next
 
+### Features
+* Set ADA as default collateral for all new loans. This way the minUTxOValue will count towards the
+collateral.
+
+### Fix
+* "Open Asks" page label missing trailing 's'.
+
 ### Dependencies
 * Switch from `cryptonite` to `crypton`. The former is deprecated.
 
