@@ -22,7 +22,7 @@ inspectLoanWidget :: AppModel -> AppNode
 inspectLoanWidget model@AppModel{lendingModel=LendingModel{..},scene=_,..} = do
     zstack
       [ vstack
-          [ vstack
+          [ vscroll_ [wheelRate 50] $ vstack
               [ centerWidgetH $
                   label "Loan ID"
                     `styleBasic` [textFont "Italics", textColor customBlue]

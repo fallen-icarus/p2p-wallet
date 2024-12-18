@@ -11,6 +11,7 @@ collateral.
 * "Open Offers" sort help message wasn't showing the correct message.
 * Tx Builder would drop the staking script observer for interest/penalty applications if loan
 payments were made in the same transaction.
+* Fix formatting when viewing information for a specific loan key from the Home page.
 
 ### Dependencies
 * Switch from `cryptonite` to `crypton`. The former is deprecated.
