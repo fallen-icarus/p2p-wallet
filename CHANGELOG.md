@@ -1,6 +1,6 @@
 # Revision history for p2p-wallet
 
-## Next
+## 0.2.2
 
 ### Features
 * Set ADA as default collateral for all new loans. This way the minUTxOValue will count towards the
