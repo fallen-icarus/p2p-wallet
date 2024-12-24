@@ -38,7 +38,8 @@ buyerWidget model@AppModel{optionsModel=OptionsModel{..}} =
 -- | The resulting trading pair will be inverted since it is from the perspective of the buyer
 -- instead of the writer.
 getContractAssetsWidget :: AppModel -> AppNode
-getContractAssetsWidget model = do
+getContractAssetsWidget AppModel{optionsModel=OptionsModel{buyerModel}} = do
+  let OptionsBuyerModel{selectedContractAssets,newContractAssets} = buyerModel
   centerWidget $ vstack
     [ centerWidgetH $ label "Which trading pair would you like to lookup?"
     , spacer_ [width 20]
@@ -57,7 +58,13 @@ getContractAssetsWidget model = do
         , spacer_ [width 3]
         , textField_ (toLensVL $ #optionsModel % #buyerModel % #newContractAssets % _2)
               [placeholder "Offer Asset"]
-            `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
+            `styleBasic` 
+              [ textSize 10
+              , width 200
+              , bgColor customGray1
+              , sndColor darkGray
+              , styleIf ("" == view _2 newContractAssets) $ border 1 customRed
+              ]
             `styleFocus` [border 1 customBlue]
         , spacer
         , label remixArrowRightLine 
@@ -65,7 +72,13 @@ getContractAssetsWidget model = do
         , spacer
         , textField_ (toLensVL $ #optionsModel % #buyerModel % #newContractAssets % _1)
               [placeholder "Ask Asset"]
-            `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
+            `styleBasic` 
+              [ textSize 10
+              , width 200
+              , bgColor customGray1
+              , sndColor darkGray
+              , styleIf ("" == view _1 newContractAssets) $ border 1 customRed
+              ]
             `styleFocus` [border 1 customBlue]
         , spacer_ [width 3]
         , box_ [alignMiddle, onClick $ Alert buyerAskAssetMsg] $
@@ -103,7 +116,7 @@ getContractAssetsWidget model = do
     , hstack 
         [ filler
         , button "Cancel" (OptionsEvent $ OptionsBuyerEvent $ SetNewContractAssets CancelAdding)
-            `nodeVisible` isJust (model ^. #optionsModel % #buyerModel % #selectedContractAssets)
+            `nodeVisible` isJust selectedContractAssets
         , spacer
         , mainButton "Confirm" $ OptionsEvent $ OptionsBuyerEvent $ SetNewContractAssets ConfirmAdding
         ]

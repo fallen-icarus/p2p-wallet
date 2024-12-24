@@ -1,5 +1,10 @@
 # Revision history for p2p-wallet
 
+## Next
+
+### Features
+* Add red text box border for required fields on the Options page.
+
 ## 0.2.2
 
 ### Features

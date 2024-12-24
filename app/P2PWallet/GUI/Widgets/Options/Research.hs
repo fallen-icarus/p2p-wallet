@@ -34,7 +34,8 @@ researchWidget model@AppModel{optionsModel=OptionsModel{..}} = do
     ]
 
 getActiveContractAssetsWidget :: AppModel -> AppNode
-getActiveContractAssetsWidget model = do
+getActiveContractAssetsWidget AppModel{optionsModel=OptionsModel{researchModel}} = do
+  let OptionsResearchModel{selectedActiveContractAssets,newActiveContractAssets} = researchModel
   centerWidget $ vstack
     [ centerWidgetH $ label "Active Options Contract Trading Pair"
         `styleBasic` [textSize 16, textFont "Italics", textColor customBlue]
@@ -54,7 +55,13 @@ getActiveContractAssetsWidget model = do
         , spacer_ [width 3]
         , textField_ (toLensVL $ #optionsModel % #researchModel % #newActiveContractAssets % _1)
               [placeholder "Offer Asset"]
-            `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
+            `styleBasic` 
+              [ textSize 10
+              , width 200
+              , bgColor customGray1
+              , sndColor darkGray
+              , styleIf ("" == view _1 newActiveContractAssets) $ border 1 customRed
+              ]
             `styleFocus` [border 1 customBlue]
         , spacer
         , label remixArrowRightLine 
@@ -62,7 +69,13 @@ getActiveContractAssetsWidget model = do
         , spacer
         , textField_ (toLensVL $ #optionsModel % #researchModel % #newActiveContractAssets % _2)
               [placeholder "Ask Asset"]
-            `styleBasic` [textSize 10, width 200, bgColor customGray1, sndColor darkGray]
+            `styleBasic` 
+              [ textSize 10
+              , width 200
+              , bgColor customGray1
+              , sndColor darkGray
+              , styleIf ("" == view _2 newActiveContractAssets) $ border 1 customRed
+              ]
             `styleFocus` [border 1 customBlue]
         , spacer_ [width 3]
         , box_ [alignMiddle, onClick $ Alert writerAskAssetMsg] $
@@ -81,7 +94,7 @@ getActiveContractAssetsWidget model = do
     , hstack 
         [ filler
         , button "Cancel" (OptionsEvent $ OptionsResearchEvent $ SetResearchActiveContractAssets CancelAdding)
-            `nodeVisible` isJust (model ^. #optionsModel % #researchModel % #selectedActiveContractAssets)
+            `nodeVisible` isJust selectedActiveContractAssets
         , spacer
         , mainButton "Confirm" $ OptionsEvent $ OptionsResearchEvent $ 
             SetResearchActiveContractAssets ConfirmAdding
