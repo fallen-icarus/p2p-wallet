@@ -409,11 +409,13 @@ currentBidsWidget model@AppModel{knownWallets,aftermarketModel,reverseTickerMap,
           payToAddress = either (const "error") fst $ plutusToBech32 network paymentAddress
           mTargetWallet = 
             find ((==payToAddress) . view #paymentAddress) $ knownWallets ^. #paymentWallets
-          addressTip = unwords $ filter (/= "")
-            [ "Payments to"
-            , maybe ":" ((<> ":") . view #alias) mTargetWallet
-            , display payToAddress
-            ]
+          addressTip = case mTargetWallet of
+            Nothing -> "Payments to: " <> display payToAddress
+            Just w -> unwords
+              [ "Payments to"
+              , w ^. #alias <> ":"
+              , display payToAddress
+              ]
           numNfts = length nftNames
           keyTypeLabel
             | nftPolicyId == Loans.activeBeaconCurrencySymbol = "Loan Key NFT(s)"

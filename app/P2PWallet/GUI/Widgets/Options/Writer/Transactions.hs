@@ -536,11 +536,13 @@ optionsInputs AppModel{..} = do
           payToAddress = either (const "error") fst $ plutusToBech32 network paymentAddress
           mTargetWallet = 
             find ((==payToAddress) . view #paymentAddress) $ knownWallets ^. #paymentWallets
-          addressTip = unwords $ filter (/= "")
-            [ "Payments to"
-            , maybe ":" ((<> ":") . view #alias) mTargetWallet
-            , display payToAddress
-            ]
+          addressTip = case mTargetWallet of
+            Nothing -> "Payments to: " <> display payToAddress
+            Just w -> unwords
+              [ "Payments to"
+              , w ^. #alias <> ":"
+              , display payToAddress
+              ]
       vstack
         [ hstack
             [ label ("Offer: " <> showAssetBalance True reverseTickerMap offerAmount)
@@ -614,11 +616,13 @@ optionsInputs AppModel{..} = do
           payToAddress = either (const "error") fst $ plutusToBech32 network paymentAddress
           mTargetWallet = 
             find ((==payToAddress) . view #paymentAddress) $ knownWallets ^. #paymentWallets
-          addressTip = unwords $ filter (/= "")
-            [ "Payments to"
-            , maybe ":" ((<> ":") . view #alias) mTargetWallet
-            , display payToAddress
-            ]
+          addressTip = case mTargetWallet of
+            Nothing -> "Payments to: " <> display payToAddress
+            Just w -> unwords
+              [ "Payments to"
+              , w ^. #alias <> ":"
+              , display payToAddress
+              ]
           formattedPrice = showPriceFormatted reverseTickerMap askNativeAsset offerAmount 
                          $ toRational strikePrice
           prettyPrice = mconcat
@@ -809,11 +813,13 @@ optionsOutputs AppModel{..} = do
           payToAddress = either (const "error") fst $ plutusToBech32 network paymentAddress
           mTargetWallet = 
             find ((==payToAddress) . view #paymentAddress) $ knownWallets ^. #paymentWallets
-          addressTip = unwords $ filter (/= "")
-            [ "Payments to"
-            , maybe ":" ((<> ":") . view #alias) mTargetWallet
-            , display payToAddress
-            ]
+          addressTip = case mTargetWallet of
+            Nothing -> "Payments to: " <> display payToAddress
+            Just w -> unwords
+              [ "Payments to"
+              , w ^. #alias <> ":"
+              , display payToAddress
+              ]
       vstack
         [ hstack
             [ label ("Offer: " <> showAssetBalance True reverseTickerMap offerAmount)
@@ -883,11 +889,13 @@ optionsOutputs AppModel{..} = do
           payToAddress = either (const "error") fst $ plutusToBech32 network paymentAddress
           mTargetWallet = 
             find ((==payToAddress) . view #paymentAddress) $ knownWallets ^. #paymentWallets
-          addressTip = unwords $ filter (/= "")
-            [ "Payments to"
-            , maybe ":" ((<> ":") . view #alias) mTargetWallet
-            , display payToAddress
-            ]
+          addressTip = case mTargetWallet of
+            Nothing -> "Payments to: " <> display payToAddress
+            Just w -> unwords
+              [ "Payments to"
+              , w ^. #alias <> ":"
+              , display payToAddress
+              ]
           formattedPrice = showPriceFormatted reverseTickerMap askNativeAsset offerAmount 
                          $ toRational strikePrice
           prettyPrice = mconcat

@@ -5,6 +5,9 @@
 ### Features
 * Add red text box border for required fields on the Options page.
 
+### Fixes
+* Fixed formatting when direct payments are to an un-tracked address.
+
 ## 0.2.2
 
 ### Features

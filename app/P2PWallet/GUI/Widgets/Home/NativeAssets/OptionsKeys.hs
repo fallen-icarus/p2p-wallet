@@ -155,11 +155,8 @@ inspectOptionsContractWidget AppModel{optionsModel=OptionsModel{..},scene=_,..} 
       let offerAmount = toNativeAsset offerAsset & #quantity .~ offerQuantity
           askNativeAsset = toNativeAsset askAsset
           payToAddress = either (const "error") fst $ plutusToBech32 network paymentAddress
-          mTargetWallet = find ((==payToAddress) . view #paymentAddress) 
-                        $ knownWallets ^. #paymentWallets
-          addressTip = unwords $ filter (/= "")
-            [ "Payments to"
-            , maybe ":" ((<> ":") . view #alias) mTargetWallet
+          addressTip = unwords
+            [ "Payments to:"
             , display payToAddress
             ]
           formattedPrice = showPriceFormatted reverseTickerMap askNativeAsset offerAmount 

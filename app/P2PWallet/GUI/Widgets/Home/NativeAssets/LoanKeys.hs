@@ -333,11 +333,13 @@ inspectLoanWidget model@AppModel{lendingModel=LendingModel{..},scene=_,..} = do
           payToAddress = either (const "error") fst $ plutusToBech32 (config ^. #network) lenderAddress
           mTargetWallet = find ((==payToAddress) . view #paymentAddress) 
                         $ knownWallets ^. #paymentWallets
-          addressTip = unwords $ filter (/= "")
-            [ "Payments to"
-            , maybe ":" ((<> ":") . view #alias) mTargetWallet
-            , display payToAddress
-            ]
+          addressTip = case mTargetWallet of
+            Nothing -> "Payments to: " <> display payToAddress
+            Just w -> unwords
+              [ "Payments to"
+              , w ^. #alias <> ":"
+              , display payToAddress
+              ]
           lookupBorrowerEvt = HomeEvent 
                             $ InspectKeyBorrowerInformation (borrowerId, loanAddress)
       vstack
