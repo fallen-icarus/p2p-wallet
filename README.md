@@ -36,9 +36,9 @@ You can find the demo video on [youtube](https://youtu.be/lB1czpijpag?si=pIcOEJ2
 Tutorial videos:
 - [Installation](https://youtu.be/A4MTurAdmtI?si=z9Bi1gn7pac-RC9Q)
 - [The Basics](https://youtu.be/wI6IPohiRYA?si=vo_XiSNY3gLgQVF_)
-- DEX - TODO
-- Options - TODO
-- Lending/Borrowing - TODO
+- [DEX](https://youtu.be/mbK0-8hrb9g)
+- [Lending/Borrowing](https://youtu.be/W_4p1dZL-_U)
+- [Options Trading](https://youtu.be/rwCMtF4jyYo)
 - Aftermarket - TODO
 
 ## Screenshots
