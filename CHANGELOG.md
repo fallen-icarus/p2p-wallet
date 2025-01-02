@@ -1,5 +1,10 @@
 # Revision history for p2p-wallet
 
+## Next
+
+### Fixes
+* Fixed aftermarket notification bug for expired claim bids.
+
 ## 0.2.3
 
 ### Features

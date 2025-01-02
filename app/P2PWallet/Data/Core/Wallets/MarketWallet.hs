@@ -502,12 +502,12 @@ instance Notify MarketWallet where
         | claimBidOnly (oldState ^. #bidUTxOs) /= claimBidOnly (newState ^. #bidUTxOs) = 
             mconcat $ intersperse "\n" $ filter (/="")
               [ "Bids to to sellers have changed."
-              , if any (claimBidHasExpired currentTime) $ newState ^. #utxos
+              , if any (claimBidHasExpired currentTime) $ newState ^. #bidUTxOs
                 then "Some Claim Bids have expired."
                 else ""
               ]
         | otherwise =
-            if any (claimBidHasExpired currentTime) $ newState ^. #utxos
+            if any (claimBidHasExpired currentTime) $ newState ^. #bidUTxOs
             then "Some Claim Bids have expired."
             else ""
 
