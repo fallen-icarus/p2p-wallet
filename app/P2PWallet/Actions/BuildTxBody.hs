@@ -39,8 +39,13 @@ logBuilderStep (BuilderLogFile file) step = case step of
   ExecutionBudgetStep budgets -> 
     -- The execution budgets are not a command but are needed for later steps. They are shown as
     -- commented json objects in the builder.log file.
-    appendFile file $ ("\n\n# Estimated budgets using previous tx.body:\n" <>) $ 
-      mconcat $ intersperse "\n" $ map (("# " <>) . show . encode) budgets
+    appendFile file $ mconcat
+      [ "\n\n# Estimated budgets using previous tx.body:\n"
+      , mconcat $ intersperse "\n" $ map (("# " <>) . show . encode) budgets
+      , "\n#\n" -- extra space
+      , ("# Total CPU: " <>) $ show $ foldl' (\acc i -> acc + i ^. #executionBudget % #cpu) 0 budgets
+      , ("\n# Total Memory: " <>) $ show $ foldl' (\acc i -> acc + i ^. #executionBudget % #memory) 0 budgets
+      ]
 
 -- | Log the command before actually running it. The command will be formatted to make it more
 -- human-readable.

@@ -96,6 +96,8 @@ instance ToJSON ExecutionBudget where
     , "cpu" .= cpu
     ]
   
+makeFieldLabelsNoPrefix ''ExecutionBudget
+
 -------------------------------------------------
 -- Script Witness
 -------------------------------------------------
