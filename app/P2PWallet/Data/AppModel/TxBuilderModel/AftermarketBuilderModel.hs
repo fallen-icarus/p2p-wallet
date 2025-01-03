@@ -211,12 +211,8 @@ instance AddToTxBody AftermarketBuilderModel where
         & flip (foldl' addSaleCloseToBody) saleCloses
         -- Add the sale updates.
         & flip (foldl' addSaleUpdateToBody) saleUpdates
-        -- Add the loan key spot purchases. This only adds the spot purchase actions. The lender
-        -- address updates and expired loan claims are handled by the LoanBuilderModel.
-        & flip (foldl' addLoanKeySpotPurchase) loanKeySpotPurchases
-        -- Add the options key spot purchases. This only adds the spot purchase actions. The
-        -- executions are handled by the OptionsBuilderModel.
-        & flip (foldl' addOptionsKeySpotPurchase) optionsKeySpotPurchases
+        -- Add the spot purchases.
+        & flip (foldl' addSpotPurchaseToBody) allSpotPurchases
         -- Add the bid creations.
         & flip (foldl' addBidCreationToBody) bidCreations
         -- Add the bid closes.
@@ -225,12 +221,8 @@ instance AddToTxBody AftermarketBuilderModel where
         & flip (foldl' addBidUpdateToBody) bidUpdates
         -- Add the claim bid acceptances.
         & flip (foldl' addClaimBidAcceptanceToBody) claimBidAcceptances
-        -- Add the loan key accepted bid claims. This only adds the bid claim actions. The lender
-        -- address updates and expired loan claims are handled by the LoanBuilderModel.
-        & flip (foldl' addLoanKeyAcceptedBidClaimToBody) loanKeyBidClaims
-        -- Add the options key accepted bid claims. This only adds the bid claim actions. Contract
-        -- executions will be handled by the OptionsBuilderModel.
-        & flip (foldl' addOptionsKeyAcceptedBidClaimToBody) optionsKeyBidClaims
+        -- Add the accepted bid claims.
+        & flip (foldl' addAcceptedBidClaimToBody) allAcceptedBidClaims
         -- Add the spot bid acceptances.
         & flip (foldl' addSpotBidAcceptanceToBody) spotBidAcceptances
         -- Add the bid unlocks.
@@ -243,6 +235,16 @@ instance AddToTxBody AftermarketBuilderModel where
         & #mints %~ removeEmptyMints
         -- Remove duplicate stake withdrawals. This removes duplicate observer entries.
         & #withdrawals %~ ordNubOn (view #stakeCredential)
+    where
+      allSpotPurchases = sortOn (view $ _2 % #saleUTxO % #utxoRef) $ mconcat
+        [ map (over _2 $ view #spotPurchase) loanKeySpotPurchases
+        , map (over _2 $ view #spotPurchase) optionsKeySpotPurchases
+        ]
+
+      allAcceptedBidClaims = sortOn (view $ _2 % #bidUTxO % #utxoRef) $ mconcat
+        [ map (over _2 $ view #bidClaim) loanKeyBidClaims
+        , map (over _2 $ view #bidClaim) optionsKeyBidClaims
+        ]
 
 addSaleCreationToBody :: TxBody -> (Int,SaleCreation) -> TxBody
 addSaleCreationToBody txBody (_,SaleCreation{..}) =
@@ -484,26 +486,6 @@ addSpotPurchaseToBody txBody (_,SpotPurchase{..}) =
           , executionBudget = def
           }
       }
-
-addLoanKeySpotPurchase :: TxBody -> (Int,LoanKeySpotPurchase) -> TxBody
-addLoanKeySpotPurchase txBody (idx,LoanKeySpotPurchase{spotPurchase}) =
-  txBody
-    & flip addSpotPurchaseToBody (idx,spotPurchase)
-
-addOptionsKeySpotPurchase :: TxBody -> (Int,OptionsKeySpotPurchase) -> TxBody
-addOptionsKeySpotPurchase txBody (idx,OptionsKeySpotPurchase{spotPurchase}) =
-  txBody
-    & flip addSpotPurchaseToBody (idx,spotPurchase)
-
-addLoanKeyAcceptedBidClaimToBody :: TxBody -> (Int,LoanKeyAcceptedBidClaim) -> TxBody
-addLoanKeyAcceptedBidClaimToBody txBody (idx,LoanKeyAcceptedBidClaim{bidClaim}) =
-  txBody
-    & flip addAcceptedBidClaimToBody (idx,bidClaim)
-
-addOptionsKeyAcceptedBidClaimToBody :: TxBody -> (Int,OptionsKeyAcceptedBidClaim) -> TxBody
-addOptionsKeyAcceptedBidClaimToBody txBody (idx,OptionsKeyAcceptedBidClaim{bidClaim}) =
-  txBody
-    & flip addAcceptedBidClaimToBody (idx,bidClaim)
 
 addBidCreationToBody :: TxBody -> (Int,BidCreation) -> TxBody
 addBidCreationToBody txBody (_,BidCreation{..}) =
