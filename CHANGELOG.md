@@ -11,6 +11,7 @@
 monitors.
 * Fixed building transactions with aftermarket spot purchases and accepted bid claims from different
 markets.
+* Fixed formatting of bid creation menu when only a Claim Bid is possible.
 
 ## 0.2.3
 

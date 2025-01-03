@@ -661,7 +661,7 @@ updateBidWidget model = do
         `styleBasic` [ bgColor customGray1 , textColor white ]
         `styleHover` [ textColor lightGray ]
   vstack
-    [ centerWidget $ vstack
+    [ centerWidget $ vscroll_ [wheelRate 50] $ vstack
         [ hgrid
             [ optionButton_ "Spot Bid" True (toLensVL $ maybeLens' % _2 % #isSpotBid) 
                 [optionButtonOffStyle offStyle]
@@ -685,6 +685,7 @@ updateBidWidget model = do
                   , radiusBR 0
                   , radiusBL 0
                   , border 0 transparent
+                  , styleIf (keyType == Loans.activeBeaconCurrencySymbol) $ radiusTL 10
                   ]
             ]
         , zstack 

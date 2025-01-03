@@ -172,6 +172,7 @@ editBidUpdateWidget model = do
               , radiusBR 0
               , radiusBL 0
               , border 0 transparent
+              , styleIf (keyType == Loans.activeBeaconCurrencySymbol) $ radiusTL 10
               ]
         ]
     , zstack 
