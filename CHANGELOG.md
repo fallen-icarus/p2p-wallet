@@ -4,6 +4,8 @@
 
 ### Fixes
 * Fixed aftermarket notification bug for expired claim bids.
+* Fixed not being able to scroll when sale and bid information doesn't fit on low resolution
+monitors.
 
 ## 0.2.3
 

@@ -153,7 +153,7 @@ editSaleUpdateWidget model = do
       offStyle = def 
         `styleBasic` [ bgColor customGray1 , textColor white ]
         `styleHover` [ textColor lightGray ]
-  centerWidget $ vstack
+  centerWidget $ vscroll_ [wheelRate 50] $ vstack
     [ hgrid
         [ optionButton_ "Spot" False (toLensVL $ maybeLens' % _2 % #isAuction) 
             [optionButtonOffStyle offStyle]
