@@ -258,7 +258,7 @@ handleAftermarketBuilderEvent model@AppModel{..} evt = case evt of
 
           let Config{currentTime,timeZone} = config
 
-          verifiedCreation <- 
+          verifiedCreation@BidCreation{deposit} <- 
             fromRightOrAppError $ verifyNewBidCreation currentTime timeZone tickerMap newCreation
 
           -- There should only be one output in the `TxBody` for this action. The calculation must
@@ -283,7 +283,9 @@ handleAftermarketBuilderEvent model@AppModel{..} evt = case evt of
                   [(0,verifiedCreation & #deposit .~ minUTxOValue1)])
 
           -- Return the `BidCreation` with the updated deposit field.
-          return (idx, verifiedCreation & #deposit .~ minUTxOValue)
+          return $ (idx,) $ verifiedCreation & #deposit .~ 
+            -- Only replace the user specified deposit if the minUTxOValue is larger.
+            if minUTxOValue > deposit then minUTxOValue else deposit
         ]
     AddResult newInfo@(idx,verifiedCreation) ->
       [ Model $ model 
@@ -356,7 +358,7 @@ handleAftermarketBuilderEvent model@AppModel{..} evt = case evt of
 
           let Config{currentTime,timeZone} = config
 
-          verifiedCreation <- 
+          verifiedCreation@BidCreation{deposit} <- 
             fromRightOrAppError $ verifyNewBidCreation currentTime timeZone tickerMap newCreation
 
           -- There should only be one output in the `TxBody` for this action. The calculation must
@@ -381,7 +383,9 @@ handleAftermarketBuilderEvent model@AppModel{..} evt = case evt of
                   [(0,verifiedCreation & #deposit .~ minUTxOValue1)])
 
           -- Return the `BidCreation` with the updated deposit field.
-          return (idx, verifiedCreation & #deposit .~ minUTxOValue)
+          return $ (idx,) $ verifiedCreation & #deposit .~ 
+            -- Only replace the user specified deposit if the minUTxOValue is larger.
+            if minUTxOValue > deposit then minUTxOValue else deposit
         ]
     AddResult (idx,verifiedCreation) ->
       [ Model $ model 

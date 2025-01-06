@@ -1079,6 +1079,18 @@ createClaimBidWidget model@AppModel{..} = do
         ]
     , spacer
     , hstack
+        [ label "Bid Deposit:"
+            `styleBasic` [textSize 10]
+        , spacer
+        , textField_ (toLensVL $ maybeLens' % #deposit)
+            [placeholder "10.0"]
+            `styleBasic` [width 200, textSize 10, bgColor customGray1]
+            `styleFocus` [border 1 customBlue]
+        , spacer_ [width 3]
+        , helpButton bidDepositMsg
+        ]
+    , spacer
+    , hstack
         [ label "Bid Price (assets separated with newlines):"
             `styleBasic` [textSize 10]
         , spacer_ [width 3]

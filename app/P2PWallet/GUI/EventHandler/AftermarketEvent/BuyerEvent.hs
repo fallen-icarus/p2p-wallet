@@ -244,7 +244,7 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
           newCreation <- fromJustOrAppError "newBidCreation is Nothing" $ 
             aftermarketModel ^. #buyerModel % #newBidCreation
 
-          verifiedCreation <- fromRightOrAppError $ 
+          verifiedCreation@BidCreation{deposit} <- fromRightOrAppError $ 
             verifyNewBidCreation currentTime timeZone tickerMap newCreation
 
           -- There should only be one output in the `TxBody` for this action. The calculation must
@@ -268,7 +268,9 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
                 (emptyAftermarketBuilderModel & #bidCreations .~ 
                   [(0,verifiedCreation & #deposit .~ minUTxOValue1)])
 
-          return $ verifiedCreation & #deposit .~ minUTxOValue
+          return $ verifiedCreation & #deposit .~ 
+            -- Only replace the user specified deposit if the minUTxOValue is larger.
+            if minUTxOValue > deposit then minUTxOValue else deposit
       ]
     AddResult verifiedCreation ->
       -- Get the index for the new bid creation.
@@ -364,7 +366,7 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
             fromJustOrAppError "newBidUpdate is Nothing" $ 
               aftermarketModel ^. #buyerModel % #newBidUpdate
 
-          verifiedCreation <- fromRightOrAppError $ 
+          verifiedCreation@BidCreation{deposit} <- fromRightOrAppError $ 
             verifyNewBidCreation currentTime timeZone tickerMap newCreation
 
           -- Verify that the new utxo is not already being spent.
@@ -401,7 +403,9 @@ handleBuyerEvent model@AppModel{..} evt = case evt of
           return $ BidUpdate
             { oldBid = 
                 aftermarketUTxOToBidClose network alias stakeCredential stakeKeyDerivation utxoToClose
-            , newBid = verifiedCreation & #deposit .~ minUTxOValue
+            , newBid = verifiedCreation & #deposit .~
+                -- Only replace the user specified deposit if the minUTxOValue is larger.
+                if minUTxOValue > deposit then minUTxOValue else deposit
             }
       ]
     AddResult verifiedUpdate ->

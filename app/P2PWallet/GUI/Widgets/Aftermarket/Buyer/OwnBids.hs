@@ -419,6 +419,12 @@ ownBidsWidget model@AppModel{scene=_,..} =
                 , spacer_ [width 2]
                 , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
                     \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+                , filler
+                , label "Deposit:"
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , spacer_ [width 2]
+                , label (display $ Lovelace bidDeposit)
+                    `styleBasic` [textSize 8, textColor lightGray]
                 ]
             ] `styleBasic` 
                 [ padding 10
@@ -622,6 +628,12 @@ ownBidsWidget model@AppModel{scene=_,..} =
                 , spacer_ [width 2]
                 , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
                     \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+                , filler
+                , label "Deposit:"
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , spacer_ [width 2]
+                , label (display $ Lovelace bidDeposit)
+                    `styleBasic` [textSize 8, textColor lightGray]
                 ]
             ] `styleBasic` 
                 [ padding 10
@@ -941,6 +953,18 @@ updateClaimBidWidget model@AppModel{..} = do
             `styleFocus` [border 1 customBlue]
         , spacer_ [width 3]
         , helpButton claimExpirationMsg
+        ]
+    , spacer
+    , hstack
+        [ label "Bid Deposit:"
+            `styleBasic` [textSize 10]
+        , spacer
+        , textField_ (toLensVL $ maybeLens' % _2 % #deposit)
+            [placeholder "10.0"]
+            `styleBasic` [width 200, textSize 10, bgColor customGray1]
+            `styleFocus` [border 1 customBlue]
+        , spacer_ [width 3]
+        , helpButton bidDepositMsg
         ]
     , spacer
     , hstack

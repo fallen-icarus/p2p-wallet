@@ -4,6 +4,11 @@
 
 ### Features
 * Added total cpu and memory usage to builder logs.
+* Added ability for users to specify custom deposit amounts for Claim Bids. Since the bidder can
+technically walk away even after the seller accepts the bid, the deposit is used to compensate the
+seller if the bidder does walk away. If the deposit is too small, the seller may prefer not to
+accept Claim Bids since it means they will miss out on other, more committed, bidders. A large
+deposit can make sellers take the Claim Bids more seriously. 
 
 ### Fixes
 * Fixed aftermarket notification bug for expired claim bids.

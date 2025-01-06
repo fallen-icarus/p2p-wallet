@@ -93,6 +93,9 @@ data NewBidCreation = NewBidCreation
   , alias :: Text
   -- | Show the NFTs list to enable removing NFTs.
   , showNfts :: Bool
+  -- | The specified deposit for the bid UTxO. The buyer can deliberately use a larger deposit
+  -- to make their claim bid more attractive.
+  , deposit :: Text
   } deriving (Show,Eq)
 
 makeFieldLabelsNoPrefix ''NewBidCreation
@@ -110,6 +113,7 @@ instance Default NewBidCreation where
     , network = def
     , alias = ""
     , showNfts = False
+    , deposit = ""
     }
 
 -- | Create a fresh `NewBidCreation`.
@@ -170,6 +174,17 @@ verifyNewBidCreation currentTime timeZone tickerMap NewBidCreation{..} = do
     when (verifiedClaimExpiration <= currentTime) $
       Left "The claim expiration must be in the future."
 
+    verifiedDeposit <- 
+      if deposit /= "" 
+      then toLovelace <$> parseAda False deposit
+      else 
+        -- This will be overridden later. It is needed to represent the proper amount of bytes for
+        -- the deposit field in the datum since it will impact the final fee calculated. If the
+        -- calculated minUTxOValue is more than the amount specified, the specified amount will be
+        -- replaced by the calculated minUTxOValue. The minUTxOValue should always be more than 1
+        -- ADA so this dummy value should always be replaced.
+        Right 1_000_000
+
     return $ BidCreation
       { network = network
       , alias = alias
@@ -182,11 +197,7 @@ verifyNewBidCreation currentTime timeZone tickerMap NewBidCreation{..} = do
       , bid = sumNativeAssets verifiedPrice -- combine native asset quantities
       , bidExpiration = verifiedBidExpiration
       , claimExpiration = verifiedClaimExpiration
-      , deposit = 
-          -- This will be overridden later. It is needed to represent the proper amount of bytes 
-          -- for the fee field since it will impact the final fee calculated. This is necessary
-          -- since the deposit amount must also go in the sale datum.
-          9_999_999 
+      , deposit = verifiedDeposit
       }
 
   where
@@ -217,6 +228,7 @@ toNewBidCreation timeZone reverseTickerMap BidCreation{..} = NewBidCreation
   , bidExpiration = maybe "" (showDate timeZone) bidExpiration
   , claimExpiration = showDate timeZone claimExpiration
   , showNfts = False
+  , deposit = toText $ toAda deposit -- Show only the quantity of ADA; no ticker.
   }
 
 -------------------------------------------------

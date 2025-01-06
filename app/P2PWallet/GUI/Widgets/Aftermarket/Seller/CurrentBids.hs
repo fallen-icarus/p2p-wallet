@@ -369,6 +369,12 @@ currentBidsWidget model@AppModel{knownWallets,aftermarketModel,reverseTickerMap,
                 , spacer_ [width 2]
                 , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
                     \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+                , filler
+                , label "Deposit:"
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , spacer_ [width 2]
+                , label (display $ Lovelace bidDeposit)
+                    `styleBasic` [textSize 8, textColor lightGray]
                 ]
             ] `styleBasic` 
                 [ padding 10
@@ -529,6 +535,12 @@ currentBidsWidget model@AppModel{knownWallets,aftermarketModel,reverseTickerMap,
                 , spacer_ [width 2]
                 , vstack_ [childSpacing_ 3] $ for (groupInto 4 prices) $ 
                     \p -> hstack_ [childSpacing_ 3] $ map priceWidget p
+                , filler
+                , label "Deposit:"
+                    `styleBasic` [textSize 8, textColor lightGray]
+                , spacer_ [width 2]
+                , label (display $ Lovelace bidDeposit)
+                    `styleBasic` [textSize 8, textColor lightGray]
                 ]
             ] `styleBasic` 
                 [ padding 10

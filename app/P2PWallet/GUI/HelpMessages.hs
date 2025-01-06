@@ -1443,6 +1443,24 @@ claimExpirationMsg = unlines
   , "01/01/25"
   ]
 
+bidDepositMsg :: Text
+bidDepositMsg = unlines
+  [ unwords
+      [ "How large of a deposit would you like to use for the claim bid?"
+      , "Leave it blank to use just the minUTxOValue amount."
+      ]
+  , ""
+  , unwords
+      [ "If the deposit you specify is less than the required minUTxOValue, the deposit will be"
+      , "increased to the minUTxOValue amount."]
+  , ""
+  , unwords
+      [ "If you use a larger deposit, the seller will take your bid more seriously since walking"
+      , "away would be more costly to you. Otherwise, the seller may prefer not to accept"
+      , "Claim Bids."
+      ]
+  ]
+
 claimBidPaymentAddressMsg :: Text
 claimBidPaymentAddressMsg = unwords
   [ "Which payment address should the proceeds be sent to?"
