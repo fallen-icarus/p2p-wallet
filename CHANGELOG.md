@@ -18,6 +18,7 @@ monitors.
 markets.
 * Fixed formatting of bid creation menu when only a Claim Bid is possible.
 * Sale updates and bid updates were not counted as tx inputs by the builder.
+* ADA in the bid wasn't counting towards minUTxOValue when claiming NFTs from an accepted bid.
 
 ## 0.2.3
 

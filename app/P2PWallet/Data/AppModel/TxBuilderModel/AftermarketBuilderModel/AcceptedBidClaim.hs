@@ -82,7 +82,10 @@ updateAcceptedBidClaimDeposit i@AcceptedBidClaim{bidUTxO} calculatedDeposit
   | calculatedDeposit > actualDeposit = i & #extraPaymentDeposit .~ calculatedDeposit - actualDeposit
   | otherwise = i & #extraPaymentDeposit .~ 0
   where
-    actualDeposit = maybe 0 Lovelace $ aftermarketUTxOSellerDeposit bidUTxO
+    bidAmount = map toNativeAsset . view #unPrices <$> aftermarketUTxOBuyerPrice bidUTxO
+    lovelaceBid = bidAmount >>= find ((=="") . view #policyId)
+    sellerDeposit = maybe 0 Lovelace $ aftermarketUTxOSellerDeposit bidUTxO
+    actualDeposit = sellerDeposit + maybe 0 (Lovelace . view #quantity) lovelaceBid
 
 -- | Generate the deposit message.
 createAcceptedBidClaimDepositMsg :: AcceptedBidClaim -> Text
@@ -91,5 +94,5 @@ createAcceptedBidClaimDepositMsg AcceptedBidClaim{extraPaymentDeposit}
   | otherwise = unwords
       [ "The new payment UTxO requires an extra"
       , display extraPaymentDeposit
-      , "for the deposit. You will need to cover this in addition to the bid payment."
+      , "for the minUTxOValue. You will need to cover this in addition to the bid payment."
       ]
