@@ -1,6 +1,6 @@
 # Revision history for p2p-wallet
 
-## Next
+## 0.2.4
 
 ### Features
 * Added total cpu and memory usage to builder logs.
