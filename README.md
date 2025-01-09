@@ -39,7 +39,7 @@ Tutorial videos:
 - [DEX](https://youtu.be/mbK0-8hrb9g)
 - [Lending/Borrowing](https://youtu.be/W_4p1dZL-_U)
 - [Options Trading](https://youtu.be/rwCMtF4jyYo)
-- Aftermarket - TODO
+- [Aftermarket](https://youtu.be/jM-YejINLsE)
 
 ## Screenshots
 
