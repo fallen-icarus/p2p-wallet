@@ -1,0 +1,82 @@
+## appimage-builder recipe see https://appimage-builder.readthedocs.io for details
+version: 1
+
+## This step requires the p2p-wallet to be buildable by source on this system. That means the crypto
+## libraries, GLEW, and SDL2 must also be installed locally before the AppImage can be created.
+script:
+  ###############################################
+  ## Prepare the AppDir.
+  ###############################################
+  - rm -rf AppDir | true
+  - mkdir -p AppDir/usr/bin AppDir/usr/lib
+
+  ###############################################
+  ## Build the `p2p-wallet` executable.
+  ###############################################
+  - cabal update
+  - cabal build exe:p2p-wallet
+  - cp "$(cabal list-bin exe:p2p-wallet)" AppDir/usr/bin/
+
+  ###############################################
+  ## Download and configure `cardano-cli`.
+  ###############################################
+  # Download version 10.3.0.0
+  - curl -L https://github.com/IntersectMBO/cardano-cli/releases/download/cardano-cli-10.3.0.0/cardano-cli-10.3.0.0-x86_64-linux.tar.gz | tar zx -C AppDir/usr/bin/
+  # Drop the version suffix for the executable.
+  - mv AppDir/usr/bin/cardano-cli* AppDir/usr/bin/cardano-cli
+  # Make it executable by the AppImage.
+  - chmod +x AppDir/usr/bin/cardano-cli
+
+  ###############################################
+  ## Download and configure `cardano-hw-cli`.
+  ###############################################
+  # Download version 1.17.0
+  - curl -L https://github.com/vacuumlabs/cardano-hw-cli/releases/download/v1.17.0/cardano-hw-cli-1.17.0_linux-x64.tar.gz | tar zx -C AppDir/usr/bin/
+  # Rename the sub-directory since it shares a name with the executable found inside it.
+  - mv AppDir/usr/bin/cardano-hw-cli/ AppDir/usr/bin/cardano-hw-cli-dir/
+  # Move everything out of the sub-directory.
+  - mv AppDir/usr/bin/cardano-hw-cli-dir/* AppDir/usr/bin/
+  # Delete the sub-directory.
+  - rm -r AppDir/usr/bin/cardano-hw-cli-dir/
+  # Make it executable by the AppImage.
+  - chmod +x AppDir/usr/bin/cardano-hw-cli
+
+  ###############################################
+  ## `libsodium` and `secp256k1`
+  ###############################################
+  ## The locally installed files are copied here for symlinking within the AppImage.
+  ## `libblst` wasn't listed as needed by the `ldd p2p-wallet` command.
+  - cp /usr/local/lib/libsodium.so.* AppDir/usr/lib/
+  - cp /usr/local/lib/libsecp256k1.so.* AppDir/usr/lib/
+
+AppDir:
+  path: ./AppDir
+  app_info:
+    id: p2p-wallet
+    name: p2p-wallet
+    version: 0.2.4
+    exec: usr/bin/p2p-wallet
+    exec_args: $@
+  apt:
+    arch: amd64
+    sources:
+      ## Make sure to use the same repositories as used by the os to build the `p2p-wallet`. The
+      ## `p2p-wallet` is going to expect specific versions of GLEW and SDL2 based on what was
+      ## available on the os at build time.
+      - sourceline: 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ focal main restricted universe multiverse'
+    include:
+      - libglew-dev
+      - libsdl2-dev
+  runtime:
+    env:
+      ## Need to make `cardano-cli` and `cardano-hw-cli` available to the AppImage.
+      PATH: $APPDIR/usr/bin:$PATH
+      ## Need to make sure the AppImage looks in the packaged dependencies before checking the
+      ## os-installed ones.
+      APPDIR_LIBRARY_PATH: $APPDIR/usr/lib:$APPDIR/lib/x86_64-linux-gnu:$APPDIR/usr/lib/x86_64-linux-gnu:$APPDIR/usr/lib/x86_64-linux-gnu/pulseaudio
+      LD_LIBRARY_PATH: $APPDIR/usr/lib:$LD_LIBRARY_PATH
+      PKG_CONFIG_PATH: $APPDIR/usr/lib/pkgconfig:$PKG_CONFIG_PATH
+
+AppImage:
+  arch: x86_64
+  update-information: none
