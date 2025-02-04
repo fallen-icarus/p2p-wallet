@@ -259,6 +259,14 @@ from 0.5 ADA to 1.7 ADA. It tripled despite Alice personally cutting costs by 66
 
 ## Installing
 
+> [!TIP]
+> There is an AppImage you can download from the releases page that should work on Linux and Windows
+> (using WSL2). To run the AppImage:
+> - make sure `libfuse2` is installed with `sudo apt install libfuse2`
+> - configure the required [udev-rules](#udev-rules-linux-only) for your hardware wallet
+> - make the AppImage executable
+> That's it! You can double-click on the AppImage to run it.
+
 The P2P-DeFi Wallet is a cross-platform GUI wrapper around
 [cardano-cli](https://github.com/IntersectMBO/cardano-cli) and
 [cardano-hw-cli](https://github.com/vacuumlabs/cardano-hw-cli). It should work on Windows, macOS,
