@@ -265,7 +265,7 @@ from 0.5 ADA to 1.7 ADA. It tripled despite Alice personally cutting costs by 66
 > (using WSL2). To run the AppImage:
 > - Make sure [Fuse2](https://github.com/AppImage/AppImageKit/wiki/FUSE) is installed. It may
 >   already be installed on you operating system.
-> - Configure the required [udev-rules](#udev-rules-linux-only) for your hardware wallet.
+> - Configure the required [udev-rules](#udev-rules---linux-only) for your hardware wallet.
 > - Make the AppImage executable.
 > That's it! You can double-click on the AppImage to run it.
 >
