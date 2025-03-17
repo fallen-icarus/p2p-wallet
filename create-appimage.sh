@@ -65,6 +65,7 @@ cp /lib/x86_64-linux-gnu/libGLEW.so.2.2 AppDir/usr/lib/
 cp /lib/x86_64-linux-gnu/libGLU.so.1 AppDir/usr/lib/
 cp /lib/x86_64-linux-gnu/libSDL2-2.0.so.0 AppDir/usr/lib/
 cp /lib/x86_64-linux-gnu/libXcursor.so.1 AppDir/usr/lib/
+cp /lib/x86_64-linux-gnu/libXss.so.1 AppDir/usr/lib/ # Missing on Fedora.
 cp /lib/x86_64-linux-gnu/libasyncns.so.0 AppDir/usr/lib/
 cp /lib/x86_64-linux-gnu/libdecor-0.so.0 AppDir/usr/lib/
 cp /lib/x86_64-linux-gnu/libogg.so.0 AppDir/usr/lib/
