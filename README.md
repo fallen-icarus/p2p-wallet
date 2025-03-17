@@ -16,6 +16,7 @@ compositions.
 - [The P2P-DeFi Wallet](#the-p2p-defi-wallet)
 - [FAQ](#faq)
 - [Installing](#installing)
+- [Creating Your Own AppImage](#creating-your-own-appimage)
 
 ## Abstract
 
@@ -262,10 +263,13 @@ from 0.5 ADA to 1.7 ADA. It tripled despite Alice personally cutting costs by 66
 > [!TIP]
 > There is an AppImage you can download from the releases page that should work on Linux and Windows
 > (using WSL2). To run the AppImage:
-> - make sure `libfuse2` is installed with `sudo apt install libfuse2`
-> - configure the required [udev-rules](#udev-rules-linux-only) for your hardware wallet
-> - make the AppImage executable
+> - Make sure [Fuse2](https://github.com/AppImage/AppImageKit/wiki/FUSE) is installed. It may
+>   already be installed on you operating system.
+> - Configure the required [udev-rules](#udev-rules-linux-only) for your hardware wallet.
+> - Make the AppImage executable.
 > That's it! You can double-click on the AppImage to run it.
+>
+> To see how the AppImage was created, checkout [create-appimage.sh](create-appimage.sh).
 
 The P2P-DeFi Wallet is a cross-platform GUI wrapper around
 [cardano-cli](https://github.com/IntersectMBO/cardano-cli) and
@@ -501,3 +505,19 @@ cp "$(cabal list-bin exe:p2p-wallet)" $HOME #This command may take a few seconds
 ```
 
 It can be opened by double-clicking on it. Enjoy!
+
+## Creating Your Own AppImage
+
+> [!IMPORTANT]
+> This step requires you to build the p2p-wallet from source so that you can add it to the
+> AppImage. Make sure to follow the [Installing](#installing) and
+> [Building From Source](#building-from-source) instructions before trying to create your own AppImage.
+
+You will need to download the [appimagetool](https://github.com/AppImage/appimagetool). Then all
+you need to do is run [create-appimage.sh](create-appimage.sh)!
+
+> [!TIP]
+> If you run into any errors trying to use the new AppImage, compare the output of
+> `ldd $(cabal list-bin exe:p2p-wallet)` with the system files being copied starting line 63 of
+> [create-appimage.sh](create-appimage.sh). You don't need to include all of the files output by
+> `ldd`, just the ones the AppImage can't find at run-time. Make sure the versions are correct!
