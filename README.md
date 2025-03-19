@@ -267,9 +267,9 @@ from 0.5 ADA to 1.7 ADA. It tripled despite Alice personally cutting costs by 66
 >   already be installed on you operating system.
 > - Configure the required [udev-rules](#udev-rules---linux-only) for your hardware wallet.
 > - Make the AppImage executable.
-> That's it! You can double-click on the AppImage to run it.
 >
-> To see how the AppImage was created, checkout [create-appimage.sh](create-appimage.sh).
+> That's it! You can double-click on the AppImage to run it. To see how the AppImage was created,
+> checkout [create-appimage.sh](create-appimage.sh).
 
 The P2P-DeFi Wallet is a cross-platform GUI wrapper around
 [cardano-cli](https://github.com/IntersectMBO/cardano-cli) and
