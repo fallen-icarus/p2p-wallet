@@ -1,5 +1,10 @@
 # Revision history for p2p-wallet
 
+## 0.2.5
+
+This version is the same as 0.2.4 except it also contains documentation for the new AppImage. A new
+tag was needed so that the Github Release would link to the right commit.
+
 ## 0.2.4
 
 ### Features
