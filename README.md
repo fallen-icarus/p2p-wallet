@@ -261,8 +261,9 @@ from 0.5 ADA to 1.7 ADA. It tripled despite Alice personally cutting costs by 66
 ## Installing
 
 > [!TIP]
-> There is an AppImage you can download from the releases page that should work on Linux and Windows
-> (using WSL2). To run the AppImage:
+> There is an AppImage you can download from the
+> [releases page](https://github.com/fallen-icarus/p2p-wallet/releases)
+> that should work on Linux and Windows (using WSL2). To run the AppImage:
 > - Make sure [Fuse2](https://github.com/AppImage/AppImageKit/wiki/FUSE) is installed. It may
 >   already be installed on you operating system.
 > - Configure the required [udev-rules](#udev-rules---linux-only) for your hardware wallet.
