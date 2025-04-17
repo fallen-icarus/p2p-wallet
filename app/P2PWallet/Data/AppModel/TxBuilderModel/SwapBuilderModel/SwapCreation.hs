@@ -256,20 +256,8 @@ toNewSwapCreation :: ReverseTickerMap -> SwapCreation -> NewSwapCreation
 toNewSwapCreation reverseTickerMap SwapCreation{..} = NewSwapCreation
   { paymentAddress = paymentAddress
   , swapType = swapType
-  , offerAsset = 
-      -- Set the offer asset quantity back to zero since another field will contain it. This 
-      -- depends on whether the trading pair is inverted.
-      if tradingPairInverted then
-        OfferAsset $ unAskAsset askAsset & #quantity .~ 0
-      else
-        offerAsset & #unOfferAsset % #quantity .~ 0
-  , askAsset = 
-      -- Set the ask asset quantity back to zero since another field will contain it. This 
-      -- depends on whether the trading pair is inverted.
-      if tradingPairInverted then
-        AskAsset $ unOfferAsset offerAsset & #quantity .~ 0
-      else
-        askAsset & #unAskAsset % #quantity .~ 0
+  , offerAsset = offerAsset
+  , askAsset = askAsset
   , offerQuantity = 
       -- Format the asset quantity. This depends on whether the trading pair is inverted.
       if tradingPairInverted then

@@ -1,5 +1,10 @@
 # Revision history for p2p-wallet
 
+## Next
+
+### Fixes
+* Editing a limit order creation to sell would mess up the units ([#14](https://github.com/fallen-icarus/p2p-wallet/issues/14)).
+
 ## 0.2.5
 
 This version is the same as 0.2.4 except it also contains documentation for the new AppImage. A new
