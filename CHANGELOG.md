@@ -1,6 +1,6 @@
 # Revision history for p2p-wallet
 
-## Next
+## 0.2.6
 
 ### Fixes
 * Editing a limit order creation to sell would mess up the units ([#14](https://github.com/fallen-icarus/p2p-wallet/issues/14)).
