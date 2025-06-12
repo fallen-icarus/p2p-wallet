@@ -100,8 +100,10 @@ openAsksWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,con
                 [ box_ [alignTop] $ label "Offered Collateral:"
                     `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
                 , spacer_ [width 3]
-                , vstack_ [childSpacing_ 3] $ for (groupInto 4 offeredCollateral) $ 
-                    \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
+                , if null offeredCollateral 
+                  then label "Unsecured" `styleBasic` [paddingT 3, textSize 8, textFont "Bold", textColor customRed]
+                  else vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+                         \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
                 ]
             ] `styleBasic` 
                   [ padding 10

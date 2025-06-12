@@ -1,5 +1,16 @@
 # Revision history for p2p-wallet
 
+## 0.3.0
+
+> [!WARNING]
+> This is a breaking change in the Lender/Borrower history! Since this is just a prototype on
+> testnet, backwards compatibility is not a goal. If you have any loan requests, loan offers, or
+> active loans open, **close them before upgrading to this version**.
+
+### Features
+
+* Added support for unsecured loans. See this [blog post](https://github.com/fallen-icarus/meditations-blog/blob/main/How%20to%20Bank%20the%20Unbanked/README.md) for details.
+
 ## 0.2.6
 
 ### Fixes

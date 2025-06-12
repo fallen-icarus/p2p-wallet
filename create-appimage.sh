@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## The latest p2p-wallet version number.
-wallet_version=0.2.6
+wallet_version=0.3.0
 
 ## Prepare the AppDir. Remove the old one if it still exists.
 rm -rf AppDir

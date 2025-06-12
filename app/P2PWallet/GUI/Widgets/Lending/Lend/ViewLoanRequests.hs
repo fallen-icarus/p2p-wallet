@@ -282,8 +282,10 @@ allAsksWidget AppModel{lendingModel=LendingModel{lendModel},reverseTickerMap} = 
                 [ box_ [alignTop] $ label "Offered Collateral:"
                     `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
                 , spacer_ [width 3]
-                , vstack_ [childSpacing_ 3] $ for (groupInto 4 offeredCollateral) $ 
-                    \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
+                , if null offeredCollateral 
+                  then label "Unsecured" `styleBasic` [paddingT 3, textSize 8, textFont "Bold", textColor customRed]
+                  else vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+                         \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
                 ]
             ] `styleBasic` 
                   [ padding 10
@@ -1087,8 +1089,10 @@ creditHistoryField target historyEvt AppModel{..} = do
             , box_ [alignTop] $ label "Collateralization:"
                 `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
-                \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
+            , if null collateralPrices 
+              then label "Unsecured" `styleBasic` [paddingT 3, textSize 8, textFont "Bold", textColor customRed]
+              else vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
+                     \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
             ]
         , widgetIf isDefault $ vstack
             [ spacer_ [width 1]
@@ -1197,8 +1201,10 @@ openAsksField target AppModel{..} = do
             [ box_ [alignTop] $ label "Offered Collateral:"
                 `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 4 offeredCollateral) $ 
-                \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
+            , if null offeredCollateral 
+              then label "Unsecured" `styleBasic` [paddingT 3, textSize 8, textFont "Bold", textColor customRed]
+              else vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+                     \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
             ]
         ] `styleBasic` 
               [ padding 10
@@ -1411,8 +1417,10 @@ currentOffersField target AppModel{..} = do
             , box_ [alignTop] $ label "Collateralization:"
                 `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
-                \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
+            , if null collateralPrices 
+              then label "Unsecured" `styleBasic` [paddingT 3, textSize 8, textFont "Bold", textColor customRed]
+              else vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
+                     \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
             ]
         ] `styleBasic` 
               [ padding 10
@@ -1626,8 +1634,12 @@ activeLoansField target historyEvt AppModel{..} = do
                         ]
                 , spacer_ [width 2]
                 ]
-            , box_ [alignTop] $ label "Locked Collateral:"
-                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+            , box_ [alignTop] $ 
+                let msg = if null $ Loans.unCollateralization collateralization
+                          then "Deposit:"
+                          else "Locked Collateral:"
+                 in label msg
+                      `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 lockedCollateral) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map lockedCollateralWidget col

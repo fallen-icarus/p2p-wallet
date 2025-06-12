@@ -445,8 +445,12 @@ inspectLoanWidget model@AppModel{lendingModel=LendingModel{..},scene=_,..} = do
                         ]
                 , spacer_ [width 2]
                 ]
-            , box_ [alignTop] $ label "Locked Collateral:"
-                `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+            , box_ [alignTop] $ 
+                let msg = if null $ Loans.unCollateralization collateralization
+                          then "Deposit:"
+                          else "Locked Collateral:"
+                 in label msg
+                      `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
             , vstack_ [childSpacing_ 3] $ for (groupInto 3 lockedCollateral) $ 
                 \col -> hstack_ [childSpacing_ 3] $ map lockedCollateralWidget col

@@ -192,23 +192,24 @@ verifyNewLoanPayment reverseTickerMap tickerMap currentTime NewLoanPayment{..} =
     verifiedCollateral <-
       mapM (parseNativeAssets tickerMap mempty) $ lines collateralBalances
 
-    let LoanUTxO{lovelace,nativeAssets} = activeUTxO
-        startingCollateralValue = relativeCollateral $
-          (lovelaceAsNativeAsset & #quantity .~ unLovelace lovelace) : nativeAssets
-        endingCollateralValue = relativeCollateral verifiedCollateral
-        collateralRatio = 
-          abs (startingCollateralValue - endingCollateralValue) / startingCollateralValue
-        paymentRatio = payment / startingBalance
-        -- Collateral Taken / Starting Collateral <= Payment Amount / Starting Balance
-        isValidCollateralization = collateralRatio <= paymentRatio
+    unless (null $ Loans.unCollateralization collateralization) $ do
+      let LoanUTxO{lovelace,nativeAssets} = activeUTxO
+          startingCollateralValue = relativeCollateral $
+            (lovelaceAsNativeAsset & #quantity .~ unLovelace lovelace) : nativeAssets
+          endingCollateralValue = relativeCollateral verifiedCollateral
+          collateralRatio = 
+            abs (startingCollateralValue - endingCollateralValue) / startingCollateralValue
+          paymentRatio = payment / startingBalance
+          -- Collateral Taken / Starting Collateral <= Payment Amount / Starting Balance
+          isValidCollateralization = collateralRatio <= paymentRatio
 
-    -- Check that enough collateral is being supplied.
-    unless isValidCollateralization $ Left $ unwords
-      [ "Not enough collateral left after payment."
-      , "You must leave at least"
-      , displayPercentage (1 - paymentRatio) <> "%"
-      , "of the relative collateral value."
-      ]
+      -- Check that enough collateral is being supplied.
+      unless isValidCollateralization $ Left $ unwords
+        [ "Not enough collateral left after payment."
+        , "You must leave at least"
+        , displayPercentage (1 - paymentRatio) <> "%"
+        , "of the relative collateral value."
+        ]
 
     return $ LoanPayment
       { collateralBalances = verifiedCollateral
