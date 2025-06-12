@@ -310,8 +310,12 @@ activeLoansWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap,
                             ]
                     , spacer_ [width 2]
                     ]
-                , box_ [alignTop] $ label "Locked Collateral:"
-                    `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
+                , box_ [alignTop] $ 
+                    let msg = if null $ Loans.unCollateralization collateralization
+                              then "Deposit:"
+                              else "Locked Collateral:"
+                     in label msg
+                          `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
                 , spacer_ [width 3]
                 , vstack_ [childSpacing_ 3] $ for (groupInto 3 lockedCollateral) $ 
                     \col -> hstack_ [childSpacing_ 3] $ map lockedCollateralWidget col
@@ -399,26 +403,29 @@ makePaymentWidget AppModel{..} = do
                     `styleBasic` [radius 5, padding 5, bgColor customGray1]
                     `styleHover` [bgColor customBlue, cursorIcon CursorHand]
               , filler
-              , label ("Collateral Unlocked: " <> prettyRatio)
-                  `styleBasic` [textSize 12]
+              , widgetIf (not $ null collateralPrices) $
+                  label ("Collateral Unlocked: " <> prettyRatio)
+                    `styleBasic` [textSize 12]
               ]
-          , spacer
-          , label "Collateral Rates:"
-              `styleBasic` [textSize 12]
-          , spacer
-          , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
-              \col -> hstack_ [childSpacing_ 3] $ [spacer] <> map (collateralAssetWidget loanBalance) col
-          , spacer
-          , hstack
-              [ label "Remaining Collateral Assets (separated with newlines):"
+          , widgetIf (not $ null collateralPrices) $ vstack
+              [ spacer
+              , label "Collateral Rates:"
                   `styleBasic` [textSize 12]
-              , spacer_ [width 3]
-              , helpButton paymentCollateralAmountsMsg
+              , spacer
+              , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
+                  \col -> hstack_ [childSpacing_ 3] $ [spacer] <> map (collateralAssetWidget loanBalance) col
+              , spacer
+              , hstack
+                  [ label "Remaining Collateral Assets (separated with newlines):"
+                      `styleBasic` [textSize 12]
+                  , spacer_ [width 3]
+                  , helpButton paymentCollateralAmountsMsg
+                  ]
+              , spacer
+              , textArea (toLensVL $ maybeLens' % #collateralBalances)
+                  `styleBasic` [height 180, textSize 10, bgColor customGray1]
+                  `styleFocus` [border 1 customBlue]
               ]
-          , spacer
-          , textArea (toLensVL $ maybeLens' % #collateralBalances)
-              `styleBasic` [height 180, textSize 10, bgColor customGray1]
-              `styleFocus` [border 1 customBlue]
           , spacer
           , box_ [alignRight] $ 
               hstack

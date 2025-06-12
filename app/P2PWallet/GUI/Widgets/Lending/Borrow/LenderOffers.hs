@@ -270,8 +270,10 @@ lenderOffersWidget model@AppModel{lendingModel=LendingModel{..},reverseTickerMap
                 , box_ [alignTop] $ label "Collateralization:"
                     `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
                 , spacer_ [width 3]
-                , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
-                    \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
+                , if null collateralPrices 
+                  then label "Unsecured" `styleBasic` [paddingT 3, textSize 8, textFont "Bold", textColor customRed]
+                  else vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
+                         \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
                 ]
             ] `styleBasic` 
                   [ padding 10
@@ -377,8 +379,10 @@ chooseAskWidget AppModel{..} = do
             [ box_ [alignTop] $ label "Offered Collateral:"
                 `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 4 offeredCollateral) $ 
-                \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
+            , if null offeredCollateral 
+              then label "Unsecured" `styleBasic` [paddingT 3, textSize 8, textFont "Bold", textColor customRed]
+              else vstack_ [childSpacing_ 3] $ for (groupInto 3 offeredCollateral) $ 
+                     \asset -> hstack_ [childSpacing_ 3] $ map collateralAssetWidget asset
             ]
         ] `styleBasic` 
             [ padding 10
@@ -404,8 +408,11 @@ specifyCollateralWidget AppModel{..} = do
     vstack
       [ centerWidget $ vstack
           [ centerWidgetH $
-              label "Specify your collateral"
-                `styleBasic` [textFont "Italics", textColor customBlue]
+              if null collateralPrices
+              then label "Accept Unsecured Loan?"
+                     `styleBasic` [textFont "Italics", textColor customBlue]
+              else label "Specify your collateral"
+                     `styleBasic` [textFont "Italics", textColor customBlue]
           , label ("Loan Amount: " <> showAssetBalance True reverseTickerMap loanAmount)
               `styleBasic` [textSize 12]
           , spacer
@@ -426,33 +433,41 @@ specifyCollateralWidget AppModel{..} = do
               , spacer_ [width 3]
               , label "Collateral Rates:"
                   `styleBasic` [textSize 12]
+              , widgetIf (null collateralPrices) $
+                  hstack
+                    [ spacer
+                    , label "Unsecured"
+                      `styleBasic` [textSize 12, textColor customRed, textFont "Bold"]
+                    ]
               ]
-          , spacer_ [width 3]
-          , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
-              \col -> hstack_ [childSpacing_ 3] $ [spacer] <> map (collateralAssetWidget loanAmount) col
-          , spacer
-          , hstack
-              [ box_ [alignMiddle, onClick $ Alert collateralAmountsMsg] $
-                  label helpIcon
-                    `styleBasic`
-                      [ border 0 transparent
-                      , radius 20
-                      , bgColor transparent
-                      , textColor customBlue
-                      , textMiddle
-                      , textFont "Remix"
-                      , textSize 10
-                      , padding 2
-                      ]
-                    `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+          , widgetIf (not $ null collateralPrices) $ vstack
+              [ spacer_ [width 3]
+              , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
+                  \col -> hstack_ [childSpacing_ 3] $ [spacer] <> map (collateralAssetWidget loanAmount) col
+              , spacer
+              , hstack
+                  [ box_ [alignMiddle, onClick $ Alert collateralAmountsMsg] $
+                      label helpIcon
+                        `styleBasic`
+                          [ border 0 transparent
+                          , radius 20
+                          , bgColor transparent
+                          , textColor customBlue
+                          , textMiddle
+                          , textFont "Remix"
+                          , textSize 10
+                          , padding 2
+                          ]
+                        `styleHover` [bgColor customGray2, cursorIcon CursorHand]
+                  , spacer_ [width 3]
+                  , label "Collateral Assets (separated with newlines):"
+                      `styleBasic` [textSize 12]
+                  ]
               , spacer_ [width 3]
-              , label "Collateral Assets (separated with newlines):"
-                  `styleBasic` [textSize 12]
+              , textArea (toLensVL $ maybeLens' % #collateralAmounts)
+                  `styleBasic` [height 180, textSize 10, bgColor customGray1]
+                  `styleFocus` [border 1 customBlue]
               ]
-          , spacer_ [width 3]
-          , textArea (toLensVL $ maybeLens' % #collateralAmounts)
-              `styleBasic` [height 180, textSize 10, bgColor customGray1]
-              `styleFocus` [border 1 customBlue]
           , spacer
           , box_ [alignRight] $ 
               hstack

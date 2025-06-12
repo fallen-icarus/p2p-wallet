@@ -150,8 +150,9 @@ verifyNewOfferAcceptance tickerMap currentTime NewOfferAcceptance{..} = do
     verifiedCollateral <- mapM (parseNativeAssets tickerMap mempty) $ lines collateralAmounts
 
     -- Check that enough collateral is being supplied.
-    when (toRational loanPrincipal > relativeCollateral verifiedCollateral) $
-      Left "Not enough collateral specified."
+    unless (null cs) $
+      when (toRational loanPrincipal > relativeCollateral verifiedCollateral) $
+        Left "Not enough collateral specified."
 
     return $ OfferAcceptance
       { collateralAmounts = verifiedCollateral

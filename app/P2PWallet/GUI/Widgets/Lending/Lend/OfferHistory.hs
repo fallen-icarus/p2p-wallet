@@ -614,8 +614,10 @@ offerInputs AppModel{..} = do
             , box_ [alignTop] $ label "Collateralization:"
                 `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
-                \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
+            , if null collateralPrices 
+              then label "Unsecured" `styleBasic` [paddingT 3, textSize 8, textFont "Bold", textColor customRed]
+              else vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
+                     \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
             ]
         ] `styleBasic` 
               [ padding 10
@@ -842,8 +844,10 @@ offerOutputs AppModel{..} = do
             , box_ [alignTop] $ label "Collateralization:"
                 `styleBasic` [paddingT 3, textSize 8, textColor lightGray]
             , spacer_ [width 3]
-            , vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
-                \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
+            , if null collateralPrices 
+              then label "Unsecured" `styleBasic` [paddingT 3, textSize 8, textFont "Bold", textColor customRed]
+              else vstack_ [childSpacing_ 3] $ for (groupInto 3 collateralPrices) $ 
+                     \col -> hstack_ [childSpacing_ 3] $ map (collateralAssetWidget loanAmount) col
             ]
         ] `styleBasic` 
               [ padding 10

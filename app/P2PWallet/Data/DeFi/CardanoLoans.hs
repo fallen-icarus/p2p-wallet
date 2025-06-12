@@ -978,11 +978,11 @@ loanScriptTestnetRef =
 
 negotiationBeaconScriptTestnetRef :: TxOutRef
 negotiationBeaconScriptTestnetRef = 
-  TxOutRef "1cf071ff8dd90288de651fd6b774f1e6cc4959faf52cb1261b9b429b1710f8f1" 0
+  TxOutRef "aae9b47200c5eb99d8cdc07297d50ad47a939e90bec6123fe275d8d7676385d0" 0
 
 activeBeaconScriptTestnetRef :: TxOutRef
 activeBeaconScriptTestnetRef = 
-  TxOutRef "7d85aa644fece35ce4d22a5968f08b7f8bd90d83a51ba011f920324afc59f1b0" 0
+  TxOutRef "5abff02703cb285c3a6381ae0e9c16eee8381a04a7c5f18f05b735b5c4823530" 0
 
 paymentObserverScriptTestnetRef :: TxOutRef
 paymentObserverScriptTestnetRef = 

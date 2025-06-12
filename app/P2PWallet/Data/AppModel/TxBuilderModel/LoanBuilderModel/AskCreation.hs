@@ -129,8 +129,6 @@ verifyNewAskCreation tickerMap NewAskCreation{..} = do
   -- Check that the assets are valid. Returns the first error, if any. No fingerprints can be used.
   verifiedCollateral <- mapM (parseNativeAssetName tickerMap) $ lines collateral
 
-  when (null verifiedCollateral) $ Left "At least one asset must be specified for collateral."
-
   -- Check that the loan term is valid.
   when (loanTerm <= 0) $ Left "Number of days must be greater than 0."
 

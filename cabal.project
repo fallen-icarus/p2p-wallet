@@ -53,8 +53,8 @@ source-repository-package
 source-repository-package
     type: git
     location: https://github.com/fallen-icarus/cardano-loans
-    -- v2.0.0.0rc
-    tag: f44266b8ae567fa4803421a626519d44ed48955a
+    -- v3.0.0.0rc
+    tag: 1890f6f1ea74599615b0dea5829fffaed6ea9200
 
 source-repository-package
     type: git

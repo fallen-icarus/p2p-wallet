@@ -672,7 +672,7 @@ askCollateralMsg :: Text
 askCollateralMsg = unlines
   [ unwords
       [ "Which assets are you willing to use for collateral? Not all assets you list here must be"
-      , "used when you actually accept an offer."
+      , "used when you actually accept an offer. Leave the box blank to ask for an unsecured loan."
       ]
   , ""
   , "The asset name must be in one of the following formats:"
@@ -685,10 +685,10 @@ askCollateralMsg = unlines
   , "The Ask UTxO must be stored with at least one unit of each asset you list here."
   , ""
   , unwords
-      [ "It is highly advisable to always include ada as collateral! Since all Cardano UTxOs require"
-      , "a minimum amount of ada, this minUTxOValue of ada will only count towards your collateral if"
-      , "ada is specified as collateral. Otherwise, you will effectively have to cover the"
-      , "the minUTxOValue in addition to the collateral."
+      [ "Unless you are asking for an unsecured loan, it is highly advisable to always include ada as"
+      , "collateral! Since all Cardano UTxOs require a minimum amount of ada, this minUTxOValue of ada"
+      , "will only count towards your collateral if ada is specified as collateral. Otherwise, you will"
+      , "effectively have to cover the minUTxOValue in addition to the collateral."
       ]
   ]
 
@@ -906,7 +906,7 @@ offerExpirationMsg = unlines
 
 offerCollateralMsg :: Text
 offerCollateralMsg = unlines
-  [ "What are the relative values of each collateral asset?"
+  [ "What are the relative values of each collateral asset? Leave blank to offer an unsecured loan."
   , ""
   , unwords
       [ "The pairings must be separated with newlines and each pairing must be in the"
